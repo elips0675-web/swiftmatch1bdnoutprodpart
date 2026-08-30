@@ -81,8 +81,13 @@ const HANGOUT_LIST_SELECT = `
          h.place_name, h.place_address, h.city, h.lat, h.lng, h.event_date,
          h.max_companions, h.hangout_type, h.status, h.created_at,
          up.display_name, up.avatar_url, up.age, up.online,
+         po.id AS offer_id, po.title AS offer_title, po.price AS offer_price,
+         po.image_url AS offer_image_url, po.deeplink AS offer_deeplink,
+         po.category AS offer_category, po.city AS offer_city, po.valid_to AS offer_valid_to,
          (SELECT COUNT(*) FROM hangout_responses hr WHERE hr.hangout_id = h.id AND hr.status = 'accepted') AS accepted_count,
          (SELECT COUNT(*) FROM hangout_participants hp WHERE hp.hangout_id = h.id AND hp.status = 'joined') AS participant_count`
+
+const JOIN_PARTNER_OFFER = `LEFT JOIN partner_offers po ON po.id = h.partner_offer_id`
 
 // ─── Feed ──────────────────────────────────────────────────────
 router.get('/api/hangouts', optionalAuth, async (req, res) => {
@@ -137,6 +142,7 @@ router.get('/api/hangouts', optionalAuth, async (req, res) => {
     const sql = `${HANGOUT_LIST_SELECT}${distanceExpr}
                  FROM hangouts h
                  JOIN user_profiles up ON up.id = h.user_id
+                 ${JOIN_PARTNER_OFFER}
                  WHERE ${where.join(' AND ')}
                  ${having}
                  ORDER BY h.event_date ASC
@@ -157,6 +163,7 @@ router.get('/api/hangouts/my', auth, async (req, res) => {
       `${HANGOUT_LIST_SELECT}
        FROM hangouts h
        JOIN user_profiles up ON up.id = h.user_id
+       ${JOIN_PARTNER_OFFER}
        WHERE h.user_id = ?
        ORDER BY h.event_date DESC`,
       [req.userId],
@@ -203,6 +210,7 @@ router.get('/api/hangouts/:id', optionalAuth, async (req, res) => {
          (SELECT hp2.status FROM hangout_participants hp2 WHERE hp2.hangout_id = h.id AND hp2.user_id = ? LIMIT 1) AS my_participant_status
      FROM hangouts h
      JOIN user_profiles up ON up.id = h.user_id
+     ${JOIN_PARTNER_OFFER}
      WHERE h.id = ?`
     const [rows] = await pool.query(sql, [req.userId || 0, req.userId || 0, req.userId || 0, id])
     if (rows.length === 0) return res.status(404).json({ message: 'Hangout not found' })

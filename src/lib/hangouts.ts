@@ -78,6 +78,14 @@ export interface Hangout {
   chat_id?: number | null
   responses?: HangoutResponse[]
   participants?: HangoutParticipant[]
+  offer_id?: number | null
+  offer_title?: string | null
+  offer_price?: string | number | null
+  offer_image_url?: string | null
+  offer_deeplink?: string | null
+  offer_category?: string | null
+  offer_city?: string | null
+  offer_valid_to?: string | null
 }
 
 export interface MyHangoutResponse {

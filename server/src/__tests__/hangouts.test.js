@@ -145,6 +145,16 @@ describe('GET /api/hangouts (feed)', () => {
     const sql = pool.query.mock.calls[0][0]
     expect(sql).not.toContain('h.title LIKE ?')
   })
+
+  it('joins partner offer and returns offer fields', async () => {
+    pool.query.mockResolvedValueOnce([[{ id: 1, title: 'Cinema', offer_id: 12, offer_price: '500.00' }], []])
+    const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts')
+    expect(res.status).toBe(200)
+    const sql = pool.query.mock.calls[0][0]
+    expect(sql).toContain('LEFT JOIN partner_offers po ON po.id = h.partner_offer_id')
+    expect(sql).toContain('po.id AS offer_id')
+    expect(res.body[0]).toMatchObject({ offer_id: 12, offer_price: '500.00' })
+  })
 })
 
 describe('POST /api/hangouts', () => {

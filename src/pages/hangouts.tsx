@@ -11,7 +11,7 @@ import { useLanguage } from "@/context/language-context";
 import { useFeatureFlags } from "@/context/feature-flags-context";
 import { getToken } from "@/lib/token";
 import { HANGOUT_CATEGORIES, formatEventDate, type Hangout, type HangoutType } from "@/lib/hangouts";
-import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X } from "lucide-react";
+import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X, Ticket } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const categoryIcon = (category: string) => {
@@ -77,11 +77,38 @@ function formatHumanDate(value: string, t: (key: string) => string): string {
 function HangoutCard({ hangout }: { hangout: Hangout }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const [buying, setBuying] = useState(false);
   const Icon = categoryIcon(hangout.category);
   const isDate = hangout.hangout_type === 'date';
 
   const navigateProfile = (h: Hangout) => {
     if (h.author_id) navigate(`/profile/${h.author_id}`);
+  };
+
+  const buyTicket = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!hangout.offer_id || buying) return;
+    const token = getToken();
+    setBuying(true);
+    try {
+      const res = await fetch("/api/partners/order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ offer_id: hangout.offer_id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        setBuying(false);
+      }
+    } catch {
+      setBuying(false);
+    }
   };
 
   return (
@@ -127,6 +154,28 @@ function HangoutCard({ hangout }: { hangout: Hangout }) {
             <p className="font-semibold text-sm mt-1.5 leading-snug line-clamp-2">{hangout.title}</p>
             {hangout.description && (
               <p className="text-xs text-muted-foreground mt-1 leading-snug line-clamp-2">{hangout.description}</p>
+            )}
+            {hangout.offer_id && hangout.offer_price ? (
+              <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-primary/5 border border-primary/20 px-2.5 py-1.5">
+                <span className="text-xs font-semibold text-foreground flex items-center gap-1">
+                  <Ticket size={13} className="text-primary" />
+                  {t("hangout.offer.buy_ticket", { price: String(hangout.offer_price) })}
+                </span>
+                <button
+                  type="button"
+                  data-testid={`hangout-offer-buy-${hangout.id}`}
+                  onClick={buyTicket}
+                  disabled={buying}
+                  className="shrink-0 text-xs font-bold rounded-full bg-primary text-primary-foreground px-2.5 py-1 hover:opacity-90 transition-opacity disabled:opacity-60"
+                >
+                  {buying ? t("hangout.offer.buying") : t("hangout.offer.buy")}
+                </button>
+              </div>
+            ) : hangout.offer_id && hangout.offer_title && (
+              <p className="mt-2 text-xs font-semibold text-primary">
+                <Ticket size={12} className="inline mr-1 -mt-0.5" />
+                {hangout.offer_title}
+              </p>
             )}
             <div className="mt-2 space-y-1 text-xs text-muted-foreground">
               <p className="flex items-center gap-1.5">
