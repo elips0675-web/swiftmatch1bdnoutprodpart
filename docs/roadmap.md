@@ -139,6 +139,17 @@
 - **Live (порт 3002):** default → 200 с 6 офферами (мои id 28–32 + существующие); `limit=3` → 3; `city=Санкт-Петербург` → только отель Ostrovok (id 29); комиссии 4–15%, deeplink присутствует.
 - **Статус:** бэкенд готов. **Фронт-блок «Куда пойти» на /hangouts — вынесен отдельным этапом** (по решению — этап бэкенд-first).
 
+## Этап 91 (30.08.2026) — Фронт: блок «Куда пойти вдвоём» на /hangouts ✅
+
+🟢 P3-фронт: видимый блок аффилиат-подборки на `/hangouts` (бэкенд `/api/affiliate/offers` из этапа 90). `src/pages/hangouts.tsx`:
+- **Блок `hangout-go-out`** под слайдером радиуса, заголовок «Куда пойти вдвоём» + горизонтальный скролл карточек (`overflow-x-auto`, `shrink-0 w-56`):
+  - карточка = `<a href={deeplink} target="_blank" rel="noopener">`: иконка категории в цветном круге (restaurant→Utensils, hotel→BedDouble, flowers→Flower2, taxi→Car, gift→ShoppingBag, fallback→MapPin), название, цена ₽ (если есть), город, бейдж «кэшбэк N%» (HandCoins, `commission_rate`, если >0).
+  - загрузка `GET /api/affiliate/offers?limit=4` (с Bearer-токеном, если есть), кэш на state; пустой массив → блок скрыт.
+- **i18n** `hangout.go_out.title` / `hangout.go_out.cashback` RU+EN (`src/context/language-context.tsx`).
+- **Тесты:** `src/test/hangouts.test.tsx` (+2): блок рендерит карточки с правильным `href`/`target=_blank`/«кэшбэк 12%»; скрыт при пустом `offers`. Существующие тесты переведены на mock-by-URL (fetch `/api/affiliate/offers` отдельно от `/api/hangouts`). **front 83/83, lint 0 errors, `vite build` OK.**
+- **DOM-проверка (Playwright, 390px):** блок `x:16, width:358 → 374 ≤ 390` ✅; первая карточка `x:20, width:224 → 244 ≤ 390` ✅; href = реальный `https://swiftmatch.app/go/bouquet-gift` (deeplink из БД).
+- **Статус:** этап 90+91 полностью закрывают P3-аффилиаты.
+
 ## Этап 84 (30.08.2026) — /hangouts P0: джойн partner_offer в ленту + блок «Билет» ✅
 
 В карточки ленты `/hangouts` добавлен `LEFT JOIN partner_offers` (`offer_id/offer_title/offer_price/offer_image_url/offer_deeplink/offer_category/offer_city/offer_valid_to`), блок «Билет {price} ₽ →» с кнопкой «Купить» → `POST /api/partners/order` (Stripe/mock). i18n `hangout.offer.buy/buying/buy_ticket`. **server 327/327, front 81/81.** Полная деталь — в `Что доделать.txt` / `context.txt`.
