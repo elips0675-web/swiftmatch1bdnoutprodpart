@@ -595,3 +595,29 @@
 - Живая проверка после рестарта: PUT био с 'тест <script>alert(1)</script> alert("xss") javascript:evil() onerror=go нормальный текст <3' -> сохранено 'тест evil() нормальный текст <3' (residue false), био восстановлено
 - sanitize.test.js: 7 тестов
 - Счётчики: server 192/192, front 61/61, E2E 47/47 = 300/300
+
+---
+
+## Этап 80 (30.08.2026): текстовый поиск в ленте встреч /hangouts
+
+По запросу пользователя — раньше список /hangouts фильтровался только по категории/дате/радиусу, текстового поиска не было.
+
+- **Сервер** (`server/src/routes/hangouts.js`, GET /api/hangouts): параметр `?q=` — LIKE `%term%` по `h.title`, `h.description`, `h.place_name`, `h.city` (4 параметра, term обрезается до 100 симв). Пустой/пробельный q не добавляет фильтр. Порядок params сохранён (where-параметры идут до geoParams радиус-фильтра).
+- **Фронт** (`src/pages/hangouts.tsx`): поле поиска с иконкой Search и кнопкой-крестиком очистки; debounce 300ms → `debouncedSearch`; при вводе сбрасывается page на 1; `q` передаётся в query-параметры и в deps fetch-`useEffect`.
+- **i18n** (`language-context.tsx`, RU + EN паритет): `hangout.filter.search`, `hangout.filter.clear_search`.
+- **Тесты**: server +2 в `hangouts.test.js` → server 326/326; front 81/81; lint 0 errors; vite build OK.
+- Живая проверка на 3002: `?q=Moscow` → 5, `?q=Evening` → 5, `?q=H2 date` → 5.
+
+## Этап 81 (30.08.2026): UX-улучшения ленты /hangouts (карточки + гео + пустое состояние)
+
+По просьбе «по этапам по важности делай сам». Сервер не менялся (age/online уже приходили в GET /api/hangouts). Всё в `src/pages/hangouts.tsx` + i18n.
+
+1. **Живая карточка** — возраст + зелёный онлайн-бейдж (конвенция чатов `bg-[#2ecc71]`).
+2. **Человеческие даты** — `formatHumanDate()`: «Сегодня 18:30» / «Завтра 12:00».
+3. **Отказ геолокации** — `geoStatus` (pending/ok/denied) + retry-кнопка; при отказе слайдер радиуса disabled; без coords запрос без radius.
+4. **Пустое состояние с CTA** → /hangouts/create (data-testid=hangouts-empty-create).
+5. **Превью описания** — line-clamp-2.
+6. **Ссылка «Мои»** → /hangouts/my (data-testid=hangout-my-link).
+7. i18n (RU+EN): `hangout.filter.geo_retry`, `hangout.filter.geo_denied`.
+
+**Счётчики:** server 326/326, front 81/81, vite build OK, lint 0 errors.
