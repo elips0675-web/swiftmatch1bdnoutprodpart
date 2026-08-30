@@ -52,6 +52,7 @@ import experimentsRoutes from './routes/experiments.js'
 import hangoutsRoutes from './routes/hangouts.js'
 import partnersRoutes from './routes/partners.js'
 import partnerDashboard from './routes/partner-dashboard.js'
+import eventsRoutes from './routes/events.js'
 import adminPartners from './routes/admin/partners.js'
 import adminBackup from './routes/admin/backup.js'
 import notificationsRoutes from './routes/notifications.js'
@@ -109,6 +110,7 @@ app.get('/metrics', metricsRoute)
 app.use('/api/premium/webhook', express.raw({ type: 'application/json' }))
 app.use('/api/partners/order/webhook', express.raw({ type: 'application/json' }))
 app.use('/api/hangouts/order/webhook', express.raw({ type: 'application/json' }))
+app.use('/api/events/order/webhook', express.raw({ type: 'application/json' }))
 app.use(express.json())
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
 app.use('/api/', limiter)
@@ -289,6 +291,7 @@ app.use(experimentsRoutes)
 app.use(hangoutsRoutes)
 app.use(partnersRoutes)
 app.use(partnerDashboard)
+app.use(eventsRoutes)
 app.use(notificationsRoutes)
 
 app.get('/health', async (req, res) => {

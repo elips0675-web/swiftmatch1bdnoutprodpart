@@ -45,6 +45,7 @@ const HangoutCreate = lazy(() => import("./pages/hangout-create"))
 const HangoutEdit = lazy(() => import("./pages/hangout-edit"))
 const HangoutsMy = lazy(() => import("./pages/hangouts-my"))
 const AdminHangouts = lazy(() => import("./pages/admin-hangouts"))
+const Events = lazy(() => import("./pages/events"))
 const AdminPartners = lazy(() => import("./pages/admin-partners"))
 const Matches = lazy(() => import("./pages/matches"))
 const Premium = lazy(() => import("./pages/premium"))
@@ -127,6 +128,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/settings/privacy": "Конфиденциальность — SwiftMatch",
   "/schedule": "Видеосвидания — SwiftMatch",
   "/hangouts": "Куда пойдем — SwiftMatch",
+  "/events": "Афиша событий — SwiftMatch",
   "/hangouts/create": "Создать встречу — SwiftMatch",
   "/hangouts/my": "Мои встречи — SwiftMatch",
   "/admin/hangouts": "Модерация встреч — SwiftMatch",
@@ -209,6 +211,7 @@ const App = () => (
                             <Route path="/groups/:category" element={<GroupCategory />} />
                             <Route path="/hangouts" element={<Hangouts />} />
                             <Route path="/hangouts/create" element={<HangoutCreate />} />
+                            <Route path="/events" element={<Events />} />
                             <Route path="/hangouts/my" element={<HangoutsMy />} />
                             <Route path="/hangouts/:id/edit" element={<HangoutEdit />} />
                             <Route path="/hangouts/:id" element={<HangoutDetail />} />

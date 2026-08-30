@@ -148,6 +148,7 @@ router.get('/offers', async (req, res) => {
     const [rows] = await pool.query(
       `SELECT o.id, o.partner_id, p.name AS partner_name, o.category, o.title,
               o.deeplink, o.city, o.price, o.placement, o.status, o.pinned,
+              o.event_start, o.event_end, o.location, o.poster_url, o.event_url, o.capacity, o.tickets_sold,
               (SELECT COUNT(*) FROM partner_conversions c WHERE c.offer_id = o.id AND c.conversion_type = 'click') AS clicks_total
        FROM partner_offers o JOIN partners p ON p.id = o.partner_id
        ORDER BY o.created_at DESC`,
@@ -169,7 +170,7 @@ router.get('/offers', async (req, res) => {
 router.post('/partners/:id/offers', async (req, res) => {
   const { id } = req.params
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
-  const { category, title, description, image_url: imageUrl, deeplink, price, city, valid_from: validFrom, valid_to: validTo, placement, pinned } = req.body || {}
+  const { category, title, description, image_url: imageUrl, deeplink, price, city, valid_from: validFrom, valid_to: validTo, placement, pinned, event_start: eventStart, event_end: eventEnd, location, poster_url: posterUrl, event_url: eventUrl, capacity } = req.body || {}
   if (!OFFER_CATEGORIES.includes(category)) {
     return res.status(400).json({ message: `category must be one of: ${OFFER_CATEGORIES.join(', ')}` })
   }
@@ -186,13 +187,17 @@ router.post('/partners/:id/offers', async (req, res) => {
   if (!placements.length) {
     return res.status(400).json({ message: `placement must contain only: ${PLACEMENTS.join(', ')}` })
   }
+  const isEvent = category === 'event' || category === 'experience'
+  if (isEvent && (!eventStart || isNaN(Date.parse(eventStart)))) {
+    return res.status(400).json({ message: 'event_start is required for events (YYYY-MM-DD HH:mm)' })
+  }
   try {
     const [[partner]] = await pool.query('SELECT id FROM partners WHERE id = ? LIMIT 1', [id])
     if (!partner) return res.status(404).json({ message: 'Partner not found' })
     const [result] = await pool.query(
-      `INSERT INTO partner_offers (partner_id, category, title, description, image_url, deeplink, price, city, valid_from, valid_to, placement, pinned)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, category, title.trim(), description || null, imageUrl || null, deeplink, price ? Number(price) : null, city || null, validFrom || null, validTo || null, placements.join(','), pinned ? 1 : 0],
+      `INSERT INTO partner_offers (partner_id, category, title, description, image_url, deeplink, price, city, valid_from, valid_to, placement, pinned, event_start, event_end, location, poster_url, event_url, capacity)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, category, title.trim(), description || null, imageUrl || null, deeplink, price ? Number(price) : null, city || null, validFrom || null, validTo || null, placements.join(','), pinned ? 1 : 0, eventStart ? new Date(eventStart) : null, eventEnd ? new Date(eventEnd) : null, location || null, posterUrl || null, eventUrl || null, capacity ? Number(capacity) : null],
     )
     await invalidate('partner:offers:hotel:*').catch(() => {})
     res.status(201).json({ id: result.insertId })
@@ -212,7 +217,7 @@ router.post('/partners/:id/offers', async (req, res) => {
 router.put('/offers/:offerId', async (req, res) => {
   const { offerId } = req.params
   if (!/^\d+$/.test(offerId)) return res.status(400).json({ message: 'Invalid id' })
-  const { title, description, deeplink, price, city, status, placement, pinned } = req.body || {}
+  const { title, description, deeplink, price, city, status, placement, pinned, event_start: eventStart, event_end: eventEnd, location, poster_url: posterUrl, event_url: eventUrl, capacity } = req.body || {}
   if (status && !['active', 'paused'].includes(status)) {
     return res.status(400).json({ message: "status must be 'active' or 'paused'" })
   }
@@ -231,6 +236,12 @@ router.put('/offers/:offerId', async (req, res) => {
     if (status !== undefined) { sets.push('status = ?'); params.push(status) }
     if (placement !== undefined) { sets.push('placement = ?'); params.push(String(placement).split(',').map((s) => s.trim()).filter((s) => PLACEMENTS.includes(s)).join(',')) }
     if (pinned !== undefined) { sets.push('pinned = ?'); params.push(pinned ? 1 : 0) }
+    if (eventStart !== undefined) { sets.push('event_start = ?'); params.push(eventStart ? new Date(eventStart) : null) }
+    if (eventEnd !== undefined) { sets.push('event_end = ?'); params.push(eventEnd ? new Date(eventEnd) : null) }
+    if (location !== undefined) { sets.push('location = ?'); params.push(location) }
+    if (posterUrl !== undefined) { sets.push('poster_url = ?'); params.push(posterUrl) }
+    if (eventUrl !== undefined) { sets.push('event_url = ?'); params.push(eventUrl) }
+    if (capacity !== undefined) { sets.push('capacity = ?'); params.push(capacity === null ? null : Number(capacity)) }
     if (!sets.length) return res.status(400).json({ message: 'Nothing to update' })
     params.push(offerId)
     const [result] = await pool.query(`UPDATE partner_offers SET ${sets.join(', ')} WHERE id = ?`, params)

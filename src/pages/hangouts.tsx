@@ -365,6 +365,15 @@ export default function HangoutsPage() {
               {t("hangout.my_listings")} →
             </Link>
 
+            <Link
+              to="/events"
+              data-testid="events-link"
+              className="flex items-center justify-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-4 py-2 text-sm font-bold text-primary hover:bg-primary/10 transition-colors"
+            >
+              <Sparkles size={16} />
+              {t("events.from_hangouts")}
+            </Link>
+
             <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -408,7 +417,7 @@ export default function HangoutsPage() {
               ))}
             </div>
 
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" data-testid="hangout-category-chips">
+            <div className="flex gap-2 flex-wrap -mx-1 px-1" data-testid="hangout-category-chips">
               {chips.map((chip) => (
                 <button
                   key={chip.key ?? "all"}

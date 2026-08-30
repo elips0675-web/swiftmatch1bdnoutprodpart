@@ -92,6 +92,7 @@ router.get('/api/partner/offers', auth, requirePartner(async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT o.id, o.category, o.title, o.description, o.deeplink, o.price, o.city, o.placement, o.status, o.created_at,
+              o.event_start, o.event_end, o.location, o.poster_url, o.event_url, o.capacity, o.tickets_sold,
               (SELECT COUNT(*) FROM partner_conversions c WHERE c.offer_id = o.id AND c.conversion_type = 'click') AS clicks
        FROM partner_offers o WHERE o.partner_id = ? ORDER BY o.created_at DESC`,
       [req.partner.id],
@@ -104,7 +105,7 @@ router.get('/api/partner/offers', auth, requirePartner(async (req, res) => {
 }))
 
 router.post('/api/partner/offers', auth, requirePartner(async (req, res) => {
-  const { category, title, description, deeplink, price, city, placement } = req.body || {}
+  const { category, title, description, deeplink, price, city, placement, event_start: eventStart, event_end: eventEnd, location, poster_url: posterUrl, event_url: eventUrl, capacity } = req.body || {}
   if (!category || !OFFER_CATEGORIES.includes(category)) {
     return res.status(400).json({ message: `category must be one of: ${OFFER_CATEGORIES.join(', ')}` })
   }
@@ -113,6 +114,10 @@ router.post('/api/partner/offers', auth, requirePartner(async (req, res) => {
   }
   if (!deeplink) {
     return res.status(400).json({ message: 'deeplink is required' })
+  }
+  const isEvent = category === 'event' || category === 'experience'
+  if (isEvent && (!eventStart || isNaN(Date.parse(eventStart)))) {
+    return res.status(400).json({ message: 'event_start is required for events (YYYY-MM-DD HH:mm)' })
   }
   try {
     const placements = String(placement || 'chat').split(',').map((p) => p.trim()).filter((p) => PLACEMENTS.includes(p))
@@ -130,9 +135,13 @@ router.post('/api/partner/offers', auth, requirePartner(async (req, res) => {
     }
 
     const [result] = await pool.query(
-      `INSERT INTO partner_offers (partner_id, category, title, description, deeplink, price, city, placement, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
+      `INSERT INTO partner_offers (partner_id, category, title, description, deeplink, price, city, placement, status, event_start, event_end, location, poster_url, event_url, capacity)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)`,
       [req.partner.id, category, String(title).trim(), description || null, deeplink, price || null, city || null, placements.join(',')],
+    )
+    await pool.query(
+      `UPDATE partner_offers SET event_start = ?, event_end = ?, location = ?, poster_url = ?, event_url = ?, capacity = ? WHERE id = ?`,
+      [eventStart ? new Date(eventStart) : null, eventEnd ? new Date(eventEnd) : null, location || null, posterUrl || null, eventUrl || null, capacity ? Number(capacity) : null, result.insertId],
     )
     invalidate('partner:offers:*').catch(() => {})
     res.status(201).json({ id: result.insertId })
@@ -149,7 +158,7 @@ router.put('/api/partner/offers/:offerId', auth, requirePartner(async (req, res)
     const [[offer]] = await pool.query('SELECT id FROM partner_offers WHERE id = ? AND partner_id = ?', [offerId, req.partner.id])
     if (!offer) return res.status(404).json({ message: 'Offer not found' })
 
-    const { title, description, deeplink, price, city, placement, status } = req.body || {}
+    const { title, description, deeplink, price, city, placement, status, event_start: eventStart, event_end: eventEnd, location, poster_url: posterUrl, event_url: eventUrl, capacity } = req.body || {}
     const updates = []
     const params = []
     if (title !== undefined) { updates.push('title = ?'); params.push(String(title).trim()) }
@@ -164,6 +173,12 @@ router.put('/api/partner/offers/:offerId', auth, requirePartner(async (req, res)
     if (status !== undefined && ['active', 'paused'].includes(status)) {
       updates.push('status = ?'); params.push(status)
     }
+    if (eventStart !== undefined) { updates.push('event_start = ?'); params.push(eventStart ? new Date(eventStart) : null) }
+    if (eventEnd !== undefined) { updates.push('event_end = ?'); params.push(eventEnd ? new Date(eventEnd) : null) }
+    if (location !== undefined) { updates.push('location = ?'); params.push(location) }
+    if (posterUrl !== undefined) { updates.push('poster_url = ?'); params.push(posterUrl) }
+    if (eventUrl !== undefined) { updates.push('event_url = ?'); params.push(eventUrl) }
+    if (capacity !== undefined) { updates.push('capacity = ?'); params.push(capacity === null ? null : Number(capacity)) }
     if (updates.length === 0) return res.status(400).json({ message: 'No fields to update' })
 
     params.push(offerId)
