@@ -669,3 +669,13 @@
   - i18n `hangout.form.ticket_price/ticket_capacity/price_invalid`, `hangout.ticket.title/price/buy/have/purchased/full` (RU+EN).
 - **Тесты**: server **334/334** (+7: PAYMENT_REQUIRED без билета, CAPACITY_FULL sold-out, respond с билетом, purchase mock-paid, purchase capacity, free→400, auth→401), front **81/81** (18 files), `npx vite build` OK, eslint 0 errors.
 - **Live-проверка** (localhost:3002, перезапущен): создана платная встреча (price=500/capacity=3); purchase от автора → 400; respond без билета → 402; purchase (mock) → 201 `{mock,paid,amount:500}`; respond с билетом → 201; detail `my_ticket_status=paid, sold=1`. Тестовые данные отменены/refunded.
+
+## Этап 86 (30.08.2026): /hangouts P1 #1 — закреплённые/спонсорские карточки «Sponsored»
+
+Первый 🟠 P1 из плана монетизации закрыт: админ может «закреплять» партнёрские офферы — закреплённые поднимаются в начало ленты /hangouts с бейджем «Реклама» («Sponsored»).
+
+- **Миграция** `database/migrations/045_partner_offers_pinned.sql`: `partner_offers.pinned TINYINT(1) NOT NULL DEFAULT 0` (additive, за `placement`). Применена к живой БД; схема обновлена в `mysql_schema.sql`.
+- **Сервер** (`admin/partners.js`): GET `/offers` возвращает `pinned`; POST create и PUT `/offers/:id` принимают `pinned` (0/1). (`hangouts.js`): `HANGOUT_LIST_SELECT` → `po.pinned AS offer_pinned`; feed `ORDER BY (po.pinned IS NOT NULL AND po.pinned = 1) DESC, h.event_date ASC`.
+- **Фронт**: `admin-partners.tsx` — тумблер «Sponsored»/«Sponsored ✓» в таблице офферов (`pin-offer-{id}`); `hangouts.tsx` (HangoutCard) — бадж «Реклама» при `offer_pinned === 1` (`hangout-sponsored-{id}`). i18n `admin.partners.sponsored/sponsored_on`, `hangout.sponsored` (RU+EN).
+- **Тесты**: server **336/336** (+2), front **81/81**, `npx vite build` OK, eslint 0 errors.
+- **Live-проверка** (localhost:3002): offer 17 (placement=hangout) → PIN → pinned=1; создана встреча 149 с `partner_offer_id=17` → feed[0]=149 с `offer_pinned=1` (закреплённая в начале ленты); unpin + тестовая встреча удалены. Коммит: add4270.

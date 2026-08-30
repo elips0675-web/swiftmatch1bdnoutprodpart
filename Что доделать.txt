@@ -559,7 +559,7 @@
 |---|---|---|---|
 | 🔴 P0 ✅ | **Джойн partner_offer в ленту /hangouts** — **СДЕЛАНО (этап 84)** | В `HANGOUT_LIST_SELECT` добавлен `LEFT JOIN partner_offers po ON po.id = h.partner_offer_id` (поля `offer_id/offer_title/offer_price/offer_image_url/offer_deeplink/offer_category/offer_city/offer_valid_to`) во все 3 выборки (feed/my/detail). В `HangoutCard` блок «Билет {price} ₽ →» с кнопкой «Купить» → `POST /api/partners/order` (уже готовый Stripe/mock-чёкаут, `partners.js:404`) → редирект на `url`. i18n `hangout.offer.buy/buying/buy_ticket` RU+EN. server 327/327 (+1 тест feed-джойна), front 81/81 | `server/src/routes/hangouts.js`, `src/pages/hangouts.tsx`, `src/lib/hangouts.ts` |
 | 🔴 P0 ✅ | **Платные встречи (ticket flow)** — **СДЕЛАНО (этап 85)** | В `hangouts` добавлены `price` + `capacity` (миграция 044). Новая таблица `hangout_tickets` (UNIQUE hangout_id+user_id). `POST /api/hangouts/:id/purchase` — Stripe Checkout (`checkout.sessions.create`, mock при отсутствии ключа → сразу paid) + webhook `/api/hangouts/order/webhook`. Гейт: respond/like/join для платной встречи требуют оплаченный билет (402 `PAYMENT_REQUIRED`), capacity-кэп (409 `CAPACITY_FULL`), PUT запрещает capacity ниже проданных. UI: форма create/edit с ценой+лимитом, карточка-бадж «Билет {price} ₽»+sold, деталь — блок «Купить билет» + бейдж «Билет куплен». server 334/334 (+7), front 81/81 | миграция `044_hangouts_paid.sql`, `server/src/routes/hangouts.js`, `server/src/index.js`, `src/pages/hangout-{create,edit,detail}.tsx`, `hangouts.tsx` |
-| 🟠 P1 | **Закреплённые/спонсированные карточки** | Оффер с `placement=hangout` + флаг `pinned` → верх ленты с бейджем «Sponsored». Продажа локальным кафе/барам/ивент-организаторам | `server/src/routes/admin/partners.js`, `partner-dashboard.js`, `src/pages/hangouts.tsx` |
+| 🟠 P1 ✅ | **Закреплённые/спонсированные карточки** — **СДЕЛАНО (этап 86)** | Оффер с `placement=hangout` + флаг `pinned` → верх ленты с бейджем «Sponsored». Продажа локальным кафе/барам/ивент-организаторам. Админ ставит pinned в admin-partners.tsx (тумблер «Sponsored»), лента /hangouts поднимает закреплённые в начало (ORDER BY pinned DESC) | миграция `045_partner_offers_pinned.sql`, `server/src/routes/admin/partners.js`, `server/src/routes/hangouts.js`, `src/pages/admin-partners.tsx`, `src/pages/hangouts.tsx` |
 | 🟠 P1 | **Событийная интеграция (ивент-организаторы)** | B2B уже есть (partner-dashboard/offers) — расширить на ивент-площадки: speed-dating, миксеры, мастер-классы → комиссия за билет (10–30% маржа). Использовать `event_url`/`poster_url` | |
 | 🟡 P2 | **Премиум-перки на встречи** | Убрать лимит 1/день для premium, супер-продвижение своих встреч, увеличение `max_companions` для premium | `server/src/routes/hangouts.js` (лимит), `use-premium.ts`, `hangout-create.tsx` upsell |
 | 🟢 P3 | **AI-подбор встреч под пары** | Курирование встреч под пару (тренд 2026: Les Amis, AI-парные активности) — premium-функция | `server/src/routes/icebreakers.js` (переиспользовать OpenAI-эндпоинт) |
@@ -594,3 +594,20 @@
 - **Live-проверка** (localhost:3002): создание платной встречи (id 148, price=500), purchase от автора → 400, respond без билета → 402, purchase (mock) → 201 paid, respond с билетом → 201, detail `my_ticket_status=paid sold=1`. Тестовые данные отменены.
 
 **Что дальше (P1):** закреплённые/спонсорские карточки «Sponsored» (placement=hangout + pinned → верх ленты), затем событийная интеграция с ивент-организаторами.
+
+## ✅ Этап 86 (30.08.2026): /hangouts P1 #1 — закреплённые/спонсорские карточки «Sponsored» — ЗАКРЫТО
+
+Первый 🟠 P1 из плана монетизации выполнен: админ может продавать «закрепление» оффера локальным кафе/барам/ивент-организаторам — закреплённые офферы поднимаются в начало ленты /hangouts с бейджем «Sponsored».
+
+- **Схема** (миграция `045_partner_offers_pinned.sql`): `partner_offers.pinned TINYINT(1) NOT NULL DEFAULT 0` (additive, за `placement`). Применена к живой БД.
+- **Сервер**:
+  - `admin/partners.js`: GET `/offers` возвращает `pinned`; POST create и PUT `/offers/:id` принимают `pinned` (0/1).
+  - `hangouts.js`: `HANGOUT_LIST_SELECT` возвращает `po.pinned AS offer_pinned`; feed `ORDER BY (po.pinned IS NOT NULL AND po.pinned = 1) DESC, h.event_date ASC` — закреплённые офферы всегда в начале ленты.
+- **Фронт**:
+  - `admin-partners.tsx` (таблица офферов): тумблер «Sponsored»/«Sponsored ✓» (data-testid `pin-offer-{id}`) — ставит/снимает pinned через PUT.
+  - `hangouts.tsx` (HangoutCard): при `offer_pinned === 1` — бейдж «Реклама» (янтарный, data-testid `hangout-sponsored-{id}`) над аватаром.
+  - i18n `admin.partners.sponsored/sponsored_on`, `hangout.sponsored` (RU+EN).
+- **Тесты**: server **336/336** (+2: `returns offer_pinned and sorts pinned offers first`, `admin PUT offer accepts pinned flag`), front **81/81**, `npx vite build` OK, eslint 0 errors (pre-existing warnings только).
+- **Live-проверка** (localhost:3002): offer 17 (placement=hangout) → PIN via admin → pinned=1; создана тестовая встреча 149 с `partner_offer_id=17` → feed[0]=149 с `offer_pinned=1` (закреплённая в начале, до более ранних event_date); unpin offer 17, тестовая встреча удалена.
+
+**Что дальше (P1):** событийная интеграция с ивент-организаторами (speed-dating, миксеры, мастер-классы → комиссия за билет 10–30%), затем P2 (премиум-перки на встречи).

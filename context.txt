@@ -644,12 +644,12 @@
 
 - 🔴 **P0 ✅ СДЕЛАНО (этап 84).** Джойн `partner_offers` в `HANGOUT_LIST_SELECT` (`LEFT JOIN po ON po.id = h.partner_offer_id` во все 3 выборки) + блок «Билет N ₽ →» в карточке на готовый Stripe/mock-чёкаут `POST /api/partners/order` (`partners.js:404`)
 - 🔴 **P0 ✅ СДЕЛАНО (этап 85).** Платные встречи: `price` + `capacity` в hangouts (миграция 044, таблица `hangout_tickets`), `POST /api/hangouts/:id/purchase` (Stripe/mock) + webhook, гейт respond/like/join (402 `PAYMENT_REQUIRED`, 409 `CAPACITY_FULL`)
-- 🟠 **P1.** Спонсорские/закреплённые карточки «Sponsored» (placement=hangout + pinned)
+- 🟠 **P1 ✅ СДЕЛАНО (этап 86).** Спонсорские/закреплённые карточки «Sponsored» (placement=hangout + `pinned` → верх ленты с бейджем; админ ставит в admin-partners.tsx)
 - 🟠 **P1.** Событийная интеграция с ивент-организаторами (speed-dating, миксеры) — комиссия за билет 10–30%
 - 🟡 **P2.** Premium-перки на встречи (снятие лимита 1/день, продвижение, max_companions)
 - 🟢 **P3.** AI-подбор встреч под пары (premium); аффилиат-ссылки «Куда пойти» (дайнинг/travel/подарки, 5–15%)
 
-**Первый шаг — 🔴 P0.** → **СДЕЛАНО (этап 84).** Второй 🔴 P0 (платные встречи) → **СДЕЛАНО (этап 85).** Следующее — P1 (спонсорские карточки).
+**Первый шаг — 🔴 P0.** → **СДЕЛАНО (этап 84).** Второй 🔴 P0 (платные встречи) → **СДЕЛАНО (этап 85).** P1 (спонсорские карточки) → **СДЕЛАНО (этап 86).** Следующее — событийная интеграция с ивент-организаторами.
 
 ## Этап 84 (30.08.2026): /hangouts P0 — джойн partner_offer + блок «Билет»
 
@@ -670,3 +670,10 @@
   - LIST/detail: `price, capacity, sold_tickets, my_ticket_status`.
 - **Фронт**: create/edit — «Цена билета» + «Лимит билетов»; лента — бадж «Билет {price} ₽» + sold/capacity; деталь — блок «Купить билет» + бейдж «Билет куплен». i18n `hangout.form.ticket_*`, `hangout.ticket.*` RU+EN.
 - **Тесты**: server **334/334** (+7), front **81/81**, vite build OK, eslint 0 errors. Live-флоу проверен на порту 3002. Коммит: 06e0bdb.
+
+## Этап 86 (30.08.2026): /hangouts P1 #1 — закреплённые/спонсорские карточки «Sponsored»
+
+- **Миграция** `database/migrations/045_partner_offers_pinned.sql`: `partner_offers.pinned TINYINT(1) NOT NULL DEFAULT 0` (additive). Применена к живой БД.
+- **Сервер**: `admin/partners.js` GET `/offers` возвращает `pinned`; POST create + PUT `/offers/:id` принимают `pinned`. `hangouts.js` `HANGOUT_LIST_SELECT` → `po.pinned AS offer_pinned`; feed `ORDER BY (po.pinned IS NOT NULL AND po.pinned = 1) DESC, h.event_date ASC`.
+- **Фронт**: `admin-partners.tsx` — тумблер «Sponsored»/«Sponsored ✓» (`pin-offer-{id}`); `hangouts.tsx` — бадж «Реклама» при `offer_pinned===1` (`hangout-sponsored-{id}`). i18n `admin.partners.sponsored/sponsored_on`, `hangout.sponsored` RU+EN.
+- **Тесты**: server **336/336** (+2), front **81/81**, vite build OK, eslint 0 errors. Live: offer 17 pinned → встреча 149 с `partner_offer_id` → feed[0] с `offer_pinned=1`. Коммит: add4270.
