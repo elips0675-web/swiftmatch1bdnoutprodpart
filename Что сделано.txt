@@ -621,3 +621,22 @@
 7. i18n (RU+EN): `hangout.filter.geo_retry`, `hangout.filter.geo_denied`.
 
 **Счётчики:** server 326/326, front 81/81, vite build OK, lint 0 errors.
+
+## Этап 82 (30.08.2026): доделки /hangouts — respond-флоу, testid, upsell, чистка
+
+По «доделай по этапам». Полный аудит бэка/фронта hangouts (explore-агент): 6 страниц, все роуты существуют, битых ссылок не нашлось. Доделан UI-уровень:
+
+1. **Реанимирован respond-флоу (мёртвый код → живой).** В date-детали `hangout-detail.tsx` кнопка «Пойдем» (`respond-hangout`) никогда не вызывала `setRespondOpen(true)` — весь серверный флоу (POST/DELETE /respond, accept/decline, 1:1 чат при accept) был недостижим из UI. Добавлена кнопка для не-автора (скрыта при наличии `my_response_status`). Убран неиспользуемый `Star` → `MessageSquareText`.
+2. **data-testid на навигацию**: back (`hangout-detail-back`×2), open-chat (`open-chat`×4), радиус (`hangout-radius`).
+3. **FIX placeholder**: диалог подбора партнёра в `hangout-create.tsx` показывал `hangout.form.description_placeholder`. Добавлен `partner.select_offer_desc` (RU+EN).
+4. **Premium-upsell**: при 403 `HANGOUT_DAILY_LIMIT` — баннер `hangout-daily-limit` на форме создания: текст + CTA «Стать Premium» → /premium + dismiss. Бэкенда не требует.
+5. **Бэкенд не трогали**. Счётчики: front 81/81, server 326/326, vite build OK, lint 0 errors.
+
+## Этап 83 (30.08.2026): связь карточек /hangouts с профилями авторов
+
+По просьбе «свяжи /hangouts с профилями». Раньше вся карточка вела только на детали встречи, автор был некликабельным.
+
+- `HangoutCard` в `hangouts.tsx`: аватар и имя автора кликабельны → `/profile/{author_id}` (роут ProfileById). `role="link"`, hover-стиль, data-testid `hangout-author-{id}` / `hangout-author-name-{id}`.
+- Внутри внешнего `<Link>` (на детали): `preventDefault() + stopPropagation()` + `navigate()` — клик по автору не уходит на карточку (React-делегирование). Любая другая часть карточки по-прежнему открывает детали встречи.
+- `author_id` уже приходил с API (`up.id AS author_id`), профиль `/profile/:id` — существующий роут. Бэкенд/i18n не трогали.
+- Проверки: front 81/81, vite build OK, lint 0 errors, /hangouts + /profile/:id 200.
