@@ -150,6 +150,17 @@
 - **DOM-проверка (Playwright, 390px):** блок `x:16, width:358 → 374 ≤ 390` ✅; первая карточка `x:20, width:224 → 244 ≤ 390` ✅; href = реальный `https://swiftmatch.app/go/bouquet-gift` (deeplink из БД).
 - **Статус:** этап 90+91 полностью закрывают P3-аффилиаты.
 
+## Этап 92 (30.08.2026) — Фронт: блок «Идеи для пары» (AI-подбор, premium) ✅
+
+🟢 P3-фронт: видимый UI AI-подбора встреч под пару (бэкенд `POST /api/hangouts/suggest` из этапа 89). `src/pages/hangouts.tsx`:
+- **Блок `hangout-suggest`** на `/hangouts` (под блоком «Куда пойти»). Гeйт через `usePremium()` (`isPremium`):
+  - **Premium:** кнопка «Показать идеи свидания» → `POST /api/hangouts/suggest` (Bearer-токен; `{ language }`) → 3 карточки-идеи (иконка категории через `categoryIcon`, название, место, описание) + переключатель языка **RU/EN** (сброс и перегенерация) + кнопка «Создать встречу» → `/hangouts/create`. Загрузка — спиннер; ошибка (в т.ч. 403) — сообщение `hangout.suggest.error`.
+  - **Free:** upsell-блок «Идеи для пары — Premium» с кнопкой «Стать Premium» → `/premium`.
+- **i18n** `hangout.suggest.*` (title/upsell_title/upsell_desc/go_premium/open/close/create/error) RU+EN (`src/context/language-context.tsx`).
+- **Тесты:** `src/test/hangouts.test.tsx` (+3): upsell для free (кнопка «Стать Premium», нет «Показать идеи»); premium отрисовывает идеи после клика (названия + «Создать встречу»); ошибка при 403. Добавлен мок `@/hooks/use-premium`. **front 86/86, lint 0 errors, `vite build` OK.**
+- **DOM/live (Playwright, 390px, порт 3002/8081):** premium-юзер (с активной подпиской) → кнопка «Показать идеи» видна, upsell скрыт; клик → **3 идеи** (первая «Кофе и настольные игры / Уютная кофейня...» — статический fallback, т.к. нет OPENAI_API_KEY); free-юзер → upsell виден, кнопка скрыта. Тестовая подписка/юзеры удалены.
+- **Статус:** этап 89+92 полностью закрывают P3-AI-подбор. Весь план монетизации (P0–P3) теперь закрыт.
+
 ## Этап 84 (30.08.2026) — /hangouts P0: джойн partner_offer в ленту + блок «Билет» ✅
 
 В карточки ленты `/hangouts` добавлен `LEFT JOIN partner_offers` (`offer_id/offer_title/offer_price/offer_image_url/offer_deeplink/offer_category/offer_city/offer_valid_to`), блок «Билет {price} ₽ →» с кнопкой «Купить» → `POST /api/partners/order` (Stripe/mock). i18n `hangout.offer.buy/buying/buy_ticket`. **server 327/327, front 81/81.** Полная деталь — в `Что доделать.txt` / `context.txt`.
