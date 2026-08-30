@@ -104,6 +104,37 @@
 
 Верифицировано e2e на scratch-БД: 73 таблицы / 93 FK загружаются, FK enforcement работает, seed 43 → migrate.js 0 errors, idempotent. Scratch-БД подчищена. Server 324/324, vite build OK, schema-validate live 73 OK.
 
+## Этап 88 (30.08.2026) — Событийная интеграция с ивент-организаторами ✅
+
+> Следующий шаг после премиум-перков /hangouts (этап 87). Закрывает 🟠 P1 «событийная интеграция» из плана монетизации.
+
+Закрыт 🟠 P1 из плана монетизации («Что доделать.txt»): события/ивенты — высокомаржинальный канал для дейтинга (комиссия за билет 10–30%). Построено на существующей партнёрской системе (`partner_offers` категории `event`/`experience` + Stripe-флоу).
+
+- **Миграция `047_events.sql`:** `partner_offers` + event-поля (`event_start/event_end/location/poster_url/event_url/capacity/tickets_sold`, additive, nullable); таблица `event_tickets` (UNIQUE `offer_id+user_id`, FK на `partner_offers`/`users`, `stripe_session_id`, `status` ENUM `pending/paid/refunded`); сид ивент-партнёр `Wild Events` (commission 20%) + 3 демо-события (speed-dating 1500₽ cap 40, миксер 1200₽ cap 60, мастер-класс 1800₽ cap 20).
+- **Бэкенд `server/src/routes/events.js`:** `GET /api/events` (афиша: только активные, `event_start >= NOW()`, JOIN partners, `remaining`/`sold_out`); `GET /api/events/:id` (+ `my_ticket`); `POST /api/events/:id/purchase` (auth; проверки цена/статус, capacity-кэп 409 `SOLD_OUT`, повторная покупка 409 `ALREADY_PURCHASED`; Stripe Checkout `pending` → `event_tickets`+`partner_orders`, или mock → сразу `paid` + `partner_conversions` + инкремент `tickets_sold`); Stripe webhook `/api/events/order/webhook` — подпись, идемпотент через `webhook_events`, апдейт `tickets_sold`/конверсия/order paid. Подключён в `index.js` с `express.raw` для webhook.
+- **Расширены CRUD event-полей:** `partner-dashboard.js` (GET/POST/PUT) и `admin/partners.js` (GET/POST/PUT) — приём/валидация `event_start` для категорий `event`/`experience`.
+- **Фронт:** страница `src/pages/events.tsx` — афиша карточками (постер/градиент, название, дата/время через `formatEventDate`, место+город, цена, остаток билетов, кнопка «Купить билет» → `POST /purchase`, бейджи sold_out/«Билет куплен», отдельная обработка 409 ALREADY_PURCHASED); роут `/events` в `App.tsx`; ссылка с /hangouts; i18n `events.*` RU+EN.
+- **Проверки:** server-сьют **357/357** (+14 новых `events.test.js`), front **81/81**, lint 0 errors, `vite build` OK. Миграции **028–047** применены к локальной БД `swiftmatch` (`migrate.js` → 047 DONE). Live-проверка на тестовом порту 3033: `/api/events` отдаёт 3 события, purchase → mock 201 (ticket_id=1), повторная → 409 ALREADY_PURCHASED, detail возвращает `my_ticket`; тестовые данные очищены.
+- **UX-фикс ленты /hangouts:** ряд чипов категорий (9 шт.) переводился в `flex-wrap` — раньше при `overflow-x-auto`+`shrink-0` чипы «Концерт/Спорт/Другое» уходили за правый край экрана (left 421px при 390px), теперь переносятся на 2-ю строку и все на виду. `src/pages/hangouts.tsx` (data-testid `hangout-category-chips`).
+
+
+
+## Этап 84 (30.08.2026) — /hangouts P0: джойн partner_offer в ленту + блок «Билет» ✅
+
+В карточки ленты `/hangouts` добавлен `LEFT JOIN partner_offers` (`offer_id/offer_title/offer_price/offer_image_url/offer_deeplink/offer_category/offer_city/offer_valid_to`), блок «Билет {price} ₽ →» с кнопкой «Купить» → `POST /api/partners/order` (Stripe/mock). i18n `hangout.offer.buy/buying/buy_ticket`. **server 327/327, front 81/81.** Полная деталь — в `Что доделать.txt` / `context.txt`.
+
+## Этап 85 (30.08.2026) — Платные встречи (ticket flow) ✅
+
+В hangouts `price` + `capacity` (миграция 044, таблица `hangout_tickets`), `POST /api/hangouts/:id/purchase` (Stripe/mock) + webhook, гейт respond/like/join для платных (402 `PAYMENT_REQUIRED`, 409 `CAPACITY_FULL`), UI create/edit/деталь с ценой+лимитом. **server 334/334 (+7), front 81/81.**
+
+## Этап 86 (30.08.2026) — Закреплённые/спонсорские карточки ✅
+
+Оффер `placement=hangout` + `pinned` → верх ленты с бейджем «Sponsored» (админ ставит в admin-partners.tsx). Миграция `045_partner_offers_pinned.sql`.
+
+## Этап 87 (30.08.2026) — Премиум-перки на встречи /hangouts ✅
+
+P2: снятие/поднятие лимита ежедневных встреч, boost карточки, поднятие `max_companions` cap 10→20 для premium.
+
 ## Плановые хвосты (не блокируют)
 
 - Внешние блокеры (не код): staging VPS + docker compose up, реальные ключи в `.env`, домен + SSL + Google Play, k6 100 VU на staging, UptimeRobot/Grafana-алерты.
