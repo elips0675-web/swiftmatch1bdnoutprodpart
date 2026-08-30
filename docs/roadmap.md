@@ -150,6 +150,18 @@
 - **DOM-проверка (Playwright, 390px):** блок `x:16, width:358 → 374 ≤ 390` ✅; первая карточка `x:20, width:224 → 244 ≤ 390` ✅; href = реальный `https://swiftmatch.app/go/bouquet-gift` (deeplink из БД).
 - **Статус:** этап 90+91 полностью закрывают P3-аффилиаты.
 
+## Этап 93 (30.08.2026) — Инфра-хвосты (Docker/nginx/CI/DEPLOY) ✅
+
+⚙️ Подготовка Docker-инфры в репо (запуск на VPS + реальные ключи — вне этой среды, задокументировано в `DEPLOY.md`):
+- **`.env.example`** — актуализирован по факту читаемых сервером переменных (собрано из `process.env.*` в `server/src`): `PORT/CLIENT_URL/CORS_ORIGIN`, `DB_*`/`DB_POOL_MAX`, `REDIS_URL`/`CACHE_TTL`, `JWT_SECRET`, `LOG_LEVEL`, `SECURITY_HEADERS_API`/`AUTH_LOCKOUT_MAX_ATTEMPTS`, опционально `OPENAI_*`/`PERSPECTIVE_API_KEY`/`TWILIO_*`/`VAPID_*`/`FCM_SERVER_KEY`/`SMTP_*`/`S3_*`/`BACKUP_*`/`STRIPE_*`/`REVENUECAT_WEBHOOK_SECRET`/`SENTRY_DSN` + `VITE_*` (клиент). Секции `### SECRETS ###` для CI/CD.
+- **`Dockerfile`** — добавлен само-достаточный этап `web` (`nginx:1.27-alpine` + `dist` из frontend-этапа, HEALTHCHECK на `/`); server-этап теперь копирует `database/` и `scripts/` (миграции + schema-validate в контейнере).
+- **`docker-compose.yml`** — nginx переведён на build-таргет `web` (**фикс бага**: раньше монтировался хост-volume `./dist`, которого не было в образе → фронт не отдавался); `app` подключает `env_file: .env` (прод-ключи Stripe/OpenAI/…); явные DB_/JWT/CORS/REDIS.
+- **`nginx/swiftmatch.http.conf`** — HTTP-конфиг для nginx-образа: `gzip`, rate-limit (`auth 5r/s`, `api 30r/s`), `/healthz`, статика из `/usr/share/nginx/html` с кэшем `assets`, SPA-fallback, прокси `/api`, `/socket.io` (upgrade), `/uploads` (30d).
+- **`deploy.yml`** — устаревший `SCP + pm2` заменён на Docker-деплой: rsync файлов (burnett01/rsync-deployments) → `docker compose up -d --build` → `docker compose exec app node database/migrations/migrate.js` → `schema-validate.mjs`. Secrets те же (`DEPLOY_HOST/DEPLOY_USER/DEPLOY_SSH_KEY`). `docker-config-check` собирает и `server`, и `web` таргеты.
+- **`.dockerignore`** — исключены `e2e/docs/monitoring/k6`, `*.log`.
+- **`DEPLOY.md`** — новый пошаговый гайд: требования к VPS, установка Docker, `.env`, первичный `docker compose up -d --build`, Caddy/HTTPS, secrets CI/CD, мониторинг (Prometheus/Grafana), k6 100 VU, cron-бэкапы БД.
+- **Статус:** весь инфа-костяк в репо выверен и согласован с deploy. Осталось (вне среды): Docker на VPS, реальные ключи в Secrets, `docker compose up`, к6 100 VU, UptimeRobot/Grafana-алерты.
+
 ## Этап 92 (30.08.2026) — Фронт: блок «Идеи для пары» (AI-подбор, premium) ✅
 
 🟢 P3-фронт: видимый UI AI-подбора встреч под пару (бэкенд `POST /api/hangouts/suggest` из этапа 89). `src/pages/hangouts.tsx`:
