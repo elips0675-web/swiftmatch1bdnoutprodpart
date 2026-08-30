@@ -8,6 +8,9 @@ import { auth, optionalAuth } from '../middleware.js'
 import logger from '../logger.js'
 import { stripHtml } from '../sanitize.js'
 import { trackEvent } from './experiments.js'
+import { createBreaker } from '../circuit-breaker.js'
+
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 
 /**
  * @openapi
@@ -1282,6 +1285,111 @@ router.post('/api/hangouts/:id/unboost', auth, boostLimiter, async (req, res) =>
   } catch (err) {
     logger.error('Hangout unboost error:', err)
     res.status(500).json({ message: 'Failed to unboost hangout' })
+  }
+})
+
+// ─── AI-подбор встреч под пару (premium perk) ───
+// body: { user_id?, language?: 'ru'|'en' } — user_id = профиль второй половины.
+// Перк для premium: free — 403 PREMIUM_REQUIRED. OpenAI + DB/static fallback.
+const suggestLimiter = rateLimit({ windowMs: 60_000, max: 20, message: { message: 'Too many suggest requests' } })
+
+const suggestBreaker = createBreaker(
+  async ({ me, partner, lang }) => {
+    const OpenAI = (await import('openai')).default
+    const client = new OpenAI({ apiKey: OPENAI_API_KEY })
+    const meCtx = me ? `User A: ${me.display_name}, ${me.age} y.o., ${me.city || 'unknown'}, bio: "${me.bio || ''}", goal: ${me.dating_goal || 'unknown'}.` : 'User A: unknown.'
+    const partnerCtx = partner ? `User B: ${partner.display_name}, ${partner.age} y.o., ${partner.city || 'unknown'}, bio: "${partner.bio || ''}", goal: ${partner.dating_goal || 'unknown'}.` : 'User B: unknown.'
+    const response = await client.chat.completions.create({
+      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a dating app assistant. Suggest 3 creative date/hangout ideas for this couple (${lang === 'ru' ? 'in Russian' : 'in English'}, fitting both profiles, realistic venues/activities). Output ONLY a JSON array of objects, each with "title" (short), "category" (cinema|theater|exhibition|cafe|concert|sport|other), "place" (suggested venue) and "description" (1-2 sentences, no hashtags).`,
+        },
+        { role: 'user', content: `${meCtx}\n${partnerCtx}` },
+      ],
+      temperature: 0.9,
+      max_tokens: 300,
+    })
+    const raw = response.choices[0]?.message?.content || '[]'
+    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim())
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed.slice(0, 3).filter((s) => s && typeof s === 'object' && s.title)
+    }
+    return null
+  },
+  'openai-hangout-suggest',
+  { timeout: 9000, volumeThreshold: 3 },
+)
+
+const STATIC_SUGGESTIONS = [
+  { title: 'Кофе и настольные игры', category: 'cafe', place: 'Уютная кофейня', description: 'Лёгкий формат: поговорить, посмеяться и узнать друг друга без напряжения.' },
+  { title: 'Вечер в кино на инди-фильм', category: 'cinema', place: 'Независимый кинотеатр', description: 'После сеанса обсудить фильм за чашкой какао — отличный повод для разговора.' },
+  { title: 'Прогулка по выставке современного искусства', category: 'exhibition', place: 'Городская галерея', description: 'Спокойный темп, много тем для разговора, можно задержаться сколько захочется.' },
+  { title: 'Концерт живой музыки', category: 'concert', place: 'Live-площадка', description: 'Общие впечатления и танцы — быстрый способ почувствовать друг друга.' },
+  { title: 'Лёгкая спортивная активность вдвоём', category: 'sport', place: 'Сквот-корт или бадминтон', description: 'Активность снимает застенчивость и дарит заряд энергии.' },
+  { title: 'Мастер-класс для двоих', category: 'other', place: 'Творческая студия', description: 'Совместный результат и командная работа — сближает быстрее обычного свидания.' },
+]
+
+router.post('/api/hangouts/suggest', auth, suggestLimiter, async (req, res) => {
+  try {
+    const { user_id: userId, language = 'ru' } = req.body || {}
+    const lang = language === 'en' ? 'en' : 'ru'
+
+    const cap = await getCompanionsCap(req.userId)
+    if (cap === COMPANIONS_CAP_FREE) {
+      return res.status(403).json({ message: 'Premium subscription required to get date suggestions', code: 'PREMIUM_REQUIRED' })
+    }
+
+    // Профили обоих для персонализации (optional)
+    const [[me]] = await pool.query(
+      `SELECT display_name, age, bio, city, dating_goal FROM user_profiles WHERE id = ? LIMIT 1`,
+      [req.userId],
+    )
+    let partner = null
+    if (userId && /^\d+$/.test(String(userId))) {
+      [[partner]] = await pool.query(
+        `SELECT display_name, age, bio, city, dating_goal FROM user_profiles WHERE id = ? LIMIT 1`,
+        [userId],
+      )
+    }
+
+    if (OPENAI_API_KEY) {
+      try {
+        const suggestions = await suggestBreaker.fire({ me, partner, lang })
+        if (suggestions && suggestions.length > 0) {
+          trackEvent('hangout_suggest', req.userId, { source: 'openai', count: suggestions.length })
+          return res.json({ source: 'openai', suggestions })
+        }
+      } catch (err) {
+        logger.warn('Hangout suggest: OpenAI breaker failed, falling back to DB:', err.message)
+      }
+    }
+
+    // DB fallback: реальные активные встречи рядом как идеи
+    const [rows] = await pool.query(
+      `SELECT id, category, title, place_name, city FROM hangouts
+       WHERE status = 'active' AND event_date > NOW()
+       ORDER BY created_at DESC LIMIT 5`,
+    )
+    const suggestionPool = []
+    const used = new Set()
+    for (const s of STATIC_SUGGESTIONS) {
+      if (!used.has(s.title)) { suggestionPool.push(s); used.add(s.title) }
+    }
+    for (const r of rows) {
+      const title = `${r.title} (${r.place_name || r.city || 'рядом'})`
+      if (!used.has(r.title)) {
+        suggestionPool.push({ title, category: r.category || 'other', place: r.place_name || r.city || '', description: 'Встреча рядом из афиши.' })
+        used.add(r.title)
+      }
+    }
+    const shuffled = suggestionPool.sort(() => Math.random() - 0.5).slice(0, 3)
+    trackEvent('hangout_suggest', req.userId, { source: rows.length ? 'db' : 'static', count: shuffled.length })
+    res.json({ source: rows.length ? 'db' : 'static', suggestions: shuffled })
+  } catch (err) {
+    logger.error('Hangout suggest error:', err)
+    res.status(500).json({ message: 'Failed to suggest hangouts' })
   }
 })
 
