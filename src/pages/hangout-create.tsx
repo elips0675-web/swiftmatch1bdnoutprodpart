@@ -20,7 +20,7 @@ import { getToken } from "@/lib/token";
 import { cn } from "@/lib/utils";
 import { HANGOUT_CATEGORIES, HANGOUT_TYPES, type HangoutCategory, type HangoutType } from "@/lib/hangouts";
 import { toast } from "sonner";
-import { Loader2, Ticket, Heart, Users } from "lucide-react";
+import { Loader2, Ticket, Heart, Users, Crown } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -61,6 +61,7 @@ export default function HangoutCreatePage() {
   const [listings, setListings] = useState<Array<{ id: number; category: string; title: string; description?: string; partner_name: string }>>([]);
   const [listingsLoading, setListingsLoading] = useState(false);
   const [selectedOfferId, setSelectedOfferId] = useState<number | null>(null);
+  const [dailyLimitHit, setDailyLimitHit] = useState(false);
 
   const openListings = async () => {
     setListingsOpen(true);
@@ -142,6 +143,7 @@ export default function HangoutCreatePage() {
           errorCode = err?.code || "";
         } catch { /* тело не JSON — игнорируем */ }
         if (errorCode === "HANGOUT_DAILY_LIMIT") {
+          setDailyLimitHit(true);
           toast.error(t("hangout.toast.daily_limit"));
           return;
         }
@@ -160,6 +162,34 @@ export default function HangoutCreatePage() {
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       <AppHeader title={t("hangout.action.create")} />
       <main className="px-4 pb-24 pt-4 max-w-2xl mx-auto">
+        {dailyLimitHit && (
+          <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 p-4" data-testid="hangout-daily-limit">
+            <div className="flex items-start gap-3">
+              <Crown size={20} className="text-amber-600 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="font-bold text-sm text-amber-800">{t("hangout.upsell.title")}</p>
+                <p className="text-xs text-amber-700 mt-1">{t("hangout.upsell.subtitle")}</p>
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    data-testid="hangout-upsell-go"
+                    className="rounded-full font-bold h-9"
+                    onClick={() => navigate("/premium")}
+                  >
+                    <Crown size={14} className="mr-1.5" /> {t("hangout.upsell.cta")}
+                  </Button>
+                  <Button
+                    data-testid="hangout-upsell-dismiss"
+                    variant="ghost"
+                    className="rounded-full h-9 text-muted-foreground"
+                    onClick={() => setDailyLimitHit(false)}
+                  >
+                    {t("hangout.action.cancel")}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <Card className="p-5 space-y-4">
           <div className="space-y-1.5">
             <Label>{t("hangout.form.type")}</Label>
@@ -325,7 +355,7 @@ export default function HangoutCreatePage() {
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>{t("partner.select_offer")}</DialogTitle>
-            <DialogDescription>{t("hangout.form.description_placeholder")}</DialogDescription>
+            <DialogDescription>{t("partner.select_offer_desc")}</DialogDescription>
           </DialogHeader>
           <div className="max-h-80 overflow-y-auto space-y-2">
             {listingsLoading && <Loader2 size={20} className="mx-auto animate-spin text-muted-foreground" />}

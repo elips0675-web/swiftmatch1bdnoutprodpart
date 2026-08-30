@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/layout/app-header";
 import { BottomNav } from "@/components/navigation/bottom-nav";
@@ -6,11 +6,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/context/language-context";
 import { useFeatureFlags } from "@/context/feature-flags-context";
 import { getToken } from "@/lib/token";
 import { HANGOUT_CATEGORIES, formatEventDate, type Hangout, type HangoutType } from "@/lib/hangouts";
-import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus } from "lucide-react";
+import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const categoryIcon = (category: string) => {
@@ -58,16 +59,42 @@ function dateRange(filter: HangoutDateFilter): { from?: string; to?: string } {
   return { from: sat.toISOString(), to: endOfDay(new Date(sat.getFullYear(), sat.getMonth(), sat.getDate() + 1)).toISOString() };
 }
 
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function formatHumanDate(value: string, t: (key: string) => string): string {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  const now = new Date();
+  const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  if (isSameDay(d, now)) return `${t("hangout.filter.today")} ${time}`;
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  if (isSameDay(d, tomorrow)) return `${t("hangout.filter.tomorrow")} ${time}`;
+  return formatEventDate(value);
+}
+
 function HangoutCard({ hangout }: { hangout: Hangout }) {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const Icon = categoryIcon(hangout.category);
   const isDate = hangout.hangout_type === 'date';
+
+  const navigateProfile = (h: Hangout) => {
+    if (h.author_id) navigate(`/profile/${h.author_id}`);
+  };
 
   return (
     <Link to={`/hangouts/${hangout.id}`} className="block">
       <Card data-testid={`hangout-card-${hangout.id}`} className="p-4 hover:bg-muted/30 transition-colors">
         <div className="flex items-start gap-3">
-          <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
+          <div
+            className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden cursor-pointer"
+            role="link"
+            aria-label={hangout.display_name}
+            data-testid={`hangout-author-${hangout.author_id}`}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigateProfile(hangout); }}
+          >
             {hangout.avatar_url ? (
               <img src={hangout.avatar_url} alt="" className="w-full h-full object-cover" />
             ) : (
@@ -83,13 +110,28 @@ function HangoutCard({ hangout }: { hangout: Hangout }) {
                 {isDate ? <Heart size={10} className="mr-0.5" /> : <UserPlus size={10} className="mr-0.5" />}
                 {t(`hangout.type.${hangout.hangout_type}`)}
               </Badge>
-              <span className="text-[11px] text-muted-foreground truncate">{hangout.display_name}</span>
+              <span
+                className="text-[11px] text-muted-foreground truncate flex items-center gap-1 hover:text-primary hover:underline cursor-pointer"
+                role="link"
+                aria-label={hangout.display_name}
+                data-testid={`hangout-author-name-${hangout.author_id}`}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigateProfile(hangout); }}
+              >
+                {hangout.display_name}
+                {typeof hangout.age === "number" && <span>· {hangout.age}</span>}
+                {Boolean(hangout.online) && (
+                  <span title={t("chats.online")} className="inline-block w-2 h-2 rounded-full bg-[#2ecc71] shrink-0" />
+                )}
+              </span>
             </div>
             <p className="font-semibold text-sm mt-1.5 leading-snug line-clamp-2">{hangout.title}</p>
+            {hangout.description && (
+              <p className="text-xs text-muted-foreground mt-1 leading-snug line-clamp-2">{hangout.description}</p>
+            )}
             <div className="mt-2 space-y-1 text-xs text-muted-foreground">
               <p className="flex items-center gap-1.5">
                 <CalendarDays size={12} />
-                {formatEventDate(hangout.event_date)}
+                {formatHumanDate(hangout.event_date, t)}
               </p>
               {(hangout.place_name || hangout.city) && (
                 <p className="flex items-center gap-1.5 truncate">
@@ -128,16 +170,35 @@ export default function HangoutsPage() {
   const [hasMore, setHasMore] = useState(false);
   const [radiusKm, setRadiusKm] = useState(10);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoStatus, setGeoStatus] = useState<"pending" | "ok" | "denied">("pending");
   const [geoAsked, setGeoAsked] = useState(false);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+  }, [search]);
+
+  const askGeo = () => {
+    if (!navigator.geolocation) { setGeoStatus("denied"); return; }
+    setGeoStatus("pending");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setGeoStatus("ok"); },
+      () => { setGeoStatus("denied"); setCoords(null); },
+      { timeout: 5000 },
+    );
+  };
 
   useEffect(() => {
     if (!geoAsked && navigator.geolocation) {
       setGeoAsked(true);
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => {},
-        { timeout: 5000 },
-      );
+      askGeo();
     }
   }, [geoAsked]);
 
@@ -146,6 +207,7 @@ export default function HangoutsPage() {
     let cancelled = false;
     setLoading(true);
     const params = new URLSearchParams();
+    if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
     if (category) params.set("category", category);
     if (hangoutType !== "all") params.set("type", hangoutType);
     const range = dateRange(dateFilter);
@@ -172,7 +234,7 @@ export default function HangoutsPage() {
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [category, hangoutType, dateFilter, page, coords, radiusKm, hangoutsEnabled]);
+  }, [category, hangoutType, dateFilter, page, coords, radiusKm, hangoutsEnabled, debouncedSearch]);
 
   const chips = useMemo(
     () => [{ key: null, label: t("hangout.filter.all_categories") }, ...HANGOUT_CATEGORIES.map((c) => ({ key: c as string, label: t(`hangout.category.${c}`) }))],
@@ -220,6 +282,37 @@ export default function HangoutsPage() {
               <PlusCircle size={18} className="mr-2" />
               {t("hangout.action.create")}
             </Button>
+
+            <Link
+              to="/hangouts/my"
+              data-testid="hangout-my-link"
+              className="block text-center text-sm font-semibold text-primary hover:underline py-0.5"
+            >
+              {t("hangout.my_listings")} →
+            </Link>
+
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                data-testid="hangout-search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t("hangout.filter.search")}
+                className="pl-9 pr-9 rounded-full h-10"
+                aria-label={t("hangout.filter.search")}
+              />
+              {search && (
+                <button
+                  type="button"
+                  data-testid="hangout-search-clear"
+                  onClick={() => setSearch("")}
+                  aria-label={t("hangout.filter.clear_search")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground rounded-full p-0.5"
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </div>
 
             <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" data-testid="hangout-type-chips">
               {(["all", "date", "company"] as const).map((typ) => (
@@ -281,7 +374,23 @@ export default function HangoutsPage() {
               ))}
             </div>
 
-            <div className="px-1">
+            <div className="px-1" data-testid="hangout-radius">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                  <MapPin size={12} />
+                  {t("hangout.filter.radius", { km: radiusKm })}
+                </label>
+                {geoStatus === "denied" && (
+                  <button
+                    type="button"
+                    data-testid="hangout-geo-retry"
+                    onClick={askGeo}
+                    className="text-xs text-primary underline underline-offset-2"
+                  >
+                    {t("hangout.filter.geo_retry")}
+                  </button>
+                )}
+              </div>
               <Slider
                 value={[radiusKm]}
                 min={1}
@@ -289,11 +398,14 @@ export default function HangoutsPage() {
                 step={1}
                 onValueChange={(v) => setRadiusKm(v[0])}
                 aria-label={t("hangout.filter.radius", { km: radiusKm })}
+                disabled={geoStatus === "denied"}
               />
-              <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
-                <MapPin size={12} />
-                {t("hangout.filter.radius", { km: radiusKm })}
-              </p>
+              {geoStatus === "denied" && (
+                <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
+                  <MapPin size={12} />
+                  {t("hangout.filter.geo_denied")}
+                </p>
+              )}
             </div>
 
             {loading ? (
@@ -301,9 +413,18 @@ export default function HangoutsPage() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
               </div>
             ) : items.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground" data-testid="hangouts-empty">
                 <CalendarDays size={48} className="mb-4 opacity-30" />
                 <p>{t("hangout.empty")}</p>
+                <Button
+                  data-testid="hangouts-empty-create"
+                  onClick={() => navigate("/hangouts/create")}
+                  variant="outline"
+                  className="mt-4 rounded-full font-bold"
+                >
+                  <PlusCircle size={16} className="mr-1.5" />
+                  {t("hangout.action.create")}
+                </Button>
               </div>
             ) : (
               <div className="space-y-3">

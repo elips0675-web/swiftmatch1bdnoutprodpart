@@ -54,6 +54,56 @@
 - **Деградация `mysql_schema.sql` (риск 🔴 при пересоздании БД):** schema.sql = **62 таблицы**, живая БД = **73**. Всё из 62 существует в live (лишних нет), но **29 таблиц созданы ТОЛЬКО миграциями 006–042** и отсутствуют в schema.sql: `_migrations`, `audit_log`, `config`, `consent_log`, `data_erase_requests`, `date_checkins`, `emergency_contacts`, `experiment_assignments`, `experiments`, `fcm_tokens`, `hangout_*` (5), `partner_*` (5), `partners`, `push_subscriptions`, `refresh_tokens`, `sms_verification`, `user_aliases`, `user_verifications`, `webhook_events`.
   - **Влияние на CI:** `deploy.yml` server-test/e2e инициализируют БД ТОЛЬКО `mysql < mysql_schema.sql` (строки 68/131), миграции в test-шагах НЕ прогоняются. `schema-validate.mjs` сверяет БД только против schema.sql (не читает `migrations/`) → самосверка «62 vs 62», дрейф миграционных таблиц НЕ ловится. `sql-explain-audit.mjs` — частично.
 
+## Этап 79 (30.08.2026) — bootstrap-корректность mysql_schema.sql + CI fresh-DB path ✅
+Закрыт 🔴-риск этапа 77 («деградация schema.sql») на уровне реального импорта в чистую БД. Найдены и исправлены 3 production-blocking бага регинерированного schema.sql (которые этап 77 не заметил):
+
+1. **`ER_FK_CANNOT_OPEN_PARENT`** — schema.sql (алфавитный дамп) создаёт `users` ПОСЛЕ таблиц со ссылками на него → импорт в чистую БД падал. Фикс: обёртка `SET FOREIGN_KEY_CHECKS=0/1`.
+2. **`ER_WRONG_VALUE_FOR_VAR @OLD_TIME_ZONE`** — хвост ссылался на невыставленный `@OLD_TIME_ZONE`. Фикс: удалено (значение нигде не менялось).
+3. **CI `Init schema → migrate.js` падал** (`Duplicate key 'idx_user_id'`) — _migrations пуст, а структура уже мигрирована. Фикс: `scripts/seed-migrations.mjs` (INSERT IGNORE, идемпотентен) в обоих CI-джобах после Init schema.
+
+## Этап 80 (30.08.2026) — текстовый поиск в ленте встреч /hangouts ✅
+
+По запросу пользователя. Раньше список /hangouts фильтровался только по категории/дате/радиусу — не было текстового поиска конкретной встречи.
+
+- **Сервер** (`server/src/routes/hangouts.js` GET /api/hangouts): новый параметр `?q=` — `LIKE`-поиск с префиксом/суффиксом `%…%` по `h.title`, `h.description`, `h.place_name`, `h.city` (4 параметра) с обрезкой до 100 симв. Пустой/пробельный q не добавляет фильтр. Порядок params сохранён (where-параметры до geoParams).
+- **Фронт** (`src/pages/hangouts.tsx`): поле поиска с иконкой и кнопкой-крестиком очистки, debounce 300ms (`setDebouncedSearch`), сброс page на 1 при поиске, `q` в query-параметрах и deps fetch-`useEffect`.
+- **i18n** (`language-context.tsx` RU+EN): `hangout.filter.search`, `hangout.filter.clear_search`.
+- **Тесты**: server +2 (`hangouts.test.js`: применяет LIKE по 4 полям / игнорит пустой q) → server 326/326; front 81/81; lint 0 errors; vite build OK. Живая проверка на 3002: `?q=Moscow` → 5 (city), `?q=Evening` → 5 (description), `?q=H2 date` → 5 (title).
+
+## Этап 81 (30.08.2026) — UX-улучшения ленты /hangouts (карточки + гео + пустое состояние) ✅
+
+По просьбе «по этапам по важности делай сам». Данные уже приходили с API, часть — доделка UI. Все в `src/pages/hangouts.tsx` (+ i18n keys).
+
+1. **Живая карточка (high):** у автора рядом с именем — возраст (`age`) и зелёный онлайн-бейдж (`online`, `bg-[#2ecc71]`, конвенция чатов).
+2. **Человеческие даты (high):** `formatHumanDate()` — «Сегодня 18:30» / «Завтра 12:00» вместо сырой даты; дальше — прежний формат.
+3. **Отказ геолокации (medium):** `geoStatus` (pending/ok/denied) через `askGeo()`; при отказе слайдер радиуса отключён, показано пояснение + кнопка «Разрешить геолокацию» (retry). Без соords запрос идёт без radius-фильтра.
+4. **Пустое состояние с CTA (medium):** вместо голой надписи — кнопка «Создать встречу» → /hangouts/create.
+5. **Превью описания (low):** 2-строчный `line-clamp-2` описания под заголовком карточки.
+6. **Быстрый доступ к «Моим» (low):** ссылка → /hangouts/my под кнопкой создания.
+7. i18n: `hangout.filter.geo_retry`, `hangout.filter.geo_denied` (RU+EN). Тесты: front 81/81, build OK, lint 0 errors, /hangouts 200.
+
+## Этап 82 (30.08.2026) — доделки /hangouts: respond-флоу, testid, upsell, чистка ✅
+
+По «доделай по этапам». Полный аудит бэка/фронта hangouts (explore): 6 страниц, все роуты существуют, битых ссылок фронт↔бэк нет. Доделать оставалось UI-уровень:
+
+1. **Реанимирован respond-флоу (🔴 high, мёртвый код → живой).** В date-детали `hangout-detail.tsx` диалог «Пойдем» существовал, но `setRespondOpen(true)` нигде не вызывался — весь флоу (POST/DELETE /respond, accept/decline в списке откликов, чат при accept) был недостижим из UI. Добавлена кнопка `respond-hangout` для не-автора (скрыта, если уже есть `my_response_status`), открывает существующий диалог с личным сообщением. Убран неиспользуемый импорт `Star` → `MessageSquareText`.
+2. **data-testid на навигацию (🟠):** back-кнопки (`hangout-detail-back` ×2), все open-chat (`open-chat` ×4), радиус-слайдер (контейнер `hangout-radius`).
+3. **FIX copy/paste placeholder (🟠):** в `hangout-create.tsx` диалог подбора партнёра показывал `hangout.form.description_placeholder` («Кого ищете») как описание. Добавлен `partner.select_offer_desc` (RU+EN).
+4. **Premium-upsell при лимите (🟠):** при 403 `HANGOUT_DAILY_LIMIT` вместо просто тоста — баннер `hangout-daily-limit` на форме создания: заголовок, пояснение, CTA «Стать Premium» → /premium, кнопка dismiss. i18n: `hangout.upsell.title/subtitle/cta`.
+5. **Бэкенд не трогали** — все эндпоинты уже были. Тесты: front 81/81, server hangouts 37/37 (общий server 326/326), build OK, lint 0 errors, /hangouts + /hangouts/create 200.
+
+## Этап 83 (30.08.2026) — связь карточек /hangouts с профилями авторов ✅
+
+По просьбе «свяжи /hangouts с профилями». Раньше вся карточка вела только на детали встречи (`/hangouts/:id`), автор был не кликабельным.
+
+- `src/pages/hangouts.tsx`, `HangoutCard`: аватар и имя автора теперь кликабельны → `/profile/${hangout.author_id}` (route `ProfileById`, App.tsx). `role="link"`, hover-стиль на имени (primary + underline), data-testid `hangout-author-{id}` / `hangout-author-name-{id}`.
+- Реализация внутри внешнего `<Link>` (на детали встречи): `e.preventDefault()+e.stopPropagation()` + `navigate()` — клик по автору не пробрасывается на карточку (React-делегирование событий: stopPropagation гасит синтетический клик до родительского Link).
+- `author_id` уже приходил с API (`up.id AS author_id`); профиль-страница `/profile/:id` — существующий роут. Бэкенд/i18n не трогали.
+- Тесты: front 81/81, build OK, lint 0 errors, /hangouts + /profile/:id 200, feed отдаёт author_id.
+
+
+Верифицировано e2e на scratch-БД: 73 таблицы / 93 FK загружаются, FK enforcement работает, seed 43 → migrate.js 0 errors, idempotent. Scratch-БД подчищена. Server 324/324, vite build OK, schema-validate live 73 OK.
+
 ## Плановые хвосты (не блокируют)
 
 - Внешние блокеры (не код): staging VPS + docker compose up, реальные ключи в `.env`, домен + SSL + Google Play, k6 100 VU на staging, UptimeRobot/Grafana-алерты.

@@ -20,7 +20,7 @@ import { useWebSocket } from "@/hooks/use-websocket";
 import { getToken } from "@/lib/token";
 import { formatEventDate, type Hangout } from "@/lib/hangouts";
 import { categoryIcon } from "./hangouts";
-import { CalendarDays, MapPin, Users, Check, X, MessageCircle, ArrowLeft, Compass, Pencil, Heart, UserPlus, UserMinus, Star, Navigation } from "lucide-react";
+import { CalendarDays, MapPin, Users, Check, X, MessageCircle, ArrowLeft, Compass, Pencil, Heart, UserPlus, UserMinus, MessageSquareText, Navigation } from "lucide-react";
 import { toast } from "sonner";
 
 const RESPONSE_STATUS_KEYS: Record<string, string> = {
@@ -250,7 +250,7 @@ export default function HangoutDetailPage() {
         <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
           <Compass size={48} className="mb-4 opacity-30" />
           <p>{t("hangout.empty")}</p>
-          <Button variant="outline" className="mt-4 rounded-full" onClick={() => navigate("/hangouts")}>
+          <Button variant="outline" className="mt-4 rounded-full" data-testid="hangout-detail-back" onClick={() => navigate("/hangouts")}>
             <ArrowLeft size={16} className="mr-2" /> {t("hangout.action.back")}
           </Button>
         </div>
@@ -268,7 +268,7 @@ export default function HangoutDetailPage() {
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       <AppHeader title={t("hangout.title")} />
       <main className="px-4 pb-24 pt-4 max-w-2xl mx-auto space-y-4">
-        <Button variant="ghost" size="sm" className="rounded-full -ml-2" onClick={() => navigate("/hangouts")}>
+        <Button variant="ghost" size="sm" className="rounded-full -ml-2" data-testid="hangout-detail-back" onClick={() => navigate("/hangouts")}>
           <ArrowLeft size={16} className="mr-1" /> {t("hangout.action.back")}
         </Button>
 
@@ -365,31 +365,44 @@ export default function HangoutDetailPage() {
                 </Badge>
                 {hangout.chat_id && (
                   <Link to={`/chats/${hangout.chat_id}`}>
-                    <Button variant="outline" className="w-full rounded-full">
+                    <Button variant="outline" className="w-full rounded-full" data-testid="open-chat">
                       <MessageCircle size={15} className="mr-2" /> {t("hangout.action.open_chat")}
                     </Button>
                   </Link>
                 )}
               </div>
             ) : (
-              <div className="flex gap-3">
-                <Button
-                  data-testid="skip-hangout"
-                  variant="outline"
-                  className="flex-1 rounded-full font-bold"
-                  disabled={hangout.status !== "active"}
-                  onClick={() => { const token = getToken(); if (!token) { navigate("/login"); return; } skipHangout(); }}
-                >
-                  <X size={16} className="mr-1" /> {t("hangout.action.skip")}
-                </Button>
-                <Button
-                  data-testid="like-hangout"
-                  className="flex-1 rounded-full font-bold bg-pink-500 hover:bg-pink-600"
-                  disabled={hangout.status !== "active"}
-                  onClick={() => { const token = getToken(); if (!token) { navigate("/login"); return; } likeHangout(); }}
-                >
-                  <Heart size={16} className="mr-1" /> {t("hangout.action.like")}
-                </Button>
+              <div className="space-y-3">
+                <div className="flex gap-3">
+                  <Button
+                    data-testid="skip-hangout"
+                    variant="outline"
+                    className="flex-1 rounded-full font-bold"
+                    disabled={hangout.status !== "active"}
+                    onClick={() => { const token = getToken(); if (!token) { navigate("/login"); return; } skipHangout(); }}
+                  >
+                    <X size={16} className="mr-1" /> {t("hangout.action.skip")}
+                  </Button>
+                  <Button
+                    data-testid="like-hangout"
+                    className="flex-1 rounded-full font-bold bg-pink-500 hover:bg-pink-600"
+                    disabled={hangout.status !== "active"}
+                    onClick={() => { const token = getToken(); if (!token) { navigate("/login"); return; } likeHangout(); }}
+                  >
+                    <Heart size={16} className="mr-1" /> {t("hangout.action.like")}
+                  </Button>
+                </div>
+                {!hangout.my_response_status && (
+                  <Button
+                    data-testid="respond-hangout"
+                    variant="outline"
+                    className="w-full rounded-full font-bold"
+                    disabled={hangout.status !== "active"}
+                    onClick={() => { const token = getToken(); if (!token) { navigate("/login"); return; } setRespondOpen(true); }}
+                  >
+                    <MessageSquareText size={15} className="mr-2" /> {t("hangout.action.respond")}
+                  </Button>
+                )}
               </div>
             )}
           </Card>

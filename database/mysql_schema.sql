@@ -4,7 +4,17 @@
 --         notifications, admin, analytics, polls, icebreakers,
 --         73 tables (incl. migration-created: hangouts, partners,
 --         experiments, refresh_tokens and others)
+--
+-- IMPORTANT (этап 79): таблицы идут в алфавитном порядке дампа, поэтому
+-- родительские таблицы (users и др.) создаются ПОСЛЕ таблиц со ссылками
+-- на них. Без отключения FK-check'ов при импорте MySQL падает с
+-- ER_FK_CANNOT_OPEN_PARENT. Обёртка FOREIGN_KEY_CHECKS=0/1 гарантирует,
+-- что schema.sql можно импортировать в чистую БД (CI Init, fresh deploy).
+-- Проверка последовательности таблиц: parseSchema в schema-validate.mjs.
 -- =============================================================
+
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+SET FOREIGN_KEY_CHECKS = 0;
 
 DROP TABLE IF EXISTS `_migrations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -1341,4 +1351,5 @@ CREATE TABLE `webhook_events` (
   UNIQUE KEY `uq_webhook_event` (`provider`,`event_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+SET FOREIGN_KEY_CHECKS = 1;

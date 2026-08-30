@@ -68,6 +68,13 @@ jobs:
         run: mysql -h127.0.0.1 -uroot -pswiftmatch_test swiftmatch_test < database/mysql_schema.sql
         env:
           MYSQL_PWD: swiftmatch_test
+      - name: Seed applied migrations (этап 79)
+        run: node scripts/seed-migrations.mjs
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASSWORD: swiftmatch_test
+          DB_NAME: swiftmatch_test
       - name: Apply DB migrations (этап 78)
         run: node database/migrations/migrate.js
         env:
@@ -136,6 +143,13 @@ jobs:
         working-directory: server
       - name: Init DB schema
         run: mysql -h127.0.0.1 -uroot -pswiftmatch_test swiftmatch_test < database/mysql_schema.sql
+      - name: Seed applied migrations (этап 79)
+        run: node scripts/seed-migrations.mjs
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASSWORD: swiftmatch_test
+          DB_NAME: swiftmatch_test
       - name: Apply DB migrations (этап 78)
         run: node database/migrations/migrate.js
         env:
@@ -202,7 +216,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "dist/,server/,database/,scripts/schema-validate.mjs,scripts/sql-explain-audit.mjs,scripts/verify-backup.mjs,package.json,package-lock.json"
+          source: "dist/,server/,database/,scripts/schema-validate.mjs,scripts/sql-explain-audit.mjs,scripts/verify-backup.mjs,scripts/seed-migrations.mjs,package.json,package-lock.json"
           target: "/app/swiftmatch"
           strip_components: 0
       - name: Migrate + restart backend

@@ -127,6 +127,24 @@ describe('GET /api/hangouts (feed)', () => {
     const sql = pool.query.mock.calls[0][0]
     expect(sql).not.toContain('h.category = ?')
   })
+
+  it('applies text search across title/description/place/city', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts?q=йога')
+    expect(res.status).toBe(200)
+    const sql = pool.query.mock.calls[0][0]
+    expect(sql).toContain('h.title LIKE ? OR h.description LIKE ? OR h.place_name LIKE ? OR h.city LIKE ?')
+    const params = pool.query.mock.calls[0][1]
+    expect(params).toContain('%йога%')
+    expect(params.filter((p) => p === '%йога%').length).toBe(4)
+  })
+
+  it('ignores empty/whitespace search query', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    await request(createApp(hangoutsRoutes)).get('/api/hangouts?q=   ')
+    const sql = pool.query.mock.calls[0][0]
+    expect(sql).not.toContain('h.title LIKE ?')
+  })
 })
 
 describe('POST /api/hangouts', () => {

@@ -86,7 +86,7 @@ const HANGOUT_LIST_SELECT = `
 
 // ─── Feed ──────────────────────────────────────────────────────
 router.get('/api/hangouts', optionalAuth, async (req, res) => {
-  const { category, type, lat, lng, radius, date_from, date_to, city } = req.query
+  const { category, type, lat, lng, radius, date_from, date_to, city, q } = req.query
   const page = Math.max(Number(req.query.page) || 1, 1)
   const limit = parseLimit(req.query.limit)
   const offset = (page - 1) * limit
@@ -94,6 +94,12 @@ router.get('/api/hangouts', optionalAuth, async (req, res) => {
   try {
     const where = ["h.status IN ('active','completed')"]
     const params = []
+
+    if (q && String(q).trim()) {
+      const term = `%${String(q).trim().slice(0, 100)}%`
+      where.push('(h.title LIKE ? OR h.description LIKE ? OR h.place_name LIKE ? OR h.city LIKE ?)')
+      params.push(term, term, term, term)
+    }
 
     if (category && HANGOUT_CATEGORIES.includes(category)) {
       where.push('h.category = ?')
