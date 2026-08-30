@@ -650,3 +650,22 @@
 - `src/lib/hangouts.ts`: тип `Hangout` расширен полями `offer_*`.
 - i18n (RU+EN): `hangout.offer.buy/buying/buy_ticket` (`{price}`).
 - server 327/327 (+1 тест feed-джойна), front 81/81, vite build OK, lint 0 errors.
+
+## Этап 85 (30.08.2026): /hangouts P0 #2 — платные встречи с билетами
+
+Второй 🔴 P0 из плана монетизации закрыт: авторы могут продавать билеты на свои встречи (price + capacity + ticket-flow через Stripe/mock).
+
+- **Миграция** `database/migrations/044_hangouts_paid.sql`: `hangouts.price DECIMAL(10,2)` + `hangouts.capacity INT UNSIGNED` (nullable, additive), таблица `hangout_tickets` (`hangout_id, user_id, stripe_session_id, amount, status pending/paid/refunded`, `UNIQUE(hangout_id,user_id)`). Схема обновлена в `mysql_schema.sql`.
+- **Сервер** (`server/src/routes/hangouts.js`):
+  - CREATE/PUT принимают `price`/`capacity` (валидация: цена ≥0, ≥1 для платных; capacity 1–1000). PUT не даёт опустить capacity ниже проданных билетов (409 `CAPACITY_BELOW_SOLD`).
+  - `POST /api/hangouts/:id/purchase` — Stripe Checkout (`checkout.sessions.create`, цена встречи, rub; success/cancel URL на `/hangouts/:id`). Без `STRIPE_SECRET_KEY` — mock, билет сразу `paid` (+rate-limit, не для своей встречи, capacity-кэп).
+  - `POST /api/hangouts/order/webhook` — подпись Stripe + idempotency через `webhook_events`, помечает билет `paid`. Монтируется с `express.raw` в `server/src/index.js`.
+  - **Гейт платности** `resolvePaidGate(hangout, userId)`: respond/like/join для платной встречи требуют оплаченный билет, иначе 402 `PAYMENT_REQUIRED`; capacity-кэп `sold+accepted ≥ limit` → 409 `CAPACITY_FULL`.
+  - `HANGOUT_LIST_SELECT` + detail возвращают `price, capacity, sold_tickets, my_ticket_status`.
+- **Фронт**:
+  - `hangout-create.tsx` / `hangout-edit.tsx`: поля «Цена билета» (c hint) и «Лимит билетов».
+  - `hangouts.tsx` (карточка): бадж «Билет {price} ₽» + `sold/capacity`, если цена задана.
+  - `hangout-detail.tsx`: карточка «Вход по билету» с кнопкой «Купить билет» (Stripe-редирект или mock-toast), бейдж «Билет куплен» при `my_ticket_status=paid`.
+  - i18n `hangout.form.ticket_price/ticket_capacity/price_invalid`, `hangout.ticket.title/price/buy/have/purchased/full` (RU+EN).
+- **Тесты**: server **334/334** (+7: PAYMENT_REQUIRED без билета, CAPACITY_FULL sold-out, respond с билетом, purchase mock-paid, purchase capacity, free→400, auth→401), front **81/81** (18 files), `npx vite build` OK, eslint 0 errors.
+- **Live-проверка** (localhost:3002, перезапущен): создана платная встреча (price=500/capacity=3); purchase от автора → 400; respond без билета → 402; purchase (mock) → 201 `{mock,paid,amount:500}`; respond с билетом → 201; detail `my_ticket_status=paid, sold=1`. Тестовые данные отменены/refunded.

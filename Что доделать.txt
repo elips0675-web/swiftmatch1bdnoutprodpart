@@ -558,7 +558,7 @@
 | Приоритет | Задача | Что делать | Файлы |
 |---|---|---|---|
 | 🔴 P0 ✅ | **Джойн partner_offer в ленту /hangouts** — **СДЕЛАНО (этап 84)** | В `HANGOUT_LIST_SELECT` добавлен `LEFT JOIN partner_offers po ON po.id = h.partner_offer_id` (поля `offer_id/offer_title/offer_price/offer_image_url/offer_deeplink/offer_category/offer_city/offer_valid_to`) во все 3 выборки (feed/my/detail). В `HangoutCard` блок «Билет {price} ₽ →» с кнопкой «Купить» → `POST /api/partners/order` (уже готовый Stripe/mock-чёкаут, `partners.js:404`) → редирект на `url`. i18n `hangout.offer.buy/buying/buy_ticket` RU+EN. server 327/327 (+1 тест feed-джойна), front 81/81 | `server/src/routes/hangouts.js`, `src/pages/hangouts.tsx`, `src/lib/hangouts.ts` |
-| 🔴 P0 | **Платные встречи (ticket flow)** | В `hangouts` добавить `price` + `capacity`. RSVP: бесплатно как сейчас; платно — через тот же `checkout.sessions.create` (переиспользовать подпись/идемпотентность из partners.js, не дублировать). Показывать цену в карточке/детали | миграция 044/045 `hangouts_price`, `server/src/routes/hangouts.js`, `premium.js`/`partners.js` чёкаут |
+| 🔴 P0 ✅ | **Платные встречи (ticket flow)** — **СДЕЛАНО (этап 85)** | В `hangouts` добавлены `price` + `capacity` (миграция 044). Новая таблица `hangout_tickets` (UNIQUE hangout_id+user_id). `POST /api/hangouts/:id/purchase` — Stripe Checkout (`checkout.sessions.create`, mock при отсутствии ключа → сразу paid) + webhook `/api/hangouts/order/webhook`. Гейт: respond/like/join для платной встречи требуют оплаченный билет (402 `PAYMENT_REQUIRED`), capacity-кэп (409 `CAPACITY_FULL`), PUT запрещает capacity ниже проданных. UI: форма create/edit с ценой+лимитом, карточка-бадж «Билет {price} ₽»+sold, деталь — блок «Купить билет» + бейдж «Билет куплен». server 334/334 (+7), front 81/81 | миграция `044_hangouts_paid.sql`, `server/src/routes/hangouts.js`, `server/src/index.js`, `src/pages/hangout-{create,edit,detail}.tsx`, `hangouts.tsx` |
 | 🟠 P1 | **Закреплённые/спонсированные карточки** | Оффер с `placement=hangout` + флаг `pinned` → верх ленты с бейджем «Sponsored». Продажа локальным кафе/барам/ивент-организаторам | `server/src/routes/admin/partners.js`, `partner-dashboard.js`, `src/pages/hangouts.tsx` |
 | 🟠 P1 | **Событийная интеграция (ивент-организаторы)** | B2B уже есть (partner-dashboard/offers) — расширить на ивент-площадки: speed-dating, миксеры, мастер-классы → комиссия за билет (10–30% маржа). Использовать `event_url`/`poster_url` | |
 | 🟡 P2 | **Премиум-перки на встречи** | Убрать лимит 1/день для premium, супер-продвижение своих встреч, увеличение `max_companions` для premium | `server/src/routes/hangouts.js` (лимит), `use-premium.ts`, `hangout-create.tsx` upsell |
@@ -577,3 +577,20 @@
 - **Тесты**: server 327/327 (+1 `joins partner offer and returns offer fields`), front 81/81 (hangouts 7/7, language-context 4/4), `npx vite build` OK, lint 0 errors (1 pre-existing react-refresh warning на categoryIcon).
 
 **Что дальше (P0 #2 → P1):** платные встречи (price+capacity в hangouts + ticket-flow через тот же чёкаут), затем закреплённые/спонсированные карточки Sponsored.
+
+## ✅ Этап 85 (30.08.2026): /hangouts P0 #2 — платные встречи с билетами — ЗАКРЫТО
+
+Второй 🔴 P0 из плана монетизации выполнен: авторы могут продавать билеты на свои встречи.
+
+- **Схема** (миграция `044_hangouts_paid.sql`): `hangouts.price DECIMAL(10,2) NULL`, `hangouts.capacity INT UNSIGNED NULL` (NULL = без ограничений), таблица `hangout_tickets` (`hangout_id, user_id, stripe_session_id, amount, status pending/paid/refunded, UNIQUE(hangout_id,user_id)`).
+- **Сервер** (`hangouts.js`):
+  - create/update принимают `price`/`capacity` (валидация: цена ≥0, ≥1 для платных; capacity 1–1000).
+  - `POST /api/hangouts/:id/purchase` — создаёт Stripe Checkout (цена из встречи, rub); без STRIPE_SECRET_KEY — mock, билет сразу paid. Ограничение: нельзя покупать свою встречу, capacity-кэп.
+  - `POST /api/hangouts/order/webhook` — Stripe-подпись + `webhook_events` idempotency, помечает билет paid. Монтируется с `express.raw` в index.js.
+  - **Гейт платности**: respond/like/join для платной встречи требуют оплаченный билет (`resolvePaidGate` → 402 `PAYMENT_REQUIRED`); capacity-кэп `sold+accepted ≥ limit` → 409 `CAPACITY_FULL`; PUT не даёт уменьшить capacity ниже проданных (409 `CAPACITY_BELOW_SOLD`).
+  - LIST/detail возвращают `price, capacity, sold_tickets, my_ticket_status`.
+- **Фронт**: create/edit — поля «Цена билета» (hint) и «Лимит билетов»; лента — бадж «Билет {price} ₽» + sold/capacity; деталь — карточка «Вход по билету» с кнопкой «Купить билет» (редирект на Stripe URL или toast в mock) + бейдж «Билет куплен».
+- **Тесты**: server **334/334** (+7: PAYMENT_REQUIRED, CAPACITY_FULL, purchase mock, purchase capacity, и др.), front **81/81** (18 files), `npx vite build` OK, eslint 0 errors (1 pre-existing react-refresh warning).
+- **Live-проверка** (localhost:3002): создание платной встречи (id 148, price=500), purchase от автора → 400, respond без билета → 402, purchase (mock) → 201 paid, respond с билетом → 201, detail `my_ticket_status=paid sold=1`. Тестовые данные отменены.
+
+**Что дальше (P1):** закреплённые/спонсорские карточки «Sponsored» (placement=hangout + pinned → верх ленты), затем событийная интеграция с ивент-организаторами.

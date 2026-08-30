@@ -643,13 +643,13 @@
 > Суть: лента — бесплатный UGC, `GET /api/hangouts` не джойнит `partner_offer_id` → цена/деeplink оффера не видны. Офферы уже имеют price/placement (`'hangout'` в PLACEMENTS), Stripe-чёкаут, комиссию 10–15%.
 
 - 🔴 **P0 ✅ СДЕЛАНО (этап 84).** Джойн `partner_offers` в `HANGOUT_LIST_SELECT` (`LEFT JOIN po ON po.id = h.partner_offer_id` во все 3 выборки) + блок «Билет N ₽ →» в карточке на готовый Stripe/mock-чёкаут `POST /api/partners/order` (`partners.js:404`)
-- 🔴 **P0.** Платные встречи: `price` + `capacity` в hangouts, ticket-flow через существующий `checkout.sessions.create`
+- 🔴 **P0 ✅ СДЕЛАНО (этап 85).** Платные встречи: `price` + `capacity` в hangouts (миграция 044, таблица `hangout_tickets`), `POST /api/hangouts/:id/purchase` (Stripe/mock) + webhook, гейт respond/like/join (402 `PAYMENT_REQUIRED`, 409 `CAPACITY_FULL`)
 - 🟠 **P1.** Спонсорские/закреплённые карточки «Sponsored» (placement=hangout + pinned)
 - 🟠 **P1.** Событийная интеграция с ивент-организаторами (speed-dating, миксеры) — комиссия за билет 10–30%
 - 🟡 **P2.** Premium-перки на встречи (снятие лимита 1/день, продвижение, max_companions)
 - 🟢 **P3.** AI-подбор встреч под пары (premium); аффилиат-ссылки «Куда пойти» (дайнинг/travel/подарки, 5–15%)
 
-**Первый шаг — 🔴 P0.** → **СДЕЛАНО (этап 84, 30.08.2026).** Следующее по плану — P0 #2 (платные встречи), затем P1 (спонсорские карточки).
+**Первый шаг — 🔴 P0.** → **СДЕЛАНО (этап 84).** Второй 🔴 P0 (платные встречи) → **СДЕЛАНО (этап 85).** Следующее — P1 (спонсорские карточки).
 
 ## Этап 84 (30.08.2026): /hangouts P0 — джойн partner_offer + блок «Билет»
 
@@ -658,3 +658,15 @@
 - `src/lib/hangouts.ts`: тип `Hangout` + `offer_*`.
 - i18n `hangout.offer.buy/buying/buy_ticket` RU+EN.
 - Счётчики: server 327/327 (+1), front 81/81, vite build OK, lint 0 errors. Коммит: 1056786.
+
+## Этап 85 (30.08.2026): /hangouts P0 #2 — платные встречи с билетами
+
+- **Миграция** `database/migrations/044_hangouts_paid.sql`: `hangouts.price DECIMAL(10,2) NULL`, `hangouts.capacity INT UNSIGNED NULL`, таблица `hangout_tickets` (UNIQUE hangout_id+user_id, status pending/paid/refunded). Применена к живой БД.
+- **Сервер** (`server/src/routes/hangouts.js`):
+  - CREATE/PUT принимают `price`/`capacity`; PUT не даёт опустить capacity ниже проданных билетов.
+  - `POST /api/hangouts/:id/purchase` — Stripe Checkout (mock при отсутствии `STRIPE_SECRET_KEY` → сразу paid, 201); не для своей встречи, capacity-кэп, rate-limit.
+  - `POST /api/hangouts/order/webhook` — подпись + `webhook_events` idempotency, помечает билет paid; монтируется с `express.raw` (index.js).
+  - `resolvePaidGate`: respond/like/join для платной встречи требуют paid-билет (402 `PAYMENT_REQUIRED`), capacity-кэп (409 `CAPACITY_FULL`).
+  - LIST/detail: `price, capacity, sold_tickets, my_ticket_status`.
+- **Фронт**: create/edit — «Цена билета» + «Лимит билетов»; лента — бадж «Билет {price} ₽» + sold/capacity; деталь — блок «Купить билет» + бейдж «Билет куплен». i18n `hangout.form.ticket_*`, `hangout.ticket.*` RU+EN.
+- **Тесты**: server **334/334** (+7), front **81/81**, vite build OK, eslint 0 errors. Live-флоу проверен на порту 3002. Коммит: 06e0bdb.
