@@ -557,7 +557,7 @@
 
 | Приоритет | Задача | Что делать | Файлы |
 |---|---|---|---|
-| 🔴 P0 | **Джойн partner_offer в ленту /hangouts** | В `HANGOUT_LIST_SELECT` добавить `LEFT JOIN partner_offers o ON o.id = h.partner_offer_id`, вернуть `o.price/o.title/o.image_url/o.deeplink`. В `HangoutCard` при наличии оффера — блок «Билет {price} ₽ →» с кнопкой CTA на уже готовый Stripe-чёкаут (`partners.js:411-438`). Подключает написанные платёжные контракты к ленте | `server/src/routes/hangouts.js`, `src/pages/hangouts.tsx`, `src/lib/hangouts.ts` |
+| 🔴 P0 ✅ | **Джойн partner_offer в ленту /hangouts** — **СДЕЛАНО (этап 84)** | В `HANGOUT_LIST_SELECT` добавлен `LEFT JOIN partner_offers po ON po.id = h.partner_offer_id` (поля `offer_id/offer_title/offer_price/offer_image_url/offer_deeplink/offer_category/offer_city/offer_valid_to`) во все 3 выборки (feed/my/detail). В `HangoutCard` блок «Билет {price} ₽ →» с кнопкой «Купить» → `POST /api/partners/order` (уже готовый Stripe/mock-чёкаут, `partners.js:404`) → редирект на `url`. i18n `hangout.offer.buy/buying/buy_ticket` RU+EN. server 327/327 (+1 тест feed-джойна), front 81/81 | `server/src/routes/hangouts.js`, `src/pages/hangouts.tsx`, `src/lib/hangouts.ts` |
 | 🔴 P0 | **Платные встречи (ticket flow)** | В `hangouts` добавить `price` + `capacity`. RSVP: бесплатно как сейчас; платно — через тот же `checkout.sessions.create` (переиспользовать подпись/идемпотентность из partners.js, не дублировать). Показывать цену в карточке/детали | миграция 044/045 `hangouts_price`, `server/src/routes/hangouts.js`, `premium.js`/`partners.js` чёкаут |
 | 🟠 P1 | **Закреплённые/спонсированные карточки** | Оффер с `placement=hangout` + флаг `pinned` → верх ленты с бейджем «Sponsored». Продажа локальным кафе/барам/ивент-организаторам | `server/src/routes/admin/partners.js`, `partner-dashboard.js`, `src/pages/hangouts.tsx` |
 | 🟠 P1 | **Событийная интеграция (ивент-организаторы)** | B2B уже есть (partner-dashboard/offers) — расширить на ивент-площадки: speed-dating, миксеры, мастер-классы → комиссия за билет (10–30% маржа). Использовать `event_url`/`poster_url` | |
@@ -566,3 +566,14 @@
 | 🟢 P3 | **Affiliate-аффилиаты (дайнинг/travel/подарки)** | Блок «Куда пойти» на /hangouts с аффилиат-ссылками: рестораны первого свидания, отели, цветы, подарки — комиссия 5–15% (OpenTable/Booking-аффилиаты). Отдельно от UGC | Новый лёгкий слой в `partner_offers` (категория dining/travel) |
 
 **Консенсус интернет-ресёрча (2026):** события/ивенты — самый естественный и высокомаржинальный канал для дейтинга (+10–30% маржа на билетах; Thursday закрыл app ради платных ивентов; Hinge — $1M фонд на Gen Z-ивенты). Гибрид «подписка + IAP + партнёрка + ивенты» даёт +30–40% LTV vs single-model. **Первый шаг рекомендован — 🔴 P0.**
+
+## ✅ Этап 84 (30.08.2026): /hangouts P0 — джойн partner_offer + блок «Билет» — ЗАКРЫТО
+
+Первый 🔴 P0 из плана монетизации выполнен: лента встреч теперь показывает и продаёт партнёрские офферы (цена + кнопка покупки).
+
+- **Сервер** (`server/src/routes/hangouts.js`): `JOIN_PARTNER_OFFER` = `LEFT JOIN partner_offers po ON po.id = h.partner_offer_id`; `HANGOUT_LIST_SELECT` возвращает `offer_id/offer_title/offer_price/offer_image_url/offer_deeplink/offer_category/offer_city/offer_valid_to`; джойн добавлен во все 3 выборки (feed, my, detail).
+- **Фронт** (`src/pages/hangouts.tsx`): в `HangoutCard` при наличии оффера — компактный блок «Билет {price} ₽» + кнопка «Купить» → `POST /api/partners/order` (переиспользован готовый Stripe/mock-чёкаут `partners.js:404`) → редирект на `session.url`. data-testid `hangout-offer-buy-{id}`. Для оффера без цены — строка с названием оффера. Тип `Hangout` расширен полями `offer_*`.
+- **i18n** (RU+EN): `hangout.offer.buy` / `hangout.offer.buying` / `hangout.offer.buy_ticket` (`{price}`).
+- **Тесты**: server 327/327 (+1 `joins partner offer and returns offer fields`), front 81/81 (hangouts 7/7, language-context 4/4), `npx vite build` OK, lint 0 errors (1 pre-existing react-refresh warning на categoryIcon).
+
+**Что дальше (P0 #2 → P1):** платные встречи (price+capacity в hangouts + ticket-flow через тот же чёкаут), затем закреплённые/спонсированные карточки Sponsored.

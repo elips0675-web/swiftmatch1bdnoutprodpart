@@ -640,3 +640,13 @@
 - Внутри внешнего `<Link>` (на детали): `preventDefault() + stopPropagation()` + `navigate()` — клик по автору не уходит на карточку (React-делегирование). Любая другая часть карточки по-прежнему открывает детали встречи.
 - `author_id` уже приходил с API (`up.id AS author_id`), профиль `/profile/:id` — существующий роут. Бэкенд/i18n не трогали.
 - Проверки: front 81/81, vite build OK, lint 0 errors, /hangouts + /profile/:id 200.
+
+## Этап 84 (30.08.2026): /hangouts P0 — джойн partner_offer + блок «Билет»
+
+Первый 🔴 P0 из плана монетизации закрыт: лента встреч показывает и продаёт партнёрские офферы.
+
+- `server/src/routes/hangouts.js`: `LEFT JOIN partner_offers po ON po.id = h.partner_offer_id` во все 3 выборки (feed/my/detail); `HANGOUT_LIST_SELECT` возвращает `offer_id/offer_title/offer_price/offer_image_url/offer_deeplink/offer_category/offer_city/offer_valid_to`.
+- `src/pages/hangouts.tsx`: в `HangoutCard` блок «Билет {price} ₽» + кнопка «Купить» → `POST /api/partners/order` (переиспользован готовый Stripe/mock-чёкаут) → редирект на `session.url`. data-testid `hangout-offer-buy-{id}`; для оффера без цены — строка с названием.
+- `src/lib/hangouts.ts`: тип `Hangout` расширен полями `offer_*`.
+- i18n (RU+EN): `hangout.offer.buy/buying/buy_ticket` (`{price}`).
+- server 327/327 (+1 тест feed-джойна), front 81/81, vite build OK, lint 0 errors.

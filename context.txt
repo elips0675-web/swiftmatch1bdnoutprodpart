@@ -642,11 +642,19 @@
 
 > Суть: лента — бесплатный UGC, `GET /api/hangouts` не джойнит `partner_offer_id` → цена/деeplink оффера не видны. Офферы уже имеют price/placement (`'hangout'` в PLACEMENTS), Stripe-чёкаут, комиссию 10–15%.
 
-- 🔴 **P0.** Джойн `partner_offers` в `HANGOUT_LIST_SELECT` (LEFT JOIN o.id = h.partner_offer_id) + блок «Билет N ₽ →» в карточке на готовый Stripe-чёкаут (`partners.js`)
+- 🔴 **P0 ✅ СДЕЛАНО (этап 84).** Джойн `partner_offers` в `HANGOUT_LIST_SELECT` (`LEFT JOIN po ON po.id = h.partner_offer_id` во все 3 выборки) + блок «Билет N ₽ →» в карточке на готовый Stripe/mock-чёкаут `POST /api/partners/order` (`partners.js:404`)
 - 🔴 **P0.** Платные встречи: `price` + `capacity` в hangouts, ticket-flow через существующий `checkout.sessions.create`
 - 🟠 **P1.** Спонсорские/закреплённые карточки «Sponsored» (placement=hangout + pinned)
 - 🟠 **P1.** Событийная интеграция с ивент-организаторами (speed-dating, миксеры) — комиссия за билет 10–30%
 - 🟡 **P2.** Premium-перки на встречи (снятие лимита 1/день, продвижение, max_companions)
 - 🟢 **P3.** AI-подбор встреч под пары (premium); аффилиат-ссылки «Куда пойти» (дайнинг/travel/подарки, 5–15%)
 
-**Первый шаг — 🔴 P0.**
+**Первый шаг — 🔴 P0.** → **СДЕЛАНО (этап 84, 30.08.2026).** Следующее по плану — P0 #2 (платные встречи), затем P1 (спонсорские карточки).
+
+## Этап 84 (30.08.2026): /hangouts P0 — джойн partner_offer + блок «Билет»
+
+- `server/src/routes/hangouts.js`: `JOIN_PARTNER_OFFER` = `LEFT JOIN partner_offers po ON po.id = h.partner_offer_id`; `HANGOUT_LIST_SELECT` возвращает `offer_id/offer_title/offer_price/offer_image_url/offer_deeplink/offer_category/offer_city/offer_valid_to` (feed/my/detail).
+- `src/pages/hangouts.tsx`: блок «Билет {price} ₽» + кнопка «Купить» → `POST /api/partners/order` (готовый Stripe/mock-чёкаут) → редирект на `session.url`; data-testid `hangout-offer-buy-{id}`; оффер без цены — строка с названием.
+- `src/lib/hangouts.ts`: тип `Hangout` + `offer_*`.
+- i18n `hangout.offer.buy/buying/buy_ticket` RU+EN.
+- Счётчики: server 327/327 (+1), front 81/81, vite build OK, lint 0 errors. Коммит: 1056786.
