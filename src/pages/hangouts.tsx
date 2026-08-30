@@ -155,6 +155,19 @@ function HangoutCard({ hangout }: { hangout: Hangout }) {
             {hangout.description && (
               <p className="text-xs text-muted-foreground mt-1 leading-snug line-clamp-2">{hangout.description}</p>
             )}
+            {hangout.price && Number(hangout.price) > 0 && (
+              <div className="mt-2 flex items-center gap-2 rounded-lg bg-primary/5 border border-primary/20 px-2.5 py-1.5">
+                <span className="text-xs font-bold text-primary flex items-center gap-1">
+                  <Ticket size={13} className="text-primary" />
+                  {t("hangout.ticket.price", { price: Number(hangout.price) })}
+                </span>
+                {typeof hangout.capacity === "number" && (
+                  <span className="ml-auto text-[10px] font-semibold text-muted-foreground">
+                    {hangout.sold_tickets ?? 0}/{hangout.capacity}
+                  </span>
+                )}
+              </div>
+            )}
             {hangout.offer_id && hangout.offer_price ? (
               <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-primary/5 border border-primary/20 px-2.5 py-1.5">
                 <span className="text-xs font-semibold text-foreground flex items-center gap-1">

@@ -577,6 +577,8 @@ CREATE TABLE `hangouts` (
   `max_companions` tinyint unsigned NOT NULL DEFAULT '1',
   `hangout_type` enum('date','company') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'date',
   `partner_offer_id` int unsigned DEFAULT NULL,
+  `price` decimal(10,2) DEFAULT NULL,
+  `capacity` int unsigned DEFAULT NULL,
   `poster_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `event_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `status` enum('active','cancelled','completed','blocked') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
@@ -591,6 +593,27 @@ CREATE TABLE `hangouts` (
   CONSTRAINT `fk_hangouts_partner_offer` FOREIGN KEY (`partner_offer_id`) REFERENCES `partner_offers` (`id`) ON DELETE SET NULL,
   CONSTRAINT `hangouts_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=148 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+DROP TABLE IF EXISTS `hangout_tickets`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `hangout_tickets` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `hangout_id` int unsigned NOT NULL,
+  `user_id` int unsigned NOT NULL,
+  `stripe_session_id` varchar(191) DEFAULT NULL,
+  `amount` decimal(10,2) DEFAULT NULL,
+  `status` enum('pending','paid','refunded') NOT NULL DEFAULT 'pending',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `paid_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_hangout_ticket` (`hangout_id`,`user_id`),
+  KEY `idx_tickets_hangout` (`hangout_id`),
+  KEY `idx_tickets_user` (`user_id`),
+  CONSTRAINT `fk_hangout_tickets_hangout` FOREIGN KEY (`hangout_id`) REFERENCES `hangouts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_hangout_tickets_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `icebreaker_answers`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;

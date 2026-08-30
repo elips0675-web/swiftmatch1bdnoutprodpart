@@ -83,9 +83,12 @@ export interface Hangout {
   offer_price?: string | number | null
   offer_image_url?: string | null
   offer_deeplink?: string | null
-  offer_category?: string | null
-  offer_city?: string | null
+offer_category?: string | null
   offer_valid_to?: string | null
+  price?: string | number | null
+  capacity?: number | null
+  sold_tickets?: number
+  my_ticket_status?: 'pending' | 'paid' | 'refunded' | null
 }
 
 export interface MyHangoutResponse {

@@ -353,6 +353,87 @@ describe('POST /api/hangouts/:id/respond', () => {
     expect(res.status).toBe(201)
     expect(res.body.id).toBe(55)
   })
+
+  it('returns PAYMENT_REQUIRED for paid hangout without ticket', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 7, user_id: 1, status: 'active', title: 'Gala', price: 500.0, capacity: 5, max_companions: 1, hangout_type: 'date' }], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await respond(createApp(hangoutsRoutes))
+    expect(res.status).toBe(402)
+    expect(res.body.message).toBe('PAYMENT_REQUIRED')
+  })
+
+  it('returns CAPACITY_FULL when sold out', async () => {
+    const paidHangout = { id: 7, user_id: 1, status: 'active', title: 'Gala', price: 500.0, capacity: 2, max_companions: 1, hangout_type: 'date' }
+    pool.query
+      .mockResolvedValueOnce([[paidHangout], []])
+      .mockResolvedValueOnce([[{ status: 'paid' }], []])
+      .mockResolvedValueOnce([[{ cnt: 2 }], []])
+      .mockResolvedValueOnce([[{ cnt: 1 }], []])
+    const res = await respond(createApp(hangoutsRoutes))
+    expect(res.status).toBe(409)
+    expect(res.body.message).toBe('CAPACITY_FULL')
+  })
+
+  it('allows respond when paid ticket exists and capacity available', async () => {
+    const paidHangout = { id: 7, user_id: 1, status: 'active', title: 'Gala', price: 500.0, capacity: 5, max_companions: 1, hangout_type: 'date' }
+    pool.query
+      .mockResolvedValueOnce([[paidHangout], []])
+      .mockResolvedValueOnce([[{ status: 'paid' }], []])
+      .mockResolvedValueOnce([[{ cnt: 1 }], []])
+      .mockResolvedValueOnce([[{ cnt: 0 }], []])
+      .mockResolvedValueOnce([{ insertId: 55 }, []])
+      .mockResolvedValueOnce([[{ display_name: 'Anna' }], []])
+      .mockResolvedValueOnce([{ insertId: 77 }, []])
+      .mockResolvedValueOnce([[{ id: 77, type: 'hangout_response', payload: '{}', created_at: new Date() }], []])
+
+    const res = await respond(createApp(hangoutsRoutes))
+    expect(res.status).toBe(201)
+    expect(res.body.id).toBe(55)
+  })
+})
+
+describe('POST /api/hangouts/:id/purchase (ticket checkout)', () => {
+  it('requires auth', async () => {
+    const res = await request(createApp(hangoutsRoutes)).post('/api/hangouts/7/purchase')
+    expect(res.status).toBe(401)
+  })
+
+  it('rejects free hangout purchase', async () => {
+    pool.query.mockResolvedValueOnce([[{ id: 7, user_id: 1, status: 'active', title: 'T', price: 0, capacity: null, max_companions: 1, hangout_type: 'date' }], []])
+    const res = await request(createApp(hangoutsRoutes))
+      .post('/api/hangouts/7/purchase')
+      .set('Authorization', `Bearer ${authToken(2)}`)
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('This hangout is free')
+  })
+
+  it('mocks immediate paid ticket when STRIPE_SECRET_KEY is absent', async () => {
+    delete process.env.STRIPE_SECRET_KEY
+    pool.query
+      .mockResolvedValueOnce([[{ id: 7, user_id: 1, status: 'active', title: 'Gala', price: 500.0, capacity: 5, max_companions: 1, hangout_type: 'date' }], []])
+      .mockResolvedValueOnce([[{ cnt: 0 }], []])
+    const res = await request(createApp(hangoutsRoutes))
+      .post('/api/hangouts/7/purchase')
+      .set('Authorization', `Bearer ${authToken(2)}`)
+    expect(res.status).toBe(201)
+    expect(res.body.paid).toBe(true)
+    expect(res.body.mock).toBe(true)
+    const insertCall = pool.query.mock.calls.find(([sql]) => sql.includes('INSERT INTO hangout_tickets'))
+    expect(insertCall).toBeTruthy()
+  })
+
+  it('returns CAPACITY_FULL when tickets exceed capacity', async () => {
+    delete process.env.STRIPE_SECRET_KEY
+    pool.query
+      .mockResolvedValueOnce([[{ id: 7, user_id: 1, status: 'active', title: 'Gala', price: 500.0, capacity: 2, max_companions: 1, hangout_type: 'date' }], []])
+      .mockResolvedValueOnce([[{ cnt: 2 }], []])
+    const res = await request(createApp(hangoutsRoutes))
+      .post('/api/hangouts/7/purchase')
+      .set('Authorization', `Bearer ${authToken(2)}`)
+    expect(res.status).toBe(409)
+    expect(res.body.message).toBe('CAPACITY_FULL')
+  })
 })
 
 describe('GET /api/hangouts/:id/responses', () => {

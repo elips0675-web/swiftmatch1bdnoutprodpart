@@ -64,6 +64,41 @@ const router = Router()
 
 const HANGOUT_CATEGORIES = ['cinema', 'theater', 'exhibition', 'cafe', 'concert', 'sport', 'other']
 
+async function countAcceptedResponses(hangoutId) {
+  const [[row]] = await pool.query(
+    'SELECT COUNT(*) AS cnt FROM hangout_responses WHERE hangout_id = ? AND status = ?',
+    [hangoutId, 'accepted'],
+  )
+  return Number(row?.cnt || 0)
+}
+
+async function resolvePaidGate(hangout, userId) {
+  if (!hangout) return null
+  const price = Number(hangout.price) || 0
+  if (price <= 0) return null
+  const [[ticket]] = await pool.query(
+    'SELECT status FROM hangout_tickets WHERE hangout_id = ? AND user_id = ? LIMIT 1',
+    [hangout.id, userId],
+  )
+  if (!ticket || ticket.status !== 'paid') {
+    return { statusCode: 402, message: 'PAYMENT_REQUIRED', price }
+  }
+  const capacityLimit = hangout.capacity !== null && hangout.capacity !== undefined
+    ? Number(hangout.capacity)
+    : Number(hangout.max_companions)
+  if (capacityLimit > 0) {
+    const [[sold]] = await pool.query(
+      'SELECT COUNT(*) AS cnt FROM hangout_tickets WHERE hangout_id = ? AND status = ?',
+      [hangout.id, 'paid'],
+    )
+    const accepted = hangout.hangout_type === 'date' ? await countAcceptedResponses(hangout.id) : 0
+    if (Number(sold?.cnt || 0) + accepted >= capacityLimit) {
+      return { statusCode: 409, message: 'CAPACITY_FULL' }
+    }
+  }
+  return null
+}
+
 const respondLimiter = rateLimit({ windowMs: 60_000, max: 30, message: { message: 'Too many responses' } })
 const createLimiter = rateLimit({ windowMs: 60_000, max: 10, message: { message: 'Too many hangouts created' } })
 
@@ -80,7 +115,9 @@ const HANGOUT_LIST_SELECT = `
   SELECT h.id, h.user_id AS author_id, h.category, h.title, h.description,
          h.place_name, h.place_address, h.city, h.lat, h.lng, h.event_date,
          h.max_companions, h.hangout_type, h.status, h.created_at,
+         h.price, h.capacity,
          up.display_name, up.avatar_url, up.age, up.online,
+         (SELECT COUNT(*) FROM hangout_tickets ht WHERE ht.hangout_id = h.id AND ht.status = 'paid') AS sold_tickets,
          po.id AS offer_id, po.title AS offer_title, po.price AS offer_price,
          po.image_url AS offer_image_url, po.deeplink AS offer_deeplink,
          po.category AS offer_category, po.city AS offer_city, po.valid_to AS offer_valid_to,
@@ -207,12 +244,13 @@ router.get('/api/hangouts/:id', optionalAuth, async (req, res) => {
          (SELECT hr3.status FROM hangout_responses hr3 WHERE hr3.hangout_id = h.id AND hr3.user_id = ? LIMIT 1) AS my_response_status,
          (SELECT COUNT(*) FROM hangout_likes hl WHERE hl.hangout_id = h.id AND hl.status = 'like') AS like_count,
          (SELECT hl2.status FROM hangout_likes hl2 WHERE hl2.hangout_id = h.id AND hl2.user_id = ? LIMIT 1) AS my_like_status,
-         (SELECT hp2.status FROM hangout_participants hp2 WHERE hp2.hangout_id = h.id AND hp2.user_id = ? LIMIT 1) AS my_participant_status
+         (SELECT hp2.status FROM hangout_participants hp2 WHERE hp2.hangout_id = h.id AND hp2.user_id = ? LIMIT 1) AS my_participant_status,
+         (SELECT ht2.status FROM hangout_tickets ht2 WHERE ht2.hangout_id = h.id AND ht2.user_id = ? LIMIT 1) AS my_ticket_status
      FROM hangouts h
      JOIN user_profiles up ON up.id = h.user_id
      ${JOIN_PARTNER_OFFER}
      WHERE h.id = ?`
-    const [rows] = await pool.query(sql, [req.userId || 0, req.userId || 0, req.userId || 0, id])
+    const [rows] = await pool.query(sql, [req.userId || 0, req.userId || 0, req.userId || 0, req.userId || 0, id])
     if (rows.length === 0) return res.status(404).json({ message: 'Hangout not found' })
 
     const hangout = rows[0]
@@ -266,7 +304,7 @@ router.get('/api/hangouts/:id', optionalAuth, async (req, res) => {
 
 // ─── Create ────────────────────────────────────────────────────
 router.post('/api/hangouts', auth, createLimiter, async (req, res) => {
-  const { category, title, description, place_name, place_address, city, lat, lng, event_date, max_companions, partner_offer_id, hangout_type } = req.body
+  const { category, title, description, place_name, place_address, city, lat, lng, event_date, max_companions, partner_offer_id, hangout_type, price, capacity } = req.body
   if (!category || !title || !event_date) {
     return res.status(400).json({ message: 'category, title and event_date are required' })
   }
@@ -284,6 +322,25 @@ router.post('/api/hangouts', auth, createLimiter, async (req, res) => {
   const companions = Number(max_companions)
   if (!Number.isInteger(companions) || companions < 1 || companions > 10) {
     return res.status(400).json({ message: 'max_companions must be between 1 and 10' })
+  }
+
+  let parsedPrice = null
+  if (price !== undefined && price !== null && price !== '') {
+    parsedPrice = Number(price)
+    if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+      return res.status(400).json({ message: 'price must be a non-negative number' })
+    }
+    if (parsedPrice > 0 && parsedPrice < 1) {
+      return res.status(400).json({ message: 'price must be at least 1 ₽ for paid hangouts' })
+    }
+  }
+
+  let parsedCapacity = null
+  if (capacity !== undefined && capacity !== null && capacity !== '') {
+    parsedCapacity = Number(capacity)
+    if (!Number.isInteger(parsedCapacity) || parsedCapacity < 1 || parsedCapacity > 1000) {
+      return res.status(400).json({ message: 'capacity must be between 1 and 1000' })
+    }
   }
 
   const cleanTitle = stripHtml(String(title)).slice(0, 255)
@@ -315,8 +372,8 @@ router.post('/api/hangouts', auth, createLimiter, async (req, res) => {
     }
 
     const [result] = await pool.query(
-      `INSERT INTO hangouts (user_id, category, title, description, place_name, place_address, city, lat, lng, event_date, max_companions, partner_offer_id, hangout_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO hangouts (user_id, category, title, description, place_name, place_address, city, lat, lng, event_date, max_companions, partner_offer_id, hangout_type, price, capacity)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.userId,
         category,
@@ -331,6 +388,8 @@ router.post('/api/hangouts', auth, createLimiter, async (req, res) => {
         companions,
         partner_offer_id && /^\d+$/.test(String(partner_offer_id)) ? Number(partner_offer_id) : null,
         validType,
+        parsedPrice,
+        parsedCapacity,
       ],
     )
 
@@ -353,9 +412,10 @@ router.put('/api/hangouts/:id', auth, async (req, res) => {
     if (hangout.user_id !== req.userId) return res.status(403).json({ message: 'Not the author' })
     if (hangout.status !== 'active') return res.status(409).json({ message: `Cannot edit hangout in status ${hangout.status}` })
 
-    const allowed = ['title', 'description', 'place_name', 'place_address', 'city', 'lat', 'lng', 'event_date', 'max_companions']
+    const allowed = ['title', 'description', 'place_name', 'place_address', 'city', 'lat', 'lng', 'event_date', 'max_companions', 'price', 'capacity']
     const sets = []
     const params = []
+    let newCapacityValue
     for (const field of allowed) {
       if (!(field in req.body)) continue
       let value = req.body[field]
@@ -374,6 +434,28 @@ router.put('/api/hangouts/:id', auth, async (req, res) => {
           return res.status(400).json({ message: 'max_companions must be between 1 and 10' })
         }
         value = c
+      } else if (field === 'price') {
+        if (value === null || value === '') {
+          value = null
+        } else {
+          const p = Number(value)
+          if (!Number.isFinite(p) || p < 0) {
+            return res.status(400).json({ message: 'price must be a non-negative number' })
+          }
+          if (p > 0 && p < 1) return res.status(400).json({ message: 'price must be at least 1 ₽ for paid hangouts' })
+          value = p
+        }
+      } else if (field === 'capacity') {
+        if (value === null || value === '') {
+          value = null
+        } else {
+          const cap = Number(value)
+          if (!Number.isInteger(cap) || cap < 1 || cap > 1000) {
+            return res.status(400).json({ message: 'capacity must be between 1 and 1000' })
+          }
+          newCapacityValue = cap
+          value = cap
+        }
       } else if (field === 'lat' || field === 'lng') {
         value = value === null || value === '' ? null : parseFloat(value)
         if (value !== null && isNaN(value)) return res.status(400).json({ message: `Invalid ${field}` })
@@ -384,6 +466,16 @@ router.put('/api/hangouts/:id', auth, async (req, res) => {
       params.push(value)
     }
     if (sets.length === 0) return res.status(400).json({ message: 'Nothing to update' })
+
+    if (newCapacityValue !== undefined) {
+      const [[sold]] = await pool.query(
+        'SELECT COUNT(*) AS cnt FROM hangout_tickets WHERE hangout_id = ? AND status = ?',
+        [id, 'paid'],
+      )
+      if (Number(sold?.cnt || 0) > newCapacityValue) {
+        return res.status(409).json({ message: `CAPACITY_BELOW_SOLD: ${sold?.cnt || 0}` })
+      }
+    }
 
     await pool.query(`UPDATE hangouts SET ${sets.join(', ')} WHERE id = ?`, [...params, id])
     res.json({ message: 'Hangout updated' })
@@ -441,10 +533,16 @@ router.post('/api/hangouts/:id/respond', auth, respondLimiter, async (req, res) 
   const message = req.body?.message ? stripHtml(String(req.body.message)).slice(0, 500) || null : null
 
   try {
-    const [[hangout]] = await pool.query('SELECT id, user_id, status, title FROM hangouts WHERE id = ?', [id])
+    const [[hangout]] = await pool.query(
+      'SELECT id, user_id, status, title, price, capacity, max_companions, hangout_type FROM hangouts WHERE id = ?',
+      [id],
+    )
     if (!hangout) return res.status(404).json({ message: 'Hangout not found' })
     if (hangout.user_id === req.userId) return res.status(400).json({ message: 'Cannot respond to your own hangout' })
     if (hangout.status !== 'active') return res.status(409).json({ message: `Hangout is ${hangout.status}` })
+
+    const paidGate = await resolvePaidGate(hangout, req.userId)
+    if (paidGate) return res.status(paidGate.statusCode).json({ message: paidGate.message, ...(paidGate.price !== undefined ? { price: paidGate.price } : {}) })
 
     const bannedWords = await getBannedWords()
     if (message && containsBannedWord(message, bannedWords)) {
@@ -695,11 +793,14 @@ router.post('/api/hangouts/:id/like', auth, likeLimiter, async (req, res) => {
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
 
   try {
-    const [[hangout]] = await pool.query('SELECT id, user_id, hangout_type, status, title FROM hangouts WHERE id = ?', [id])
+    const [[hangout]] = await pool.query('SELECT id, user_id, hangout_type, status, title, price, capacity, max_companions FROM hangouts WHERE id = ?', [id])
     if (!hangout) return res.status(404).json({ message: 'Hangout not found' })
     if (hangout.user_id === req.userId) return res.status(400).json({ message: 'Cannot like your own hangout' })
     if (hangout.status !== 'active') return res.status(409).json({ message: 'Hangout is not active' })
     if (hangout.hangout_type !== 'date') return res.status(400).json({ message: 'Like is only for date-type hangouts' })
+
+    const paidGate = await resolvePaidGate(hangout, req.userId)
+    if (paidGate) return res.status(paidGate.statusCode).json({ message: paidGate.message })
 
     await pool.query(
       'INSERT INTO hangout_likes (hangout_id, user_id, status) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE status = VALUES(status)',
@@ -790,11 +891,14 @@ router.post('/api/hangouts/:id/join', auth, joinLimiter, async (req, res) => {
 
   try {
     const [[hangout]] = await pool.query(
-      'SELECT id, user_id, hangout_type, status, max_companions, title FROM hangouts WHERE id = ?', [id])
+      'SELECT id, user_id, hangout_type, status, max_companions, title, price, capacity FROM hangouts WHERE id = ?', [id])
     if (!hangout) return res.status(404).json({ message: 'Hangout not found' })
     if (hangout.hangout_type !== 'company') return res.status(400).json({ message: 'Join is only for company-type hangouts' })
     if (hangout.status !== 'active') return res.status(409).json({ message: 'Hangout is not active' })
     if (hangout.user_id === req.userId) return res.status(400).json({ message: 'You are the organizer' })
+
+    const paidGate = await resolvePaidGate(hangout, req.userId)
+    if (paidGate) return res.status(paidGate.statusCode).json({ message: paidGate.message })
 
     const [[existing]] = await pool.query(
       'SELECT id, status FROM hangout_participants WHERE hangout_id = ? AND user_id = ? LIMIT 1',
@@ -1014,6 +1118,137 @@ router.post('/api/hangouts/:id/review', auth, reviewLimiter, async (req, res) =>
     logger.error('Hangout review error:', err)
     res.status(500).json({ message: 'Failed to submit review' })
   }
+})
+
+const hangoutTicketLimiter = rateLimit({ windowMs: 60_000, max: 10, message: { message: 'Too many ticket requests' } })
+
+router.post('/api/hangouts/:id/purchase', auth, hangoutTicketLimiter, async (req, res) => {
+  const { id } = req.params
+  if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
+
+  try {
+    const [[hangout]] = await pool.query(
+      'SELECT id, user_id, title, status, price, capacity, max_companions, hangout_type FROM hangouts WHERE id = ?',
+      [id],
+    )
+    if (!hangout) return res.status(404).json({ message: 'Hangout not found' })
+    if (hangout.status !== 'active') return res.status(409).json({ message: 'Hangout is not active' })
+    if (hangout.user_id === req.userId) return res.status(400).json({ message: 'Cannot purchase your own hangout' })
+
+    const price = Number(hangout.price)
+    if (!price || price <= 0) return res.status(400).json({ message: 'This hangout is free' })
+
+    const capacityLimit = hangout.capacity !== null ? Number(hangout.capacity) : Number(hangout.max_companions)
+    if (capacityLimit > 0) {
+      const [[sold]] = await pool.query(
+        'SELECT COUNT(*) AS cnt FROM hangout_tickets WHERE hangout_id = ? AND status = ?',
+        [id, 'paid'],
+      )
+      if (Number(sold?.cnt || 0) >= capacityLimit) {
+        return res.status(409).json({ message: 'CAPACITY_FULL' })
+      }
+    }
+
+    const stripeKey = process.env.STRIPE_SECRET_KEY
+    if (!stripeKey) {
+      await pool.query(
+        `INSERT INTO hangout_tickets (hangout_id, user_id, amount, status, paid_at)
+         VALUES (?, ?, ?, 'paid', NOW())
+         ON DUPLICATE KEY UPDATE amount = VALUES(amount), status = 'paid', paid_at = NOW()`,
+        [id, req.userId, price],
+      )
+      return res.status(201).json({ mock: true, paid: true, amount: price, url: null, session_id: null })
+    }
+
+    const { default: Stripe } = await import('stripe')
+    const stripe = new Stripe(stripeKey)
+    const origin = req.headers.origin || process.env.CLIENT_URL || 'http://localhost:8081'
+    const successUrl = `${origin}/hangouts/${id}?ticket=success`
+    const cancelUrl = `${origin}/hangouts/${id}?ticket=cancelled`
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: 'rub',
+            product_data: { name: hangout.title, description: 'SwiftMatch hangout ticket' },
+            unit_amount: Math.round(price * 100),
+          },
+        },
+      ],
+      metadata: { hangout_id: id, user_id: String(req.userId) },
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+    })
+
+    await pool.query(
+      `INSERT INTO hangout_tickets (hangout_id, user_id, stripe_session_id, amount, status)
+       VALUES (?, ?, ?, ?, 'pending')
+       ON DUPLICATE KEY UPDATE stripe_session_id = VALUES(stripe_session_id), amount = VALUES(amount), status = 'pending'`,
+      [id, req.userId, session.id, price],
+    )
+
+    res.json({ url: session.url, session_id: session.id, mock: false, paid: false })
+  } catch (err) {
+    logger.error('Hangout purchase error:', err)
+    res.status(500).json({ message: 'Failed to create ticket checkout' })
+  }
+})
+
+router.post('/api/hangouts/order/webhook', async (req, res) => {
+  const stripeKey = process.env.STRIPE_SECRET_KEY
+  if (!stripeKey) return res.status(200).json({ received: true })
+
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET
+  const sig = req.headers['stripe-signature']
+  if (!sig || !endpointSecret) return res.status(400).json({ message: 'Missing signature' })
+
+  let event
+  try {
+    const { default: Stripe } = await import('stripe')
+    const stripe = new Stripe(stripeKey)
+    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret)
+  } catch (err) {
+    logger.error('Hangout webhook signature error:', err)
+    return res.status(400).json({ message: 'Invalid signature' })
+  }
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object
+    const { hangout_id: hangoutId, user_id: userId } = session.metadata || {}
+    if (session.payment_status !== 'paid') return res.json({ received: true })
+    try {
+      const conn = await pool.getConnection()
+      try {
+        await conn.beginTransaction()
+        const [evt] = await conn.query(
+          'INSERT IGNORE INTO webhook_events (provider, event_id) VALUES (?, ?)',
+          ['stripe_hangout_ticket', String(event.id || '')],
+        )
+        if (!evt || evt.affectedRows === 0) {
+          await conn.rollback()
+          return res.json({ received: true })
+        }
+        await conn.query(
+          `UPDATE hangout_tickets SET status = 'paid', paid_at = NOW()
+           WHERE hangout_id = ? AND user_id = ? AND stripe_session_id = ?`,
+          [hangoutId, userId, session.id],
+        )
+        await conn.commit()
+      } catch (err) {
+        await conn.rollback()
+        throw err
+      } finally {
+        conn.release()
+      }
+    } catch (err) {
+      logger.error('Hangout ticket webhook processing error:', err)
+    }
+  }
+  res.json({ received: true })
 })
 
 export default router

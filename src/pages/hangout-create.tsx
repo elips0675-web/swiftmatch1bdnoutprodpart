@@ -56,6 +56,8 @@ export default function HangoutCreatePage() {
   const [city, setCity] = useState("");
   const [eventDate, setEventDate] = useState(defaultDateTime());
   const [maxCompanions, setMaxCompanions] = useState(1);
+  const [price, setPrice] = useState("");
+  const [capacity, setCapacity] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [listingsOpen, setListingsOpen] = useState(false);
   const [listings, setListings] = useState<Array<{ id: number; category: string; title: string; description?: string; partner_name: string }>>([]);
@@ -101,6 +103,10 @@ export default function HangoutCreatePage() {
       toast.error(t("hangout.form.required"));
       return;
     }
+    if (price && (Number(price) <= 0 || Number.isNaN(Number(price)))) {
+      toast.error(t("hangout.form.price_invalid"));
+      return;
+    }
     setSubmitting(true);
     try {
       let lat: number | null = null;
@@ -132,6 +138,8 @@ export default function HangoutCreatePage() {
           lng,
           event_date: new Date(eventDate).toISOString(),
           max_companions: maxCompanions,
+          price: price ? Number(price) : undefined,
+          capacity: capacity ? Number(capacity) : undefined,
           partner_offer_id: selectedOfferId ?? undefined,
         }),
       });
@@ -338,6 +346,35 @@ export default function HangoutCreatePage() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="hangout-price">{t("hangout.form.ticket_price")}</Label>
+            <Input
+              id="hangout-price"
+              data-testid="hangout-price"
+              type="number"
+              min="0"
+              step="1"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder={t("hangout.form.ticket_price_placeholder")}
+            />
+            <p className="text-xs text-muted-foreground">{t("hangout.form.ticket_price_hint")}</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="hangout-capacity">{t("hangout.form.ticket_capacity")}</Label>
+            <Input
+              id="hangout-capacity"
+              data-testid="hangout-capacity"
+              type="number"
+              min="1"
+              step="1"
+              value={capacity}
+              onChange={(e) => setCapacity(e.target.value)}
+              placeholder={t("hangout.form.ticket_capacity_placeholder")}
+            />
           </div>
 
           <Button

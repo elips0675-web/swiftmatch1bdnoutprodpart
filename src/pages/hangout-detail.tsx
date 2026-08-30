@@ -20,7 +20,7 @@ import { useWebSocket } from "@/hooks/use-websocket";
 import { getToken } from "@/lib/token";
 import { formatEventDate, type Hangout } from "@/lib/hangouts";
 import { categoryIcon } from "./hangouts";
-import { CalendarDays, MapPin, Users, Check, X, MessageCircle, ArrowLeft, Compass, Pencil, Heart, UserPlus, UserMinus, MessageSquareText, Navigation } from "lucide-react";
+import { CalendarDays, MapPin, Users, Check, X, MessageCircle, ArrowLeft, Compass, Pencil, Heart, UserPlus, UserMinus, MessageSquareText, Navigation, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const RESPONSE_STATUS_KEYS: Record<string, string> = {
@@ -45,6 +45,7 @@ export default function HangoutDetailPage() {
   const [respondOpen, setRespondOpen] = useState(false);
   const [respondMessage, setRespondMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -232,6 +233,38 @@ export default function HangoutDetailPage() {
     }
   };
 
+  const buyTicket = async () => {
+    if (!id) return;
+    setPurchasing(true);
+    try {
+      const token = getToken();
+      if (!token) { navigate("/login"); return; }
+      const res = await fetch(`/api/hangouts/${id}/purchase`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        if (err.message === "CAPACITY_FULL") toast.error(t("hangout.ticket.full"));
+        else toast.error(err.message || t("hangout.error.load"));
+        return;
+      }
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      if (data.paid) {
+        toast.success(t("hangout.ticket.purchased"));
+        load();
+      }
+    } catch {
+      toast.error(t("hangout.error.load"));
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
@@ -263,6 +296,9 @@ export default function HangoutDetailPage() {
   const acceptedCount = hangout.accepted_count ?? 0;
   const isDate = hangout.hangout_type === 'date';
   const isCompany = hangout.hangout_type === 'company';
+  const isPaid = Number(hangout.price) > 0;
+  const hasTicket = hangout.my_ticket_status === 'paid';
+  const needsTicket = isPaid && !hangout.is_author && !hasTicket;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
@@ -346,6 +382,37 @@ export default function HangoutDetailPage() {
             )}
           </div>
         </Card>
+
+        {needsTicket && (
+          <Card className="p-4 border-primary/30">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <span className="text-primary font-black text-sm">₽</span>
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-sm">{t("hangout.ticket.title")}</p>
+                <p className="text-sm text-muted-foreground">
+                  {t("hangout.ticket.price", { price: Number(hangout.price) })}
+                  {hangout.capacity ? ` · ${hangout.sold_tickets ?? 0}/${hangout.capacity}` : ""}
+                </p>
+              </div>
+              <Button
+                data-testid="buy-hangout-ticket"
+                className="ml-auto rounded-full font-bold shrink-0"
+                disabled={purchasing}
+                onClick={buyTicket}
+              >
+                {purchasing && <Loader2 size={15} className="mr-1 animate-spin" />}
+                {t("hangout.ticket.buy")}
+              </Button>
+            </div>
+          </Card>
+        )}
+        {isPaid && hasTicket && (
+          <Badge className="bg-green-100 text-green-800 border-transparent" data-testid="hangout-ticket-paid">
+            ✓ {t("hangout.ticket.have")}
+          </Badge>
+        )}
 
         {hangout.is_author && hangout.status === "active" && (
           <Link to={`/hangouts/${hangout.id}/edit`}>
