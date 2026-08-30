@@ -627,3 +627,26 @@
 
 ### Решённые конфликты
 - Remote (a79ddff) уже содержал свои плейсхолдеры ({to_lat} = ctxLat юзера). Объединено: {to_lat} = offer.lat ?? ctxLat; {city} = ctxCity ?? offer_city; плейсхолдеры без контекста сохраняются (null → match)
+
+## Этапы 80–83 (30.08.2026): /hangouts — поиск, UX, доделки, связь с профилями
+
+> Подробности: «Что сделано.txt» (этапы 80–83), «Что доделать.txt». Бэкенд этапов 81/83 не менялся.
+
+- **80 (текстовый поиск):** `GET /api/hangouts?q=` — LIKE `%term%` по title/description/place_name/city (4 × `%term%`, trim 100, пустой q игнор); UI: поле+крестик, debounce 300ms, сброс page, `q` в deps; i18n `hangout.filter.search/clear_search`. server 326/326, front 81/81
+- **81 (UX-улучшения ленты):** возраст + онлайн-бейдж, `formatHumanDate()` («Сегодня 18:30»/«Завтра 12:00»), `geoStatus` pending/ok/denied + retry, слайдер disabled при отказе, пустое состояние с CTA, line-clamp-2, ссылка «Мои»; i18n `hangout.filter.geo_retry/geo_denied`
+- **82 (доделки):** реанимирован respond-флоу в date-детали (кнопка `respond-hangout` открывала диалог, но не вызывала `setRespondOpen` — серверный флоу был недостижим из UI); data-testid back/open-chat/radius; fix placeholder `partner.select_offer_desc`; premium-upsell при 403 `HANGOUT_DAILY_LIMIT` → /premium
+- **83 (связь с профилями):** аватар и имя автора в `HangoutCard` кликабельны → `/profile/{author_id}` (ProfileById); `role="link"`, hover, data-testid `hangout-author-{id}`/`hangout-author-name-{id}`; `preventDefault+stopPropagation+navigate` внутри внешнего `<Link>` (React-делегирование гасит клик до родительского Link)
+- **Счётчики:** server 326/326, front 81/81, E2E 150/150 (не гоняли заново), vite build OK, lint 0 errors. Коммиты: 146cc27 (код этапы 79–83), 3ee4443/d638128 (docs сделано), 6a97f36 (docs доделать)
+
+## План монетизации /hangouts (30.08.2026) — очередь по важности
+
+> Суть: лента — бесплатный UGC, `GET /api/hangouts` не джойнит `partner_offer_id` → цена/деeplink оффера не видны. Офферы уже имеют price/placement (`'hangout'` в PLACEMENTS), Stripe-чёкаут, комиссию 10–15%.
+
+- 🔴 **P0.** Джойн `partner_offers` в `HANGOUT_LIST_SELECT` (LEFT JOIN o.id = h.partner_offer_id) + блок «Билет N ₽ →» в карточке на готовый Stripe-чёкаут (`partners.js`)
+- 🔴 **P0.** Платные встречи: `price` + `capacity` в hangouts, ticket-flow через существующий `checkout.sessions.create`
+- 🟠 **P1.** Спонсорские/закреплённые карточки «Sponsored» (placement=hangout + pinned)
+- 🟠 **P1.** Событийная интеграция с ивент-организаторами (speed-dating, миксеры) — комиссия за билет 10–30%
+- 🟡 **P2.** Premium-перки на встречи (снятие лимита 1/день, продвижение, max_companions)
+- 🟢 **P3.** AI-подбор встреч под пары (premium); аффилиат-ссылки «Куда пойти» (дайнинг/travel/подарки, 5–15%)
+
+**Первый шаг — 🔴 P0.**
