@@ -129,6 +129,16 @@
 - **Тесты:** `server/src/__tests__/hangout-suggest.test.js` (+6): auth 401, non-premium 403 `PREMIUM_REQUIRED`, static-fallback, db-fallback, partner user_id, 500 на ошибку БД. **server 363/363, lint 0 errors.**
 - **Live (порт 3002):** premium user 3 → 200 `source:'db'` (реальные Crocus City Hall + Aurora Cinema + статические идеи), и с `user_id`, и с `language:'en'`; free-user → 403; без токена → 401; тестовые данные не создаются.
 
+## Этап 90 (30.08.2026) — Affiliate «Куда пойти» (бэкенд) ✅
+
+🟢 P3: аффилиат-слой монетизации dining/travel/gift. **Автономный эндпоинт `GET /api/affiliate/offers`** (публичный, без гейта — реклама для всех), квери `{ city?, limit? }` (`server/src/routes/affiliate.js`):
+- Фильтр: категории `restaurant/hotel/flowers/taxi/gift` (все уже в enum `partner_offers`), `status='active'`, `deeplink` не пустой, `valid_to >= CURDATE()`; JOIN `partners` → `partner_name` + `commission_rate`; числовые `price`/`commission_rate`; сортировка pinned DESC, лимит по умолчанию 6 (max 12).
+- **Миграция `048_affiliate_seed.sql`** (идемпотентно, применена): 5 демо-офферов «Куда пойти» от существующих партнёров — Restoclub ресторан 12%, Ostrovok отель 4%, Flowwow цветы 15%, Yandex Go такси 8%, Bouquet.ru подарок 12%; плюс в БД уже были 9 аффилиат-офферов (Ostrovok/Restoclub/YandexGo/Bouquet/Flowwow/Lavka) → итого 14 под фильтр.
+- **Монтирование:** `app.use(affiliateRoutes)` в `server/src/index.js`.
+- **Тесты:** `server/src/__tests__/affiliate.test.js` (+3): маппинг числовых полей/возврат списка, city-filter+limit попадают в params SQL, 500 на ошибку БД. **server 366/366, lint 0 errors.**
+- **Live (порт 3002):** default → 200 с 6 офферами (мои id 28–32 + существующие); `limit=3` → 3; `city=Санкт-Петербург` → только отель Ostrovok (id 29); комиссии 4–15%, deeplink присутствует.
+- **Статус:** бэкенд готов. **Фронт-блок «Куда пойти» на /hangouts — вынесен отдельным этапом** (по решению — этап бэкенд-first).
+
 ## Этап 84 (30.08.2026) — /hangouts P0: джойн partner_offer в ленту + блок «Билет» ✅
 
 В карточки ленты `/hangouts` добавлен `LEFT JOIN partner_offers` (`offer_id/offer_title/offer_price/offer_image_url/offer_deeplink/offer_category/offer_city/offer_valid_to`), блок «Билет {price} ₽ →» с кнопкой «Купить» → `POST /api/partners/order` (Stripe/mock). i18n `hangout.offer.buy/buying/buy_ticket`. **server 327/327, front 81/81.** Полная деталь — в `Что доделать.txt` / `context.txt`.
