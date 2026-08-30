@@ -119,6 +119,16 @@
 
 
 
+## Этап 89 (30.08.2026) — AI-подбор встреч под пару (premium perk) ✅
+
+🟢 P3: премиум-функция курирования идей встреч/свиданий под конкретную пару. **Бэкенд-эндпоинт `POST /api/hangouts/suggest`** (`server/src/routes/hangouts.js`), тело `{ user_id?, language?: 'ru'|'en' }`:
+- **Premium-гейт** тем же механизмом, что boost (`getCompanionsCap`): без активной подписки — **403 `PREMIUM_REQUIRED`**.
+- **Профили пары:** выбирает профили обоих (`req.userId` + `user_id`) из `user_profiles` (display_name/age/bio/city/dating_goal) для персонализации → передаёт в OpenAI-контекст.
+- **OpenAI:** переиспользует `createBreaker` (как icebreakers) — `suggestBreaker` генерирует **3 объекта** `{ title, category, place, description }` (RU/EN), category из набора cinema|theater|exhibition|cafe|concert|sport|other. `source: 'openai'`.
+- **Fallback:** без `OPENAI_API_KEY` или при сбое breaker — **DB** (реальные активные встречи из `hangouts`, `source: 'db'`) + **static** набор идей 6 шт. (`source: 'static'`). Трекается `trackEvent('hangout_suggest', …)`.
+- **Тесты:** `server/src/__tests__/hangout-suggest.test.js` (+6): auth 401, non-premium 403 `PREMIUM_REQUIRED`, static-fallback, db-fallback, partner user_id, 500 на ошибку БД. **server 363/363, lint 0 errors.**
+- **Live (порт 3002):** premium user 3 → 200 `source:'db'` (реальные Crocus City Hall + Aurora Cinema + статические идеи), и с `user_id`, и с `language:'en'`; free-user → 403; без токена → 401; тестовые данные не создаются.
+
 ## Этап 84 (30.08.2026) — /hangouts P0: джойн partner_offer в ленту + блок «Билет» ✅
 
 В карточки ленты `/hangouts` добавлен `LEFT JOIN partner_offers` (`offer_id/offer_title/offer_price/offer_image_url/offer_deeplink/offer_category/offer_city/offer_valid_to`), блок «Билет {price} ₽ →» с кнопкой «Купить» → `POST /api/partners/order` (Stripe/mock). i18n `hangout.offer.buy/buying/buy_ticket`. **server 327/327, front 81/81.** Полная деталь — в `Что доделать.txt` / `context.txt`.
