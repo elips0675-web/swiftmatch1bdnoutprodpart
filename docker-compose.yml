@@ -64,11 +64,15 @@ services:
       - redis_data:/data
 
   app:
-    build: .
+    build:
+      context: .
+      target: server
     restart: unless-stopped
     ports:
       - "3002:3002"
     mem_limit: 512m
+    env_file:
+      - .env
     environment:
       PORT: 3002
       DB_HOST: db
@@ -92,13 +96,12 @@ services:
         condition: service_started
 
   nginx:
-    image: nginx:alpine
+    build:
+      context: .
+      target: web
     restart: unless-stopped
     ports:
       - "8080:80"
-    volumes:
-      - ./nginx/swiftmatch.conf:/etc/nginx/conf.d/swiftmatch.conf:ro
-      - ./dist:/app/dist:ro
     depends_on:
       app:
         condition: service_healthy

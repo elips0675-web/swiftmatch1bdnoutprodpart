@@ -6,7 +6,12 @@ dist
 .env.local
 test-results
 playwright-report
+e2e
+docs
+monitoring
+k6
 android
 .vite
 .DS_Store
 *.tsbuildinfo
+*.log

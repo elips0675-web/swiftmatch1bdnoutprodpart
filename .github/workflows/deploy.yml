@@ -191,49 +191,43 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate docker-compose.yml
         run: docker compose config --quiet
-      - name: Build Docker image (dry run)
-        run: docker build --target server -t swiftmatch-check . 2>&1 | tail -5
+      - name: Build server Docker image (dry run)
+        run: docker build --target server -t swiftmatch-server-check . 2>&1 | tail -5
+      - name: Build web (nginx) Docker image (dry run)
+        run: docker build --target web -t swiftmatch-web-check . 2>&1 | tail -5
 
   deploy:
-    name: Deploy to Production
+    name: Deploy to Production (Docker)
     needs: [lint-and-typecheck, frontend-test, server-test, e2e-test]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Push raw files to VPS via rsync
+        uses: burnett01/rsync-deployments@7.0.1
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-      - name: Build frontend
-        run: npm ci && npx vite build
-      - name: Install server deps (production)
-        run: npm ci --omit=dev
-        working-directory: server
-      - name: Deploy via SCP
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "dist/,server/,database/,scripts/schema-validate.mjs,scripts/sql-explain-audit.mjs,scripts/verify-backup.mjs,scripts/seed-migrations.mjs,package.json,package-lock.json"
-          target: "/app/swiftmatch"
-          strip_components: 0
-      - name: Migrate + restart backend
+          switches: -avz --delete --exclude node_modules --exclude .git --exclude test-results --exclude playwright-report --exclude e2e/.auth
+          path: ./
+          remote_path: /app/swiftmatch
+          remote_host: ${{ secrets.DEPLOY_HOST }}
+          remote_user: ${{ secrets.DEPLOY_USER }}
+          remote_key: ${{ secrets.DEPLOY_SSH_KEY }}
+          remote_port: 22
+      - name: Build & migrate & deploy via Docker
         uses: appleboy/ssh-action@v1.1.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
+            set -e
             cd /app/swiftmatch
-            set -a
-            . ./server/.env
-            set +a
-            node scripts/schema-validate.mjs
-            node scripts/sql-explain-audit.mjs
-            node database/migrations/migrate.js
-            cd server
-            npm ci --omit=dev
-            pm2 restart swiftmatch-api || pm2 start src/index.js --name swiftmatch-api
-            sudo nginx -s reload || true
+            # прод-секреты (.env с реальными ключами) должны лежать на VPS (не в git)
+            test -f .env || cp .env.example .env
+            # Собрать образы и запустить compose (schema применяется при первичном старте
+            # пустого DB volume через docker-entrypoint-initdb.d — см. docker-compose.yml)
+            docker compose up -d --build
+            # Применить новые миграции && проверить схему против кода
+            docker compose exec -T app node database/migrations/migrate.js
+            docker compose exec -T app node scripts/schema-validate.mjs
+            docker compose ps
