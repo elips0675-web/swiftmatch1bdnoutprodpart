@@ -162,8 +162,17 @@ describe('GET /api/hangouts (feed)', () => {
     expect(res.status).toBe(200)
     const sql = pool.query.mock.calls[0][0]
     expect(sql).toContain('po.pinned AS offer_pinned')
-    expect(sql).toMatch(/ORDER BY \(po\.pinned IS NOT NULL AND po\.pinned = 1\) DESC/)
+    expect(sql).toMatch(/ORDER BY \(h\.boosted = 1\) DESC, \(po\.pinned IS NOT NULL AND po\.pinned = 1\) DESC/)
     expect(res.body[0]).toMatchObject({ offer_id: 5, offer_pinned: 1 })
+  })
+
+  it('selects boosted flag for hangouts', async () => {
+    pool.query.mockResolvedValueOnce([[{ id: 3, boosted: 1 }], []])
+    const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts')
+    expect(res.status).toBe(200)
+    const sql = pool.query.mock.calls[0][0]
+    expect(sql).toContain('h.boosted')
+    expect(res.body[0]).toMatchObject({ boosted: 1 })
   })
 })
 
@@ -236,6 +245,9 @@ describe('POST /api/hangouts', () => {
   })
 
   it('rejects max_companions out of range', async () => {
+    pool.query
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ cnt: 0 }], []])
     const res = await request(createApp(hangoutsRoutes))
       .post('/api/hangouts')
       .set('Authorization', `Bearer ${authToken(2)}`)
@@ -246,6 +258,7 @@ describe('POST /api/hangouts', () => {
         max_companions: 11,
       })
     expect(res.status).toBe(400)
+    expect(res.body.code).toBe('COMPANIONS_LIMIT')
   })
 
   it('rejects invalid category', async () => {
@@ -652,5 +665,67 @@ describe('GET /api/hangouts/by-chat/:chatId', () => {
       .get('/api/hangouts/by-chat/abc')
       .set('Authorization', `Bearer ${authToken(2)}`)
     expect(res.status).toBe(400)
+  })
+})
+
+describe('Boost / unboost (premium perk)', () => {
+  it('requires auth', async () => {
+    const res = await request(createApp(hangoutsRoutes)).post('/api/hangouts/1/boost')
+    expect(res.status).toBe(401)
+  })
+
+  it('forbids boost by non-author', async () => {
+    pool.query.mockResolvedValueOnce([[{ user_id: 99, status: 'active' }], []])
+    const res = await request(createApp(hangoutsRoutes))
+      .post('/api/hangouts/1/boost')
+      .set('Authorization', `Bearer ${authToken(2)}`)
+    expect(res.status).toBe(403)
+  })
+
+  it('rejects boost for free user with PREMIUM_REQUIRED', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ user_id: 2, status: 'active' }], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await request(createApp(hangoutsRoutes))
+      .post('/api/hangouts/1/boost')
+      .set('Authorization', `Bearer ${authToken(2)}`)
+    expect(res.status).toBe(403)
+    expect(res.body.code).toBe('PREMIUM_REQUIRED')
+  })
+
+  it('limits to 1 boosted hangout at a time', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ user_id: 2, status: 'active' }], []])
+      .mockResolvedValueOnce([[{ id: 5 }], []])
+      .mockResolvedValueOnce([[{ cnt: 1 }], []])
+    const res = await request(createApp(hangoutsRoutes))
+      .post('/api/hangouts/1/boost')
+      .set('Authorization', `Bearer ${authToken(2)}`)
+    expect(res.status).toBe(409)
+    expect(res.body.code).toBe('BOOST_LIMIT')
+  })
+
+  it('boosts own hangout for premium user', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ user_id: 2, status: 'active' }], []])
+      .mockResolvedValueOnce([[{ id: 5 }], []])
+      .mockResolvedValueOnce([[{ cnt: 0 }], []])
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []])
+    const res = await request(createApp(hangoutsRoutes))
+      .post('/api/hangouts/1/boost')
+      .set('Authorization', `Bearer ${authToken(2)}`)
+    expect(res.status).toBe(200)
+    expect(res.body.boosted).toBe(true)
+  })
+
+  it('unboosts own hangout', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ user_id: 2 }], []])
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []])
+    const res = await request(createApp(hangoutsRoutes))
+      .post('/api/hangouts/1/unboost')
+      .set('Authorization', `Bearer ${authToken(2)}`)
+    expect(res.status).toBe(200)
+    expect(res.body.boosted).toBe(false)
   })
 })

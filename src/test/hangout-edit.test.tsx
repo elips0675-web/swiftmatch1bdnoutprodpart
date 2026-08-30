@@ -10,6 +10,10 @@ vi.mock("@/lib/token", () => ({
   getToken: () => "test-token",
 }));
 
+vi.mock("@/hooks/use-premium", () => ({
+  usePremium: () => ({ isPremium: false, tier: null, subscription: null, loading: false, daysRemaining: 0, refresh: vi.fn() }),
+}));
+
 const mockUseLanguage = {
   t: (key: string, options?: Record<string, any>) => {
     let value = (mockTranslations as Record<string, string>)[key] || key;

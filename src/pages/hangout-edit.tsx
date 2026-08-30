@@ -15,12 +15,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLanguage } from "@/context/language-context";
+import { usePremium } from "@/hooks/use-premium";
 import { getToken } from "@/lib/token";
 import type { Hangout } from "@/lib/hangouts";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Lock } from "lucide-react";
 
 const COMPANION_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const COMPANION_OPTIONS_PREMIUM = [...COMPANION_OPTIONS, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 
 function toLocalInput(iso?: string): string {
   if (!iso) return "";
@@ -34,6 +36,8 @@ export default function HangoutEditPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const { isPremium } = usePremium();
+  const companionOptions = isPremium ? COMPANION_OPTIONS_PREMIUM : COMPANION_OPTIONS;
   const [loading, setLoading] = useState(true);
   const [notEditable, setNotEditable] = useState(false);
   const [title, setTitle] = useState("");
@@ -221,11 +225,17 @@ export default function HangoutEditPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {COMPANION_OPTIONS.map((n) => (
+                  {companionOptions.map((n) => (
                     <SelectItem key={n} value={String(n)}>{n}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {!isPremium && (
+                <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Lock size={12} className="shrink-0" />
+                  {t("hangout.form.companions_premium_hint")}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">

@@ -88,6 +88,7 @@ export interface Hangout {
   offer_pinned?: number | boolean | null
   price?: string | number | null
   capacity?: number | null
+  boosted?: number | boolean | null
   sold_tickets?: number
   my_ticket_status?: 'pending' | 'paid' | 'refunded' | null
 }

@@ -11,7 +11,7 @@ import { useLanguage } from "@/context/language-context";
 import { useFeatureFlags } from "@/context/feature-flags-context";
 import { getToken } from "@/lib/token";
 import { HANGOUT_CATEGORIES, formatEventDate, type Hangout, type HangoutType } from "@/lib/hangouts";
-import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X, Ticket } from "lucide-react";
+import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X, Ticket, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const categoryIcon = (category: string) => {
@@ -114,6 +114,12 @@ function HangoutCard({ hangout }: { hangout: Hangout }) {
   return (
     <Link to={`/hangouts/${hangout.id}`} className="block">
       <Card data-testid={`hangout-card-${hangout.id}`} className="p-4 hover:bg-muted/30 transition-colors">
+        {Number(hangout.boosted) === 1 && (
+          <div className="mb-2 flex items-center gap-1.5 rounded-md bg-violet-50 border border-violet-200 px-2 py-1 w-fit" data-testid={`hangout-boosted-${hangout.id}`}>
+            <Zap size={12} className="text-violet-600" />
+            <span className="text-[10px] font-bold uppercase tracking-wide text-violet-700">{t("hangout.boosted")}</span>
+          </div>
+        )}
         {Number(hangout.offer_pinned) === 1 && (
           <div className="mb-2 flex items-center gap-1.5 rounded-md bg-amber-50 border border-amber-200 px-2 py-1 w-fit" data-testid={`hangout-sponsored-${hangout.id}`}>
             <Sparkles size={12} className="text-amber-600" />

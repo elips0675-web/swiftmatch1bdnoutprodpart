@@ -111,11 +111,23 @@ function parseLimit(value) {
   return Math.min(Math.floor(n), PAGE_SIZE_MAX)
 }
 
+const COMPANIONS_CAP_FREE = 10
+const COMPANIONS_CAP_PREMIUM = 20
+
+async function getCompanionsCap(userId) {
+  const [subRows] = await pool.query(
+    'SELECT id FROM subscriptions WHERE user_id = ? AND is_active = 1 AND expires_at > NOW() LIMIT 1',
+    [userId],
+  )
+  return subRows.length > 0 ? COMPANIONS_CAP_PREMIUM : COMPANIONS_CAP_FREE
+}
+
+
 const HANGOUT_LIST_SELECT = `
   SELECT h.id, h.user_id AS author_id, h.category, h.title, h.description,
          h.place_name, h.place_address, h.city, h.lat, h.lng, h.event_date,
          h.max_companions, h.hangout_type, h.status, h.created_at,
-         h.price, h.capacity,
+         h.price, h.capacity, h.boosted,
          up.display_name, up.avatar_url, up.age, up.online,
          (SELECT COUNT(*) FROM hangout_tickets ht WHERE ht.hangout_id = h.id AND ht.status = 'paid') AS sold_tickets,
          po.id AS offer_id, po.title AS offer_title, po.price AS offer_price,
@@ -183,7 +195,7 @@ router.get('/api/hangouts', optionalAuth, async (req, res) => {
                  ${JOIN_PARTNER_OFFER}
                  WHERE ${where.join(' AND ')}
                  ${having}
-                 ORDER BY (po.pinned IS NOT NULL AND po.pinned = 1) DESC, h.event_date ASC
+                 ORDER BY (h.boosted = 1) DESC, (po.pinned IS NOT NULL AND po.pinned = 1) DESC, h.event_date ASC
                  LIMIT ? OFFSET ?`
     const rows = await pool.query(sql, [...params, ...geoParams, limit, offset])
 
@@ -321,8 +333,8 @@ router.post('/api/hangouts', auth, createLimiter, async (req, res) => {
   }
 
   const companions = Number(max_companions)
-  if (!Number.isInteger(companions) || companions < 1 || companions > 10) {
-    return res.status(400).json({ message: 'max_companions must be between 1 and 10' })
+  if (!Number.isInteger(companions) || companions < 1) {
+    return res.status(400).json({ message: 'max_companions must be a positive integer' })
   }
 
   let parsedPrice = null
@@ -372,6 +384,14 @@ router.post('/api/hangouts', auth, createLimiter, async (req, res) => {
       }
     }
 
+    const companionsCap = subRows.length > 0 ? COMPANIONS_CAP_PREMIUM : COMPANIONS_CAP_FREE
+    if (companions > companionsCap) {
+      return res.status(400).json({
+        message: `max_companions can be up to ${companionsCap} for your plan`,
+        code: companionsCap === COMPANIONS_CAP_PREMIUM ? undefined : 'COMPANIONS_LIMIT',
+      })
+    }
+
     const [result] = await pool.query(
       `INSERT INTO hangouts (user_id, category, title, description, place_name, place_address, city, lat, lng, event_date, max_companions, partner_offer_id, hangout_type, price, capacity)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -417,6 +437,7 @@ router.put('/api/hangouts/:id', auth, async (req, res) => {
     const sets = []
     const params = []
     let newCapacityValue
+    let newCompanionsValue
     for (const field of allowed) {
       if (!(field in req.body)) continue
       let value = req.body[field]
@@ -431,9 +452,10 @@ router.put('/api/hangouts/:id', auth, async (req, res) => {
         value = d
       } else if (field === 'max_companions') {
         const c = Number(value)
-        if (!Number.isInteger(c) || c < 1 || c > 10) {
-          return res.status(400).json({ message: 'max_companions must be between 1 and 10' })
+        if (!Number.isInteger(c) || c < 1) {
+          return res.status(400).json({ message: 'max_companions must be a positive integer' })
         }
+        newCompanionsValue = c
         value = c
       } else if (field === 'price') {
         if (value === null || value === '') {
@@ -475,6 +497,16 @@ router.put('/api/hangouts/:id', auth, async (req, res) => {
       )
       if (Number(sold?.cnt || 0) > newCapacityValue) {
         return res.status(409).json({ message: `CAPACITY_BELOW_SOLD: ${sold?.cnt || 0}` })
+      }
+    }
+
+    if (newCompanionsValue !== undefined) {
+      const companionsCap = await getCompanionsCap(req.userId)
+      if (newCompanionsValue > companionsCap) {
+        return res.status(400).json({
+          message: `max_companions can be up to ${companionsCap} for your plan`,
+          code: companionsCap === COMPANIONS_CAP_PREMIUM ? undefined : 'COMPANIONS_LIMIT',
+        })
       }
     }
 
@@ -1196,6 +1228,60 @@ router.post('/api/hangouts/:id/purchase', auth, hangoutTicketLimiter, async (req
   } catch (err) {
     logger.error('Hangout purchase error:', err)
     res.status(500).json({ message: 'Failed to create ticket checkout' })
+  }
+})
+
+const boostLimiter = rateLimit({ windowMs: 60_000, max: 10, message: { message: 'Too many boost requests' } })
+
+// ─── Boost / Unboost own hangout (premium perk, author only) ───
+// Продвижение поднимает свою встречу в начало ленты (boosted=1, без срока).
+// Перк для premium: free — 403 PREMIUM_REQUIRED; лимит 1 активное на автора.
+router.post('/api/hangouts/:id/boost', auth, boostLimiter, async (req, res) => {
+  const { id } = req.params
+  if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
+
+  try {
+    const [[hangout]] = await pool.query('SELECT user_id, status FROM hangouts WHERE id = ?', [id])
+    if (!hangout) return res.status(404).json({ message: 'Hangout not found' })
+    if (hangout.user_id !== req.userId) return res.status(403).json({ message: 'Not the author' })
+    if (hangout.status !== 'active') return res.status(409).json({ message: `Cannot boost hangout in status ${hangout.status}` })
+
+    const cap = await getCompanionsCap(req.userId)
+    if (cap === COMPANIONS_CAP_FREE) {
+      return res.status(403).json({ message: 'Premium subscription required to boost a hangout', code: 'PREMIUM_REQUIRED' })
+    }
+
+    const [[already]] = await pool.query(
+      'SELECT COUNT(*) AS cnt FROM hangouts WHERE user_id = ? AND boosted = 1 AND id <> ?',
+      [req.userId, id],
+    )
+    if (Number(already?.cnt || 0) >= 1) {
+      return res.status(409).json({ message: 'You can have only 1 boosted hangout at a time', code: 'BOOST_LIMIT' })
+    }
+
+    await pool.query('UPDATE hangouts SET boosted = 1 WHERE id = ?', [id])
+    trackEvent('hangout_boosted', req.userId, { hangout_id: Number(id) })
+    res.json({ boosted: true, message: 'Hangout boosted' })
+  } catch (err) {
+    logger.error('Hangout boost error:', err)
+    res.status(500).json({ message: 'Failed to boost hangout' })
+  }
+})
+
+router.post('/api/hangouts/:id/unboost', auth, boostLimiter, async (req, res) => {
+  const { id } = req.params
+  if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
+
+  try {
+    const [[hangout]] = await pool.query('SELECT user_id FROM hangouts WHERE id = ?', [id])
+    if (!hangout) return res.status(404).json({ message: 'Hangout not found' })
+    if (hangout.user_id !== req.userId) return res.status(403).json({ message: 'Not the author' })
+
+    await pool.query('UPDATE hangouts SET boosted = 0 WHERE id = ?', [id])
+    res.json({ boosted: false, message: 'Hangout unboosted' })
+  } catch (err) {
+    logger.error('Hangout unboost error:', err)
+    res.status(500).json({ message: 'Failed to unboost hangout' })
   }
 })
 

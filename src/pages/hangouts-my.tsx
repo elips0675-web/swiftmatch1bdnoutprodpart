@@ -16,10 +16,11 @@ import {
 } from "@/components/ui/dialog";
 import { useLanguage } from "@/context/language-context";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { usePremium } from "@/hooks/use-premium";
 import { getToken } from "@/lib/token";
 import { formatEventDate, type Hangout, type MyHangoutResponse } from "@/lib/hangouts";
 import { categoryIcon } from "./hangouts";
-import { CalendarDays, MapPin, Users, PlusCircle, MessageCircle, Trash2, Compass } from "lucide-react";
+import { CalendarDays, MapPin, Users, PlusCircle, MessageCircle, Trash2, Compass, Zap, Crown } from "lucide-react";
 import { toast } from "sonner";
 
 const RESPONSE_STATUS_KEYS: Record<string, string> = {
@@ -35,9 +36,12 @@ const STATUS_COLORS: Record<string, string> = {
   blocked: "bg-red-100 text-red-800 border-transparent",
 };
 
-function ListingRow({ hangout, onCancel }: { hangout: Hangout; onCancel: (id: number) => void }) {
+function ListingRow({ hangout, onCancel, onBoost, boosingId }: { hangout: Hangout; onCancel: (id: number) => void; onBoost: (id: number) => void; boosingId: number | null }) {
   const { t } = useLanguage();
+  const { isPremium } = usePremium();
   const Icon = categoryIcon(hangout.category);
+  const isBoosted = Number(hangout.boosted) === 1;
+  const busy = boosingId === hangout.id;
 
   return (
     <Card className="p-4" data-testid={`my-hangout-${hangout.id}`}>
@@ -75,15 +79,46 @@ function ListingRow({ hangout, onCancel }: { hangout: Hangout; onCancel: (id: nu
               </Link>
             )}
             {hangout.status === "active" && (
-              <Button
-                size="sm"
-                variant="ghost"
-                data-testid={`cancel-hangout-${hangout.id}`}
-                className="rounded-full h-8 px-4 text-destructive hover:text-destructive"
-                onClick={() => onCancel(hangout.id)}
-              >
-                <Trash2 size={13} className="mr-1" /> {t("hangout.action.cancel")}
-              </Button>
+              <>
+                {isBoosted ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    data-testid={`unboost-hangout-${hangout.id}`}
+                    className="rounded-full h-8 px-4 text-violet-700 border-violet-200 bg-violet-50 hover:bg-violet-100"
+                    onClick={() => onBoost(hangout.id)}
+                    disabled={busy}
+                  >
+                    <Zap size={13} className="mr-1" /> {t("hangout.boost.promoted")}
+                  </Button>
+                ) : isPremium ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    data-testid={`boost-hangout-${hangout.id}`}
+                    className="rounded-full h-8 px-4 text-violet-700 border-violet-200 hover:bg-violet-50"
+                    onClick={() => onBoost(hangout.id)}
+                    disabled={busy}
+                  >
+                    <Zap size={13} className="mr-1" /> {t("hangout.boost.promote")}
+                  </Button>
+                ) : (
+                  <Link to="/premium">
+                    <Button size="sm" variant="outline" data-testid={`boost-upgrade-${hangout.id}`} className="rounded-full h-8 px-4">
+                      <Crown size={13} className="mr-1 text-amber-500" /> {t("hangout.boost.promote")}
+                    </Button>
+                  </Link>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  data-testid={`cancel-hangout-${hangout.id}`}
+                  className="rounded-full h-8 px-4 text-destructive hover:text-destructive"
+                  onClick={() => onCancel(hangout.id)}
+                >
+                  <Trash2 size={13} className="mr-1" /> {t("hangout.action.cancel")}
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -100,6 +135,7 @@ export default function HangoutsMyPage() {
   const [loading, setLoading] = useState(true);
   const [cancelTarget, setCancelTarget] = useState<number | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [boosingId, setBoosingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -158,6 +194,36 @@ export default function HangoutsMyPage() {
     }
   };
 
+  const toggleBoost = async (id: number) => {
+    const target = listings.find((h) => h.id === id);
+    const isBoosted = Number(target?.boosted) === 1;
+    setBoosingId(id);
+    try {
+      const token = getToken();
+      const res = await fetch(`/api/hangouts/${id}/${isBoosted ? "unboost" : "boost"}`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 403 && data?.code === "PREMIUM_REQUIRED") {
+          toast.error(t("hangout.boost.premium_required"));
+        } else if (res.status === 409 && data?.code === "BOOST_LIMIT") {
+          toast.error(t("hangout.boost.limit"));
+        } else {
+          toast.error(data?.message || t("hangout.error.load"));
+        }
+        return;
+      }
+      toast.success(isBoosted ? t("hangout.boost.toast.unboosted") : t("hangout.boost.toast.boosted"));
+      load();
+    } catch {
+      toast.error(t("hangout.error.load"));
+    } finally {
+      setBoosingId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       <AppHeader title={t("nav.hangouts")} />
@@ -188,7 +254,7 @@ export default function HangoutsMyPage() {
               </div>
             ) : (
               listings.map((h) => (
-                <ListingRow key={h.id} hangout={h} onCancel={(id) => setCancelTarget(id)} />
+                <ListingRow key={h.id} hangout={h} onCancel={(id) => setCancelTarget(id)} onBoost={(id) => toggleBoost(id)} boosingId={boosingId} />
               ))
             )}
           </TabsContent>

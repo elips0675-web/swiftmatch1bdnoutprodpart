@@ -579,6 +579,7 @@ CREATE TABLE `hangouts` (
   `partner_offer_id` int unsigned DEFAULT NULL,
   `price` decimal(10,2) DEFAULT NULL,
   `capacity` int unsigned DEFAULT NULL,
+  `boosted` tinyint(1) NOT NULL DEFAULT '0',
   `poster_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `event_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `status` enum('active','cancelled','completed','blocked') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',

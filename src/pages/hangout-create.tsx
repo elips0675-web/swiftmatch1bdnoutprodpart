@@ -16,11 +16,12 @@ import {
 } from "@/components/ui/select";
 import { useLanguage } from "@/context/language-context";
 import { useFeatureFlags } from "@/context/feature-flags-context";
+import { usePremium } from "@/hooks/use-premium";
 import { getToken } from "@/lib/token";
 import { cn } from "@/lib/utils";
 import { HANGOUT_CATEGORIES, HANGOUT_TYPES, type HangoutCategory, type HangoutType } from "@/lib/hangouts";
 import { toast } from "sonner";
-import { Loader2, Ticket, Heart, Users, Crown } from "lucide-react";
+import { Loader2, Ticket, Heart, Users, Crown, Lock } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 
 const COMPANION_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const COMPANION_OPTIONS_PREMIUM = [...COMPANION_OPTIONS, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 
 const PARTNER_TO_HANGOUT_CATEGORY: Record<string, HangoutCategory> = {
   cinema: "cinema",
@@ -46,7 +48,9 @@ function defaultDateTime(): string {
 export default function HangoutCreatePage() {
   const { t } = useLanguage();
   const { partnerOffersEnabled } = useFeatureFlags();
+  const { isPremium } = usePremium();
   const navigate = useNavigate();
+  const companionOptions = isPremium ? COMPANION_OPTIONS_PREMIUM : COMPANION_OPTIONS;
   const [category, setCategory] = useState<HangoutCategory>("cinema");
   const [hangoutType, setHangoutType] = useState<HangoutType>("date");
   const [title, setTitle] = useState("");
@@ -341,11 +345,17 @@ export default function HangoutCreatePage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {COMPANION_OPTIONS.map((n) => (
+                {companionOptions.map((n) => (
                   <SelectItem key={n} value={String(n)}>{n}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {!isPremium && (
+              <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Lock size={12} className="shrink-0" />
+                {t("hangout.form.companions_premium_hint")}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">
