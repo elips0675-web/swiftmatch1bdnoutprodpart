@@ -53,6 +53,7 @@ import hangoutsRoutes from './routes/hangouts.js'
 import partnersRoutes from './routes/partners.js'
 import partnerDashboard from './routes/partner-dashboard.js'
 import eventsRoutes from './routes/events.js'
+import affiliateRoutes from './routes/affiliate.js'
 import adminPartners from './routes/admin/partners.js'
 import adminBackup from './routes/admin/backup.js'
 import notificationsRoutes from './routes/notifications.js'
@@ -292,6 +293,7 @@ app.use(hangoutsRoutes)
 app.use(partnersRoutes)
 app.use(partnerDashboard)
 app.use(eventsRoutes)
+app.use(affiliateRoutes)
 app.use(notificationsRoutes)
 
 app.get('/health', async (req, res) => {
