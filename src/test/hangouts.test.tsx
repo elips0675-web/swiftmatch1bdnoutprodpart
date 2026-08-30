@@ -45,6 +45,13 @@ const mockTranslations: Record<string, string> = {
   "hangout.empty_my_responses": "Вы пока никуда не откликались",
   "hangout.go_out.title": "Куда пойти вдвоём",
   "hangout.go_out.cashback": "кэшбэк {pct}%",
+  "hangout.suggest.upsell_title": "Идеи для пары — Premium",
+  "hangout.suggest.go_premium": "Стать Premium",
+  "hangout.suggest.title": "Идеи для пары",
+  "hangout.suggest.open": "Показать идеи свидания",
+  "hangout.suggest.close": "Скрыть",
+  "hangout.suggest.create": "Создать встречу",
+  "hangout.suggest.error": "Не удалось подобрать идеи. Попробуйте позже.",
 }
 
 vi.mock("@/context/language-context", () => ({
@@ -55,6 +62,11 @@ const mockFlags = { hangoutsEnabled: true }
 
 vi.mock("@/context/feature-flags-context", () => ({
   useFeatureFlags: () => mockFlags,
+}))
+
+let mockIsPremium = true
+vi.mock("@/hooks/use-premium", () => ({
+  usePremium: () => ({ isPremium: mockIsPremium }),
 }))
 
 vi.mock("@/components/layout/app-header", () => ({
@@ -93,6 +105,7 @@ describe("HangoutsPage", () => {
     vi.clearAllMocks()
     mockFetch.mockReset()
     mockFlags.hangoutsEnabled = true
+    mockIsPremium = true
     ;(navigator as any).geolocation = undefined
   })
 
@@ -237,6 +250,74 @@ describe("HangoutsPage", () => {
 
     await waitFor(() => {
       expect(screen.queryByTestId("hangout-go-out")).toBeNull()
+    })
+  })
+
+  it("shows premium upsell for free users and navigates to /premium", async () => {
+    mockIsPremium = false
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+
+    renderPage(<HangoutsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-suggest-upsell")).toBeTruthy()
+    })
+    expect(screen.getByText("Стать Premium")).toBeTruthy()
+    expect(screen.queryByTestId("hangout-suggest-open")).toBeNull()
+  })
+
+  it("renders date ideas for premium user after clicking open", async () => {
+    mockIsPremium = true
+    const ideas = [
+      { title: "Кофе и настольные игры", category: "cafe", place: "Кофейня", description: "Дeскрипшн" },
+      { title: "Вечер в кино", category: "cinema", place: "Кинотеатр", description: "Д2" },
+    ]
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      if (u.includes("/api/hangouts/suggest")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ source: "openai", suggestions: ideas }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+
+    renderPage(<HangoutsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-suggest-open")).toBeTruthy()
+    })
+    fireEvent.click(screen.getByTestId("hangout-suggest-open"))
+
+    await waitFor(() => {
+      expect(screen.getByText("Кофе и настольные игры")).toBeTruthy()
+    })
+    expect(screen.getByText("Вечер в кино")).toBeTruthy()
+    expect(screen.getAllByText("Создать встречу").length).toBeGreaterThan(0)
+  })
+
+  it("shows error message when suggest returns 403 or fails", async () => {
+    mockIsPremium = true
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      if (u.includes("/api/hangouts/suggest")) return Promise.resolve({ ok: false, status: 403, json: () => Promise.resolve({ error: "PREMIUM_REQUIRED" }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+
+    renderPage(<HangoutsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-suggest-open")).toBeTruthy()
+    })
+    fireEvent.click(screen.getByTestId("hangout-suggest-open"))
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-suggest-error")).toBeTruthy()
     })
   })
 })

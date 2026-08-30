@@ -9,6 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/context/language-context";
 import { useFeatureFlags } from "@/context/feature-flags-context";
+import { usePremium } from "@/hooks/use-premium";
 import { getToken } from "@/lib/token";
 import { HANGOUT_CATEGORIES, formatEventDate, type Hangout, type HangoutType } from "@/lib/hangouts";
 import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X, Ticket, Zap, Utensils, BedDouble, Flower2, Car, Gift, ShoppingBag, HandCoins } from "lucide-react";
@@ -280,6 +281,12 @@ export default function HangoutsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [goOutOffers, setGoOutOffers] = useState<GoOutOffer[] | null>(null);
+  const { isPremium } = usePremium();
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [suggestIdeas, setSuggestIdeas] = useState<Array<{ title: string; category: string; place?: string; description?: string }>>([]);
+  const [suggestLang, setSuggestLang] = useState<"ru" | "en">("ru");
+  const [suggestError, setSuggestError] = useState(false);
 
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -358,6 +365,47 @@ export default function HangoutsPage() {
     () => [{ key: null, label: t("hangout.filter.all_categories") }, ...HANGOUT_CATEGORIES.map((c) => ({ key: c as string, label: t(`hangout.category.${c}`) }))],
     [t],
   );
+
+  const loadSuggest = async () => {
+    if (!isPremium) return;
+    setSuggestLoading(true);
+    setSuggestError(false);
+    try {
+      const token = getToken();
+      const res = await fetch("/api/hangouts/suggest", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ language: suggestLang }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data?.suggestions)) {
+        setSuggestIdeas(data.suggestions);
+      } else if (res.status === 403) {
+        setSuggestError(true);
+      } else {
+        setSuggestError(true);
+      }
+    } catch {
+      setSuggestError(true);
+    } finally {
+      setSuggestLoading(false);
+    }
+  };
+
+  const handleSuggest = () => {
+    if (!isPremium) return;
+    setSuggestOpen(true);
+    if (suggestIdeas.length === 0 && !suggestLoading && !suggestError) loadSuggest();
+  };
+
+  const changeSuggestLang = (lang: "ru" | "en") => {
+    setSuggestLang(lang);
+    if (suggestOpen) setSuggestIdeas([]);
+  };
+
 
   const dateChips = useMemo(
     () => [
@@ -584,6 +632,129 @@ export default function HangoutsPage() {
                 </div>
               </div>
             )}
+
+            <div className="px-1" data-testid="hangout-suggest">
+              {!isPremium ? (
+                <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
+                  <div className="flex items-center gap-1 mb-1">
+                    <Sparkles size={16} className="text-primary" />
+                    <h3 className="text-sm font-bold">{t("hangout.suggest.upsell_title")}</h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">{t("hangout.suggest.upsell_desc")}</p>
+                  <Button
+                    type="button"
+                    data-testid="hangout-suggest-upsell"
+                    onClick={() => navigate("/premium")}
+                    className="w-full rounded-full font-bold"
+                    size="sm"
+                  >
+                    {t("hangout.suggest.go_premium")}
+                  </Button>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-muted bg-card p-3">
+                  <div className="flex items-center gap-1 mb-2">
+                    <Sparkles size={16} className="text-primary" />
+                    <h3 className="text-sm font-bold flex-1">{t("hangout.suggest.title")}</h3>
+                    <button
+                      type="button"
+                      data-testid="hangout-suggest-lang-en"
+                      onClick={() => changeSuggestLang("en")}
+                      aria-pressed={suggestLang === "en"}
+                      className={`text-xs font-bold px-2 py-0.5 rounded-full border ${suggestLang === "en" ? "bg-primary text-white border-primary" : "border-muted text-muted-foreground"}`}
+                    >
+                      EN
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="hangout-suggest-lang-ru"
+                      onClick={() => changeSuggestLang("ru")}
+                      aria-pressed={suggestLang === "ru"}
+                      className={`text-xs font-bold px-2 py-0.5 rounded-full border ${suggestLang === "ru" ? "bg-primary text-white border-primary" : "border-muted text-muted-foreground"}`}
+                    >
+                      RU
+                    </button>
+                  </div>
+
+                  {suggestOpen && suggestIdeas.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      {suggestIdeas.map((idea, i) => {
+                        const Icon = categoryIcon(idea.category);
+                        return (
+                          <div key={i} data-testid={`hangout-suggest-idea-${i}`} className="rounded-xl border border-muted p-2.5 bg-background/40">
+                            <div className="flex items-start gap-2">
+                              <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-primary/10 text-primary shrink-0">
+                                <Icon size={16} />
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold leading-tight">{idea.title}</p>
+                                {idea.place && (
+                                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                                    <MapPin size={10} />
+                                    {idea.place}
+                                  </p>
+                                )}
+                                {idea.description && (
+                                  <p className="text-xs text-muted-foreground mt-1">{idea.description}</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <Button
+                        type="button"
+                        data-testid="hangout-suggest-create"
+                        onClick={() => navigate("/hangouts/create")}
+                        variant="outline"
+                        className="mt-1 rounded-full font-bold"
+                        size="sm"
+                      >
+                        <PlusCircle size={14} className="mr-1.5" />
+                        {t("hangout.suggest.create")}
+                      </Button>
+                    </div>
+                  )}
+
+                  {suggestOpen && suggestLoading && (
+                    <div className="flex items-center justify-center py-6">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                    </div>
+                  )}
+
+                  {suggestOpen && suggestError && !suggestLoading && (
+                    <p className="text-xs text-amber-600" data-testid="hangout-suggest-error">
+                      {t("hangout.suggest.error")}
+                    </p>
+                  )}
+
+                  {!suggestOpen && (
+                    <Button
+                      type="button"
+                      data-testid="hangout-suggest-open"
+                      onClick={handleSuggest}
+                      className="w-full rounded-full font-bold"
+                      size="sm"
+                    >
+                      <Sparkles size={14} className="mr-1.5" />
+                      {t("hangout.suggest.open")}
+                    </Button>
+                  )}
+                  {suggestOpen && (
+                    <Button
+                      type="button"
+                      data-testid="hangout-suggest-close"
+                      onClick={() => setSuggestOpen(false)}
+                      variant="ghost"
+                      className="w-full rounded-full font-bold mt-2 text-muted-foreground text-xs"
+                      size="sm"
+                    >
+                      {t("hangout.suggest.close")}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
 
             {loading ? (
               <div className="flex items-center justify-center py-16">
