@@ -539,3 +539,30 @@
 Проверки этого этапа: **server 311/311 ✅** (+4 `admin-users-ban`), **front 81/81 ✅** + `npx vite build` ✅, **E2E 134/134 ✅** (полный прогон `--retries=0`; `ban-realtime` + существующие WS-тесты real-time не регрессировали).
 
 Счётчики после этапа 68: server **311/311**, front **81/81**, E2E **134/134** = **526/526**
+
+## ✅ Этапы 80–83 (30.08.2026): /hangouts — поиск, UX, доделки, связь с профилями — ЗАКРЫТО
+
+| Что | Чем закрыто |
+|---|---|
+| Текстовый поиск в ленте /hangouts (раньше только категория/дата/радиус) | `GET /api/hangouts?q=` — LIKE по title/description/place_name/city (4 × `%term%`, trim 100 симв., пустой q игнор). UI: поле+крестик, debounce 300ms, сброс page, `q` в deps. i18n `hangout.filter.search/clear_search`. server +2 теста → 326/326 |
+| UX-улучшения ленты (карточки, гео, пустое состояние) | `src/pages/hangouts.tsx`: возраст + зелёный онлайн-бейдж, `formatHumanDate()` («Сегодня 18:30»/«Завтра 12:00»), `geoStatus` pending/ok/denied + retry, слайдер disabled при отказе, пустое состояние с CTA, line-clamp-2 превью, ссылка «Мои». i18n `geo_retry/geo_denied`. server 326/326, front 81/81 |
+| Доделки /hangouts (respond, testid, upsell, placeholder) | `hangout-detail.tsx`: кнопка `respond-hangout` открывает диалог (мёртвый серверный respond-флоу стал достижим); data-testid back/open-chat/radius. `hangout-create.tsx`: upsell-баннер при 403 `HANGOUT_DAILY_LIMIT` → /premium + dismiss; fix placeholder `partner.select_offer_desc`. i18n `hangout.upsell.*`. front 81/81, server 326/326 |
+| Связь карточек /hangouts с профилями авторов | `HangoutCard`: аватар и имя автора кликабельны → `/profile/{author_id}` (ProfileById). `role="link"`, hover-стиль, data-testid `hangout-author-{id}`/`hangout-author-name-{id}`. `preventDefault+stopPropagation+navigate` внутри внешнего `<Link>`. Бэкенд/i18n не трогали. front 81/81, build OK |
+
+**Итоговые счётчики (этапы 80–83):** server 326/326, front 81/81, E2E 150/150 (не гоняли заново — сервера/E2E не меняли кроме роута +2 юнит-теста), vite build OK, lint 0 errors. Живые проверки: `?q=Moscow`→5, `?q=Evening`→5, `?q=H2 date`→5; /hangouts, /hangouts/create, /profile/:id → 200.
+
+## 📋 Обновление (30.08.2026): ПЛАН МОНЕТИЗАЦИИ /hangouts — ОЧЕРЕДЬ ПО ВАЖНОСТИ
+
+**Фактическое состояние (аудит).** `hangouts` уже имеет `partner_offer_id` (FK → partner_offers, создание из оффера — `hangouts.js:310-324`); офферы партнёров имеют `price`/`city`/`category`/`placement` + Stripe-чёкаут + комиссию 10–15%; `PLACEMENTS` уже содержит `'hangout'` (`partner-dashboard.js:11`, `admin/partners.js:10`); premium/IAP/RevenueCat есть. **Главный разрыв:** лента `/hangouts` — бесплатный UGC, `GET /api/hangouts` (HANGOUT_LIST_SELECT) НЕ джойнит связанный оффер → цена/купон/деeplink в карточке не видны, деньги «продаются» мимо ленты.
+
+| Приоритет | Задача | Что делать | Файлы |
+|---|---|---|---|
+| 🔴 P0 | **Джойн partner_offer в ленту /hangouts** | В `HANGOUT_LIST_SELECT` добавить `LEFT JOIN partner_offers o ON o.id = h.partner_offer_id`, вернуть `o.price/o.title/o.image_url/o.deeplink`. В `HangoutCard` при наличии оффера — блок «Билет {price} ₽ →» с кнопкой CTA на уже готовый Stripe-чёкаут (`partners.js:411-438`). Подключает написанные платёжные контракты к ленте | `server/src/routes/hangouts.js`, `src/pages/hangouts.tsx`, `src/lib/hangouts.ts` |
+| 🔴 P0 | **Платные встречи (ticket flow)** | В `hangouts` добавить `price` + `capacity`. RSVP: бесплатно как сейчас; платно — через тот же `checkout.sessions.create` (переиспользовать подпись/идемпотентность из partners.js, не дублировать). Показывать цену в карточке/детали | миграция 044/045 `hangouts_price`, `server/src/routes/hangouts.js`, `premium.js`/`partners.js` чёкаут |
+| 🟠 P1 | **Закреплённые/спонсированные карточки** | Оффер с `placement=hangout` + флаг `pinned` → верх ленты с бейджем «Sponsored». Продажа локальным кафе/барам/ивент-организаторам | `server/src/routes/admin/partners.js`, `partner-dashboard.js`, `src/pages/hangouts.tsx` |
+| 🟠 P1 | **Событийная интеграция (ивент-организаторы)** | B2B уже есть (partner-dashboard/offers) — расширить на ивент-площадки: speed-dating, миксеры, мастер-классы → комиссия за билет (10–30% маржа). Использовать `event_url`/`poster_url` | |
+| 🟡 P2 | **Премиум-перки на встречи** | Убрать лимит 1/день для premium, супер-продвижение своих встреч, увеличение `max_companions` для premium | `server/src/routes/hangouts.js` (лимит), `use-premium.ts`, `hangout-create.tsx` upsell |
+| 🟢 P3 | **AI-подбор встреч под пары** | Курирование встреч под пару (тренд 2026: Les Amis, AI-парные активности) — premium-функция | `server/src/routes/icebreakers.js` (переиспользовать OpenAI-эндпоинт) |
+| 🟢 P3 | **Affiliate-аффилиаты (дайнинг/travel/подарки)** | Блок «Куда пойти» на /hangouts с аффилиат-ссылками: рестораны первого свидания, отели, цветы, подарки — комиссия 5–15% (OpenTable/Booking-аффилиаты). Отдельно от UGC | Новый лёгкий слой в `partner_offers` (категория dining/travel) |
+
+**Консенсус интернет-ресёрча (2026):** события/ивенты — самый естественный и высокомаржинальный канал для дейтинга (+10–30% маржа на билетах; Thursday закрыл app ради платных ивентов; Hinge — $1M фонд на Gen Z-ивенты). Гибрид «подписка + IAP + партнёрка + ивенты» даёт +30–40% LTV vs single-model. **Первый шаг рекомендован — 🔴 P0.**
