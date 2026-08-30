@@ -11,7 +11,7 @@ import { useLanguage } from "@/context/language-context";
 import { useFeatureFlags } from "@/context/feature-flags-context";
 import { getToken } from "@/lib/token";
 import { HANGOUT_CATEGORIES, formatEventDate, type Hangout, type HangoutType } from "@/lib/hangouts";
-import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X, Ticket, Zap } from "lucide-react";
+import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X, Ticket, Zap, Utensils, BedDouble, Flower2, Car, Gift, ShoppingBag, HandCoins } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const categoryIcon = (category: string) => {
@@ -35,6 +35,36 @@ const CATEGORY_COLORS: Record<string, string> = {
   concert: "bg-indigo-100 text-indigo-700",
   sport: "bg-emerald-100 text-emerald-700",
   other: "bg-slate-100 text-slate-600",
+};
+
+type GoOutOffer = {
+  id: number;
+  category: string;
+  title: string;
+  description?: string;
+  deeplink: string;
+  price?: number | null;
+  city?: string | null;
+  partner_name?: string;
+  commission_rate?: number | null;
+};
+
+const GO_OUT_ICONS: Record<string, React.ElementType> = {
+  restaurant: Utensils,
+  cafe: Utensils,
+  hotel: BedDouble,
+  flowers: Flower2,
+  taxi: Car,
+  gift: ShoppingBag,
+};
+
+const GO_OUT_COLORS: Record<string, string> = {
+  restaurant: "bg-orange-100 text-orange-700",
+  cafe: "bg-orange-100 text-orange-700",
+  hotel: "bg-indigo-100 text-indigo-700",
+  flowers: "bg-pink-100 text-pink-700",
+  taxi: "bg-sky-100 text-sky-700",
+  gift: "bg-amber-100 text-amber-700",
 };
 
 export type HangoutDateFilter = "all" | "today" | "tomorrow" | "weekend";
@@ -249,6 +279,7 @@ export default function HangoutsPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [goOutOffers, setGoOutOffers] = useState<GoOutOffer[] | null>(null);
 
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -275,6 +306,19 @@ export default function HangoutsPage() {
       askGeo();
     }
   }, [geoAsked]);
+
+  useEffect(() => {
+    if (!hangoutsEnabled) return;
+    let cancelled = false;
+    const token = getToken();
+    fetch("/api/affiliate/offers?limit=4", {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (!cancelled) setGoOutOffers((data?.offers as GoOutOffer[]) || []); })
+      .catch(() => { if (!cancelled) setGoOutOffers([]); });
+    return () => { cancelled = true; };
+  }, [hangoutsEnabled]);
 
   useEffect(() => {
     if (!hangoutsEnabled) { setLoading(false); return; }
@@ -490,6 +534,56 @@ export default function HangoutsPage() {
                 </p>
               )}
             </div>
+
+            {goOutOffers && goOutOffers.length > 0 && (
+              <div data-testid="hangout-go-out" className="px-1">
+                <div className="flex items-center gap-1 mb-2">
+                  <Compass size={14} className="text-primary" />
+                  <h3 className="text-sm font-bold">{t("hangout.go_out.title")}</h3>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                  {goOutOffers.map((offer) => {
+                    const Icon = GO_OUT_ICONS[offer.category] || MapPin;
+                    const color = GO_OUT_COLORS[offer.category] || "bg-slate-100 text-slate-600";
+                    return (
+                      <a
+                        key={offer.id}
+                        href={offer.deeplink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-testid={`hangout-go-out-${offer.id}`}
+                        className="shrink-0 w-56 rounded-2xl border border-muted bg-card p-3 hover:shadow-md transition-shadow"
+                      >
+                        <span className={`inline-flex items-center justify-center h-8 w-8 rounded-full ${color} mb-2`}>
+                          <Icon size={16} />
+                        </span>
+                        <p className="text-sm font-bold leading-tight line-clamp-2">{offer.title}</p>
+                        {offer.price != null && (
+                          <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                            <Ticket size={12} />
+                            {offer.price % 1 === 0 ? offer.price.toLocaleString("ru-RU") : offer.price} ₽
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
+                          {offer.city && (
+                            <span className="flex items-center gap-0.5">
+                              <MapPin size={10} />
+                              {offer.city}
+                            </span>
+                          )}
+                          {typeof offer.commission_rate === "number" && offer.commission_rate > 0 && (
+                            <span className="flex items-center gap-0.5 text-emerald-600 font-semibold">
+                              <HandCoins size={10} />
+                              {t("hangout.go_out.cashback", { pct: String(offer.commission_rate) })}
+                            </span>
+                          )}
+                        </div>
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {loading ? (
               <div className="flex items-center justify-center py-16">

@@ -43,6 +43,8 @@ const mockTranslations: Record<string, string> = {
   "hangout.my_responses": "Мои отклики",
   "hangout.empty_my_listings": "Вы еще не создавали встречи",
   "hangout.empty_my_responses": "Вы пока никуда не откликались",
+  "hangout.go_out.title": "Куда пойти вдвоём",
+  "hangout.go_out.cashback": "кэшбэк {pct}%",
 }
 
 vi.mock("@/context/language-context", () => ({
@@ -95,7 +97,11 @@ describe("HangoutsPage", () => {
   })
 
   it("renders feed with hangout cards", async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(sampleHangouts) })
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(sampleHangouts) })
+    })
     const HangoutsPage = (await import("@/pages/hangouts")).default
 
     renderPage(<HangoutsPage />)
@@ -180,13 +186,57 @@ describe("HangoutsPage", () => {
   })
 
   it("shows empty message when feed is empty", async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+    })
     const HangoutsPage = (await import("@/pages/hangouts")).default
 
     renderPage(<HangoutsPage />)
 
     await waitFor(() => {
       expect(screen.getByText("Пока нет активных встреч")).toBeTruthy()
+    })
+  })
+
+  it("renders «Куда пойти вдвоём» affiliate block with offers", async () => {
+    const offers = [
+      { id: 28, category: "restaurant", title: "Ресторан для первого свидания", deeplink: "https://go/x", price: 2500, city: "Москва", partner_name: "Restoclub", commission_rate: 12 },
+      { id: 30, category: "flowers", title: "Цветы к свиданию", deeplink: "https://go/y", price: 1500, city: "Москва", partner_name: "Flowwow", commission_rate: 15 },
+    ]
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+
+    renderPage(<HangoutsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-go-out")).toBeTruthy()
+    })
+    expect(screen.getByText("Куда пойти вдвоём")).toBeTruthy()
+    expect(screen.getByText("Ресторан для первого свидания")).toBeTruthy()
+    expect(screen.getByText("кэшбэк 12%")).toBeTruthy()
+    const link = screen.getByTestId("hangout-go-out-28") as HTMLAnchorElement
+    expect(link.href).toBe("https://go/x")
+    expect(link.target).toBe("_blank")
+  })
+
+  it("hides go-out block when offers array is empty", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+
+    renderPage(<HangoutsPage />)
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("hangout-go-out")).toBeNull()
     })
   })
 })
