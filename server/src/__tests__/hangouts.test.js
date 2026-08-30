@@ -155,6 +155,16 @@ describe('GET /api/hangouts (feed)', () => {
     expect(sql).toContain('po.id AS offer_id')
     expect(res.body[0]).toMatchObject({ offer_id: 12, offer_price: '500.00' })
   })
+
+  it('returns offer_pinned and sorts pinned offers first', async () => {
+    pool.query.mockResolvedValueOnce([[{ id: 2, offer_id: 5, offer_pinned: 1 }], []])
+    const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts')
+    expect(res.status).toBe(200)
+    const sql = pool.query.mock.calls[0][0]
+    expect(sql).toContain('po.pinned AS offer_pinned')
+    expect(sql).toMatch(/ORDER BY \(po\.pinned IS NOT NULL AND po\.pinned = 1\) DESC/)
+    expect(res.body[0]).toMatchObject({ offer_id: 5, offer_pinned: 1 })
+  })
 })
 
 describe('POST /api/hangouts', () => {

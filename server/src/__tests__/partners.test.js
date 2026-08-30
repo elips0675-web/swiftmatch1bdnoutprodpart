@@ -400,6 +400,18 @@ describe('Admin partners CRUD', () => {
       .send({ category: 'taxi', title: 'Test offer', deeplink: 'https://x.ru', placement: 'moon' })
     expect(badPlacement.status).toBe(400)
   })
+
+  it('admin PUT offer accepts pinned flag', async () => {
+    pool.query.mockResolvedValueOnce([{ affectedRows: 1 }, []])
+    const res = await request(adminApp)
+      .put('/offers/9')
+      .send({ pinned: true })
+    expect(res.status).toBe(200)
+    const [sql, params] = pool.query.mock.calls[0]
+    expect(sql).toContain('pinned = ?')
+    expect(params).toContain(1)
+    expect(res.body.message).toBe('Offer updated')
+  })
 })
 
 describe('Admin payouts & stats', () => {

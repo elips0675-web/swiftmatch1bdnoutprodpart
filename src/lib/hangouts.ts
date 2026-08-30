@@ -83,8 +83,9 @@ export interface Hangout {
   offer_price?: string | number | null
   offer_image_url?: string | null
   offer_deeplink?: string | null
-offer_category?: string | null
+  offer_category?: string | null
   offer_valid_to?: string | null
+  offer_pinned?: number | boolean | null
   price?: string | number | null
   capacity?: number | null
   sold_tickets?: number

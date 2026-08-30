@@ -12,7 +12,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
-import { Handshake, Plus, Pause, CircleCheck, Loader2, Banknote, BarChart3 } from "lucide-react";
+import { Handshake, Plus, Pause, CircleCheck, Loader2, Banknote, BarChart3, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/language-context";
 import { getToken } from "@/lib/token";
@@ -38,6 +38,7 @@ interface AdminOffer {
   title: string;
   placement: string;
   status: 'active' | 'paused';
+  pinned: number | boolean;
   clicks_total: number;
 }
 
@@ -218,6 +219,21 @@ export default function AdminPartnersPage() {
     }
   };
 
+  const togglePin = async (o: AdminOffer) => {
+    try {
+      const token = getToken();
+      const res = await fetch(`/api/admin/offers/${o.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ pinned: !o.pinned }),
+      });
+      if (!res.ok) throw new Error('failed');
+      fetchData();
+    } catch {
+      toast.error(t('error.generic_title'));
+    }
+  };
+
   const createPayout = async () => {
     if (!payoutForm.partner_id || !Number(payoutForm.amount)) return;
     setBusy(true);
@@ -389,15 +405,21 @@ export default function AdminPartnersPage() {
                       <TableCell className="text-[10px] text-muted-foreground">{o.placement}</TableCell>
                       <TableCell className="text-sm font-bold">{o.clicks_total}</TableCell>
                       <TableCell>
-                        {o.status === 'active' ? (
-                          <Button size="sm" variant="outline" data-testid={`pause-offer-${o.id}`} onClick={() => toggleOffer(o)} className="rounded-full h-8 px-3 text-xs">
-                            <Pause size={12} className="mr-1" /> {t('admin.partners.pause')}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Button size="sm" variant={o.pinned ? "default" : "outline"} data-testid={`pin-offer-${o.id}`} onClick={() => togglePin(o)}
+                            className={"rounded-full h-8 px-3 text-xs " + (o.pinned ? "bg-amber-500 hover:bg-amber-500 text-white" : "text-amber-700 hover:text-amber-700")}>
+                            <Sparkles size={12} className="mr-1" /> {o.pinned ? t('admin.partners.sponsored_on') : t('admin.partners.sponsored')}
                           </Button>
-                        ) : (
-                          <Button size="sm" variant="outline" data-testid={`activate-offer-${o.id}`} onClick={() => toggleOffer(o)} className="rounded-full h-8 px-3 text-xs text-green-700 hover:text-green-700">
-                            <CircleCheck size={12} className="mr-1" /> {t('admin.partners.activate')}
-                          </Button>
-                        )}
+                          {o.status === 'active' ? (
+                            <Button size="sm" variant="outline" data-testid={`pause-offer-${o.id}`} onClick={() => toggleOffer(o)} className="rounded-full h-8 px-3 text-xs">
+                              <Pause size={12} className="mr-1" /> {t('admin.partners.pause')}
+                            </Button>
+                          ) : (
+                            <Button size="sm" variant="outline" data-testid={`activate-offer-${o.id}`} onClick={() => toggleOffer(o)} className="rounded-full h-8 px-3 text-xs text-green-700 hover:text-green-700">
+                              <CircleCheck size={12} className="mr-1" /> {t('admin.partners.activate')}
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

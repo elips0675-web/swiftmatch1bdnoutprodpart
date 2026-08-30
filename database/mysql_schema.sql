@@ -842,6 +842,7 @@ CREATE TABLE `partner_offers` (
   `valid_from` date DEFAULT NULL,
   `valid_to` date DEFAULT NULL,
   `placement` set('hangout','chat','profile','passport','attachment_result') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `pinned` tinyint(1) NOT NULL DEFAULT '0',
   `status` enum('active','paused') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

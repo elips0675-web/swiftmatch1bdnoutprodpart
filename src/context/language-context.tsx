@@ -1455,6 +1455,7 @@ const translations = {
     'hangout.offer.buy': 'Купить',
     'hangout.offer.buying': 'Переходим…',
     'hangout.offer.buy_ticket': 'Билет {price} ₽',
+    'hangout.sponsored': 'Реклама',
     'hangout.response.pending': 'На рассмотрении',
     'hangout.response.accepted': 'Принят',
     'hangout.response.declined': 'Отклонен',
@@ -1588,6 +1589,8 @@ const translations = {
     'admin.partners.details': 'Реквизиты',
     'admin.partners.pause': 'Пауза',
     'admin.partners.activate': 'Включить',
+    'admin.partners.sponsored': 'Sponsored',
+    'admin.partners.sponsored_on': 'Sponsored ✓',
   },
   EN: {
     'common.zodiac.aries': 'Aries',
@@ -3037,6 +3040,7 @@ const translations = {
     'hangout.offer.buy': 'Buy',
     'hangout.offer.buying': 'Redirecting…',
     'hangout.offer.buy_ticket': 'Ticket {price} ₽',
+    'hangout.sponsored': 'Sponsored',
     'hangout.response.pending': 'Pending',
     'hangout.response.accepted': 'Accepted',
     'hangout.response.declined': 'Declined',
@@ -3170,6 +3174,8 @@ const translations = {
     'admin.partners.details': 'Details',
     'admin.partners.pause': 'Pause',
     'admin.partners.activate': 'Activate',
+    'admin.partners.sponsored': 'Sponsored',
+    'admin.partners.sponsored_on': 'Sponsored ✓',
   }
 };
 

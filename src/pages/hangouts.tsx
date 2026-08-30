@@ -114,6 +114,12 @@ function HangoutCard({ hangout }: { hangout: Hangout }) {
   return (
     <Link to={`/hangouts/${hangout.id}`} className="block">
       <Card data-testid={`hangout-card-${hangout.id}`} className="p-4 hover:bg-muted/30 transition-colors">
+        {Number(hangout.offer_pinned) === 1 && (
+          <div className="mb-2 flex items-center gap-1.5 rounded-md bg-amber-50 border border-amber-200 px-2 py-1 w-fit" data-testid={`hangout-sponsored-${hangout.id}`}>
+            <Sparkles size={12} className="text-amber-600" />
+            <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700">{t("hangout.sponsored")}</span>
+          </div>
+        )}
         <div className="flex items-start gap-3">
           <div
             className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden cursor-pointer"

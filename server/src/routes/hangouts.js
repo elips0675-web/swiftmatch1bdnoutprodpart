@@ -121,6 +121,7 @@ const HANGOUT_LIST_SELECT = `
          po.id AS offer_id, po.title AS offer_title, po.price AS offer_price,
          po.image_url AS offer_image_url, po.deeplink AS offer_deeplink,
          po.category AS offer_category, po.city AS offer_city, po.valid_to AS offer_valid_to,
+         po.pinned AS offer_pinned,
          (SELECT COUNT(*) FROM hangout_responses hr WHERE hr.hangout_id = h.id AND hr.status = 'accepted') AS accepted_count,
          (SELECT COUNT(*) FROM hangout_participants hp WHERE hp.hangout_id = h.id AND hp.status = 'joined') AS participant_count`
 
@@ -182,7 +183,7 @@ router.get('/api/hangouts', optionalAuth, async (req, res) => {
                  ${JOIN_PARTNER_OFFER}
                  WHERE ${where.join(' AND ')}
                  ${having}
-                 ORDER BY h.event_date ASC
+                 ORDER BY (po.pinned IS NOT NULL AND po.pinned = 1) DESC, h.event_date ASC
                  LIMIT ? OFFSET ?`
     const rows = await pool.query(sql, [...params, ...geoParams, limit, offset])
 
