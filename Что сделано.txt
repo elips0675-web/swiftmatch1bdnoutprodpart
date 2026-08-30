@@ -1,6 +1,6 @@
 # Что сделано
 
-> Актуально на 26.08.2026. Все тесты: **388/388** — сервер 307/307 ✅, фронт 81/81 ✅. Vite build: ✅. Lint: 0 errors.
+> Актуально на 30.08.2026. Все тесты: **417/417** — сервер 336/336 ✅ (7 skipped предзаданных), фронт 81/81 ✅. Vite build: ✅. Lint: 0 errors.
 
 ## Хотфикс (26.08.2026): admin/content → profile/edit, UI-фиксы, поиск
 
@@ -679,3 +679,21 @@
 - **Фронт**: `admin-partners.tsx` — тумблер «Sponsored»/«Sponsored ✓» в таблице офферов (`pin-offer-{id}`); `hangouts.tsx` (HangoutCard) — бадж «Реклама» при `offer_pinned === 1` (`hangout-sponsored-{id}`). i18n `admin.partners.sponsored/sponsored_on`, `hangout.sponsored` (RU+EN).
 - **Тесты**: server **336/336** (+2), front **81/81**, `npx vite build` OK, eslint 0 errors.
 - **Live-проверка** (localhost:3002): offer 17 (placement=hangout) → PIN → pinned=1; создана встреча 149 с `partner_offer_id=17` → feed[0]=149 с `offer_pinned=1` (закреплённая в начале ленты); unpin + тестовая встреча удалены. Коммит: add4270.
+
+## Этап 87 (30.08.2026): /hangouts P2 — Премиум-перки на встречи (boost + companions cap)
+
+Третий пункт плана монетизации закрыт (P2 «Премиум-перки на встречи»): premium получает увеличенный лимит компаньонов и возможность «продвигать» свои встречи в начало ленты.
+
+- **Миграция** `database/migrations/046_hangouts_boost.sql`: `hangouts.boosted TINYINT(1) NOT NULL DEFAULT 0 AFTER capacity` (additive). Применена к живой БД; схема обновлена в `mysql_schema.sql`.
+- **Сервер** (`server/src/routes/hangouts.js`):
+  - `getCompanionsCap(userId)`: читает активную подписку — `COMPANIONS_CAP_FREE = 10`, `COMPANIONS_CAP_PREMIUM = 20`. CREATE/PUT проверяют `max_companions` против капа юзера (400 `COMPANIONS_LIMIT` для free >10).
+  - `HANGOUT_LIST_SELECT` → `h.boosted AS boosted`; feed `ORDER BY (h.boosted = 1) DESC, (po.pinned IS NOT NULL AND po.pinned = 1) DESC, h.event_date ASC` (boost выше pinned).
+  - `POST /api/hangouts/:id/boost` — premium-only (free → 403 `PREMIUM_REQUIRED`), author-only (403 Not the author), только для `active` (409), лимит 1 активный буст (409 `BOOST_LIMIT`); `POST /api/hangouts/:id/unboost`.
+  - Восстановлена случайно затёртая строка открытия `router.post('/api/hangouts/order/webhook', ...)` (баг этапа 85 был уже исправлен ранее, повторно проверено).
+- **Фронт**:
+  - `hangout-create.tsx` / `hangout-edit.tsx`: `usePremium()`; `COMPANION_OPTIONS_PREMIUM = [1..20]` для premium; для free только 1–10; hint с иконкой `Lock`.
+  - `hangouts.tsx` (карточка): бадж «Продвинуто» (`hangout-boosted-{id}`, violet, `Zap`) перед sponsored.
+  - `hangouts-my.tsx`: `ListingRow` — кнопка «Продвинуто ✓» (unboost) / «Продвинуть» (boost) для premium, для free ссылка `/premium` с `Crown`; обработчики `toggleBoost`/`boosingId` + toast-и на PREMIUM_REQUIRED/BOOST_LIMIT.
+  - i18n (RU+EN): `hangout.form.companions_premium_hint`, `hangout.boosted`, `hangout.boost.promote/promoted/toast.boosted/toast.unboosted/limit/premium_required`. Тип `Hangout` расширен полем `boosted`.
+- **Тесты**: server **336/336** (hangouts.test.js 53 теста, +7: boosted-select + boost/unboost), front **81/81**, `npx vite build` OK, eslint 0 errors (только warnings). Исправлен тест `hangout-edit.test.tsx` (мок `@/hooks/use-premium`, чтобы usePremium не съедал mock-ответ fetch).
+- **Live-проверка** (localhost:3002, MySQL поднят заново): premium → создана встреча max_companions=12 (200), free → PUT 12 → 400 `COMPANIONS_LIMIT`; premium boost → 200; второй активный boost → 409 `BOOST_LIMIT`; unboost → 200 и повторный boost другого — 200; free boost → 403 `PREMIUM_REQUIRED`; не-автор → 403 Not the author; feed[0]=забущенная с `boosted=1`. Тестовые встречи (150, 151) и временная подписка юзера 1 удалены.

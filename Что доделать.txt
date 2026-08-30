@@ -611,3 +611,18 @@
 - **Live-проверка** (localhost:3002): offer 17 (placement=hangout) → PIN via admin → pinned=1; создана тестовая встреча 149 с `partner_offer_id=17` → feed[0]=149 с `offer_pinned=1` (закреплённая в начале, до более ранних event_date); unpin offer 17, тестовая встреча удалена.
 
 **Что дальше (P1):** событийная интеграция с ивент-организаторами (speed-dating, миксеры, мастер-классы → комиссия за билет 10–30%), затем P2 (премиум-перки на встречи).
+
+## ✅ Этап 87 (30.08.2026): /hangouts P2 — Премиум-перки на встречи (boost + companions cap)
+
+🟠 P2 из плана монетизации закрыт: premium получает увеличенный лимит компаньонов (10→20) и «продвижение» своих встреч в начало ленты.
+
+- **Схема** (миграция `046_hangouts_boost.sql`): `hangouts.boosted TINYINT(1) NOT NULL DEFAULT 0` (additive, за `capacity`). Применена к живой БД; `mysql_schema.sql` обновлён.
+- **Сервер** (`hangouts.js`):
+  - `getCompanionsCap(userId)` — активная подписка → `COMPANIONS_CAP_PREMIUM = 20`, иначе `COMPANIONS_CAP_FREE = 10`; CREATE/PUT проверяют `max_companions` (400 `COMPANIONS_LIMIT` для free >10).
+  - `POST /api/hangouts/:id/boost` — premium-only (free → 403 `PREMIUM_REQUIRED`), author-only (403 Not the author), только `active` (409), лимит 1 активный буст (409 `BOOST_LIMIT`); `POST /api/hangouts/:id/unboost`.
+  - `HANGOUT_LIST_SELECT` → `h.boosted AS boosted`; feed `ORDER BY (h.boosted = 1) DESC, (po.pinned = 1) DESC, h.event_date ASC` — boost выше pinned.
+- **Фронт**: `hangout-create.tsx`/`hangout-edit.tsx` — `COMPANION_OPTIONS_PREMIUM=[1..20]` для premium (иначе 1–10) + hint с `Lock`; `hangouts.tsx` — бейдж «Продвинуто» (`hangout-boosted-{id}`, `Zap`); `hangouts-my.tsx` — кнопки Продвинуть/Продвинуто ✓ (unboost)/ссылка /premium для free; `toggleBoost`+`boosingId`+toast на PREMIUM_REQUIRED/BOOST_LIMIT. i18n `hangout.boost.*`, `hangout.form.companions_premium_hint` (RU+EN). Тип `Hangout` + поле `boosted`.
+- **Тесты**: server **336/336** (hangouts.test.js 53 теста, +7 boost/unboost/companions-cap), front **81/81** (hangout-edit.test.tsx + мок `use-premium`), `npx vite build` OK, eslint 0 errors.
+- **Live-проверка** (localhost:3002): premium max_companions=12 → 200; free 12 → 400 COMPANIONS_LIMIT; premium boost → 200; второй буст → 409 BOOST_LIMIT; unboost → 200 и повторный буст другого → 200; free boost → 403 PREMIUM_REQUIRED; не-автор → 403 Not the author; feed[0]=забущенная с `boosted=1`. Тестовые встречи (150, 151) и временная подписка удалены.
+
+**Что дальше (P1):** событийная интеграция с ивент-организаторами (speed-dating, миксеры, мастер-классы → комиссия за билет 10–30%), затем P3 (AI-подбор мест, affiliate-офферы).

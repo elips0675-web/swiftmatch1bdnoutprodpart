@@ -677,3 +677,14 @@
 - **Сервер**: `admin/partners.js` GET `/offers` возвращает `pinned`; POST create + PUT `/offers/:id` принимают `pinned`. `hangouts.js` `HANGOUT_LIST_SELECT` → `po.pinned AS offer_pinned`; feed `ORDER BY (po.pinned IS NOT NULL AND po.pinned = 1) DESC, h.event_date ASC`.
 - **Фронт**: `admin-partners.tsx` — тумблер «Sponsored»/«Sponsored ✓» (`pin-offer-{id}`); `hangouts.tsx` — бадж «Реклама» при `offer_pinned===1` (`hangout-sponsored-{id}`). i18n `admin.partners.sponsored/sponsored_on`, `hangout.sponsored` RU+EN.
 - **Тесты**: server **336/336** (+2), front **81/81**, vite build OK, eslint 0 errors. Live: offer 17 pinned → встреча 149 с `partner_offer_id` → feed[0] с `offer_pinned=1`. Коммит: add4270.
+
+## Этап 87 (30.08.2026): /hangouts P2 — Премиум-перки на встречи (boost + companions cap)
+
+- **Миграция** `database/migrations/046_hangouts_boost.sql`: `hangouts.boosted TINYINT(1) NOT NULL DEFAULT 0` (additive, за `capacity`). Применена к живой БД; схема обновлена в `mysql_schema.sql`.
+- **Сервер** (`server/src/routes/hangouts.js`):
+  - `getCompanionsCap(userId)`: активная подписка → `COMPANIONS_CAP_PREMIUM = 20`, иначе `COMPANIONS_CAP_FREE = 10`; CREATE/PUT проверяют `max_companions` (400 `COMPANIONS_LIMIT` для free >10).
+  - `POST /api/hangouts/:id/boost` — premium-only (free → 403 `PREMIUM_REQUIRED`), author-only (403 Not the author), только `active` (409), лимит 1 активный буст (409 `BOOST_LIMIT`); `POST /api/hangouts/:id/unboost`.
+  - `HANGOUT_LIST_SELECT` → `h.boosted AS boosted`; feed `ORDER BY (h.boosted = 1) DESC, (po.pinned = 1) DESC, h.event_date ASC` — boost выше pinned.
+- **Фронт**: `hangout-create.tsx`/`hangout-edit.tsx` — `usePremium()`, `COMPANION_OPTIONS_PREMIUM=[1..20]` для premium (иначе 1–10) + hint с `Lock`; `hangouts.tsx` — бейдж «Продвинуто» (`hangout-boosted-{id}`, `Zap`); `hangouts-my.tsx` — кнопки «Продвинуть»/«Продвинуто ✓» (unboost)/ссылка `/premium` для free, `toggleBoost`+`boosingId`+toast. i18n `hangout.boost.*`, `hangout.form.companions_premium_hint` RU+EN. Тип `Hangout` + `boosted`.
+- **Тесты**: server **336/336** (hangouts.test.js 53 теста, +7 boost/unboost/companions-cap), front **81/81** (hangout-edit.test.tsx + мок `use-premium`), vite build OK, eslint 0 errors.
+- **Live-проверка** (localhost:3002): premium max_companions=12 → 200; free 12 → 400 `COMPANIONS_LIMIT`; premium boost → 200; второй буст → 409 `BOOST_LIMIT`; unboost → 200 и повторный буст другого → 200; free boost → 403 `PREMIUM_REQUIRED`; не-автор → 403 Not the author; feed[0]=забущенная с `boosted=1`. Тестовые встречи (150, 151) и временная подписка удалены.
