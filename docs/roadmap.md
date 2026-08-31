@@ -350,6 +350,16 @@ UX-улучшение ленты (следующий по приоритету �
 - **Тесты:** front +1 — remount в пределах 60s не перезапрашивает ленту (считаются только `?page=`-запросы, исключая H1-рекомендации).
 - **Счётчики:** server 389/389 (без изменений), front 111/111, tsc/lint 0 errors, `vite build` OK.
 
+## Этап 111 (31.08.2026) — SEO meta-теги (SeoHead + react-helmet-async) на detail-странице 🚀
+
+Пункт 🟠 #20 плана — базовые meta/OG-теги для страниц встреч (превью в мессенджерах и поисковиках).
+
+- **Зависимость:** `react-helmet-async` `^3.0.0` в `package.json`.
+- **Компонент `src/components/seo/seo-head.tsx` (новый):** обёртка над `Helmet` — `title`, `meta description`, `link canonical`, OG-теги (`og:title/description/type/url/image`, дефолт `{origin}/icon-512x512.png`), Twitter Card (`summary_large_image`).
+- **Провайдер (`src/main.tsx`):** корневой рендер обёрнут в `<HelmetProvider>`.
+- **Подключение (`src/pages/hangout-detail.tsx`):** добавлен `<SeoHead>` с `title="${hangout.title} — SwiftMatch"`, `description` = `description · place_name · city` (обрезается до 200 симв., фолбэк `hangout.seo.feed_desc`), `image=hangout.avatar_url`, `canonical=${origin}/hangouts/{id}`, `type="article"`; корневой `<div>` заменён на fragment `<>...</>`.
+- **Счётчики:** tsc/lint 0 errors, `vite build` OK.
+
 ## Плановые хвосты (не блокируют)
 
 - Внешние блокеры (не код): staging VPS + docker compose up, реальные ключи в `.env`, домен + SSL + Google Play, k6 100 VU на staging, UptimeRobot/Grafana-алерты.

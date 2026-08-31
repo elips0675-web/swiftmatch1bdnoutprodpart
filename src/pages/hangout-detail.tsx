@@ -22,6 +22,7 @@ import { formatEventDate, type Hangout } from "@/lib/hangouts";
 import { categoryIcon } from "./hangouts";
 import { CalendarDays, MapPin, Users, Check, X, MessageCircle, ArrowLeft, Compass, Pencil, Heart, UserPlus, UserMinus, MessageSquareText, Navigation, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { SeoHead } from "@/components/seo/seo-head";
 
 const RESPONSE_STATUS_KEYS: Record<string, string> = {
   pending: "hangout.response.pending",
@@ -306,8 +307,18 @@ export default function HangoutDetailPage() {
   const hasTicket = hangout.my_ticket_status === 'paid';
   const needsTicket = isPaid && !hangout.is_author && !hasTicket;
 
+  const seoDescription = [hangout.description, hangout.place_name, hangout.city].filter(Boolean).join(" · ") || t("hangout.seo.feed_desc");
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+    <>
+      <SeoHead
+        title={`${hangout.title} — SwiftMatch`}
+        description={seoDescription.slice(0, 200)}
+        image={hangout.avatar_url}
+        canonical={`${window.location.origin}/hangouts/${id}`}
+        type="article"
+      />
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       <AppHeader title={t("hangout.title")} />
       <main className="px-4 pb-24 pt-4 max-w-2xl mx-auto space-y-4">
         <Button variant="ghost" size="sm" className="rounded-full -ml-2" data-testid="hangout-detail-back" onClick={() => navigate("/hangouts")}>
@@ -663,6 +674,6 @@ export default function HangoutDetailPage() {
       </Dialog>
 
       <BottomNav />
-    </div>
+    </>
   );
 }
