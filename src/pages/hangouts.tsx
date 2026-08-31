@@ -747,7 +747,7 @@ export default function HangoutsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       <AppHeader title={t("hangout.title")} />
-      <main className="px-4 pb-24 pt-4 max-w-2xl mx-auto space-y-4">
+      <main className="px-4 pb-24 pt-3 max-w-2xl mx-auto space-y-3">
         {!hangoutsEnabled ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground" data-testid="hangouts-disabled">
             <Compass size={48} className="mb-4 opacity-30" />
@@ -760,7 +760,6 @@ export default function HangoutsPage() {
               data-testid="create-hangout"
               onClick={() => navigate("/hangouts/create")}
               className="w-full rounded-full font-bold"
-              size="lg"
             >
               <PlusCircle size={18} className="mr-2" />
               {t("hangout.action.create")}
@@ -790,7 +789,7 @@ export default function HangoutsPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={t("hangout.filter.search")}
-                className="pl-9 pr-9 rounded-full h-10"
+                className="pl-9 pr-9 rounded-full h-9"
                 aria-label={t("hangout.filter.search")}
               />
               {search && (
@@ -815,7 +814,7 @@ export default function HangoutsPage() {
                   data-testid={`hangout-type-${typ}`}
                   onClick={() => { setPage(1); setHangoutType(typ); }}
                   className={cn(
-                    "shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors",
+                    "shrink-0 px-3 py-1 rounded-full text-xs font-bold border transition-colors",
                     hangoutType === typ
                       ? "gradient-bg border-0 text-white shadow-md"
                       : "bg-background border-muted text-muted-foreground hover:bg-muted/40",
@@ -835,7 +834,7 @@ export default function HangoutsPage() {
                   data-testid={chip.key ? `hangout-category-${chip.key}` : "hangout-category-all"}
                   onClick={() => applyCategory(chip.key)}
                   className={cn(
-                    "shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors",
+                    "shrink-0 px-3 py-1 rounded-full text-xs font-bold border transition-colors",
                     category === chip.key
                       ? "gradient-bg border-0 text-white shadow-md"
                       : "bg-background border-muted text-muted-foreground hover:bg-muted/40",
@@ -855,7 +854,7 @@ export default function HangoutsPage() {
                   data-testid={`hangout-date-${chip.key}`}
                   onClick={() => applyDateFilter(chip.key)}
                   className={cn(
-                    "shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors",
+                    "shrink-0 px-3 py-1 rounded-full text-xs font-bold border transition-colors",
                     dateFilter === chip.key
                       ? "gradient-bg border-0 text-white shadow-md"
                       : "bg-background border-muted text-muted-foreground hover:bg-muted/40",
@@ -877,7 +876,7 @@ export default function HangoutsPage() {
                   value={sortBy}
                   onChange={(e) => { setSortBy(e.target.value as HangoutSort); setPage(1); }}
                   aria-label={t("hangout.filter.sort")}
-                  className="appearance-none rounded-full border border-muted bg-background text-xs font-bold text-muted-foreground pl-3 pr-7 py-1.5 hover:bg-muted/40 transition-colors"
+                  className="appearance-none rounded-full border border-muted bg-background text-xs font-bold text-muted-foreground pl-3 pr-7 py-1 hover:bg-muted/40 transition-colors"
                 >
                   <option value="date">{t("hangout.sort.date")}</option>
                   <option value="popularity">{t("hangout.sort.popularity")}</option>
@@ -900,7 +899,7 @@ export default function HangoutsPage() {
                       data-testid={`hangout-price-${v}`}
                       onClick={() => { setPriceFilter(v); setPage(1); }}
                       className={cn(
-                        "shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors",
+                        "shrink-0 px-3 py-1 rounded-full text-xs font-bold border transition-colors",
                         priceFilter === v
                           ? "gradient-bg border-0 text-white shadow-md"
                           : "bg-background border-muted text-muted-foreground hover:bg-muted/40",
