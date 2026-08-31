@@ -297,6 +297,20 @@ UX-улучшение ленты (следующий по приоритету �
 - **Тесты:** front +2 — stagger (класс на `closest("a")`), pull-to-refresh (touch-жест `touchStart 50 → touchMove 200 → touchEnd` увеличивает число `/api/hangouts` запросов). **front 96→98/98**; tsc/lint 0 errors; `vite build` OK; server 372/372 (не менялся). Live (390px): ptr-индикатор + 4 stagger-карточки, первая delay 0ms.
 - **Примечание:** pull-to-refresh работает на touch-устройствах (мобильный веб / Capacitor); на десктопе пользовательский паттерн от Web-скролла сохраняется (кнопка «Показать новые» для свежих встреч остаётся).
 
+## Этап 106 (31.08.2026) — Оптимистичный UI respond/join/like на карточке ✅
+
+Пункт 🛠 #14(б) / UX-кандидат — не ждать ответа сервера: состояние карточки меняется сразу, при ошибке откатывается.
+
+- **`HangoutCard` (`src/pages/hangouts.tsx`), `doAction(kind: "respond"|"join"|"like"):`** перед сетевой `POST /api/hangouts/:id/{respond,join,like}` применяется оптимистичный патч через `onOptimistic(hangout.id, patch)`:
+  - `respond` → `my_response_status: "pending"`;
+  - `join` → `my_participant_status: "joined"` + `participant_count + 1`;
+  - `like` → `my_like_status: "like"` + `like_count + 1`.
+  Инверс (`prev`) сохраняется для отката.
+- **Откат:** при `!ok && status !== 201` (409/402/401/прочее) или при сетевом catch — повторно применяется `prev` (`onOptimistic?.(id, prev)`), показывается соответствующий тост (`already`/`payment_required`/`auth_required`/`error`).
+- **`applyOptimistic` (useCallback)** — обновляет встречу в state `items` по `id`; передаётся как `onOptimistic={applyOptimistic}` в обе точки рендера `HangoutCard` (лента + H1-рекомендации).
+- **Тесты (`src/test/hangouts.test.tsx`, +2):** «applies optimistic join immediately and keeps it on success (этап 106)» (кнопка join исчезает до ответа сервера и остаётся после 201) и «rolls back optimistic join when the request fails (этап 106)» (500 → кнопка join снова появляется).
+- **Счётчики:** в рамках сессии 107–110 — итоговые server 389/389, front 111/111, tsc/lint 0 errors, `vite build` OK.
+
 ## Этап 107 (31.08.2026) — Пустое состояние /hangouts: рекомендации + онбординг-баннер ✅
 
 Пункт 🔴 #3 плана «Улучшение страницы hangouts» — снизить порог входа для новых пользователей, у которых лента может быть пустой.

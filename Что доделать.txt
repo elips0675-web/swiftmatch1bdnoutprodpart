@@ -781,4 +781,16 @@ UX-улучшение ленты (следующий кандидат из сп�
 - **Тесты:** front 96→**98/98** (+2: stagger-класс на `closest("a")`, pull-жест `touchStart/Move/End` → перезапрос `/api/hangouts`); tsc/lint 0, `vite build` OK, server 372/372 (не менялся). Live: ptr-индикатор + 4 stagger-карточки, первая delay 0ms.
 - **Примечание:** работает на touch-устройствах; на десктопе паттерн обычный + кнопка «Показать новые».
 
-Следующие кандидаты (не блокируют): оптимистичный UI respond/join, чип «все» в категориях, бейдж-счётчики на чипах «Куда пойти», эмбед-кадры с мероприятиями в карточках.
+## ✅ Этап 106 (31.08.2026): оптимистичный UI respond/join/like на карточке — ЗАКРЫТО
+
+Пункт из «следующих кандидатов»: состояние карточки меняется сразу, до ответа сервера, при ошибке откатывается.
+
+- **`HangoutCard` (`src/pages/hangouts.tsx`), `doAction(kind: "respond"|"join"|"like")`:** перед сетевой `POST /api/hangouts/:id/{respond,join,like}` применяется оптимистичный патч через `onOptimistic(hangout.id, patch)`: respond → `my_response_status:"pending"`; join → `my_participant_status:"joined"` + `participant_count+1`; like → `my_like_status:"like"` + `like_count+1`. Инверс (`prev`) сохраняется для отката.
+- **Откат:** при `!ok && status!==201` (409/402/401/прочее) или сетевом catch — повторно применяется `prev`, показывается тост (`already`/`payment_required`/`auth_required`/`error`).
+- **`applyOptimistic` (useCallback)** — патчит встречу в state `items` по `id`; передаётся как `onOptimistic={applyOptimistic}` в обе точки рендера `HangoutCard` (лента + H1-рекомендации).
+- **Тесты (`src/test/hangouts.test.tsx`, +2):** «applies optimistic join immediately and keeps it on success (этап 106)» и «rolls back optimistic join when the request fails (этап 106)».
+- **Счётчики:** итог сессии 107–110 — server 389/389, front 111/111, tsc/lint 0, `vite build` OK.
+
+Код этапа 106 был реализован и закоммичен вместе с сессией 107–110 (commit `ddca811`, файлы `hangouts.tsx`/`hangouts.test.tsx`); данная запись фиксирует этап в документации.
+
+Следующие кандидаты (не блокируют): чип «все» в категориях, бейдж-счётчики на чипах «Куда пойти», эмбед-кадры с мероприятиями в карточках. Внешние блокеры (не код): VPS+SSL для FCM push, live Stripe-ключи, координаты офферов.
