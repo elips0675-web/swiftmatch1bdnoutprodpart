@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/layout/app-header";
 import { BottomNav } from "@/components/navigation/bottom-nav";
@@ -21,7 +21,7 @@ import { getToken } from "@/lib/token";
 import { cn } from "@/lib/utils";
 import { HANGOUT_CATEGORIES, HANGOUT_TYPES, type HangoutCategory, type HangoutType } from "@/lib/hangouts";
 import { toast } from "sonner";
-import { Loader2, Ticket, Heart, Users, Crown, Lock } from "lucide-react";
+import { Loader2, Ticket, Heart, Users, Crown, Lock, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -68,6 +68,52 @@ export default function HangoutCreatePage() {
   const [listingsLoading, setListingsLoading] = useState(false);
   const [selectedOfferId, setSelectedOfferId] = useState<number | null>(null);
   const [dailyLimitHit, setDailyLimitHit] = useState(false);
+
+  const STEPS = [
+    { key: "what", label: t("hangout.form.step_what") },
+    { key: "where", label: t("hangout.form.step_where") },
+    { key: "when", label: t("hangout.form.step_when") },
+    { key: "tickets", label: t("hangout.form.step_tickets") },
+  ];
+  const TOTAL_STEPS = STEPS.length;
+  const [step, setStep] = useState(0);
+
+  // Предзаполнение города из профиля пользователя
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const token = getToken();
+      if (!token || city) return;
+      try {
+        const res = await fetch("/api/profile/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const me = await res.json();
+        if (!cancelled && me?.city && !city) setCity(me.city);
+      } catch { /* профиль недоступен — оставляем пусто */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const canProceed = (s: number) => {
+    if (s === 0) return title.trim().length > 0;
+    if (s === 2) return Boolean(eventDate) && eventDate >= defaultDateTime().slice(0, 16);
+    return true;
+  };
+
+  const next = () => {
+    if (!canProceed(step)) {
+      toast.error(t(step === 0 ? "hangout.form.required" : "hangout.form.date_invalid"));
+      return;
+    }
+    if (step < TOTAL_STEPS) setStep((s) => s + 1);
+  };
+
+  const prev = () => setStep((s) => Math.max(0, s - 1));
+
+  const isLastStep = step === TOTAL_STEPS - 1;
 
   const openListings = async () => {
     setListingsOpen(true);
@@ -203,199 +249,261 @@ export default function HangoutCreatePage() {
           </div>
         )}
         <Card className="p-5 space-y-4">
-          <div className="space-y-1.5">
-            <Label>{t("hangout.form.type")}</Label>
-            <div className="flex gap-2">
-              {HANGOUT_TYPES.map((typ) => (
+          <div className="flex items-center gap-1.5" data-testid="hangout-create-steps">
+            {STEPS.map((s, i) => {
+              const done = i < step;
+              const active = i === step;
+              return (
                 <button
-                  key={typ}
+                  key={s.key}
                   type="button"
-                  data-testid={`hangout-type-${typ}`}
-                  onClick={() => setHangoutType(typ)}
+                  data-testid={`hangout-step-pill-${s.key}`}
+                  onClick={() => { if (i <= step) setStep(i); }}
+                  aria-current={active ? "step" : undefined}
                   className={cn(
-                    "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold border transition-colors",
-                    hangoutType === typ
-                      ? typ === "date"
-                        ? "border-pink-400 bg-pink-50 text-pink-700"
-                        : "border-blue-400 bg-blue-50 text-blue-700"
-                      : "border-muted bg-background text-muted-foreground hover:bg-muted/40",
+                    "flex-1 rounded-full text-[10px] font-bold uppercase tracking-wide py-1.5 transition-colors flex items-center justify-center gap-1",
+                    active ? "bg-primary text-primary-foreground" : done ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
                   )}
                 >
-                  {typ === "date" ? <Heart size={16} /> : <Users size={16} />}
-                  {t(`hangout.type.${typ}`)}
+                  {done ? <Check size={11} /> : <span>{i + 1}</span>}
+                  <span className="hidden sm:inline">{s.label}</span>
                 </button>
-              ))}
+              );
+            })}
+          </div>
+          {step === 0 && (
+            <div className="space-y-4" data-testid="hangout-step-what">
+              <div className="space-y-1.5">
+                <Label>{t("hangout.form.type")}</Label>
+                <div className="flex gap-2">
+                  {HANGOUT_TYPES.map((typ) => (
+                    <button
+                      key={typ}
+                      type="button"
+                      data-testid={`hangout-type-${typ}`}
+                      onClick={() => setHangoutType(typ)}
+                      className={cn(
+                        "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold border transition-colors",
+                        hangoutType === typ
+                          ? typ === "date"
+                            ? "border-pink-400 bg-pink-50 text-pink-700"
+                            : "border-blue-400 bg-blue-50 text-blue-700"
+                          : "border-muted bg-background text-muted-foreground hover:bg-muted/40",
+                      )}
+                    >
+                      {typ === "date" ? <Heart size={16} /> : <Users size={16} />}
+                      {t(`hangout.type.${typ}`)}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {hangoutType === "date"
+                    ? t("hangout.form.type_date_desc")
+                    : t("hangout.form.type_company_desc")
+                  }
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="hangout-category">{t("hangout.form.category")}</Label>
+                <Select value={category} onValueChange={(v) => setCategory(v as HangoutCategory)}>
+                  <SelectTrigger id="hangout-category" data-testid="hangout-category" aria-label={t("hangout.form.category")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {HANGOUT_CATEGORIES.map((c) => (
+                      <SelectItem key={c} value={c}>{t(`hangout.category.${c}`)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="hangout-title">{t("hangout.form.title")}</Label>
+                  {partnerOffersEnabled && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      data-testid="pick-from-listings"
+                      onClick={openListings}
+                      className="h-7 rounded-full text-xs font-bold text-primary px-3"
+                    >
+                      <Ticket size={13} className="mr-1" />
+                      {t("partner.select_offer")}
+                    </Button>
+                  )}
+                </div>
+                <Input
+                  id="hangout-title"
+                  data-testid="hangout-title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={t("hangout.form.title_placeholder")}
+                  maxLength={255}
+                />
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {hangoutType === "date"
-                ? t("hangout.form.type_date_desc")
-                : t("hangout.form.type_company_desc")
-              }
-            </p>
-          </div>
+          )}
 
-          <div className="space-y-1.5">
-            <Label htmlFor="hangout-category">{t("hangout.form.category")}</Label>
-            <Select value={category} onValueChange={(v) => setCategory(v as HangoutCategory)}>
-              <SelectTrigger id="hangout-category" data-testid="hangout-category" aria-label={t("hangout.form.category")}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {HANGOUT_CATEGORIES.map((c) => (
-                  <SelectItem key={c} value={c}>{t(`hangout.category.${c}`)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {step === 1 && (
+            <div className="space-y-4" data-testid="hangout-step-where">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="hangout-place">{t("hangout.form.place_name")}</Label>
+                  <Input
+                    id="hangout-place"
+                    data-testid="hangout-place"
+                    value={placeName}
+                    onChange={(e) => setPlaceName(e.target.value)}
+                    placeholder={t("hangout.form.place_name_placeholder")}
+                    maxLength={255}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="hangout-address">{t("hangout.form.place_address")}</Label>
+                  <Input
+                    id="hangout-address"
+                    data-testid="hangout-address"
+                    value={placeAddress}
+                    onChange={(e) => setPlaceAddress(e.target.value)}
+                    maxLength={255}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="hangout-city">{t("hangout.form.city")}</Label>
+                <Input
+                  id="hangout-city"
+                  data-testid="hangout-city"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  maxLength={100}
+                />
+              </div>
+            </div>
+          )}
 
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="hangout-title">{t("hangout.form.title")}</Label>
-              {partnerOffersEnabled && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  data-testid="pick-from-listings"
-                  onClick={openListings}
-                  className="h-7 rounded-full text-xs font-bold text-primary px-3"
+          {step === 2 && (
+            <div className="space-y-4" data-testid="hangout-step-when">
+              <div className="space-y-1.5">
+                <Label htmlFor="hangout-date">{t("hangout.form.date")}</Label>
+                <Input
+                  id="hangout-date"
+                  data-testid="hangout-date"
+                  type="datetime-local"
+                  value={eventDate}
+                  onChange={(e) => setEventDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("hangout.form.max_companions")}</Label>
+                <Select
+                  value={String(maxCompanions)}
+                  onValueChange={(v) => setMaxCompanions(Number(v))}
                 >
-                  <Ticket size={13} className="mr-1" />
-                  {t("partner.select_offer")}
-                </Button>
-              )}
+                  <SelectTrigger data-testid="hangout-max-companions" aria-label={t("hangout.form.max_companions")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companionOptions.map((n) => (
+                      <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!isPremium && (
+                  <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Lock size={12} className="shrink-0" />
+                    {t("hangout.form.companions_premium_hint")}
+                  </p>
+                )}
+              </div>
             </div>
-            <Input
-              id="hangout-title"
-              data-testid="hangout-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={t("hangout.form.title_placeholder")}
-              maxLength={255}
-            />
-          </div>
+          )}
 
-          <div className="space-y-1.5">
-            <Label htmlFor="hangout-description">{t("hangout.form.description")}</Label>
-            <Textarea
-              id="hangout-description"
-              data-testid="hangout-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={t("hangout.form.description_placeholder")}
-              rows={3}
-              maxLength={2000}
-            />
-          </div>
+          {step === 3 && (
+            <div className="space-y-4" data-testid="hangout-step-tickets">
+              <div className="space-y-1.5">
+                <Label htmlFor="hangout-price">{t("hangout.form.ticket_price")}</Label>
+                <Input
+                  id="hangout-price"
+                  data-testid="hangout-price"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder={t("hangout.form.ticket_price_placeholder")}
+                />
+                <p className="text-xs text-muted-foreground">{t("hangout.form.ticket_price_hint")}</p>
+              </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="hangout-place">{t("hangout.form.place_name")}</Label>
-              <Input
-                id="hangout-place"
-                data-testid="hangout-place"
-                value={placeName}
-                onChange={(e) => setPlaceName(e.target.value)}
-                placeholder={t("hangout.form.place_name_placeholder")}
-                maxLength={255}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="hangout-address">{t("hangout.form.place_address")}</Label>
-              <Input
-                id="hangout-address"
-                data-testid="hangout-address"
-                value={placeAddress}
-                onChange={(e) => setPlaceAddress(e.target.value)}
-                maxLength={255}
-              />
-            </div>
-          </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="hangout-capacity">{t("hangout.form.ticket_capacity")}</Label>
+                <Input
+                  id="hangout-capacity"
+                  data-testid="hangout-capacity"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={capacity}
+                  onChange={(e) => setCapacity(e.target.value)}
+                  placeholder={t("hangout.form.ticket_capacity_placeholder")}
+                />
+              </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="hangout-city">{t("hangout.form.city")}</Label>
-              <Input
-                id="hangout-city"
-                data-testid="hangout-city"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                maxLength={100}
-              />
+              <div className="space-y-1.5">
+                <Label htmlFor="hangout-description">{t("hangout.form.description")}</Label>
+                <Textarea
+                  id="hangout-description"
+                  data-testid="hangout-description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder={t("hangout.form.description_placeholder")}
+                  rows={3}
+                  maxLength={2000}
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="hangout-date">{t("hangout.form.date")}</Label>
-              <Input
-                id="hangout-date"
-                data-testid="hangout-date"
-                type="datetime-local"
-                value={eventDate}
-                onChange={(e) => setEventDate(e.target.value)}
-              />
-            </div>
-          </div>
+          )}
 
-          <div className="space-y-1.5">
-            <Label>{t("hangout.form.max_companions")}</Label>
-            <Select
-              value={String(maxCompanions)}
-              onValueChange={(v) => setMaxCompanions(Number(v))}
-            >
-              <SelectTrigger data-testid="hangout-max-companions" aria-label={t("hangout.form.max_companions")}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {companionOptions.map((n) => (
-                  <SelectItem key={n} value={String(n)}>{n}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {!isPremium && (
-              <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Lock size={12} className="shrink-0" />
-                {t("hangout.form.companions_premium_hint")}
-              </p>
+          <div className="flex items-center gap-2 pt-1" data-testid="hangout-create-nav">
+            {step > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                data-testid="hangout-wizard-prev"
+                onClick={prev}
+                disabled={submitting}
+                className="rounded-full font-bold h-11 px-4"
+              >
+                <ChevronLeft size={16} className="mr-1" />
+                {t("hangout.form.back")}
+              </Button>
+            )}
+            {!isLastStep ? (
+              <Button
+                type="button"
+                data-testid="hangout-wizard-next"
+                onClick={next}
+                className="flex-1 rounded-full font-bold h-11"
+              >
+                {t("hangout.form.next")}
+                <ChevronRight size={16} className="ml-1" />
+              </Button>
+            ) : (
+              <Button
+                data-testid="submit-hangout"
+                onClick={submit}
+                disabled={submitting}
+                className="flex-1 rounded-full font-bold h-11"
+              >
+                {submitting && <Loader2 size={16} className="mr-2 animate-spin" />}
+                {t("hangout.form.submit")}
+              </Button>
             )}
           </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="hangout-price">{t("hangout.form.ticket_price")}</Label>
-            <Input
-              id="hangout-price"
-              data-testid="hangout-price"
-              type="number"
-              min="0"
-              step="1"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder={t("hangout.form.ticket_price_placeholder")}
-            />
-            <p className="text-xs text-muted-foreground">{t("hangout.form.ticket_price_hint")}</p>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="hangout-capacity">{t("hangout.form.ticket_capacity")}</Label>
-            <Input
-              id="hangout-capacity"
-              data-testid="hangout-capacity"
-              type="number"
-              min="1"
-              step="1"
-              value={capacity}
-              onChange={(e) => setCapacity(e.target.value)}
-              placeholder={t("hangout.form.ticket_capacity_placeholder")}
-            />
-          </div>
-
-          <Button
-            data-testid="submit-hangout"
-            onClick={submit}
-            disabled={submitting}
-            className="w-full rounded-full font-bold h-11"
-          >
-            {submitting && <Loader2 size={16} className="mr-2 animate-spin" />}
-            {t("hangout.form.submit")}
-          </Button>
         </Card>
       </main>
       <Dialog open={listingsOpen} onOpenChange={setListingsOpen}>

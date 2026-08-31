@@ -863,4 +863,16 @@
 - **Замечание:** в jsdom класс не влияет на видимость (CSS не применяется), поэтому 15/15 фронт-тестов проходят как раньше.
 - **Проверки:** front 89/89, server 363/363, tsc/lint 0 errors, `vite build` OK. Live (390px): у карточек класс `hangout-virt`, `getBoundingClientRect().height>0` (content-visibility не скрывает видимые карточки), H-overflow нет.
 
-Этапы 100–101 закрыты. Следующий кандидат: мастер создания встречи + предзаполнение из профиля (этап 102).
+## Этап 102 (31.08.2026) — мастер создания встречи + предзаполнение из профиля ✅
+
+Пункт 🟠 #6 плана. Форма `/hangouts/create` (`src/pages/hangout-create.tsx`) переделана из длинной одностраничной в пошаговый мастер.
+
+- **4 шага:** 0 «Что» (тип + категория + заголовок — обязателен), 1 «Где» (место+адрес+город), 2 «Когда» (дата+время — не в прошлом + кол-во участников), 3 «Билеты» (цена+лимит+описание, последний шаг → «Создать»).
+- **Степпер** `data-testid="hangout-create-steps"` с кнопками `hangout-step-pill-<key>` (active/done состояния через `aria-current`), навигация `hangout-wizard-prev`/`hangout-wizard-next`, `isLastStep = step === TOTAL_STEPS - 1`. Возврат на пройденные шаги разрешён (клик по pill). Все прежние data-testid полей/сабмита/листингов/upsell сохранены.
+- **`next()`** — валидация: на шаге 0 требует `title.trim()` (иначе тост `hangout.form.required`), на шаге 2 — `eventDate >= defaultDateTime().slice(0,16)` (иначе `hangout.form.date_invalid`).
+- **Предзаполнение города:** `useEffect(() => {...}, [])` при монтировании → если есть token и город ещё пуст → `GET /api/profile/me` (auth) → `setCity(me.city)`. Поле города живёт на шаге 1.
+- **i18n (RU+EN):** +7 ключей — `hangout.form.step_what/step_where/step_when/step_tickets`, `hangout.form.back/next`, `hangout.form.date_invalid`.
+- **Тест (`src/test/hangout-create.test.tsx`, +3):** 1) prefill города из профиля + на шаге 0 скрыты поля шагов 1/3 (city читается после перехода на шаг 1 — т.к. поля др. шагов не в DOM); 2) блокировка «Далее» при пустом заголовке (title остаётся, `hangout-place` нет); 3) проход 0→1→2→3, на последнем шаге есть `submit-hangout` и нет `hangout-wizard-next`. renderPage — async `await import`. Моки: sonner toast, useFeatureFlags `{partnerOffersEnabled:false}`, usePremium `{isPremium:false}`, getToken `'test-token'`.
+- **Проверки: front 89→92/92, server 363/363 (без изменений), tsc/lint 0 errors, `vite build` OK.** Live (390px): у demo-юзера подставился «Екатеринбург» из `/api/profile/me`, все переходы/валидации работают (проверено Playwright: title-hidden на шаге0→валидация→0→1→2→3→submit).
+
+Этапы 100–102 закрыты. Следующие кандидаты: push-уведомления о новых встречах в радиусе (🟠 #7), улучшение аффилиат-блока (🟠 #8), pull-to-refresh + stagger-анимация.
