@@ -2,11 +2,19 @@ import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { ACCESS_COOKIE } from './cookies.js'
 
+let devJwtSecretCache = null
+
 function getJwtSecret() {
   if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
     throw new Error('JWT_SECRET must be set in environment for production')
   }
-  return process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex')
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET
+  // В dev без JWT_SECRET генерируем и кешируем один секрет на время процесса,
+  // чтобы подпись и проверка токенов использовали один и тот же ключ.
+  if (!devJwtSecretCache) {
+    devJwtSecretCache = crypto.randomBytes(32).toString('hex')
+  }
+  return devJwtSecretCache
 }
 
 function decodeAny(...tokens) {
