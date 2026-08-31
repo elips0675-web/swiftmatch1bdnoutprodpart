@@ -875,4 +875,21 @@
 - **Тест (`src/test/hangout-create.test.tsx`, +3):** 1) prefill города из профиля + на шаге 0 скрыты поля шагов 1/3 (city читается после перехода на шаг 1 — т.к. поля др. шагов не в DOM); 2) блокировка «Далее» при пустом заголовке (title остаётся, `hangout-place` нет); 3) проход 0→1→2→3, на последнем шаге есть `submit-hangout` и нет `hangout-wizard-next`. renderPage — async `await import`. Моки: sonner toast, useFeatureFlags `{partnerOffersEnabled:false}`, usePremium `{isPremium:false}`, getToken `'test-token'`.
 - **Проверки: front 89→92/92, server 363/363 (без изменений), tsc/lint 0 errors, `vite build` OK.** Live (390px): у demo-юзера подставился «Екатеринбург» из `/api/profile/me`, все переходы/валидации работают (проверено Playwright: title-hidden на шаге0→валидация→0→1→2→3→submit).
 
-Этапы 100–102 закрыты. Следующие кандидаты: push-уведомления о новых встречах в радиусе (🟠 #7), улучшение аффилиат-блока (🟠 #8), pull-to-refresh + stagger-анимация.
+## Этап 103 (31.08.2026) — уведомления о новых встречах в радиусе (веб-часть) ✅
+
+Пункт 🟠 #7 плана. Полные нативные push (FCM) — во внешних блокерах (staging VPS + google-services/APNs + SSL); закрыта веб-часть без внешних ключей.
+
+- **Сервер** (`server/src/routes/hangouts.js`, emit-блок create-route): payload `hangout:new` теперь содержит `lat: parsedLat, lng: parsedLng` (добавлены к `hangoutId/category/title/city/hangoutType`). Нужно клиенту для радиус-фильтра.
+- **`src/pages/hangouts.tsx`**: экспортирован хелпер `haversineKm(aLat,aLng,bLat,bLng)` (R=6371). В WS-эффекте (этап 98) `onNew` расширен:
+  - payload-тип: `{ hangoutId?, title?, lat?, lng? }`;
+  - `hasNewCoords` — числовые лат/лнг у встречи;
+  - **радиус-фильтр**: `if (coords && hasNewCoords && radiusKm>0 && haversineKm(coords...) > radiusKm) return;` — встреча вне радиуса подавляется (бейдж/тост/notification не появляются). При `coords=null` — условие false → бейдж как в 98 (обратная совместимость);
+  - **веб-Notification**: на первую in-radius встречу — `Notification.permission==='granted'` → `new Notification(...)`; `'default'` → `Notification.requestPermission()` и показать при согласии; `denied` → молча (только бейдж); обёрнуто в try/catch (не поддерживается → бейдж).
+  - deps эффекта: `[pageSocket.socket, hangoutsEnabled, t, pageToast, coords, radiusKm]`.
+- **Тесты:**
+  - server `hangouts.test.js` emit-тест: в POST добавлены `lat:55.75, lng:37.62`, добавлен `expect(... objectContaining({ lat:55.75, lng:37.62 }))`; **server 363→370/370**.
+  - front `hangouts.test.tsx`: +1 unit `haversineKm` (Екатеринбург 56.84,60.64 → Москва 55.75,37.62 в диапазоне 1200–1600 км; совпадение координат <0.01 км); **front 92→93/93**.
+- **Live-WS перепроверка ограничена средой**: free-юзер admin@mail.ru упёрся в `HANGOUT_DAILY_LIMIT` (1/день; сбрасывал удалением сегодняшних встреч id 9/10/11/12 из БД); WS подключается на `ws://localhost:8081/?token=...` (Vite прокси на 3002) — бейдж в этом прогоне не успел появиться (механика бейджа уже live-подтверждена в этапе 98; изменение — только расширение payload + радиус-фильтр, покрыто тестами).
+- **Внимание для след. сессий:** создание live-встреч у free-юзеров упирается в дневной лимит — для тестов освобождать лимит удалением `hangouts WHERE user_id=? AND created_at >= CURDATE()`, либо тестить под premium-аккаунтом.
+
+Этапы 100–103 закрыты. Следующие кандидаты: улучшение аффилиат-блока (🟠 #8), pull-to-refresh + stagger-анимация, оптимистичный UI respond/join, чип «все» в категориях.

@@ -747,4 +747,16 @@
 - **i18n (RU+EN):** +7 ключей hangout.form.step_what/step_where/step_when/step_tickets, hangout.form.back/next, hangout.form.date_invalid.
 - **Тесты (новый hangout-create.test.tsx, +3):** prefill города из профиля + скрытие полей др. шагов; блокировка «Далее» при пустом заголовке; проход 0→3, на последнем — «Создать». **front 89→92/92, server 363/363, tsc/lint 0 errors, ite build OK.** Live (390px): подставился «Екатеринбург», навигация/валидация работают.
 
-Следующие кандидаты (не блокируют): push-уведомления о новых встречах в радиусе (🟠 #7), улучшение аффилиат-блока (🟠 #8), pull-to-refresh + stagger-анимация карточек.
+## ✅ Этап 103 (31.08.2026): уведомления о новых встречах в радиусе (веб-часть) — ЗАКРЫТО
+
+Пункт 🟠 #7 плана. Полные нативные push (FCM) — во внешних блокерах; закрыта веб-часть без API-ключей.
+
+- **Сервер** (`server/src/routes/hangouts.js`): payload `hangout:new` расширен `lat`/`lng` встречи (нужно для радиус-фильтра).
+- **Клиент** (`src/pages/hangouts.tsx`): хелпер `haversineKm` (экспорт); в WS-эффекте этапа 98:
+  - радиус-фильтр — если есть `coords` юзера и координаты встречи и distance > `radiusKm` → событие подавляется (бейдж/тост/notification не показываются);
+  - системное веб-`Notification` на первую in-radius встречу: granted → показать, default → аккуратный requestPermission, denied → только бейдж;
+  - при `coords=null` поведение прежнее (бейдж как в 98). Deps: `[..., coords, radiusKm]`.
+- **Тесты:** server emit-тест дополнен lat/lng; front unit `haversineKm`. **server 363→370/370, front 92→93/93, tsc/lint 0, `vite build` OK.** Live-WS перепроверка ограничена средой (free daily-лимит + WS-прокси 8081/3002); механика бейджа live-подтверждена в 98.
+- **Хвосты:** нативный FCM (Capacitor) — staging VPS + google-services/APNs + SSL.
+
+Следующие кандидаты (не блокируют): улучшение аффилиат-блока (🟠 #8), pull-to-refresh + stagger-анимация, оптимистичный UI respond/join, чип «все» в категориях.

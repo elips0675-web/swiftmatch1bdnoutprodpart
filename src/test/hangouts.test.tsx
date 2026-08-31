@@ -460,4 +460,14 @@ describe("HangoutsMyPage", () => {
       expect(screen.getByTestId("my-hangout-1")).toBeTruthy()
     })
   })
+
+  it("haversineKm computes distance used for radius filter", async () => {
+    const { haversineKm } = await import("@/pages/hangouts")
+    // Екатеринбург (56.84, 60.64) → Москва (55.75, 37.62)
+    const moscowKm = haversineKm(56.84, 60.64, 55.75, 37.62)
+    expect(moscowKm).toBeGreaterThan(1200)
+    expect(moscowKm).toBeLessThan(1600)
+    // Нулевое расстояние для совпадающих координат
+    expect(haversineKm(55.75, 37.62, 55.75, 37.62)).toBeLessThan(0.01)
+  })
 })

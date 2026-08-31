@@ -244,12 +244,15 @@ describe('POST /api/hangouts', () => {
         title: 'Feed live test',
         city: 'Moscow',
         hangout_type: 'company',
+        lat: 55.75,
+        lng: 37.62,
         event_date: new Date(Date.now() + 86_400_000).toISOString(),
         max_companions: 3,
       })
     expect(res.status).toBe(201)
     expect(toMock).toHaveBeenCalledWith('hangout:feed')
     expect(feedEmit).toHaveBeenCalledWith('hangout:new', expect.objectContaining({ hangoutId: 55, category: 'cafe', title: 'Feed live test', hangoutType: 'company' }))
+    expect(feedEmit).toHaveBeenCalledWith('hangout:new', expect.objectContaining({ lat: 55.75, lng: 37.62 }))
     vi.mocked(getIO).mockReturnValue({ to: vi.fn(() => ({ emit: vi.fn() })) })
   })
 

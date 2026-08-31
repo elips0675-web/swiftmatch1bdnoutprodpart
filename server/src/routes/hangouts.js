@@ -470,6 +470,8 @@ router.post('/api/hangouts', auth, createLimiter, async (req, res) => {
         title: cleanTitle,
         city: city ? stripHtml(String(city)).slice(0, 100) : null,
         hangoutType: validType,
+        lat: parsedLat,
+        lng: parsedLng,
       })
     }
 

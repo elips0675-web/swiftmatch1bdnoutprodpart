@@ -42,6 +42,18 @@ const CATEGORY_COLORS: Record<string, string> = {
   other: "bg-slate-100 text-slate-600",
 };
 
+// Haversine: расстояние в км между двумя координатами (для радиус-фильтра WS-уведомлений, этап 103)
+export function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const s =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
 type GoOutOffer = {
   id: number;
   category: string;
@@ -589,9 +601,24 @@ export default function HangoutsPage() {
     const socket = pageSocket.socket;
     if (!socket || !hangoutsEnabled) return;
     socket.emit("hangout:join_feed");
-    const onNew = (payload: { hangoutId?: number; title?: string }) => {
+    const onNew = (payload: {
+      hangoutId?: number;
+      title?: string;
+      lat?: string | number | null;
+      lng?: string | number | null;
+    }) => {
       const hid = Number(payload?.hangoutId);
       if (!hid) return;
+
+      // Радиус-фильтр (этап 103): если у пользователя включена геолокация и у встречи есть координаты,
+      // игнорируем встречи за пределами выбранного радиуса.
+      const nLat = Number(payload?.lat);
+      const nLng = Number(payload?.lng);
+      const hasNewCoords = !isNaN(nLat) && !isNaN(nLng) && payload?.lat != null && payload?.lng != null;
+      if (coords && hasNewCoords && radiusKm > 0 && haversineKm(coords.lat, coords.lng, nLat, nLng) > radiusKm) {
+        return;
+      }
+
       setPendingNew((prev) => {
         if (prev.some((n) => n.hangoutId === hid)) return prev;
         if (prev.length === 0) {
@@ -599,6 +626,20 @@ export default function HangoutsPage() {
             title: t("hangout.new.title"),
             description: payload?.title || t("hangout.new.desc"),
           });
+          // Системное (веб) уведомление — только при granted permission, не навязчиво
+          try {
+            if (typeof window !== "undefined" && "Notification" in window) {
+              if (Notification.permission === "granted") {
+                new Notification(t("hangout.new.title"), { body: payload?.title || "" });
+              } else if (Notification.permission === "default") {
+                Notification.requestPermission().then((perm) => {
+                  if (perm === "granted") {
+                    new Notification(t("hangout.new.title"), { body: payload?.title || "" });
+                  }
+                }).catch(() => {});
+              }
+            }
+          } catch { /* не поддерживается — только бейдж */ }
         }
         return [{ hangoutId: hid, title: payload?.title || "" }, ...prev];
       });
@@ -608,7 +649,7 @@ export default function HangoutsPage() {
       socket.off("hangout:new", onNew);
       socket.emit("hangout:leave_feed");
     };
-  }, [pageSocket.socket, hangoutsEnabled, t, pageToast]);
+  }, [pageSocket.socket, hangoutsEnabled, t, pageToast, coords, radiusKm]);
 
   const refreshFeed = useCallback(() => {
     setPendingNew([]);
