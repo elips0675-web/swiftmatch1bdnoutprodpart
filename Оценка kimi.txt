@@ -1,48 +1,45 @@
-Оценка SwiftMatch — 8.5 / 10 (технически) | 6.5 / 10 (к продакшену)
-Общий вердикт
-Проект находится в состоянии «готов к staging и закрытой бете, но не готов к открытому релизу без разблокировки внешних зависимостей». Кодовая база зрелая, тестовое покрытие выше среднего по индустрии, безопасность продумана многослойно. Основные риски — не код, а отсутствие реального окружения (VPS, ключи API, домен, SSL) и непрогнанная инфраструктура под нагрузкой.
-По категориям
+Оценка SwiftMatch — Август 2026
+Итог: 7.5 / 10 — «готов к staging и закрытой бете, не готов к открытому продакшену без внешних действий».
+Проект представляет собой высококачественный full-stack продукт с продвинутой архитектурой, но существует разрыв между «код готов» и «можно открыть для пользователей».
+✅ Сильные стороны (что сделано на уровень enterprise)
 Таблица
-Категория	Балл	Обоснование
-Код и архитектура	9/10	Strict TypeScript, prepared statements (?? в mysql2), миграции с идемпотентностью (information_schema + PREPARE), разделение ответственности (routes/middleware/jobs), ESM-консистентность. Минус: Windows-центричность скриптов (.bat/.ps1) усложнит переезд на Linux-VPS.
-Тестирование	9.5/10	388/388 зелёных (307 сервер + 81 фронт + 55 E2E), cross-browser (firefox/webkit), security blind spots (refresh race, GDPR cascade, cookie edges), schema-validate в CI. Минус: нет backup/restore smoke в CI, нет E2E для TOTP enrollment (требует QR-скан).
-Безопасность	8.5/10	httpOnly cookie + refresh rotation с reuse detection + family revocation, account lockout, XSS sanitize (stripHtml + миграция чистки легаси), helmet, rate-limit, admin TOTP 2FA, Sentry PII-scrubbing. Минус: CSRF double-submit отложен (SameSite=Lax — не панацея для same-site атак), fingerprinting сессий не реализован, нет UptimeRobot/алертов.
-Инфраструктура	7/10	Docker Compose, Prometheus/Grafana, CI/CD, Redis, k6 — всё описано и частично проверено. Минус: Docker Compose не поднимался реально (нет Docker на машине), нет staging-окружения, нет внешнего мониторинга (UptimeRobot), single-instance rate-limit (cluster mode запрещён до Redis store).
-Продукт / фичи	9/10	Полный цикл дейтинга + Hangouts 2.0 (date/company/mutual like/check-in/reviews) + партнёрская экосистема (Wave 1–4: deeplink → Stripe Checkout → S2S postback → B2B marketplace) + монетизация (Stripe + RevenueCat scaffold) + админка с аналитикой.
-Что критично для продакшена (блокеры релиза)
+Пункт	Оценка
+Тестовое покрытие	366 сервер + 86 фронт + 150 E2E = 0 failures. Это редкость даже для команд.
+Архитектура фич	Полный цикл дейтинга + монетизация (Stripe + IAP) + партнёрка + ивенты + B2B — всё интегрировано в единую схему.
+Безопасность	JWT rotation + reuse detection, account lockout, TOTP 2FA для админки, Helmet/CSP, rate-limiting, audit log, soft delete.
+DevOps-инфра	Docker multi-stage, nginx, Prometheus/Grafana, GitHub Actions CI/CD, schema-validate, backup/restore smoke test.
+i18n и data-консистентность	RU/EN parity, translation keys в БД, сортировка через t().localeCompare().
+Graceful degradation	Все внешние сервисы (Stripe, OpenAI, SMTP, FCM) имеют mock/fallback — приложение не падает без ключей.
+🔴 Критические риски (блокеры и техдолг)
 Таблица
-#	Блокер	Почему критично	Что делать
-1	Нет staging VPS	Нельзя проверить Docker Compose, k6 100 VU, SSL, WS через nginx, поведение под реальной нагрузкой.	Поднять VPS (Hetzner/DO), настроить GitHub secrets, прогнать docker compose up end-to-end.
-2	Реальные API-ключи	Stripe LIVE, SMTP, Sentry DSN, S3, Twilio, OpenAI, FCM, RevenueCat — без них платежи, письма, пуши, модерация, SMS — моки.	Завести тестовые аккаунты, вписать в server/.env, прогнать E2E с реальными ключами.
-3	Android-релиз	APK debug собран, но нет домена, keystore, App Links (assetlinks.json), AAB, Google Play 17+.	Купить домен, настроить SSL (Let's Encrypt), сгенерировать keystore, собрать AAB, подать в Google Play.
-4	CSRF при выносе API на поддомен	Сейчас SameSite=Lax + CORS_ORIGIN strict. Если API уедет на api.swiftmatch.app, нужен double-submit token.	Зафиксировать в ADR: при выносе API на поддомен — внедрить CSRF-token (cookie + header).
-5	Single-instance rate-limit	pm2 fork mode + nginx limit_req — первая линия, но при росте нагрузки упремся в потолок одного процесса.	Миграция на Redis store для rate-limit после стабилизации staging.
-Что сделано исключительно хорошо
-Итеративный аудит-цикл — этапы 30–59 с закрытием находок трёх разных моделей (kimi/qwen/дипсик). Это редкая дисциплина: не просто «написал фичу», а «проверил, что аудит не найдёт регресс».
-Graceful degradation — сервер стартует и живёт без всех внешних ключей (mock/fallback/skip + warn). Это спасает dev-окружение и снижает риск падения в проде при временной недоступности Redis/S3.
-Схемная дисциплина — schema-validate.mjs в CI, EXPLAIN-аудит SQL, миграции идемпотентны, mysql_schema.sql синхронизирован с живой БД. Это убивает класс багов «колонка есть в коде, но нет в БД».
-Security headers + blind spots — 7 тестов заголовков против живого сервера, E2E на refresh race и GDPR cascade, ratelimit spec (61-й запрос → 429).
-Приоритет следующих шагов (фазы qwen, консенсус)
-Фаза 1: «Первый рубль» (1–2 недели)
-Staging VPS + GitHub secrets (DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY).
-Заполнить реальные ключи (Stripe test, SMTP, Sentry DSN).
-E2E на staging с реальными ключами.
-docker compose up end-to-end + healthcheck/volumes/сеть.
-Фаза 2: «Мобильный релиз» (2–3 недели)
-Домен + SSL (Let's Encrypt auto-renewal).
-Keystore + AAB + App Links (assetlinks.json + SHA256).
-RevenueCat проект + ключ.
-Google Play: политика 17+, скриншоты, TestFlight/Internal Testing.
-Фаза 3: «Надёжность» (параллельно)
-k6 100 VU на staging с мониторингом free -m / Threads_connected.
-UptimeRobot + Grafana alerts в Telegram (CPU, 5xx, DB connections).
-Тест плана отката (docs/rollback-plan.md).
-Разбить AGENTS.md при превышении 1500 строк (сейчас ~1180, но растёт).
-Фаза 4: «Масштабирование» (после релиза)
-S3/CDN для фото.
-FCM push на Android.
-Twilio SMS + Rekognition/OpenAI фото-модерация.
-Storybook / Design System.
-Итог
-Код готов на 85–90%. Не нужен новый продуктовый код. Нужно разблокировать прод: staging → ключи → домен → релиз Android. Технический долг второй очереди (CSRF double-submit, fingerprinting, circuit breaker, log aggregation) — после первых реальных пользователей, не раньше.
-Если завтра появится VPS + домен + ключи — проект можно вывести в закрытую бету за 2 недели.
+Риск	Уровень	Почему важно
+Schema drift	🔴 Высокий	mysql_schema.sql = 62 таблицы, живая БД = 73. Пересоздание БД из schema.sql даст неполную схему (29 таблиц только из миграций). CI-инит БД создаёт тестовую БД из неполной схемы — schema-validate.mjs не ловит это, т.к. сверяет «сам с собой».
+Windows-центричность	🟠 Средний	Основной workflow — Laragon, PowerShell, .bat. Prod будет Linux. Не все скрипты имеют .sh-эквиваленты, пути захардкожены (C:\swiftmatch1bd...).
+In-memory rate-limit	🟠 Средний	express-rate-limit и lockout.js используют память процесса. При масштабировании на 2+ инстанса (pm2 cluster / Docker replicas) лимиты перестанут работать. Есть решение (Redis store), но оно не внедрено.
+Отсутствие staging-окружения	🔴 Высокий	Docker Compose «не прогонялся end-to-end» (по вашим же записям). Нет VPS, домена, SSL. Невозможно проверить реальное поведение под нагрузкой.
+CSRF / fingerprinting	🟡 Низкий	SameSite=Lax + Bearer для нативки — приемлемо для текущей архитектуры, но при выносе API на поддомен понадобится double-submit token. Fingerprint сессий отложен.
+Redis fallback crash (исправлен, но требует мониторинга)	🟡 Низкий	Этап 42 починил краш при недоступном Redis, но нужно убедиться, что fallback не DDOS'ит MySQL при массовом cache-miss.
+⛔ Блокеры перед продакшеном (что нужно сделать вне кода)
+VPS + Docker Compose end-to-end — поднять на реальном железе, проверить healthcheck'и, сеть между контейнерами, volume persistence.
+Домен + SSL — Let's Encrypt + auto-renewal, проверка wss:// (WebSocket через HTTPS).
+Реальные API-ключи — минимум: Stripe (test mode для staging), SMTP (Mailtrap/Resend), Sentry DSN, Redis.
+k6 100 VU на staging — проверить RADAR_PRE_LEAK_64 (память MySQL под нагрузкой), убедиться что DB_POOL_MAX=20 достаточно.
+Android-релиз — keystore, AAB, App Links (assetlinks.json + SHA256), Google Play Console (17+, Privacy Policy).
+Мониторинг — UptimeRobot + Grafana alerts (CPU, 5xx, DB connections).
+📋 Приоритеты действий
+Неделя 1 (разблокировать staging):
+Перегенерировать mysql_schema.sql из живой БД (mysqldump --no-data) или добавить в CI node database/migrations/migrate.js после mysql_schema.sql (этап 79 частично это сделал, но стоит перепроверить).
+Поднять VPS (Ubuntu), установить Docker, склонировать репо, собрать docker compose up -d --build.
+Прогнать schema-validate.mjs + migrate.js на чистой БД на VPS.
+Неделя 2 (ключи и смоук):
+Вписать Stripe test keys, SMTP (Mailtrap), Sentry DSN.
+Прогнать E2E против staging (реальные ключи, реальный домен).
+Проверить backup/restore цикл на VPS (scripts/backup-mysql.sh + verify-backup.mjs).
+Неделя 3 (нагрузка и безопасность):
+k6 100 VU, мониторинг free -m / Threads_connected.
+Настроить UptimeRobot + Telegram/Slack алерты.
+При необходимости — перевести rate-limit на Redis store (если планируется >1 инстанс API).
+💬 Вердикт
+Кодовая база — production-grade. Архитектура, тесты, документация (AGENTS.md, runbook-keys, rollback-plan) находятся на уровне команды из 5–10 человек.
+Но: проект сейчас в состоянии «отличный код в репозитории, который никогда не работал на реальном железе с реальными ключами». Разрыв между «написано» и «работает у пользователей» закрывается не кодом, а инфраструктурными действиями (VPS, ключи, домен, сторы).
+Если вам нужна одна цифра: 7.5/10 (код 9/10, инфра 6/10).

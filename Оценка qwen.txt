@@ -1,302 +1,110 @@
-Оценка проекта SwiftMatch1BD (август 2026)
-1. Общая зрелость: 8 / 10 (pet-проект), 6.5 / 10 (prod-SaaS)
-Проект демонстрирует исключительную инженерную дисциплину для solo/small-team разработки: 54+ итеративных этапа, 388/388 тестов, систематическое закрытие аудитов от трёх AI-моделей. Код и тесты — на уровне крепкого стартапа. Продакшен блокируют не технические долги, а инфраструктурные prerequisites.
-2. Стек и архитектура — ✅ Сильно
-Компонент
-Выбор
-Оценка
-Фронтенд
-React 18 + TS + Vite 8
-Современный, актуальный
-Бэкенд
-Node.js / Express + mysql2
-Надёжный, проверенный
-Real-time
-Socket.IO
-Стандарт индустрии
-Мобайл
-Capacitor Android
-Разумный MVP-выбор
-БД
-MySQL 8.4 + Spatial
-ST_Distance_Sphere — грамотный geo-поиск
-CI/CD
-GitHub Actions
-Lint → test → E2E → deploy
-Риск: Express без NestJS/Fastify может стать bottleneck при масштабировании, но для беты — абсолютно адекватно.
-3. Покрытие фичами — ✅ Впечатляюще
-Реализован полный цикл дейтинга + дифференцирующие фичи:
-Категория
-Что есть
-Статус
-Core dating
-Регистрация, анкета, лайки, мэтчи, чаты, геопоиск
-✅ Полный цикл
-Hangouts 2.0
-Date vs Company, mutual like, рейтинг, бронь ресторанов
-✅ Этап 53–54
-Premium
-Stripe Checkout (3 тарифа), гейтинг, idempotency
-✅ (mock без ключей)
-Safety
-Video Date Scheduling, Safety Check-in, репорты
-✅
-Privacy
-Ghost Mode, Disappearing Messages (TTL 5s–24h)
-✅
-Smart Matching
-interest overlap + age + proximity + activity
-✅
-Партнёрская сеть
-Offers, conversions, payouts, админка выплат
-✅ Этап 52
-i18n
-RU/EN, все данные через translation keys
-✅
-A/B + Feature flags
-assign card_cta, analytics/track
-✅
-Рефералка
-invite_codes, utm_source tracking
-✅
-Push
-VAPID (Web Push)
-✅
-Attachment-тест
-Психологическая совместимость
-✅
-Чего не хватает для конкуренции с Tinder/Bumble:
-Фича
-Влияние
-Сложность
-Stories / Moments
-DAU +20% (Tinder/Bumble стандарт)
-Средняя
-Onboarding flow
-Конверсия регистрации → первый лайк
-Низкая
-Product Analytics (PostHog)
-Funnel-видимость, без неё — слепой полёт
-Низкая
-FCM push (Android)
-60% уходят без пушей — критично
-Средняя
-Crashlytics
-Мобильные краши невидимы
-Низкая
-SEO публичных профилей
-Органический трафик
-Низкая
-4. Тестирование — ✅ Отлично
-Уровень
-Покрытие
-Комментарий
-Серверные unit/integration
-307/307 ✅
-Включая партнёрские выплаты, hangouts, invites
-Фронтенд unit
-81/81 ✅
-E2E (Playwright)
-44/44 ✅
-features.spec.ts + audit-full.spec.ts
-Load testing (k6)
-Скрипт готов, 10 VU: p95 < 250ms
-100 VU — на staging
-Backup verify
-scripts/verify-backup.ps1
-Sanity-check 6 таблиц
-Замечание: 388 тестов для такого объёма фич — хорошо, но стоит добавить контрактные тесты API (schema validation) и E2E для премиум-флоу с mock Stripe.
-5. Безопасность — ✅ Хорошо, с оговорками
-Закрыто (Этап 34+):
-Rate limiting (600/мин глобальный, 30/мин лайки)
-CORS fail-fast в production (без CORS_ORIGIN — не стартует)
-dev-login guard (404 в production)
-Sentry errorHandler зарегистрирован корректно
-Matches дубликаты устранены (UNIQUE + Math.min/max)
-Idempotency-Key для Stripe
-Осталось (низкий приоритет, пост-бета):
-CSRF double-submit — только при выносе API на поддомен
-Fingerprint привязка refresh-токена — риск сломать мобильный Bearer-flow
-Circuit breakers Stripe/OpenAI/S3
-AI-модерация фото — пока regex/fallback, Rekognition после AWS-ключей
-Оценка безопасности: 7.5/10 — для беты достаточно, для open prod нужно закрыть ключи + CSRF.
-6. Готовность к продакшену — 🔴 Блокеры
-Консенсус трёх предыдущих аудитов верен: новый продуктовый код не нужен. Блокеры — чисто инфраструктурные:
+Оценка состояния проекта SwiftMatch (на 31.08.2026)
+Вердикт: 8.5/10 — технически готов к staging/закрытой бете, к открытому проду — 70% (блокеры внешние, не кодовые)
+Консенсус с предыдущими аудитами (kimi 7.5, qwen 8, дипсик 95%): код и тесты на высоком уровне, релиз держат внешние блокеры — ключи, домен, сторы, staging VPS.
+🟢 Что сделано сильно (сильные стороны)
+1. Тестовое покрытие — исключительное
+Server: 366/366, front: 86/86, E2E: 150/150 = 602 теста
+E2E покрывает критические флоу: auth, hangouts, premium, partners, admin, ban-realtime, GDPR cascade, refresh race
+Cross-browser (chromium/firefox/webkit) по флагу
+--retries=0 проходит чисто — 0 флейков
+2. Безопасность — проработана на уровне enterprise
+adminAuth ACTIVE с единым гейтом (правило из этапа 37)
+TOTP 2FA для админов (этап 38)
+Refresh rotation + family revoke + race condition закрыт (этап 34)
+Account lockout 5→429/15мин
+Stripe webhook: express.raw + webhook_events идемпотентность (этап 39)
+Circuit breaker для OpenAI/Stripe (этап 76)
+Security headers supertest в CI (этап 35)
+XSS-sanitize на входе (bio/display_name/messages)
+3. Инфраструктура — production-ready
+Docker Compose (app + nginx + redis + prometheus + grafana)
+deploy.yml на Docker (rsync → docker compose up -d --build → migrate.js → schema-validate.mjs)
+Backup/restore: RTO ~3.6 сек (dev), <30 мин (prod, экстраполяция)
+Schema validation в CI — дрейф миграций ловится ДО деплоя
+DEPLOY.md — пошаговый гайд для VPS
+4. Монетизация — закрыт весь план P0–P3
+Premium (Stripe + IAP RevenueCat)
+Hangouts с билетами (платные встречи, capacity-кэп)
+Sponsored-карточки (pinned офферы)
+Событийная интеграция (ивент-организаторы, комиссия 10–30%)
+AI-подбор встреч под пару (OpenAI + DB-fallback)
+Affiliate-блок «Куда пойти вдвоём»
+B2B партнёрский маркетплейс (Wave 1–4)
+5. Документация — зрелая
+AGENTS.md — системный промпт для AI-ассистентов (390 строк, разбит)
+rollback-plan.md — категории инцидентов, диагностика ≤5 мин
+runbook-keys.md — ротация каждого ключа + чеклист при утечке
+roadmap.md — 93 этапа с датами и счётчиками
+🟠 Что осталось (внешние блокеры, не код)
 Блокер
-Приоритет
-Усилие
-Staging VPS + docker compose end-to-end
-🔴 P0
-1–2 дня
-Реальные ключи (Stripe LIVE, SMTP, Sentry, S3, Twilio, OpenAI, FCM, RevenueCat)
-🔴 P0
-1 день (сбор)
-Домен + SSL (Let's Encrypt + certbot)
-🔴 P0
-2 часа
-FCM для Android (без пушей — 60% отток)
-🟡 P1
-1–2 дня
-Google Play 17+ (App Links, assetlinks.json, SHA256, keystore/AAB)
-🟡 P1
-2–3 дня
-k6 100 VU на staging + мониторинг ресурсов
-🟡 P1
-1 день
-UptimeRobot + Grafana alerts
-🟢 P2
-2 часа
-Без ключей деградация мягкая (mock/fallback), кроме Stripe-webhook и RevenueCat-webhook (осознанные 502/503) — это правильно спроектировано.
-7. Качество кода и баг-трекинг — ✅ Зрело
-Впечатляет культура багфиксов: каждая найденная проблема документируется в таблице с причиной и фиксом. Примеры зрелости:
-Тень маршрута (PUT /api/profile/score после PUT /api/profile/:id) — классическая Express-ловушка, найдена и задокументирована
-MySQL 8.4 миграции переписаны через information_schema вместо IF NOT EXISTS
-Хардкодные русские строки систематически заменены на t() (~40 ключей)
-Мёртвые импорты и дубликаты роутов вычищены
-Lint: 0 errors, Vite build: ✅ — чистый код.
-8. Мониторинг и DevOps — ⚠️ Каркас есть, мяса нет
-Что
 Статус
-Комментарий
-Prometheus + Grafana
-✅ Порты :9090/:3001
-Но алертов нет
-Winston JSON-логи
-✅
-Но агрегации (Loki/ELK) нет
-Sentry
-✅ init + handlers
-Но DSN — плейсхолдер
-CI/CD GitHub Actions
-✅ lint → test → E2E → deploy
-Но deploy-хост не настроен
-k6 load test
-✅ Скрипт
-Но полный ramp — на staging
-Backup verify
-✅ Скрипт
-Но не в CI
-APM (traces/spans)
+Критичность
+Staging VPS + docker compose up end-to-end
+❌ не прогонялся
+🔴 до релиза
+Реальные ключи (Stripe live, SMTP, Sentry DSN, S3, Twilio, OpenAI, FCM, RevenueCat)
+❌ mock/fallback
+🔴 до первого рубля
+Домен + SSL (Caddy/Let's Encrypt) + App Links (assetlinks.json + SHA256)
 ❌
-Sentry Performance не подключён
-PagerDuty/Opsgenie
+🔴 для Android
+Keystore + AAB + Google Play (17+)
 ❌
-Нет алертов
-9. Итоговая матрица
-Категория
+🔴 мобильный релиз
+k6 100 VU на staging (проверка RADAR_PRE_LEAK_64)
+❌
+🟠 перед публичным запуском
+UptimeRobot + Grafana alerts в Telegram
+❌
+🟠
+SMS (Twilio), AI-модерация фото (Rekognition), CDN/S3
+❌ scaffold есть, ключей нет
+🟡 после беты
+🔴 Риски и техдолг
+Windows-центричность workflow — Laragon, Task Scheduler, .bat, PowerShell. При переезде на Linux VPS нужно адаптировать. Docker Compose есть, но не является основным путём.
+mysql_schema.sql деградирован (этап 77/79): schema = 62 таблицы, живая БД = 73. 29 таблиц созданы ТОЛЬКО миграциями. Починено для CI (seed-migrations.mjs), но риск при пересоздании БД с нуля сохраняется.
+Single-instance rate-limit (rollback-plan N+2): express-rate-limit и lockout.js — in-memory, НЕ шарятся между процессами. Запрещён pm2 cluster mode и Docker replicas > 1 до миграции на Redis store.
+CSRF double-submit — отложено. SameSite=Lax не защищает от same-site атак. Критично только при выносе API на отдельный домен.
+Fingerprint refresh (привязка к устройству/IP) — риск сломать мобильный Bearer-flow, делать осторожно после беты.
+📊 Готовность к продакшену
+Критерий
 Оценка
-Комментарий
-Архитектура
-8.5/10
-Современный стек, грамотные решения
-Фичи
-8/10
-Полный цикл + дифференциация, но нет Stories/Onboarding
-Тесты
-9/10
-388/388 + E2E + k6 — выше среднего для стартапа
+Код и тесты
+10/10
 Безопасность
-7.5/10
-База закрыта, прод-харденинг после ключей
-Код
+9/10
+Инфраструктура (репо)
+9/10
+Инфраструктура (развёрнуто)
+3/10 (нет staging)
+Монетизация
+9/10 (mock, нет live-ключей)
+Мобильный релиз
+2/10 (APK собран, сторы не начаты)
+Документация
+9/10
+Итого
 8.5/10
-Чистый, документированный, систематические фиксы
-DevOps/Инфра
-4/10
-Каркас есть, но staging/ключи/домен — блокеры
-Продуктовая аналитика
-3/10
-Нет funnel-трекинга — слепой полёт
-Мобильный опыт
-5/10
-Capacitor есть, но FCM/Crashlytics отсутствуют
-10. Рекомендации: дорожная карта к релизу
-Фаза 0 — «Разблокировать прод» (1 неделя)
-Арендовать VPS, поднять staging через docker compose
-Собрать все реальные ключи (Stripe test → live, SMTP, Sentry, S3)
-Домен + SSL + App Links
-k6 100 VU на staging, замерить DB_POOL
-Фаза 1 — «Закрытая бета» (2 недели)
-FCM push для Android — критично для retention
-Подключить PostHog/Amplitude — funnel: register → first_like → first_match → first_message
-Google Play internal testing track (AAB + 17+ rating)
-UptimeRobot + Grafana alerts → Telegram
-Фаза 2 — «Открытый релиз» (пост-бета)
-Stories/Moments (DAU-бустер)
-Onboarding flow (конверсия)
-Crashlytics (мобильные краши)
-Subscription retention offers (скидка при отмене)
-Circuit breakers, log aggregation
-Вердикт: Проект технически готов к закрытой бете. Инженерная культура — на уровне, который редко встречается у solo-разработчиков. Главный риск сейчас — не код, а отсутствие продуктовой аналитики: без funnel-данных вы не узнаете, где теряете пользователей после релиза. Фаза 0 (staging + ключи + домен) — это недели, не месяцы. Пора выпускать.
-1/2
-Копировать
-Спросить Qwen
-Объяснить
-Перевести(ru-RU)
-один общий ответ, еще тесты нужны ?
-
-Завершено размышление
-Нужны ли ещё тесты? — Короткий ответ
-Да, но точечно. 388/388 — это крепкая база для pet/solo-проекта. Добавлять тесты «для покрытия» не нужно. Добавлять тесты на критичные непроверенные флоу — нужно.
-Что уже покрыто отлично (не трогаем)
-✅ Core auth (login/register/refresh/lockout/rotation/2FA) — 30+ тестов
-✅ Security headers, XSS sanitize, rate-limit, upload — закрыты
-✅ Hangouts v1, notifications, GDPR, Icebreakers, A/B, Video Date, Safety — E2E есть
-✅ Partners Wave 1 (offers/track/admin) — 13+4 E2E
-✅ Cookie edges, refresh race, GDPR cascade — security-blind-spots.spec.ts
-Реальные пробелы (что стоит добавить)
-#
-Что
-Тип
-Приоритет
-Усилие
-1
-Premium-флоу с mock Stripe (выбор тарифа → checkout → success → подписка активна)
-E2E
-🔴 P0
-1 день
-2
-Hangouts 2.0 (Date/Company, mutual like, checkin, review)
-E2E
-🔴 P0
-1 день
-3
-B2B partner dashboard (регистрация партнёра → оффер → конверсия → выплата)
-E2E
-🟠 P1
-1 день
-4
-Псевдонимы + верификация (CRUD aliases, verification flow)
-E2E
-🟡 P2
-0.5 дня
-5
-Контрактные API-тесты (Zod-схемы ответов, защита от дрейфа фронта/бэка)
-Integration
-🟠 P1
-2 дня
-6
-Lighthouse CI (performance budget: LCP < 2.5s, bundle < 150KB)
-CI
-🟡 P2
-0.5 дня
-7
-Accessibility smoke (jest-axe на ключевых страницах)
-Unit
-🟢 P3
-1 день
-8
-Backup restore в CI (restore → smoke API)
-CI
-🟢 P3
-0.5 дня
-Что НЕ нужно (отсекаем)
-❌ 100% coverage — overkill для solo
-❌ Mutation testing (stryker) — дорого, мало пользы
-❌ Visual regression (Chromatic) — нет дизайн-системы, преждевременно
-❌ Chaos/resilience тесты — post-release
-❌ E2E для каждой мелкой фичи — достаточно unit + smoke
-Итоговая рекомендация
-Минимум перед релизом (1 неделя): пункты 1, 2, 3 — это деньги и новые большие фичи, которые сейчас не покрыты E2E. После этого — 500+ тестов, и все критичные user flows закрыты.
-После релиза (по мере роста): пункты 5–8.
-Вердикт: 388 → ~500 тестов, и можно спать спокойно. Дальше — только по мере появления новых фич.
+🎯 Рекомендуемые приоритеты (следующие 2 недели)
+Фаза 1 «Первый рубль» (1–2 нед):
+Staging VPS + docker compose up end-to-end
+GitHub secrets → реальные ключи (Stripe test→live, SMTP, Sentry)
+E2E на staging с реальными ключами
+Домен + SSL (Caddy)
+Фаза 2 «Мобильный релиз» (2–3 нед):
+Keystore + AAB
+App Links (assetlinks.json + SHA256)
+RevenueCat проект + VITE_REVENUECAT_API_KEY
+Google Play (17+, Privacy Policy, скриншоты)
+Фаза 3 «Надёжность» (параллельно):
+k6 100 VU на staging + мониторинг free -m / Threads_connected
+UptimeRobot + Grafana alerts
+Тест плана отката (реальный restore из бэкапа)
+Фаза 4 «Масштабирование» (после релиза):
+S3/CDN, FCM, Twilio, Rekognition
+Redis-backed rate-limit (для cluster mode)
+CSRF double-submit (если API на поддомене)
+💡 Резюме
+Проект в исключительно зрелом состоянии для pet-project / indie-стартапа. 93 этапа за ~6 месяцев, 602 теста, production-grade безопасность и инфраструктура в репо.
+Главный разрыв — не код, а операционная готовность: нет развёрнутого staging, нет live-ключей, нет мобильного релиза. Это 1–2 недели работы, не месяцы.
+Консенсус с kimi/qwen/дипсик подтверждается: новый продуктовый код не нужен — разблокировать прод (staging → ключи → домен → релиз Android).

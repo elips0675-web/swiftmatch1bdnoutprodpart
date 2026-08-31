@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,16 +6,28 @@ import { Badge } from '@/components/ui/badge';
 import { ShieldCheck, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import { getToken } from '@/lib/token';
+import QRCode from 'qrcode';
 
 // TOTP 2FA enrollment (этап 38): секрет + otpauth URL для приложения-аутентификатора
 export default function TwoFaSettings() {
   const { t } = useLanguage();
   const [busy, setBusy] = useState(false);
   const [setup, setSetup] = useState<{ otpauthUrl: string; secret: string } | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
+
+  useEffect(() => {
+    if (setup?.otpauthUrl) {
+      QRCode.toDataURL(setup.otpauthUrl, { width: 180, margin: 1 })
+        .then(setQrDataUrl)
+        .catch(() => setQrDataUrl(null));
+    } else {
+      setQrDataUrl(null);
+    }
+  }, [setup]);
 
   const post = async (path: string, body: Record<string, unknown>) => {
     const token = getToken();
@@ -95,7 +107,19 @@ export default function TwoFaSettings() {
 
         {setup && (
           <div className="space-y-2 text-xs">
-            <p className="font-medium">{t('two_fa_scan_or_key')}:</p>
+            {qrDataUrl ? (
+              <>
+                <p className="font-medium">{t('two_fa_scan_qr')}:</p>
+                <img
+                  src={qrDataUrl}
+                  alt="TOTP QR"
+                  className="h-[180px] w-[180px] rounded border bg-white p-1"
+                  data-testid="two-fa-qr"
+                />
+              </>
+            ) : (
+              <p className="font-medium">{t('two_fa_scan_or_key')}:</p>
+            )}
             <code className="block break-all rounded bg-muted p-2 text-[10px]">{setup.otpauthUrl}</code>
             <p className="text-muted-foreground">{t('two_fa_manual_key')}:</p>
             <code className="block break-all rounded bg-muted p-2 text-[10px] tracking-widest">{setup.secret}</code>
