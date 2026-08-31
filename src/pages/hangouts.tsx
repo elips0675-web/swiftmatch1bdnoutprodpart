@@ -988,7 +988,7 @@ export default function HangoutsPage() {
                   <Compass size={14} className="text-primary" />
                   <h3 className="text-sm font-bold">{t("hangout.go_out.title")}</h3>
                 </div>
-                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-1 -mx-1 px-1">
                   {goOutOffers.map((offer) => {
                     const Icon = GO_OUT_ICONS[offer.category] || MapPin;
                     const color = GO_OUT_COLORS[offer.category] || "bg-slate-100 text-slate-600";
@@ -999,7 +999,7 @@ export default function HangoutsPage() {
                         target="_blank"
                         rel="noopener noreferrer"
                         data-testid={`hangout-go-out-${offer.id}`}
-                        className="shrink-0 w-56 rounded-2xl border border-muted bg-card p-3 hover:shadow-md transition-shadow"
+                        className="shrink-0 snap-start w-[82%] rounded-2xl border border-muted bg-card p-3 hover:shadow-md transition-shadow"
                       >
                         <span className={`inline-flex items-center justify-center h-8 w-8 rounded-full ${color} mb-2`}>
                           <Icon size={16} />
