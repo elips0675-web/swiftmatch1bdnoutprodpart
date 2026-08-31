@@ -674,6 +674,7 @@ export default function HangoutDetailPage() {
       </Dialog>
 
       <BottomNav />
+      </div>
     </>
   );
 }

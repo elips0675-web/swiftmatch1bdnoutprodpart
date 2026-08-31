@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import React from "react";
+import { HelmetProvider } from "react-helmet-async";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 
 const mockFetch = vi.fn();
@@ -103,12 +104,14 @@ const baseHangout = {
 
 function renderDetail(ui: React.ReactElement) {
   return render(
-    <MemoryRouter initialEntries={["/hangouts/5"]}>
-      <Routes>
-        <Route path="/hangouts/:id" element={ui} />
-        <Route path="/chats/:chatId" element={<div data-testid="chat-page" />} />
-      </Routes>
-    </MemoryRouter>
+    <HelmetProvider>
+      <MemoryRouter initialEntries={["/hangouts/5"]}>
+        <Routes>
+          <Route path="/hangouts/:id" element={ui} />
+          <Route path="/chats/:chatId" element={<div data-testid="chat-page" />} />
+        </Routes>
+      </MemoryRouter>
+    </HelmetProvider>
   );
 }
 
