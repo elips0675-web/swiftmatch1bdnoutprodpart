@@ -130,7 +130,7 @@ const HANGOUT_LIST_SELECT = `
   SELECT h.id, h.user_id AS author_id, h.category, h.title, h.description,
          h.place_name, h.place_address, h.city, h.lat, h.lng, h.event_date,
          h.max_companions, h.hangout_type, h.status, h.created_at,
-         h.price, h.capacity, h.boosted,
+         h.price, h.capacity, h.boosted, h.view_count,
          up.display_name, up.avatar_url, up.age, up.online,
          (SELECT COUNT(*) FROM hangout_tickets ht WHERE ht.hangout_id = h.id AND ht.status = 'paid') AS sold_tickets,
          po.id AS offer_id, po.title AS offer_title, po.price AS offer_price,
@@ -315,6 +315,14 @@ router.get('/api/hangouts/:id', optionalAuth, async (req, res) => {
     const hangout = rows[0]
     const isAuthor = req.userId === hangout.author_id
 
+    // Счётчик просмотров (H2): инкрементируем при открытии детальной страницы.
+    // Не считаем просмотр самого автора, чтобы не завышать популярность своей встречи.
+    if (!isAuthor) {
+      pool.query('UPDATE hangouts SET view_count = view_count + 1 WHERE id = ?', [id]).catch((e) => {
+        logger.error('Hangout view_count increment error:', e)
+      })
+    }
+
     let responses = []
     let participants = []
     if (isAuthor) {
@@ -341,12 +349,19 @@ router.get('/api/hangouts/:id', optionalAuth, async (req, res) => {
       )
     }
 
+    // H3: чат доступен и для откликнувшегося до подтверждения (если отклик активен).
     const [[chat]] = isAuthor
       ? await pool.query(
           `SELECT hc.chat_id FROM hangout_chats hc WHERE hc.hangout_id = ? LIMIT 1`,
           [id],
         )
-      : [[]]
+      : await pool.query(
+          `SELECT hc.chat_id FROM hangout_chats hc
+           JOIN hangout_responses hr ON hr.id = hc.response_id
+           WHERE hc.hangout_id = ? AND hr.user_id = ? AND hr.status != 'cancelled'
+           LIMIT 1`,
+          [id, req.userId],
+        )
 
     res.json({
       ...parseAttendees(hangout),
@@ -647,6 +662,39 @@ router.post('/api/hangouts/:id/respond', auth, respondLimiter, async (req, res) 
       [id, req.userId, message],
     )
 
+    // H3: чат с организатором доступен сразу после отклика (до подтверждения).
+    // Создаём/переиспользуем личный чат между откликнувшимся и автором и
+    // привязываем к отклику через hangout_chats.
+    let preChatId = null
+    try {
+      const [existingPair] = await pool.query(
+        `SELECT c.id FROM chats c
+         JOIN chat_participants cp1 ON cp1.chat_id = c.id AND cp1.user_id = ?
+         JOIN chat_participants cp2 ON cp2.chat_id = c.id AND cp2.user_id = ?
+         WHERE c.is_group = 0
+         LIMIT 1`,
+        [req.userId, hangout.user_id],
+      )
+      if (existingPair.length > 0) {
+        preChatId = existingPair[0].id
+      } else {
+        const [chatResult] = await pool.query('INSERT INTO chats (is_group) VALUES (0)')
+        preChatId = chatResult.insertId
+        await pool.query(
+          'INSERT INTO chat_participants (chat_id, user_id) VALUES (?, ?), (?, ?)',
+          [preChatId, req.userId, preChatId, hangout.user_id],
+        )
+      }
+      if (preChatId) {
+        await pool.query(
+          'INSERT IGNORE INTO hangout_chats (hangout_id, response_id, chat_id) VALUES (?, ?, ?)',
+          [id, result.insertId, preChatId],
+        )
+      }
+    } catch (chatErr) {
+      logger.warn('Hangout pre-accept chat error (non-fatal):', chatErr)
+    }
+
     const [[respondent]] = await pool.query('SELECT display_name FROM user_profiles WHERE id = ?', [req.userId])
 
     const [notifResult] = await pool.query(
@@ -668,7 +716,7 @@ router.post('/api/hangouts/:id/respond', auth, respondLimiter, async (req, res) 
     sendPushToUser(hangout.user_id, 'SwiftMatch', `${respondent?.display_name || 'Someone'} wants to join: ${hangout.title}`).catch(() => {})
     trackEvent('hangout_response_sent', req.userId, { hangout_id: Number(id), response_id: result.insertId })
 
-    res.status(201).json({ id: result.insertId, message: 'Response sent' })
+    res.status(201).json({ id: result.insertId, message: 'Response sent', chat_id: preChatId })
   } catch (err) {
     if (err && err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ message: 'Already responded to this hangout' })

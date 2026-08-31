@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, waitFor, fireEvent, act } from "@testing-library/react"
 import React from "react"
 import { MemoryRouter } from "react-router-dom"
+import { __resetFeedCache } from "@/pages/hangouts"
 
 const mockFetch = vi.fn()
 globalThis.fetch = mockFetch
@@ -45,9 +46,16 @@ const mockTranslations: Record<string, string> = {
   "hangout.filter.radius": "Радиус: {km} км",
   "hangout.category.cinema": "Кино",
   "hangout.empty": "Пока нет активных встреч",
+  "hangout.empty_banner_title": "Как это работает",
+  "hangout.empty_banner_date": "Формат «Свидание» — вы ищете человека для встречи один на один.",
+  "hangout.empty_banner_company": "Формат «Компания» — присоединяйтесь к компании или соберите свою.",
+  "hangout.empty_recommend_title": "Популярное в других городах",
+  "hangout.empty_recommend_desc": "Рядом сейчас пусто, вот что активно ищут другие",
+  "hangout.empty_recommend_placeholder": "Подбираем популярные встречи",
   "hangout.disabled": "Встречи скоро появятся",
   "hangout.disabled_desc": "Эта функция пока выключена. Загляните позже!",
   "hangout.label.companions_count": "{count} из {max}",
+  "hangout.label.views": "Просмотров",
   "nav.hangouts": "Встречи",
   "hangout.my_listings": "Мои объявления",
   "hangout.my_responses": "Мои отклики",
@@ -131,6 +139,7 @@ describe("HangoutsPage", () => {
     mockFetch.mockReset()
     mockFlags.hangoutsEnabled = true
     mockIsPremium = true
+    __resetFeedCache()
     ;(navigator as any).geolocation = undefined
   })
 
@@ -148,6 +157,25 @@ describe("HangoutsPage", () => {
       expect(screen.getByTestId("hangout-card-1")).toBeTruthy()
     })
     expect(screen.getByText("Иду на Дюну")).toBeTruthy()
+  })
+
+  it("shows view count on card when present (H2)", async () => {
+    const withViews = [{ ...sampleHangouts[0], view_count: 128 }]
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(withViews) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+
+    renderPage(<HangoutsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-card-1")).toBeTruthy()
+    })
+    const views = screen.getByTestId("hangout-views-1")
+    expect(views).toBeTruthy()
+    expect(views.textContent).toContain("128")
   })
 
   it("applies stagger animation to feed cards", async () => {
@@ -381,6 +409,44 @@ describe("HangoutsPage", () => {
     })
   })
 
+  it("shows onboarding explainer banner in empty state (H1)", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+
+    renderPage(<HangoutsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-onboard")).toBeTruthy()
+    })
+    expect(screen.getByText("Как это работает")).toBeTruthy()
+    expect(screen.getByText(/Формат «Свидание»/)).toBeTruthy()
+    expect(screen.getByText(/Формат «Компания»/)).toBeTruthy()
+  })
+
+  it("shows popular hangouts recommendations in empty state (H1)", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      if (u.includes("/api/hangouts") && u.includes("sort=popularity")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([{ ...sampleHangouts[0], id: 55, city: "Санкт-Петербург" }]) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+
+    renderPage(<HangoutsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-recs")).toBeTruthy()
+    })
+    expect(screen.getByText("Популярное в других городах")).toBeTruthy()
+    expect(screen.getByTestId("hangout-card-55")).toBeTruthy()
+  })
+
   it("renders «Куда пойти вдвоём» affiliate block with offers", async () => {
     const offers = [
       { id: 28, category: "restaurant", title: "Ресторан для первого свидания", deeplink: "https://go/x", price: 2500, city: "Москва", partner_name: "Restoclub", commission_rate: 12 },
@@ -567,6 +633,76 @@ describe("HangoutsPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("hangout-suggest-error")).toBeTruthy()
     })
+  })
+
+  it("applies optimistic join immediately and keeps it on success (этап 106)", async () => {
+    let resolvePost: (v: any) => void = () => {}
+    const postPromise = new Promise<any>((res) => { resolvePost = res })
+    const joinable = [{ ...sampleHangouts[0], hangout_type: "company", participant_count: 1, like_count: 0, my_participant_status: null, is_author: false }]
+    mockFetch.mockImplementation((url: string, options?: RequestInit) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      if (u.includes("/api/hangouts") && options?.method === "POST") return postPromise
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(joinable) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+    renderPage(<HangoutsPage />)
+    await waitFor(() => { expect(screen.getByTestId("hangout-join-1")).toBeTruthy() })
+
+    fireEvent.click(screen.getByTestId("hangout-join-1"))
+    // Сразу (до ответа сервера) кнопка join исчезает — карточка стала «уже идёт»
+    expect(screen.queryByTestId("hangout-join-1")).toBeNull()
+
+    await act(async () => { resolvePost({ ok: true, status: 201, json: () => Promise.resolve({}) }) })
+    await waitFor(() => { expect(screen.queryByTestId("hangout-join-1")).toBeNull() })
+  })
+
+  it("rolls back optimistic join when the request fails (этап 106)", async () => {
+    let resolvePost: (v: any) => void = () => {}
+    const postPromise = new Promise<any>((res) => { resolvePost = res })
+    const joinable = [{ ...sampleHangouts[0], hangout_type: "company", participant_count: 1, like_count: 0, my_participant_status: null, is_author: false }]
+    mockFetch.mockImplementation((url: string, options?: RequestInit) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      if (u.includes("/api/hangouts") && options?.method === "POST") return postPromise
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(joinable) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+    renderPage(<HangoutsPage />)
+    await waitFor(() => { expect(screen.getByTestId("hangout-join-1")).toBeTruthy() })
+
+    fireEvent.click(screen.getByTestId("hangout-join-1"))
+    expect(screen.queryByTestId("hangout-join-1")).toBeNull()
+
+    await act(async () => { resolvePost({ ok: false, status: 500, json: () => Promise.resolve({ error: "boom" }) }) })
+    // Откат — кнопка join снова появилась
+    await waitFor(() => { expect(screen.getByTestId("hangout-join-1")).toBeTruthy() })
+  })
+
+  it("serves the feed from the 60s cache instead of refetching on remount (H4)", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      if (u.includes("/api/hangouts") && !u.includes("/my")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(sampleHangouts) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+    // Считаем только запросы основной ленты (с параметром page=), исключая H1-рекомендации (sort=popularity)
+    const feedCalls = () =>
+      mockFetch.mock.calls.filter(([u]) => String(u).includes("/api/hangouts?page=")).length
+
+    const first = renderPage(<HangoutsPage />)
+    await waitFor(() => { expect(screen.getByTestId("hangout-card-1")).toBeTruthy() })
+    const callsAfterFirst = feedCalls()
+    expect(callsAfterFirst).toBeGreaterThan(0)
+    first.unmount()
+
+    renderPage(<HangoutsPage />)
+    await waitFor(() => { expect(screen.getByTestId("hangout-card-1")).toBeTruthy() })
+    // В пределах staleTime (60s) повторный запрос ленты не выполняется — отдаётся кэш
+    expect(feedCalls()).toBe(callsAfterFirst)
   })
 })
 

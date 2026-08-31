@@ -201,6 +201,72 @@ describe('GET /api/hangouts (feed)', () => {
     expect(sql).toContain('h.boosted')
     expect(res.body[0]).toMatchObject({ boosted: 1 })
   })
+
+  it('selects view_count for hangouts (H2)', async () => {
+    pool.query.mockResolvedValueOnce([[{ id: 7, view_count: 42 }], []])
+    const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts')
+    expect(res.status).toBe(200)
+    const sql = pool.query.mock.calls[0][0]
+    expect(sql).toContain('h.view_count')
+    expect(res.body[0]).toMatchObject({ view_count: 42 })
+  })
+})
+
+describe('GET /api/hangouts/:id (detail) view counter (H2)', () => {
+  const baseRow = {
+    id: 5,
+    user_id: 10,
+    author_id: 10,
+    category: 'cinema',
+    hangout_type: 'date',
+    title: 'Кино',
+    status: 'active',
+    event_date: new Date(Date.now() + 86400000).toISOString(),
+    display_name: 'Макс',
+    view_count: 10,
+  }
+
+  it('returns detail and increments view_count for a non-author viewer', async () => {
+    pool.query
+      .mockResolvedValueOnce([[baseRow], []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([[], []])
+    const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts/5').set('Authorization', `Bearer ${authToken(99)}`)
+    expect(res.status).toBe(200)
+    expect(res.body.view_count).toBe(10)
+    const update = pool.query.mock.calls[1]
+    expect(update[0]).toContain('UPDATE hangouts SET view_count = view_count + 1 WHERE id = ?')
+    expect(update[1]).toContain('5')
+  })
+
+  it('does not increment view_count when the author views their own hangout', async () => {
+    pool.query
+      .mockResolvedValueOnce([[baseRow], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[]])
+    const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts/5').set('Authorization', `Bearer ${authToken(10)}`)
+    expect(res.status).toBe(200)
+    const calls = pool.query.mock.calls
+    expect(calls.some(([sql]) => String(sql).includes('view_count = view_count + 1'))).toBe(false)
+  })
+
+  it('returns 404 for unknown hangout without increment', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts/999').set('Authorization', `Bearer ${authToken(99)}`)
+    expect(res.status).toBe(404)
+    const calls = pool.query.mock.calls
+    expect(calls.some(([sql]) => String(sql).includes('view_count = view_count + 1'))).toBe(false)
+  })
+
+  it('returns chat_id for a respondent with a pending response (H3 pre-accept chat)', async () => {
+    pool.query
+      .mockResolvedValueOnce([[baseRow], []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([[{ chat_id: 300 }], []])
+    const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts/5').set('Authorization', `Bearer ${authToken(99)}`)
+    expect(res.status).toBe(200)
+    expect(res.body.chat_id).toBe(300)
+  })
 })
 
 describe('POST /api/hangouts', () => {
@@ -421,16 +487,24 @@ describe('POST /api/hangouts/:id/respond', () => {
     expect(res.status).toBe(409)
   })
 
-  it('creates pending response and notifies author', async () => {
+  it('creates pending response, pre-accept chat and notifies author (H3)', async () => {
     pool.query
       .mockResolvedValueOnce([[{ id: 7, user_id: 1, status: 'active', title: 'Dune' }], []])
       .mockResolvedValueOnce([{ insertId: 55 }, []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([{ insertId: 200 }, []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([{}, []])
       .mockResolvedValueOnce([[{ display_name: 'Anna' }], []])
       .mockResolvedValueOnce([{ insertId: 77 }, []])
       .mockResolvedValueOnce([[{ id: 77, type: 'hangout_response', payload: '{}', created_at: new Date() }], []])
     const res = await respond(createApp(hangoutsRoutes))
     expect(res.status).toBe(201)
     expect(res.body.id).toBe(55)
+    expect(res.body.chat_id).toBe(200)
+    const chatLink = pool.query.mock.calls.find(([sql]) => String(sql).includes('INSERT IGNORE INTO hangout_chats'))
+    expect(chatLink).toBeTruthy()
+    expect(chatLink[1]).toEqual(['7', 55, 200])
   })
 
   it('returns PAYMENT_REQUIRED for paid hangout without ticket', async () => {
@@ -462,13 +536,19 @@ describe('POST /api/hangouts/:id/respond', () => {
       .mockResolvedValueOnce([[{ cnt: 1 }], []])
       .mockResolvedValueOnce([[{ cnt: 0 }], []])
       .mockResolvedValueOnce([{ insertId: 55 }, []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([{ insertId: 300 }, []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([{}, []])
       .mockResolvedValueOnce([[{ display_name: 'Anna' }], []])
       .mockResolvedValueOnce([{ insertId: 77 }, []])
       .mockResolvedValueOnce([[{ id: 77, type: 'hangout_response', payload: '{}', created_at: new Date() }], []])
+      .mockResolvedValue([{}, []])
 
     const res = await respond(createApp(hangoutsRoutes))
     expect(res.status).toBe(201)
     expect(res.body.id).toBe(55)
+    expect(res.body.chat_id).toBe(300)
   })
 })
 

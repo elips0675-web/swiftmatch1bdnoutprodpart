@@ -96,8 +96,14 @@ export default function HangoutDetailPage() {
       if (!res.ok) throw new Error("failed");
       setRespondOpen(false);
       setRespondMessage("");
+      const data = await res.json().catch(() => ({}));
       toast.success(t("hangout.toast.response_sent"));
-      load();
+      // H3: после отклика открываем чат с организатором (до подтверждения)
+      if (data?.chat_id) {
+        navigate(`/chats/${data.chat_id}`);
+      } else {
+        load();
+      }
     } catch {
       toast.error(t("hangout.error.load"));
     } finally {
@@ -469,6 +475,18 @@ export default function HangoutDetailPage() {
                   >
                     <MessageSquareText size={15} className="mr-2" /> {t("hangout.action.respond")}
                   </Button>
+                )}
+                {hangout.my_response_status === "pending" && (
+                  <p className="text-xs text-muted-foreground text-center pt-2" data-testid="response-pending-note">
+                    {t("hangout.response.pending_note")}
+                  </p>
+                )}
+                {hangout.my_response_status === "pending" && hangout.chat_id && (
+                  <Link to={`/chats/${hangout.chat_id}`}>
+                    <Button data-testid="message-organizer" className="w-full rounded-full font-bold mt-2">
+                      <MessageCircle size={15} className="mr-2" /> {t("hangout.action.message_organizer")}
+                    </Button>
+                  </Link>
                 )}
               </div>
             )}

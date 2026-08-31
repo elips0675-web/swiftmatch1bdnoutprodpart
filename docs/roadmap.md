@@ -297,6 +297,45 @@ UX-улучшение ленты (следующий по приоритету �
 - **Тесты:** front +2 — stagger (класс на `closest("a")`), pull-to-refresh (touch-жест `touchStart 50 → touchMove 200 → touchEnd` увеличивает число `/api/hangouts` запросов). **front 96→98/98**; tsc/lint 0 errors; `vite build` OK; server 372/372 (не менялся). Live (390px): ptr-индикатор + 4 stagger-карточки, первая delay 0ms.
 - **Примечание:** pull-to-refresh работает на touch-устройствах (мобильный веб / Capacitor); на десктопе пользовательский паттерн от Web-скролла сохраняется (кнопка «Показать новые» для свежих встреч остаётся).
 
+## Этап 107 (31.08.2026) — Пустое состояние /hangouts: рекомендации + онбординг-баннер ✅
+
+Пункт 🔴 #3 плана «Улучшение страницы hangouts» — снизить порог входа для новых пользователей, у которых лента может быть пустой.
+
+- **Онбординг-баннер** (`src/pages/hangouts.tsx`): в empty-state добавлен баннер `data-testid="hangout-onboard"` с объяснением, что такое встречи (Date/Company) и как они работают.
+- **Рекомендации** (`recHangouts`/`recLoading`): отдельный fetch-эффект `GET /api/hangouts?sort=popularity&limit=3&status=active` (без гео-фильтров — «популярные встречи в других городах»); блок `data-testid="hangout-recs"` / `hangout-recs-loading` переиспользует `HangoutCard` с `onOptimistic={applyOptimistic}` и классом `hangout-stagger-enter`.
+- **i18n (RU+EN):** ключи `hangout.empty_banner_title/date/company`, `hangout.empty_recommend_title/desc/placeholder`.
+- **Тесты:** front +3 (баннер; рекомендации с карточкой `hangout-card-55`; RU-ключи в моках).
+- **Счётчики:** tsc/lint 0 errors, `vite build` OK; итоговые по сессии hangouts — server 389/389, front 111/111.
+
+## Этап 108 (31.08.2026) — Счётчик просмотров встречи ✅
+
+Пункт 🟠 #5 плана (соцсигналы) — счётчик просмотров в БД, показывающий популярность на карточке.
+
+- **Миграция `049_hangouts_view_count.sql`:** `ALTER TABLE hangouts ADD COLUMN view_count INT NOT NULL DEFAULT 0 AFTER boosted` + индекс `idx_hangouts_view_count` (вместо `AFTER like_count` — like_count не физическая колонка); синхронизировано с `database/mysql_schema.sql`.
+- **Сервер (`server/src/routes/hangouts.js`):** `h.view_count` добавлен в `HANGOUT_LIST_SELECT`; в detail-роуте для не-автора fire-and-forget `UPDATE hangouts SET view_count = view_count + 1 WHERE id = ?` (просмотр автора не засчитывается).
+- **Фронт (`src/pages/hangouts.tsx`):** иконка `Eye` из lucide-react; в meta-строке карточки показан `view_count` (`data-testid="hangout-views-{id}"`, `toLocaleString("ru-RU")`), ключ `hangout.label.views`.
+- **Тесты:** front +1 (показ `view_count` на карточке); server +4 (SELECT `h.view_count`; 3 теста detail view counter) — обновлён H2-тест на 3 явных `mockResolvedValueOnce` (UPDATE + chat-запрос не-автора).
+- **Счётчики:** tsc/lint 0 errors, `vite build` OK; итоговые по сессии hangouts — server 389/389, front 111/111.
+
+## Этап 109 (31.08.2026) — Встроенный чат с организатором до подтверждения ✅
+
+Пункт 🟡 #12 плана — написать организатору вопрос до confirm (раньше чат создавался только при accept).
+
+- **Сервер (`server/src/routes/hangouts.js`):** в `POST /api/hangouts/:id/respond` после INSERT отклика создаётся/переиспользуется личный чат между откликнувшимся и автором (`chats` + `chat_participants` + `INSERT IGNORE INTO hangout_chats (hangout_id, response_id, chat_id)`), ответ 201 включает `chat_id: preChatId`. В detail-роуте для не-автора `chat_id` ищется по активному отклику (`JOIN hangout_responses ... hr.user_id = ? AND hr.status != 'cancelled'`), а не через `[[]]`.
+- **Фронт (`src/pages/hangout-detail.tsx`):** в `respond()` после успеха при наличии `data.chat_id` — `navigate('/chats/'+chat_id)`, иначе `load()`; при `my_response_status === "pending"` показаны кнопка «Написать организатору» (`data-testid="message-organizer"`, `Link /chats/{chat_id}`) и подпись `data-testid="response-pending-note"`.
+- **i18n (RU+EN):** `hangout.action.message_organizer`, `hangout.response.pending_note` (+ починена слитая строка RU `hangout.response.pending`).
+- **Тесты:** server — обновлены respond-моки (9/12 вызовов pool.query, `chatLink[1]` = `['7', 55, 200]`) + новый H3-тест `returns chat_id for a respondent with a pending response` (hangouts.test.js → 62); front — новый `src/test/hangout-detail.test.tsx` (+2: кнопка «message organizer» показывается при pending+chat_id, скрыта без chat_id).
+- **Счётчики:** server 389/389, front 111/111, tsc/lint 0 errors, `vite build` OK.
+
+## Этап 110 (31.08.2026) — Кэширование ленты (staleTime 60s) + Sentry-метрики ✅
+
+Пункты 🛠 #14 и #16 плана — меньше запросов при переключении вкладок/навигации и мониторинг производительности.
+
+- **Клиентский кэш ленты** (`src/pages/hangouts.tsx`): модульный `feedCache` (Map по `cacheKey` = query-строка) со staleTime **60s** — на page 1 при свежем кэше fetch не выполняется; явный pull-to-refresh (`refreshKey > 0`) всегда идёт в сеть; `__resetFeedCache()` для изоляции тестов.
+- **Sentry (`src/lib/sentry.ts`):** добавлены `captureTiming(name, ms)` (метрика времени загрузки ленты `hangout.feed.load`) и `captureMessage(...)` — no-op без `VITE_SENTRY_DSN`. В `buyTicket` на провал/ошибку логируются `hangout.ticket_purchase_failed`/`_error` с `offer_id`/`hangout_id`.
+- **Тесты:** front +1 — remount в пределах 60s не перезапрашивает ленту (считаются только `?page=`-запросы, исключая H1-рекомендации).
+- **Счётчики:** server 389/389 (без изменений), front 111/111, tsc/lint 0 errors, `vite build` OK.
+
 ## Плановые хвосты (не блокируют)
 
 - Внешние блокеры (не код): staging VPS + docker compose up, реальные ключи в `.env`, домен + SSL + Google Play, k6 100 VU на staging, UptimeRobot/Grafana-алерты.

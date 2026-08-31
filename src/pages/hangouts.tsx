@@ -13,10 +13,11 @@ import { useFeatureFlags } from "@/context/feature-flags-context";
 import { usePremium } from "@/hooks/use-premium";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { getToken } from "@/lib/token";
+import { captureTiming, captureMessage } from "@/lib/sentry";
 import { useToast } from "@/components/ui/use-toast";
 import { HangoutSkeletonCard } from "@/components/hangout-skeleton-card";
 import { HANGOUT_CATEGORIES, formatEventDate, type Hangout, type HangoutType } from "@/lib/hangouts";
-import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X, Ticket, Zap, Utensils, BedDouble, Flower2, Car, Gift, ShoppingBag, HandCoins, Share, Star, Loader2, ChevronDown, Navigation, Filter } from "lucide-react";
+import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X, Ticket, Zap, Utensils, BedDouble, Flower2, Car, Gift, ShoppingBag, HandCoins, Share, Star, Loader2, ChevronDown, Navigation, Filter, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GO_OUT_ICONS, GO_OUT_COLORS } from "@/lib/go-out";
 import { GoOutBookingDialog, AffiliateMap, fillDeeplink, type GoOutOffer } from "@/components/hangout-go-out";
@@ -106,6 +107,16 @@ function groupHangoutsByDate(hangouts: Hangout[]): Array<[string, Hangout[]]> {
 
 const PAGE_LIMIT = 20;
 
+// H4: клиентский кэш ленты со staleTime 60s — меньше запросов при переключении вкладок/навигации
+const FEED_CACHE_TTL = 60_000;
+type FeedCacheEntry = { data: Hangout[]; time: number };
+const feedCache = new Map<string, FeedCacheEntry>();
+
+// Для тестов: сброс кэша ленты между кейсами (иначе модульный кэш «протекает» между тестами)
+export function __resetFeedCache() {
+  feedCache.clear();
+}
+
 function dateRange(filter: HangoutDateFilter): { from?: string; to?: string } {
   if (filter === "all") return {};
   const now = new Date();
@@ -139,7 +150,7 @@ function formatHumanDate(value: string, t: (key: string) => string): string {
   return formatEventDate(value);
 }
 
-function HangoutCard({ hangout, className, style }: { hangout: Hangout; className?: string; style?: React.CSSProperties }) {
+function HangoutCard({ hangout, className, style, onOptimistic }: { hangout: Hangout; className?: string; style?: React.CSSProperties; onOptimistic?: (id: number, patch: Partial<Hangout>) => void }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -156,6 +167,24 @@ function HangoutCard({ hangout, className, style }: { hangout: Hangout; classNam
     if (actionLoading) return;
     setActionLoading(true);
     const token = getToken();
+    // Оптимистичный патч и его инверс (откат) — до сетевого запроса (этап 106)
+    const prev: Partial<Hangout> = {};
+    const patch: Partial<Hangout> = {};
+    if (kind === "respond") {
+      prev.my_response_status = hangout.my_response_status ?? null;
+      patch.my_response_status = "pending";
+    } else if (kind === "join") {
+      prev.my_participant_status = hangout.my_participant_status ?? null;
+      prev.participant_count = hangout.participant_count;
+      patch.my_participant_status = "joined";
+      patch.participant_count = (Number(hangout.participant_count ?? 0) + 1);
+    } else {
+      prev.my_like_status = hangout.my_like_status ?? null;
+      prev.like_count = hangout.like_count;
+      patch.my_like_status = "like";
+      patch.like_count = (Number(hangout.like_count ?? 0) + 1);
+    }
+    onOptimistic?.(hangout.id, patch);
     try {
       const res = await fetch(`/api/hangouts/${hangout.id}/${kind}`, {
         method: "POST",
@@ -182,7 +211,12 @@ function HangoutCard({ hangout, className, style }: { hangout: Hangout; classNam
       } else {
         toast({ title: data?.error || t("hangout.action.error"), variant: "destructive" });
       }
+      // При ошибке — откат оптимистичного обновления
+      if (!(res.ok || res.status === 201)) {
+        onOptimistic?.(hangout.id, prev);
+      }
     } catch {
+      onOptimistic?.(hangout.id, prev);
       toast({ title: t("hangout.action.error"), variant: "destructive" });
     } finally {
       setActionLoading(false);
@@ -224,9 +258,11 @@ function HangoutCard({ hangout, className, style }: { hangout: Hangout; classNam
         window.location.href = data.url;
       } else {
         setBuying(false);
+        captureMessage("hangout.ticket_purchase_failed", "error", { offer_id: hangout.offer_id, hangout_id: hangout.id, status: res.status });
       }
     } catch {
       setBuying(false);
+      captureMessage("hangout.ticket_purchase_error", "error", { offer_id: hangout.offer_id, hangout_id: hangout.id });
     }
   };
 
@@ -381,6 +417,12 @@ function HangoutCard({ hangout, className, style }: { hangout: Hangout; classNam
                 }
                 {typeof hangout.distance_km === "number" && (
                   <span className="ml-1">· {t("hangout.label.distance", { km: hangout.distance_km })}</span>
+                )}
+                {Number(hangout.view_count) > 0 && (
+                  <span className="inline-flex items-center gap-1" data-testid={`hangout-views-${hangout.id}`} title={t("hangout.label.views")}>
+                    <Eye size={12} />
+                    {Number(hangout.view_count).toLocaleString("ru-RU")}
+                  </span>
                 )}
               </p>
               {(showRating || showScarcity) && (
@@ -569,6 +611,8 @@ export default function HangoutsPage() {
   const [suggestError, setSuggestError] = useState(false);
   const [pendingNew, setPendingNew] = useState<Array<{ hangoutId: number; title: string }>>([]);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [recHangouts, setRecHangouts] = useState<Hangout[] | null>(null);
+  const [recLoading, setRecLoading] = useState(false);
   const [ptrState, setPtrState] = useState<"idle" | "pulling" | "refreshing">("idle");
   const [ptrDist, setPtrDist] = useState(0);
   const ptrStartY = useRef<number | null>(null);
@@ -635,6 +679,11 @@ export default function HangoutsPage() {
     setPage(1);
     setRefreshKey((k) => k + 1);
   }, [setPage]);
+
+  // Оптимистичное обновление карточки в ленте (этап 106)
+  const applyOptimistic = useCallback((id: number, patch: Partial<Hangout>) => {
+    setItems((prev) => prev.map((h) => (h.id === id ? { ...h, ...patch } : h)));
+  }, []);
 
   // Pull-to-refresh (этап 105): свайп вниз с самой верхней позиции скролла
   const handlePtrTouchStart = (e: React.TouchEvent) => {
@@ -755,6 +804,27 @@ export default function HangoutsPage() {
     return () => { cancelled = true; };
   }, [hangoutsEnabled, goOutCity, goOutFilter]);
 
+  // Рекомендации для пустого состояния: популярные встречи без привязки к городу/радиусу (H1)
+  useEffect(() => {
+    if (!hangoutsEnabled) return;
+    let cancelled = false;
+    setRecLoading(true);
+    const token = getToken();
+    const params = new URLSearchParams({ sort: "popularity", limit: "3", status: "active" });
+    fetch(`/api/hangouts?${params.toString()}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (cancelled) return;
+        const arr = Array.isArray(data) ? data : [];
+        setRecHangouts(arr);
+      })
+      .catch(() => { if (!cancelled) setRecHangouts([]); })
+      .finally(() => { if (!cancelled) setRecLoading(false); });
+    return () => { cancelled = true; };
+  }, [hangoutsEnabled]);
+
   useEffect(() => {
     if (!hangoutsEnabled) { setLoading(false); return; }
     let cancelled = false;
@@ -776,14 +846,31 @@ export default function HangoutsPage() {
       params.set("lng", String(coords.lng));
       params.set("radius", String(radiusKm));
     }
+    const cacheKey = params.toString();
+    const startedAt = Date.now();
+    // H4: staleTime 60s — отдаём свежий кэш первой страницы вместо запроса.
+    // Явный refresh (pull-to-refresh, refreshKey>0) всегда идёт в сеть.
+    if (page === 1 && !(refreshKey > 0) && feedCache.has(cacheKey)) {
+      const cached = feedCache.get(cacheKey)!;
+      if (Date.now() - cached.time < FEED_CACHE_TTL) {
+        setItems(cached.data);
+        setHasMore(cached.data.length >= PAGE_LIMIT);
+        setLoading(false);
+        return () => { cancelled = true; };
+      }
+    }
     const token = getToken();
-    fetch(`/api/hangouts?${params.toString()}`, {
+    fetch(`/api/hangouts?${cacheKey}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         if (cancelled) return;
         const arr = Array.isArray(data) ? data : [];
+        if (page === 1) {
+          feedCache.set(cacheKey, { data: arr, time: Date.now() });
+          captureTiming("hangout.feed.load", Date.now() - startedAt);
+        }
         setItems((prev) => {
           const combined = page > 1 ? [...prev, ...arr] : arr;
           if (sortBy === "popularity" || sortBy === "price") {
@@ -1367,44 +1454,92 @@ export default function HangoutsPage() {
                 ))}
               </div>
             ) : items.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground" data-testid="hangouts-empty">
-                <CalendarDays size={48} className="mb-4 opacity-30" />
-                <p className="text-sm">{t("hangout.empty")}</p>
-                <p className="text-xs text-muted-foreground mt-1">{t("hangout.empty_desc")}</p>
-                <Button
-                  data-testid="hangouts-empty-reset"
-                  onClick={() => {
-                    setSearch("");
-                    setCategory(null);
-                    setHangoutType("all");
-                    setDateFilter("all");
-                    setSortBy("date");
-                    setPage(1);
-                    setDebouncedSearch("");
-                  }}
-                  variant="outline"
-                  className="mt-3 rounded-full font-bold text-xs"
-                >
-                  {t("hangout.empty_reset")}
-                </Button>
-                {goOutOffers && goOutOffers.length > 0 && (
+              <div className="flex flex-col py-6 text-muted-foreground" data-testid="hangouts-empty">
+                <div className="flex flex-col items-center justify-center text-center px-4">
+                  <CalendarDays size={48} className="mb-4 opacity-30" />
+                  <p className="text-sm">{t("hangout.empty")}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t("hangout.empty_desc")}</p>
                   <Button
-                    data-testid="hangouts-empty-goout"
-                    onClick={() => document.getElementById("hangout-go-out")?.scrollIntoView({ behavior: "smooth" })}
-                    variant="ghost"
-                    className="mt-2 rounded-full font-bold text-xs"
+                    data-testid="hangouts-empty-reset"
+                    onClick={() => {
+                      setSearch("");
+                      setCategory(null);
+                      setHangoutType("all");
+                      setDateFilter("all");
+                      setSortBy("date");
+                      setPage(1);
+                      setDebouncedSearch("");
+                    }}
+                    variant="outline"
+                    className="mt-3 rounded-full font-bold text-xs"
                   >
-                    {t("hangout.empty_goout")}
+                    {t("hangout.empty_reset")}
                   </Button>
-                )}
-                <Button
-                  data-testid="hangouts-empty-create"
-                  onClick={() => navigate("/hangouts/create")}
-                  className="mt-2 rounded-full font-bold"
-                >
-                  <PlusCircle size={16} className="mr-1.5" />
-                  {t("hangout.action.create")}
-                </Button>
+                  {goOutOffers && goOutOffers.length > 0 && (
+                    <Button
+                      data-testid="hangouts-empty-goout"
+                      onClick={() => document.getElementById("hangout-go-out")?.scrollIntoView({ behavior: "smooth" })}
+                      variant="ghost"
+                      className="mt-2 rounded-full font-bold text-xs"
+                    >
+                      {t("hangout.empty_goout")}
+                    </Button>
+                  )}
+                  <Button
+                    data-testid="hangouts-empty-create"
+                    onClick={() => navigate("/hangouts/create")}
+                    className="mt-2 rounded-full font-bold"
+                  >
+                    <PlusCircle size={16} className="mr-1.5" />
+                    {t("hangout.action.create")}
+                  </Button>
+                </div>
+
+                <div className="mt-6 px-4" data-testid="hangout-onboard">
+                  <h3 className="flex items-center gap-1 text-sm font-bold text-foreground mb-2">
+                    <Sparkles size={15} className="text-primary" />
+                    {t("hangout.empty_banner_title")}
+                  </h3>
+                  <div className="rounded-2xl border border-muted bg-card p-3 space-y-2.5">
+                    <div className="flex items-start gap-2.5">
+                      <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-primary/10 text-primary shrink-0"><Heart size={15} /></span>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{t("hangout.empty_banner_date")}</p>
+                    </div>
+                    <div className="flex items-start gap-2.5">
+                      <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-primary/10 text-primary shrink-0"><Users size={15} /></span>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{t("hangout.empty_banner_company")}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {recLoading ? (
+                  <div className="mt-6 px-4">
+                    <p className="text-xs text-muted-foreground animate-pulse" data-testid="hangout-recs-loading">
+                      {t("hangout.empty_recommend_placeholder")}
+                    </p>
+                  </div>
+                ) : recHangouts && recHangouts.length > 0 ? (
+                  <div className="mt-6" data-testid="hangout-recs">
+                    <div className="px-4 mb-2">
+                      <h3 className="flex items-center gap-1 text-sm font-bold text-foreground">
+                        <Star size={15} className="text-amber-500" />
+                        {t("hangout.empty_recommend_title")}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">{t("hangout.empty_recommend_desc")}</p>
+                    </div>
+                    <div className="px-4 space-y-3">
+                      {recHangouts.map((h, idx) => (
+                        <HangoutCard
+                          key={`rec-${h.id}`}
+                          hangout={h}
+                          className="hangout-stagger-enter"
+                          style={{ animationDelay: `${Math.min(idx * 40, 320)}ms` }}
+                          onOptimistic={applyOptimistic}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="space-y-3">
@@ -1428,14 +1563,15 @@ export default function HangoutsPage() {
                       {hangoutGroupLabel(key, t)}
                     </h3>
                     <div className="space-y-3 mt-1.5">
-                      {group.map((h, idx) => (
-                        <HangoutCard
-                          key={`${refreshKey}-${h.id}`}
-                          hangout={h}
-                          className="hangout-stagger-enter"
-                          style={{ animationDelay: `${Math.min(idx * 40, 320)}ms` }}
-                        />
-                      ))}
+            {group.map((h, idx) => (
+              <HangoutCard
+                key={`${refreshKey}-${h.id}`}
+                hangout={h}
+                className="hangout-stagger-enter"
+                style={{ animationDelay: `${Math.min(idx * 40, 320)}ms` }}
+                onOptimistic={applyOptimistic}
+              />
+            ))}
                     </div>
                   </section>
                 ))}

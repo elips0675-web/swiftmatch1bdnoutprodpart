@@ -38,3 +38,34 @@ export function clearSentryUser() {
   if (!SENTRY_DSN) return
   Sentry.setUser(null)
 }
+
+/**
+ * H4: пользовательская метрика производительности (например, время загрузки ленты).
+ * No-op, если Sentry не настроен (VITE_SENTRY_DSN отсутствует).
+ * Добавляет breadcrumb и, при наличии активного транзакции, глобальное измерение.
+ */
+export function captureTiming(name: string, ms: number) {
+  if (!SENTRY_DSN || !Number.isFinite(ms)) return
+  try {
+    Sentry.addBreadcrumb({ category: 'performance', message: `${name}: ${Math.round(ms)}ms`, level: 'info' })
+    Sentry.metrics.addMeasurement(name, ms)
+  } catch {
+    /* метрики не критичны */
+  }
+}
+
+/**
+ * H4: лог важного клиентского события (например, неудачной попытки покупки билета).
+ * No-op, если Sentry не настроен.
+ */
+export function captureMessage(message: string, level: 'info' | 'warning' | 'error' = 'error', context?: Record<string, unknown>) {
+  if (!SENTRY_DSN) return
+  try {
+    Sentry.captureMessage(message, {
+      level,
+      extra: context || {},
+    })
+  } catch {
+    /* не критично */
+  }
+}
