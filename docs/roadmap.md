@@ -1,6 +1,6 @@
 # SwiftMatch — Roadmap / журнал этапов
 
-> Актуально: 29.08.2026.
+> Актуально: 31.08.2026.
 > Полная детальная история и сводные аудиты живут в локальных (gitignored) файлах:
 > `test/Что сделано.txt`, `test/Что доделать.txt`, `test/Оценка kimi|qwen|дипсик.txt`.
 > Этот файл — чистая (UTF-8) сводка последних этапов, отслеживаемая в git.
@@ -188,6 +188,17 @@
 ## Этап 87 (30.08.2026) — Премиум-перки на встречи /hangouts ✅
 
 P2: снятие/поднятие лимита ежедневных встреч, boost карточки, поднятие `max_companions` cap 10→20 для premium.
+
+## Этап 94–97 (31.08.2026) — Улучшение ленты /hangouts: quick actions, сортировка, infinite scroll, backend aggregates ✅
+
+Комплексное улучшение UX ленты встреч по плану из «Улучшение страницы hangouts Встречи.txt»:
+
+- **Этап 94 — Quick actions на карточке:** кнопки «Откликнуться»/«Присоединиться» + «Нравится» (с ответом на API `/respond`, `/join`, `/like`; тосты на 409/402/401/200). Кнопка «Поделиться» (Web Share API или clipboard). Бейдж рейтинга (★ + оценка). Scarcity-индикатор «Осталось N» / «Все места заняты». Аватарки первых 3 участников (`hangout.attendees`). `loading="lazy"` на аватаре автора. Компонент `HangoutSkeletonCard` для загрузки.
+- **Этап 95 — Сортировка + URL sync:** селектор «По дате»/«Популярные»/«Сначала дешёвые» (`hangout-sort-select`), параметр `sort` в URL через `useSearchParams`. Фильтры пишутся в URL и читаются при монтировании.
+- **Этап 96 — Backend aggregates:** в `HANGOUT_LIST_SELECT` добавлены `rating` (AVG `hangout_reviews.rating`), `review_count`, `attendees_csv` (GROUP_CONCAT первых 3 участников через `user_profiles`). Функция `parseAttendees` конвертирует CSV → массив. Применяется в feed, my, detail.
+- **Этап 97 — Infinite scroll + скелетоны + группировка:** кнопка «Показать ещё» заменена на бесконечный скролл через `IntersectionObserver` (sentinel `hangout-sentinel`, rootMargin 250px). Скелетоны 3 штук вместо спиннера. Группировка по датам со sticky-заголовками («Сегодня», «Завтра», дата). Улучшенное пустое состояние (reset фильтров + ссылка «Куда пойти»).
+- **i18n** (RU+EN): 24 новых ключа `hangout.group.*`, `hangout.sort.*`, `hangout.filter.*`, `hangout.action.*`, `hangout.label.*`, `hangout.empty_*`.
+- **Тесты:** mock `IntersectionObserver` в `src/test/setup.ts`; тест load-more заменён на infinite scroll (AutoIO → mock → page=2). **server 366/366, front 86/86, lint 0 errors, `vite build` OK.** DOM (Playwright 390px): все карточки в bounds 390px, action buttons на каждой, rating badge на карточке с рейтингом, sorting в URL, group headings sticky, sentinel absent при <20 записей.
 
 ## Плановые хвосты (не блокируют)
 

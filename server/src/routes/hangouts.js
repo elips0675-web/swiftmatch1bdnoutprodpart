@@ -138,9 +138,36 @@ const HANGOUT_LIST_SELECT = `
          po.category AS offer_category, po.city AS offer_city, po.valid_to AS offer_valid_to,
          po.pinned AS offer_pinned,
          (SELECT COUNT(*) FROM hangout_responses hr WHERE hr.hangout_id = h.id AND hr.status = 'accepted') AS accepted_count,
-         (SELECT COUNT(*) FROM hangout_participants hp WHERE hp.hangout_id = h.id AND hp.status = 'joined') AS participant_count`
+         (SELECT COUNT(*) FROM hangout_participants hp WHERE hp.hangout_id = h.id AND hp.status = 'joined') AS participant_count,
+         (SELECT ROUND(AVG(hrv.rating), 1) FROM hangout_reviews hrv WHERE hrv.hangout_id = h.id AND hrv.rating IS NOT NULL) AS rating,
+         (SELECT COUNT(*) FROM hangout_reviews hrv2 WHERE hrv2.hangout_id = h.id AND hrv2.rating IS NOT NULL) AS review_count,
+         (SELECT COALESCE(GROUP_CONCAT(CONCAT(hp2.user_id, '|', NULLIF(hp2.display_name, ''), '|', NULLIF(hp2.avatar_url, '')) SEPARATOR ';'), '')
+            FROM (
+              SELECT hp3.user_id, up3.display_name, up3.avatar_url, hp3.joined_at
+              FROM hangout_participants hp3
+              JOIN user_profiles up3 ON up3.id = hp3.user_id
+              WHERE hp3.hangout_id = h.id AND hp3.status = 'joined'
+              ORDER BY hp3.joined_at ASC
+              LIMIT 3
+            ) hp2
+          ) AS attendees_csv`
 
 const JOIN_PARTNER_OFFER = `LEFT JOIN partner_offers po ON po.id = h.partner_offer_id`
+
+function parseAttendees(row) {
+  if (!row) return undefined
+  if (row.attendees_csv !== undefined) {
+    row.attendees = String(row.attendees_csv || "")
+      .split(';')
+      .filter(Boolean)
+      .map((part) => {
+        const [user_id, display_name, avatar_url] = part.split('|')
+        return { user_id: Number(user_id), display_name: display_name || undefined, avatar_url: avatar_url || null }
+      })
+    delete row.attendees_csv
+  }
+  return row
+}
 
 // ─── Feed ──────────────────────────────────────────────────────
 router.get('/api/hangouts', optionalAuth, async (req, res) => {
@@ -202,7 +229,7 @@ router.get('/api/hangouts', optionalAuth, async (req, res) => {
                  LIMIT ? OFFSET ?`
     const rows = await pool.query(sql, [...params, ...geoParams, limit, offset])
 
-    res.json(rows[0])
+    res.json(rows[0].map(parseAttendees))
   } catch (err) {
     logger.error('Hangouts feed error:', err)
     res.status(500).json({ message: 'Failed to fetch hangouts' })
@@ -219,9 +246,9 @@ router.get('/api/hangouts/my', auth, async (req, res) => {
        ${JOIN_PARTNER_OFFER}
        WHERE h.user_id = ?
        ORDER BY h.event_date DESC`,
-      [req.userId],
+       [req.userId],
     )
-    res.json(rows)
+    res.json(rows.map(parseAttendees))
   } catch (err) {
     logger.error('My hangouts error:', err)
     res.status(500).json({ message: 'Failed to fetch my hangouts' })
@@ -306,7 +333,7 @@ router.get('/api/hangouts/:id', optionalAuth, async (req, res) => {
       : [[]]
 
     res.json({
-      ...hangout,
+      ...parseAttendees(hangout),
       is_author: isAuthor,
       responses: isAuthor ? responses : undefined,
       participants,

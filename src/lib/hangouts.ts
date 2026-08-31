@@ -91,6 +91,10 @@ export interface Hangout {
   boosted?: number | boolean | null
   sold_tickets?: number
   my_ticket_status?: 'pending' | 'paid' | 'refunded' | null
+  rating?: number | null
+  review_count?: number | null
+  view_count?: number | null
+  attendees?: Array<{ user_id: number; display_name?: string; avatar_url?: string | null }>
 }
 
 export interface MyHangoutResponse {

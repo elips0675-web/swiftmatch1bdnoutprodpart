@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AppHeader } from "@/components/layout/app-header";
 import { BottomNav } from "@/components/navigation/bottom-nav";
 import { Card } from "@/components/ui/card";
@@ -11,8 +11,10 @@ import { useLanguage } from "@/context/language-context";
 import { useFeatureFlags } from "@/context/feature-flags-context";
 import { usePremium } from "@/hooks/use-premium";
 import { getToken } from "@/lib/token";
+import { useToast } from "@/components/ui/use-toast";
+import { HangoutSkeletonCard } from "@/components/hangout-skeleton-card";
 import { HANGOUT_CATEGORIES, formatEventDate, type Hangout, type HangoutType } from "@/lib/hangouts";
-import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X, Ticket, Zap, Utensils, BedDouble, Flower2, Car, Gift, ShoppingBag, HandCoins } from "lucide-react";
+import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X, Ticket, Zap, Utensils, BedDouble, Flower2, Car, Gift, ShoppingBag, HandCoins, Share, Star, Loader2, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const categoryIcon = (category: string) => {
@@ -70,6 +72,43 @@ const GO_OUT_COLORS: Record<string, string> = {
 
 export type HangoutDateFilter = "all" | "today" | "tomorrow" | "weekend";
 
+export type HangoutSort = "date" | "popularity" | "price";
+
+function hangoutDateKey(value: string): string {
+  const d = new Date(value);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.round((target.getTime() - today.getTime()) / 86400000);
+  if (diffDays === 0) return "today";
+  if (diffDays === 1) return "tomorrow";
+  return d.toISOString().slice(0, 10);
+}
+
+function hangoutGroupLabel(key: string, t: (k: string) => string): string {
+  if (key === "today") return t("hangout.group.today");
+  if (key === "tomorrow") return t("hangout.group.tomorrow");
+  const d = new Date(key);
+  if (isNaN(d.getTime())) return key;
+  return d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+}
+
+function groupHangoutsByDate(hangouts: Hangout[]): Array<[string, Hangout[]]> {
+  const map = new Map<string, Hangout[]>();
+  for (const h of hangouts) {
+    const key = hangoutDateKey(h.event_date);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(h);
+  }
+  return Array.from(map.entries()).sort((a, b) => {
+    const w = { today: 0, tomorrow: 1 } as Record<string, number>;
+    const va = w[a[0]] !== undefined ? w[a[0]] : 2;
+    const vb = w[b[0]] !== undefined ? w[b[0]] : 2;
+    if (va !== vb) return va - vb;
+    return a[0].localeCompare(b[0]);
+  });
+}
+
 const PAGE_LIMIT = 20;
 
 function dateRange(filter: HangoutDateFilter): { from?: string; to?: string } {
@@ -108,12 +147,66 @@ function formatHumanDate(value: string, t: (key: string) => string): string {
 function HangoutCard({ hangout }: { hangout: Hangout }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [buying, setBuying] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const Icon = categoryIcon(hangout.category);
   const isDate = hangout.hangout_type === 'date';
 
   const navigateProfile = (h: Hangout) => {
     if (h.author_id) navigate(`/profile/${h.author_id}`);
+  };
+
+  const doAction = async (kind: "respond" | "join" | "like") => {
+    if (actionLoading) return;
+    setActionLoading(true);
+    const token = getToken();
+    try {
+      const res = await fetch(`/api/hangouts/${hangout.id}/${kind}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok || res.status === 201) {
+        const msg =
+          kind === "like"
+            ? t("hangout.action.liked")
+            : kind === "respond"
+              ? t("hangout.action.responded")
+              : t("hangout.action.joined");
+        toast({ title: msg });
+      } else if (res.status === 409) {
+        toast({ title: t("hangout.action.already"), variant: "destructive" });
+      } else if (res.status === 402) {
+        toast({ title: t("hangout.action.payment_required"), variant: "destructive" });
+      } else if (res.status === 401) {
+        toast({ title: t("hangout.action.auth_required"), variant: "destructive" });
+      } else {
+        toast({ title: data?.error || t("hangout.action.error"), variant: "destructive" });
+      }
+    } catch {
+      toast({ title: t("hangout.action.error"), variant: "destructive" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const shareHangout = async () => {
+    const url = `${location.origin}/hangouts/${hangout.id}`;
+    const title = hangout.title;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast({ title: t("hangout.action.link_copied") });
+      }
+    } catch {
+      /* пользователь отменил нативный share */
+    }
   };
 
   const buyTicket = async (e: React.MouseEvent) => {
@@ -142,6 +235,24 @@ function HangoutCard({ hangout }: { hangout: Hangout }) {
     }
   };
 
+  const replyClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    doAction(hangout.hangout_type === 'date' ? "respond" : "join");
+  };
+
+  const likeClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    doAction("like");
+  };
+
+  const isFull = typeof hangout.capacity === "number" && (hangout.sold_tickets ?? 0) >= hangout.capacity;
+  const remaining = Number(hangout.capacity ?? 0) - Number(hangout.sold_tickets ?? 0);
+  const showScarcity = typeof hangout.capacity === "number" && Number(hangout.capacity) > 0;
+  const showRating = Number(hangout.rating) > 0;
+  const isAuthorCard = Boolean(hangout.is_author) || hangout.my_participant_status === "joined" || hangout.my_response_status === "accepted";
+
   return (
     <Link to={`/hangouts/${hangout.id}`} className="block">
       <Card data-testid={`hangout-card-${hangout.id}`} className="p-4 hover:bg-muted/30 transition-colors">
@@ -166,7 +277,7 @@ function HangoutCard({ hangout }: { hangout: Hangout }) {
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigateProfile(hangout); }}
           >
             {hangout.avatar_url ? (
-              <img src={hangout.avatar_url} alt="" className="w-full h-full object-cover" />
+              <img src={hangout.avatar_url} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
             ) : (
               <Icon size={20} className="text-primary" />
             )}
@@ -254,8 +365,95 @@ function HangoutCard({ hangout }: { hangout: Hangout }) {
                   <span className="ml-1">· {t("hangout.label.distance", { km: hangout.distance_km })}</span>
                 )}
               </p>
+              {(showRating || showScarcity) && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {showRating && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600" data-testid={`hangout-rating-${hangout.id}`}>
+                      <Star size={11} className="fill-amber-400 text-amber-400" />
+                      {Number(hangout.rating).toFixed(1)}
+                    </span>
+                  )}
+                  {showScarcity && (
+                    <span
+                      data-testid={`hangout-remaining-${hangout.id}`}
+                      className={cn(
+                        "inline-flex items-center gap-1 text-[11px] font-bold",
+                        isFull ? "text-red-600" : remaining <= 3 ? "text-orange-600" : "text-muted-foreground",
+                      )}
+                    >
+                      {isFull
+                        ? t("hangout.label.sold_out")
+                        : t("hangout.label.remaining", { count: remaining })}
+                    </span>
+                  )}
+                </div>
+              )}
+              {hangout.attendees && hangout.attendees.length > 0 && (
+                <div className="flex items-center -space-x-2 mt-1" data-testid={`hangout-attendees-${hangout.id}`}>
+                  {hangout.attendees.slice(0, 3).map((a) => (
+                    a.avatar_url ? (
+                      <img
+                        key={a.user_id}
+                        src={a.avatar_url}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="h-6 w-6 rounded-full border-2 border-background object-cover"
+                      />
+                    ) : (
+                      <span key={a.user_id} className="h-6 w-6 rounded-full border-2 border-background bg-primary/10 flex items-center justify-center text-[9px] font-bold text-primary">
+                        {a.display_name?.slice(0, 1) || "?"}
+                      </span>
+                    )
+                  ))}
+                </div>
+              )}
             </div>
           </div>
+          <button
+            type="button"
+            data-testid={`hangout-share-${hangout.id}`}
+            onClick={shareHangout}
+            aria-label={t("hangout.action.share")}
+            className="shrink-0 rounded-full p-2 text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
+          >
+            <Share size={14} />
+          </button>
+        </div>
+        <div className="mt-3 flex gap-2 flex-wrap">
+          {!isAuthorCard && (
+            <button
+              type="button"
+              data-testid={`hangout-${hangout.hangout_type === 'date' ? 'respond' : 'join'}-${hangout.id}`}
+              onClick={replyClick}
+              disabled={actionLoading || isFull}
+              aria-label={isDate ? t("hangout.action.respond") : t("hangout.action.join")}
+              className="flex-1 shrink-0 text-xs font-bold rounded-full bg-primary text-primary-foreground px-3 py-1.5 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {actionLoading ? (
+                <Loader2 size={12} className="inline animate-spin mr-1" />
+              ) : (
+                <>{isDate ? <Heart size={12} className="inline mr-1" /> : <UserPlus size={12} className="inline mr-1" />}</>
+              )}
+              {isFull ? t("hangout.action.attend_full") : isDate ? t("hangout.action.respond") : t("hangout.action.join")}
+            </button>
+          )}
+          <button
+            type="button"
+            data-testid={`hangout-quicklike-${hangout.id}`}
+            onClick={likeClick}
+            disabled={actionLoading}
+            aria-label={t("hangout.action.like")}
+            className={cn(
+              "shrink-0 text-xs font-bold rounded-full px-3 py-1.5 border transition-colors disabled:opacity-50",
+              hangout.my_like_status === "like"
+                ? "bg-pink-100 text-pink-700 border-pink-200"
+                : "bg-background border-muted text-muted-foreground hover:bg-muted/40",
+            )}
+          >
+            <Heart size={12} className={cn("inline mr-1", hangout.my_like_status === "like" && "fill-pink-500 text-pink-500")} />
+            {t("hangout.action.like")}
+          </button>
         </div>
       </Card>
     </Link>
@@ -265,12 +463,14 @@ function HangoutCard({ hangout }: { hangout: Hangout }) {
 export default function HangoutsPage() {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { hangoutsEnabled } = useFeatureFlags();
   const [items, setItems] = useState<Hangout[]>([]);
   const [loading, setLoading] = useState(true);
   const [hangoutType, setHangoutType] = useState<HangoutType | "all">("all");
   const [category, setCategory] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState<HangoutDateFilter>("all");
+  const [sortBy, setSortBy] = useState<HangoutSort>("date");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [radiusKm, setRadiusKm] = useState(10);
@@ -280,6 +480,7 @@ export default function HangoutsPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [goOutOffers, setGoOutOffers] = useState<GoOutOffer[] | null>(null);
   const { isPremium } = usePremium();
   const [suggestOpen, setSuggestOpen] = useState(false);
@@ -314,6 +515,32 @@ export default function HangoutsPage() {
     }
   }, [geoAsked]);
 
+  // Чтение фильтров из URL при монтировании (делиться ссылкой / не терять при перезагрузке)
+  useEffect(() => {
+    const q = searchParams.get("q");
+    const cat = searchParams.get("category");
+    const date = searchParams.get("date") as HangoutDateFilter | null;
+    const type = searchParams.get("type") as HangoutType | "all" | null;
+    const sort = searchParams.get("sort") as HangoutSort | null;
+    if (q != null) setSearch(q);
+    if (cat != null) setCategory(cat);
+    if (date && ["all", "today", "tomorrow", "weekend"].includes(date)) setDateFilter(date);
+    if (type && ["all", "date", "company"].includes(type)) setHangoutType(type);
+    if (sort && ["date", "popularity", "price"].includes(sort)) setSortBy(sort);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Запись фильтров в URL
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
+    if (category) params.set("category", category);
+    if (dateFilter !== "all") params.set("date", dateFilter);
+    if (hangoutType !== "all") params.set("type", hangoutType);
+    if (sortBy !== "date") params.set("sort", sortBy);
+    setSearchParams(params, { replace: true });
+  }, [debouncedSearch, category, dateFilter, hangoutType, sortBy, setSearchParams]);
+
   useEffect(() => {
     if (!hangoutsEnabled) return;
     let cancelled = false;
@@ -338,6 +565,7 @@ export default function HangoutsPage() {
     const range = dateRange(dateFilter);
     if (range.from) params.set("date_from", range.from);
     if (range.to) params.set("date_to", range.to);
+    if (sortBy !== "date") params.set("sort", sortBy);
     params.set("page", String(page));
     params.set("limit", String(PAGE_LIMIT));
     if (coords) {
@@ -353,13 +581,43 @@ export default function HangoutsPage() {
       .then((data) => {
         if (cancelled) return;
         const arr = Array.isArray(data) ? data : [];
-        setItems((prev) => (page > 1 ? [...prev, ...arr] : arr));
+        setItems((prev) => {
+          const combined = page > 1 ? [...prev, ...arr] : arr;
+          if (sortBy === "popularity" || sortBy === "price") {
+            combined.sort((a, b) => {
+              if (sortBy === "popularity") {
+                const pa = Number(a.participant_count ?? 0) + Number(a.like_count ?? 0) + Number(a.accepted_count ?? 0);
+                const pb = Number(b.participant_count ?? 0) + Number(b.like_count ?? 0) + Number(b.accepted_count ?? 0);
+                return pb - pa;
+              }
+              const va = Number(a.price ?? 0);
+              const vb = Number(b.price ?? 0);
+              return va - vb;
+            });
+          }
+          return combined;
+        });
         setHasMore(arr.length >= PAGE_LIMIT);
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [category, hangoutType, dateFilter, page, coords, radiusKm, hangoutsEnabled, debouncedSearch]);
+  }, [category, hangoutType, dateFilter, page, coords, radiusKm, hangoutsEnabled, debouncedSearch, sortBy]);
+
+  // Бесконечный скролл: авто-подгрузка следующей страницы при достижении sentinel
+  useEffect(() => {
+    if (!hangoutsEnabled || !hasMore || loading || !sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setPage((p) => p + 1);
+        }
+      },
+      { rootMargin: "250px" },
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hangoutsEnabled, hasMore, loading, page, setPage]);
 
   const chips = useMemo(
     () => [{ key: null, label: t("hangout.filter.all_categories") }, ...HANGOUT_CATEGORIES.map((c) => ({ key: c as string, label: t(`hangout.category.${c}`) }))],
@@ -547,6 +805,26 @@ export default function HangoutsPage() {
                   {chip.label}
                 </button>
               ))}
+            </div>
+
+            <div className="px-1 flex items-center gap-2" data-testid="hangout-sort">
+              <label className="text-xs font-semibold text-muted-foreground">
+                {t("hangout.filter.sort")}
+              </label>
+              <div className="relative">
+                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground" />
+                <select
+                  data-testid="hangout-sort-select"
+                  value={sortBy}
+                  onChange={(e) => { setSortBy(e.target.value as HangoutSort); setPage(1); }}
+                  aria-label={t("hangout.filter.sort")}
+                  className="appearance-none rounded-full border border-muted bg-background text-xs font-bold text-muted-foreground pl-3 pr-7 py-1.5 hover:bg-muted/40 transition-colors"
+                >
+                  <option value="date">{t("hangout.sort.date")}</option>
+                  <option value="popularity">{t("hangout.sort.popularity")}</option>
+                  <option value="price">{t("hangout.sort.price")}</option>
+                </select>
+              </div>
             </div>
 
             <div className="px-1" data-testid="hangout-radius">
@@ -757,38 +1035,69 @@ export default function HangoutsPage() {
             </div>
 
             {loading ? (
-              <div className="flex items-center justify-center py-16">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+              <div className="space-y-3" data-testid="hangout-skeletons" aria-hidden="true">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <HangoutSkeletonCard key={`sk-${i}`} />
+                ))}
               </div>
             ) : items.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground" data-testid="hangouts-empty">
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground" data-testid="hangouts-empty">
                 <CalendarDays size={48} className="mb-4 opacity-30" />
-                <p>{t("hangout.empty")}</p>
+                <p className="text-sm">{t("hangout.empty")}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t("hangout.empty_desc")}</p>
+                <Button
+                  data-testid="hangouts-empty-reset"
+                  onClick={() => {
+                    setSearch("");
+                    setCategory(null);
+                    setHangoutType("all");
+                    setDateFilter("all");
+                    setSortBy("date");
+                    setPage(1);
+                    setDebouncedSearch("");
+                  }}
+                  variant="outline"
+                  className="mt-3 rounded-full font-bold text-xs"
+                >
+                  {t("hangout.empty_reset")}
+                </Button>
+                {goOutOffers && goOutOffers.length > 0 && (
+                  <Button
+                    data-testid="hangouts-empty-goout"
+                    onClick={() => document.getElementById("hangout-go-out")?.scrollIntoView({ behavior: "smooth" })}
+                    variant="ghost"
+                    className="mt-2 rounded-full font-bold text-xs"
+                  >
+                    {t("hangout.empty_goout")}
+                  </Button>
+                )}
                 <Button
                   data-testid="hangouts-empty-create"
                   onClick={() => navigate("/hangouts/create")}
-                  variant="outline"
-                  className="mt-4 rounded-full font-bold"
+                  className="mt-2 rounded-full font-bold"
                 >
                   <PlusCircle size={16} className="mr-1.5" />
                   {t("hangout.action.create")}
                 </Button>
               </div>
             ) : (
-              <div className="space-y-3">
-                {items.map((h) => (
-                  <HangoutCard key={h.id} hangout={h} />
+              <div className="space-y-6" role="list" aria-label={t("hangout.title")}>
+                {groupHangoutsByDate(items).map(([key, group]) => (
+                  <section key={key} role="listitem">
+                    <h3 className="sticky top-[64px] z-10 bg-background/95 backdrop-blur-sm py-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                      {hangoutGroupLabel(key, t)}
+                    </h3>
+                    <div className="space-y-3 mt-1.5">
+                      {group.map((h) => (
+                        <HangoutCard key={h.id} hangout={h} />
+                      ))}
+                    </div>
+                  </section>
                 ))}
                 {hasMore && (
-                  <Button
-                    data-testid="hangouts-load-more"
-                    variant="outline"
-                    className="w-full rounded-full font-bold"
-                    disabled={loading}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    {t("hangout.filter.load_more")}
-                  </Button>
+                  <div ref={sentinelRef} className="h-12 flex items-center justify-center" data-testid="hangout-sentinel">
+                    {loading && <Loader2 size={18} className="animate-spin text-muted-foreground" />}
+                  </div>
                 )}
               </div>
             )}

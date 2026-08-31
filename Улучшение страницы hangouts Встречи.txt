@@ -1,0 +1,430 @@
+На основе анализа текущего кода (этапы 80–88, план монетизации, файлы src/pages/hangouts.tsx, src/pages/hangout-detail.tsx, серверные роуты) и лучших практик дейтинговых приложений, предлагаю комплекс улучшений, разделённых по приоритетам.
+
+🔴 Высокий приоритет (улучшение конверсии и удержания)
+1. Карточки встреч — добавление «быстрых действий» без перехода на детальную страницу
+Проблема: сейчас карточка ведёт только на детальную страницу, что увеличивает число кликов для основных действий (отклик, лайк, покупка билета).
+
+Решение: добавить на карточку кнопки:
+
+«Откликнуться» (для Date-встреч) — сразу отправляет запрос на участие, без перехода.
+
+«Купить билет» (если есть цена) — запускает checkout прямо с ленты (уже есть кнопка, но она ведёт на детальную страницу? В коде hangouts.tsx есть блок с кнопкой «Купить» → POST /api/partners/order — нужно проверить, что она работает без перезагрузки).
+
+«Показать на карте» — открывает модалку с картой.
+
+Технически: добавить обработчики кликов на карточку с stopPropagation, чтобы не переходить на детальную страницу при клике на кнопку. Использовать мутации React Query для быстрого отклика.
+
+2. Улучшение фильтрации и поиска
+Текущее: есть поиск по тексту, фильтр по категориям, датам, радиусу, переключение Date/Company.
+
+Добавить:
+
+Фильтр по цене (бесплатные / платные / диапазон) — сейчас в ленте есть цена, но нет фильтра.
+
+Сортировка (по дате, по популярности, по близости) — в API уже есть сортировка по дате и бусту, но пользователь не может выбрать.
+
+Сохранение фильтров в URL (уже частично есть ?q=, ?page=, но не все параметры сохраняются). Расширить, чтобы можно было делиться ссылкой с фильтрами.
+
+Технически: обновить useEffect в hangouts.tsx, добавить параметры в searchParams и синхронизировать с состоянием.
+
+3. Улучшение пустого состояния и онбординга
+Текущее: есть CTA «Создать встречу», но для новых пользователей лента может быть пустой.
+
+Добавить:
+
+Рекомендации на основе интересов пользователя (если нет встреч рядом) — предложить создать свою или показать популярные встречи в других городах.
+
+Чек-лист для создания первой встречи (подсказки, как заполнить описание, выбрать категорию).
+
+Баннер с объяснением, что такое встречи и как они работают (особенно для Company-режима).
+
+4. Интеграция с картами (геолокация)
+Текущее: есть слайдер радиуса, но местоположение отображается только текстом.
+
+Добавить:
+
+Мини-карту на карточке встречи (или при наведении) с отображением точки на карте.
+
+Кнопка «Проложить маршрут» — открывает навигатор (Google/Apple Maps) с координатами встречи.
+
+Визуализация радиуса поиска на карте.
+
+Технически: использовать @react-google-maps/api или leaflet, добавить компонент карты в модалку или на детальную страницу.
+
+🟠 Средний приоритет (улучшение вовлечённости)
+5. Социальные сигналы и рейтинг
+Текущее: есть лайки, участники, отзывы (hangout_reviews), но они не отображаются в ленте.
+
+Добавить на карточку:
+
+Количество участников (для Company) и количество откликов (для Date).
+
+Рейтинг встречи (средняя оценка из отзывов) — отображать звёздами.
+
+Количество просмотров (можно добавить счётчик в БД) — показывает популярность.
+
+Технически: дополнить HANGOUT_LIST_SELECT в hangouts.js агрегатами (COUNT участников, AVG(review.rating)), обновить тип Hangout.
+
+6. Улучшение процесса создания встречи
+Текущее: форма с полями, выбор категории, даты, лимита участников.
+
+Добавить:
+
+Мастер создания (пошаговый) — для новых пользователей.
+
+Предзаполнение на основе профиля (город, интересы) — автоматически подставлять.
+
+Подсказки для описания (генерация с помощью AI, но уже есть AI-подбор, можно использовать для подсказок).
+
+Возможность добавить фото встречи (сейчас только текст) — расширить hangouts колонкой image_url.
+
+Технически: создать новый компонент HangoutWizard, использовать react-hook-form с валидацией.
+
+7. Уведомления и обратная связь в реальном времени
+Текущее: есть WS-уведомления о новых ответах, изменениях статуса.
+
+Улучшить:
+
+Тост при появлении новой встречи в ленте (если пользователь на странице) — через WS hangout:new.
+
+Индикатор обновления ленты (кнопка «Показать новые»).
+
+Push-уведомления о новых встречах в радиусе (использовать существующий push-механизм).
+
+Технически: добавить обработку WS-событий в hangouts.tsx (уже есть для моих встреч, но не для ленты).
+
+8. Улучшение блока «Куда пойти» (аффилиаты)
+Текущее: горизонтальный скролл карточек с офферами.
+
+Добавить:
+
+Фильтр по категории (рестораны, отели, цветы) прямо в блоке.
+
+Интеграция с картой для показа всех офферов на карте.
+
+Персонализация на основе истории посещений или интересов (можно использовать колонку city из профиля).
+
+Кнопка «Забронировать» прямо из карточки (сейчас переход по deeplink, можно сделать модалку бронирования).
+
+Технически: расширить GET /api/affiliate/offers параметрами фильтрации, добавить компонент AffiliateMap.
+
+🟡 Низкий приоритет (долгосрочное развитие)
+9. A/B-тестирование различных макетов
+В проекте уже есть фреймворк для экспериментов. Запустить тесты:
+
+Лента vs сетка (карточки в 2 колонки).
+
+Размер карточки (компактный / полный).
+
+Расположение кнопки «Купить билет».
+
+Использовать useExperiment для управления.
+
+10. Рекомендательная система на основе ML
+Использовать данные о взаимодействиях (лайки, просмотры, отклики) для построения персонализированной ленты.
+
+Начать с простого: сортировка по схожести интересов (уже есть в поиске) и по активности.
+
+11. Геймификация
+Добавить достижения за создание встреч, участие, получение отзывов.
+
+Показывать уровень пользователя (например, «Организатор», «Завсегдатай»).
+
+12. Встроенный чат для встреч
+Сейчас чат создаётся автоматически при accept. Можно добавить возможность написать организатору до подтверждения (как вопрос).
+
+🛠 Технические улучшения (производительность и стабильность)
+13. Оптимизация рендеринга списка
+Использовать react-window или react-virtualized для виртуализации длинного списка (если встреч > 50).
+
+Уже есть пагинация, но виртуализация улучшит скролл.
+
+14. Кэширование данных на клиенте
+Использовать staleTime и cacheTime в React Query для уменьшения запросов при переключении вкладок.
+
+Для списка встреч установить staleTime: 60_000 (1 минута).
+
+15. Улучшение SSR/SEO
+Страница /hangouts — динамическая, но можно добавить мета-теги для соцсетей (Open Graph) с помощью react-helmet-async.
+
+Для каждой встречи — отдельный OG-тег с картинкой и описанием.
+
+16. Мониторинг ошибок и производительности
+Добавить пользовательские метрики в Sentry (например, время загрузки ленты).
+
+Логировать неудачные попытки покупки билетов.
+
+📋 Чек-лист быстрых побед (можно реализовать за 1–2 дня)
+Добавить на карточки кнопки быстрых действий (лайк, отклик, купить билет) с тостами об успехе.
+
+Добавить фильтр по цене и сортировку (по дате, по популярности).
+
+Отображать рейтинг и количество участников на карточке.
+
+Интегрировать карту в детальную страницу (или модалку).
+
+Улучшить пустое состояние — добавить рекомендации и онбординг.
+
+Заключение
+Страница /hangouts уже функциональна и монетизирована, но её UX можно значительно улучшить, снизив порог входа для новых пользователей и повысив вовлечённость. Предложенные улучшения основаны на анализе кода и лучших практиках. Рекомендую начать с высокоприоритетных пунктов (быстрые действия, фильтры, карта), так как они напрямую влияют на конверсию. Средне- и низкоприоритетные можно внедрять в следующих релизах.
+
+
+
+На основе анализа предоставленных файлов (roadmap.md, Что доделать.txt, AGENTS.md), страница /hangouts уже находится в отличном состоянии: реализованы поиск, UX-улучшения (возраст, онлайн-статус, human-readable даты), платные билеты, спонсорские карточки, AI-подбор и аффилиат-блок.
+Однако, чтобы довести страницу до уровня production-ready SaaS (9.5/10), предлагаю следующие улучшения, разбитые по приоритетам. Все они соответствуют стеку (React 18, Tailwind, shadcn/ui, React Query v5) и правилам из AGENTS.md.
+🚀 1. Быстрые победы (UX/UI) — Высокий impact, низкие затраты
+А. Скелетоны загрузки (Skeleton Loading)
+Вместо спиннера при первичной загрузке или рефетче использовать скелетоны карточек. Это снижает воспринимаемое время загрузки.
+Где: src/pages/hangouts.tsx
+Как: Добавить компонент HangoutCardSkeleton (используя shadcn/ui Skeleton) и рендерить его массивом, пока isLoading в React Query.
+Б. Индикатор заполненности (Scarcity/Urgency)
+Для встреч с capacity показывать визуальный прогресс-бар или текст "Осталось X мест из Y". Это повышает конверсию в покупку билета или отклик.
+Где: HangoutCard в src/pages/hangouts.tsx
+Как:
+tsx
+
+12345678
+В. Кнопка "Поделиться" (Share)
+Добавить иконку "Share" в карточку встречи. На мобильных устройствах это вызовет нативный navigator.share, на десктопе — скопирует ссылку в буфер обмена.
+Где: HangoutCard actions
+Как:
+tsx
+
+123456789
+⚡ 2. Производительность и стабильность
+А. Бесконечный скролл (Infinite Scroll) вместо "Показать ещё"
+В этапе 48 реализована пагинация с кнопкой. Для мобильного UX (Capacitor) лучше использовать @tanstack/react-query useInfiniteQuery + IntersectionObserver.
+Где: src/pages/hangouts.tsx
+Как: Заменить page state на getNextPageParam в React Query. Добавить невидимый div с ref от useInView (из react-intersection-observer), который триггерит fetchNextPage().
+Б. Оптимистичный UI для действий (Respond / Join)
+При нажатии "Пойдем" или "Лайк" не ждать ответа сервера, а сразу обновить состояние карточки. В случае ошибки (409, 403) — откатить состояние и показать тост.
+Где: src/pages/hangout-detail.tsx или HangoutCard
+Как: Использовать onMutate и onError в useMutation из React Query v5 для обновления queryClient.setQueryData.
+В. Кэширование списков
+Убедиться, что запрос /api/hangouts имеет адекватные staleTime (например, 30-60 секунд), чтобы при переходе на детальную страницу и назад список не мигал и не делал лишний запрос.
+Где: Хук useQuery для списка встреч.
+Как: staleTime: 1000 * 30, gcTime: 1000 * 60 * 5.
+💎 3. Продуктовые фичи (Вовлечение)
+А. Аватарки участников ("Уже идут")
+Показывать мини-аватарки 2-3 пользователей, которые уже откликнулись или купили билет. Это социальное доказательство (Social Proof).
+Где: HangoutCard footer
+Как: Если API возвращает массив attendees (или можно сделать легкий JOIN на 3 user_id из hangout_tickets/responses), рендерить AvatarGroup (наложить аватарки друг на друга с -ml-2).
+Б. Умная сортировка по умолчанию
+Сейчас сортировка: pinned DESC, boosted DESC, event_date ASC.
+Добавить переключатель сортировки для пользователя: "Ближайшие", "Популярные (по числу откликов)", "Бесплатные сначала".
+Где: src/pages/hangouts.tsx (рядом с поиском)
+Как: Select из shadcn/ui, который меняет параметр ?sort_by=date|popularity|price в запросе.
+В. Контекстная пустая страница (Empty State)
+Если поиск ?q= или фильтры не дали результатов, показывать не просто "Ничего не найдено", а:
+Предложение сбросить фильтры.
+Ссылку на "Куда пойти вдвоём" (аффилиат-блок из этапа 91) как альтернативу.
+Кнопку "Создать свою встречу".
+🛡️ 4. Доступность (a11y) и QA (согласно AGENTS.md)
+Проверка ARIA: Убедиться, что все новые кнопки (купить билет, boost, share) имеют aria-label={t('hangout.action.buy_ticket')} и т.д.
+Клавиатурная навигация: Проверить, что карточки и кнопки внутри них фокусируются через Tab и активируются через Enter/Space.
+Error Boundary: Обернуть список встреч или отдельные карточки в <ErrorBoundary fallback={<... />}>, чтобы ошибка рендера одной карточки (например, из-за битых данных от API) не "уронила" всю страницу /hangouts (белый экран).
+Image loading="lazy": Убедиться, что все изображения (poster_url, offer_image_url) имеют атрибут loading="lazy" и decoding="async".
+📋 Рекомендуемый план действий (на 1-2 спринта)
+Шаг 1 (UX): Добавить Skeleton Loading и индикатор "Мало мест" в HangoutCard. (2-3 часа)
+Шаг 2 (Perf): Перевести пагинацию на useInfiniteQuery + Intersection Observer. (4-6 часов)
+Шаг 3 (Product): Добавить кнопку "Поделиться" и аватарки участников (если бэкенд уже отдает эти данные, иначе добавить легкий endpoint). (3-4 часа)
+Шаг 4 (QA): Прогнать Lighthouse Audit для /hangouts на мобильном размере (390px), исправить проблемы с a11y и контрастностью. (2 часа)
+Примечание: Перед внедрением любых изменений запустите npx vite build и npm run test (как требует Golden Rule из AGENTS.md), чтобы убедиться, что новые компоненты не ломают существующие 86/86 фронтенд-тестов.
+
+
+Страница /hangouts уже функционально насыщена (поиск, гео, билеты, буст, AI-идеи, affiliate-блок). Следующий уровень — UX-полировка: сократить cognitive load, ускорить perceived performance и сделать ленту «нативно-приложной».
+Вот 5 улучшений, которые не требуют новых API и закрываются на фронте за 1–2 этапа.
+1. Skeleton + Stagger-анимация карточек
+Проблема: спиннер в центре экрана убивает perceived performance.
+Решение: 3 skeleton-карточки вместо спиннера + stagger-вход реальных карточек через Framer Motion.
+Файлы: src/pages/hangouts.tsx, src/components/hangout-skeleton-card.tsx
+tsx
+// src/components/hangout-skeleton-card.tsx
+import { cn } from "@/lib/utils";
+
+export function HangoutSkeletonCard({ className }: { className?: string }) {
+  return (
+    <div className={cn("rounded-2xl border border-border bg-card p-4 space-y-3", className)}>
+      <div className="flex items-center gap-3">
+        <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
+        <div className="space-y-2">
+          <div className="h-4 w-24 rounded bg-muted animate-pulse" />
+          <div className="h-3 w-16 rounded bg-muted animate-pulse" />
+        </div>
+      </div>
+      <div className="h-4 w-3/4 rounded bg-muted animate-pulse" />
+      <div className="h-20 rounded-xl bg-muted animate-pulse" />
+      <div className="flex gap-2">
+        <div className="h-8 w-20 rounded-lg bg-muted animate-pulse" />
+        <div className="h-8 w-20 rounded-lg bg-muted animate-pulse" />
+      </div>
+    </div>
+  );
+}
+tsx
+// в hangouts.tsx — заменить {loading && <Spinner />} на:
+{loading && Array.from({ length: 3 }).map((_, i) => (
+  <HangoutSkeletonCard key={`sk-${i}`} />
+))}
+
+// вход карточек:
+import { motion, AnimatePresence } from "framer-motion";
+
+<AnimatePresence mode="popLayout">
+  {hangouts.map((h, i) => (
+    <motion.div
+      key={h.id}
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.3 }}
+      layout
+    >
+      <HangoutCard hangout={h} />
+    </motion.div>
+  ))}
+</AnimatePresence>
+2. Группировка по датам со sticky headers
+Проблема: лента — плоский список, сложно сканировать «что сегодня / завтра».
+Решение: группировка по дням с sticky-заголовками («Сегодня», «Завтра», «Понедельник, 1 сентября»).
+Файл: src/pages/hangouts.tsx + src/lib/hangouts.ts
+tsx
+// src/lib/hangouts.ts
+export function groupHangoutsByDate(hangouts: Hangout[]): [string, Hangout[]][] {
+  const map = new Map<string, Hangout[]>();
+  for (const h of hangouts) {
+    const key = formatDateKey(h.event_date); // "today" | "tomorrow" | "2026-09-01"
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(h);
+  }
+  return Array.from(map.entries());
+}
+
+export function formatDateGroupLabel(key: string, t: (k: string) => string): string {
+  if (key === "today") return t("hangout.group.today");
+  if (key === "tomorrow") return t("hangout.group.tomorrow");
+  return new Date(key).toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
+}
+tsx
+// в рендере:
+<div className="space-y-6">
+  {groups.map(([key, items]) => (
+    <section key={key}>
+      <h3 className="sticky top-[72px] z-10 bg-background/95 backdrop-blur-sm py-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+        {formatDateGroupLabel(key, t)}
+      </h3>
+      <div className="space-y-4 mt-2">
+        {items.map(h => <HangoutCard key={h.id} hangout={h} />)}
+      </div>
+    </section>
+  ))}
+</div>
+i18n: добавить hangout.group.today, hangout.group.tomorrow в language-context.tsx.
+3. Бесконечный скролл (Intersection Observer)
+Проблема: кнопка «Показать ещё» требует точного попадания пальцем.
+Решение: авто-подгрузка при приближении к низу + небольшой sentinel.
+Файл: src/pages/hangouts.tsx
+tsx
+const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+useEffect(() => {
+  if (!sentinelRef.current || !hasMore || loading) return;
+  const observer = new IntersectionObserver(
+    ([entry]) => { if (entry.isIntersecting) fetchNextPage(); },
+    { rootMargin: "200px" }
+  );
+  observer.observe(sentinelRef.current);
+  return () => observer.disconnect();
+}, [hasMore, loading, fetchNextPage]);
+
+// в JSX под списком:
+{hasMore && (
+  <div ref={sentinelRef} className="h-8 flex items-center justify-center">
+    {loadingNext && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+  </div>
+)}
+4. Синхронизация фильтров с URL
+Проблема: при обновлении страницы фильтры сбрасываются; нельзя поделиться ссылкой «встречи в Москве на завтра».
+Решение: useSearchParams из react-router-dom для q, category, date, radius.
+Файл: src/pages/hangouts.tsx
+tsx
+import { useSearchParams } from "react-router-dom";
+
+const [searchParams, setSearchParams] = useSearchParams();
+
+// при изменении фильтров:
+useEffect(() => {
+  const params = new URLSearchParams();
+  if (debouncedSearch) params.set("q", debouncedSearch);
+  if (category !== "all") params.set("category", category);
+  if (dateFilter !== "all") params.set("date", dateFilter);
+  if (radius > 0) params.set("radius", String(radius));
+  setSearchParams(params, { replace: true });
+}, [debouncedSearch, category, dateFilter, radius, setSearchParams]);
+
+// при маунте — читаем:
+useEffect(() => {
+  setSearch(searchParams.get("q") || "");
+  setCategory(searchParams.get("category") || "all");
+  setDateFilter(searchParams.get("date") || "all");
+  setRadius(Number(searchParams.get("radius") || 0));
+}, [searchParams]);
+5. Pull-to-refresh (мобильный паттерн)
+Проблема: на мобильном нет нативного жеста обновления.
+Решение: лёгкая реализация на touch-событиях + интеграция с TanStack Query refetch.
+Файл: src/pages/hangouts.tsx
+tsx
+const containerRef = useRef<HTMLDivElement>(null);
+const [pullY, setPullY] = useState(0);
+const startY = useRef(0);
+const isPulling = useRef(false);
+
+const onTouchStart = (e: React.TouchEvent) => {
+  if (containerRef.current && containerRef.current.scrollTop === 0) {
+    startY.current = e.touches[0].clientY;
+    isPulling.current = true;
+  }
+};
+
+const onTouchMove = (e: React.TouchEvent) => {
+  if (!isPulling.current) return;
+  const diff = e.touches[0].clientY - startY.current;
+  if (diff > 0 && diff < 120) setPullY(diff * 0.5);
+};
+
+const onTouchEnd = () => {
+  if (pullY > 60) {
+    refetch(); // TanStack Query
+  }
+  isPulling.current = false;
+  setPullY(0);
+};
+
+// в JSX:
+<div
+  ref={containerRef}
+  onTouchStart={onTouchStart}
+  onTouchMove={onTouchMove}
+  onTouchEnd={onTouchEnd}
+  style={{ transform: `translateY(${pullY}px)`, transition: isPulling.current ? "none" : "transform 0.2s" }}
+>
+  {pullY > 20 && (
+    <div className="flex justify-center py-2 text-muted-foreground text-sm">
+      {pullY > 60 ? t("hangout.pull.release") : t("hangout.pull.pull")}
+    </div>
+  )}
+  {/* список */}
+</div>
+i18n: hangout.pull.pull → «Потяните чтобы обновить», hangout.pull.release → «Отпустите для обновления».
+Бонус: Accessibility-шлифовка
+Добавьте на карточки:
+role="list" / role="listitem" для контейнера и карточек
+aria-label={t("hangout.card.aria", { title: h.title })} на кнопку-ссылку
+aria-live="polite" на блок «Нет встреч»
+Pre-flight Checklist (перед коммитом)
+[ ] npx vite build — 0 errors
+[ ] npm run test — front 86/86 (или сколько там сейчас) + новые тесты на groupHangoutsByDate и useSearchParams синхронизацию
+[ ] i18n: RU/EN parity для новых ключей (hangout.group.*, hangout.pull.*)
+[ ] Проверить на 390px (Playwright): sticky-заголовки не перекрывают фильтры, sentinel не вызывает двойной fetch
+[ ] Framer Motion layout — проверить, что при фильтрации карточки не «прыгают» резко
+Ожидаемый эффект: лента будет ощущаться как нативное приложение (Tinder / Meetup), а не как веб-страница с перезагрузками.

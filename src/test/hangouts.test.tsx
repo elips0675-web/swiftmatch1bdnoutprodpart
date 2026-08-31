@@ -162,28 +162,38 @@ describe("HangoutsPage", () => {
     })
   })
 
-  it("shows load more button and requests next page on click", async () => {
+  it("auto-loads next page when sentinel becomes visible (infinite scroll)", async () => {
     const baseItem = sampleHangouts[0]
     mockFetch.mockImplementation((url: string) => {
       const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
       const page = Number(new URLSearchParams(u.split("?")[1] || "").get("page") || 1)
-      const items = Array.from({ length: 20 }, (_, i) => ({ ...baseItem, id: i + 1 + (page - 1) * 100 }))
+      const count = page >= 2 ? 5 : 20
+      const items = Array.from({ length: count }, (_, i) => ({ ...baseItem, id: i + 1 + (page - 1) * 100 }))
       return Promise.resolve({ ok: true, json: () => Promise.resolve(items) })
     })
-    const HangoutsPage = (await import("@/pages/hangouts")).default
 
+    class AutoIO {
+      constructor(private cb: (entries: { isIntersecting: boolean }[]) => void) {}
+      observe() {
+        this.cb([{ isIntersecting: true }])
+      }
+      unobserve() {}
+      disconnect() {}
+      takeRecords() {
+        return []
+      }
+    }
+    ;(globalThis as any).IntersectionObserver = AutoIO
+
+    const HangoutsPage = (await import("@/pages/hangouts")).default
     renderPage(<HangoutsPage />)
 
-    await waitFor(() => {
-      expect(screen.getByTestId("hangouts-load-more")).toBeTruthy()
-    })
-
-    fireEvent.click(screen.getByTestId("hangouts-load-more"))
+    expect(screen.queryByTestId("hangouts-load-more")).toBeNull()
 
     await waitFor(() => {
       const calls = mockFetch.mock.calls.filter(([url]) => String(url).includes("/api/hangouts"))
-      const last = String(calls[calls.length - 1][0])
-      expect(last).toContain("page=2")
+      expect(String(calls[calls.length - 1][0])).toContain("page=2")
     })
   })
 

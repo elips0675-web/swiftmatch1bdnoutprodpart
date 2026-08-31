@@ -42,3 +42,18 @@ if (typeof globalThis.ResizeObserver === "undefined") {
   }
   globalThis.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
 }
+
+if (typeof globalThis.IntersectionObserver === "undefined") {
+  class IntersectionObserverMock {
+    readonly root = null;
+    readonly rootMargin = "";
+    readonly thresholds: ReadonlyArray<number> = [];
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  }
+  globalThis.IntersectionObserver = IntersectionObserverMock as unknown as typeof IntersectionObserver;
+}

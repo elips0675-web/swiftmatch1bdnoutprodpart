@@ -627,3 +627,36 @@
 - **Live-проверка** (localhost:3002): premium max_companions=12 → 200; free 12 → 400 COMPANIONS_LIMIT; premium boost → 200; второй буст → 409 BOOST_LIMIT; unboost → 200 и повторный буст другого → 200; free boost → 403 PREMIUM_REQUIRED; не-автор → 403 Not the author; feed[0]=забущенная с `boosted=1`. Тестовые встречи (150, 151) и временная подписка удалены.
 
 **Что дальше (P1):** событийная интеграция с ивент-организаторами (speed-dating, миксеры, мастер-классы → комиссия за билет 10–30%), затем P3 (AI-подбор мест, affiliate-офферы).
+
+## ✅ Этапы 94–97 (31.08.2026): Улучшение ленты /hangouts — quick actions, сортировка, infinite scroll, aggregates — ЗАКРЫТО
+
+Комплексное улучшение UX ленты встреч по плану из «Улучшение страницы hangouts Встречи.txt» (этапы 94–97 из 94–98, этап 98 отложен).
+
+- **Этап 94 — Quick actions на карточке** (`src/pages/hangouts.tsx`, HangoutCard):
+  - Кнопки «Откликнуться»/«Присоединиться» + «Нравится» — вызывают `POST /api/hangouts/:id/{respond,join,like}`; тосты на 200/401/402/409/ошибка. Кнопки disabled при `actionLoading` или `isFull`.
+  - Кнопка «Поделиться» — Web Share API (мобильные) или clipboard.writeText + toast `hangout.action.link_copied`.
+  - Бейдж рейтинга (★ + `Number(rating).toFixed(1)`) — `showRating = Number(hangout.rating) > 0` (mysql2 DECIMAL → строка, Number() конвертирует).
+  - Scarcity-индикатор — «Осталось N» (≤3 → оранжевый, =0 → красный + `hangout.label.sold_out`).
+  - Аватарки участников (`hangout.attendees`) — первые 3, `object-cover`, `-space-x-2` overlap.
+  - Компонент `hangout-skeleton-card.tsx` — скелетон для загрузки (3 штуки).
+  - `loading="lazy" decoding="async"` на аватаре автора.
+- **Этап 95 — Сортировка + URL sync** (`hangouts.tsx`):
+  - Селектор `hangout-sort-select` с тремя вариантами: date / popularity / price. Параметр `sort` в URL через `useSearchParams`.
+  - Эффект чтения фильтров из URL при монтировании + эффект записи. `sortBy` в deps загрузки. Сортировка popularity/price — client-side (после загрузки items).
+- **Этап 96 — Backend aggregates** (`server/src/routes/hangouts.js`):
+  - `HANGOUT_LIST_SELECT` добавлены: `rating` (ROUND AVG hangout_reviews), `review_count`, `attendees_csv` (GROUP_CONCAT первых 3 участников `user_id|display_name|avatar_url` через LIMIT 3 подзапрос).
+  - Функция `parseAttendees(row)` конвертирует `attendees_csv` → `attendees: Array<{user_id, display_name, avatar_url}>`, удаляет CSV-ключ. Применяется к feed, my, detail.
+  - Тип `Hangout` расширен: `rating?: number | null`, `review_count?: number | null`, `attendees?: Array<{user_id; display_name?; avatar_url?}>`.
+- **Этап 97 — Infinite scroll + скелетоны + группировка** (`hangouts.tsx`):
+  - Бесконечный скролл через `IntersectionObserver` (sentinel `hangout-sentinel`, rootMargin 250px). `hasMore` = `items.length >= PAGE_LIMIT`. Кнопка «Показать ещё» удалена.
+  - Скелетоны `HangoutSkeletonCard` (3 шт) вместо спиннера при первой загрузке.
+  - Группировка `groupHangoutsByDate` — сегодня/завтра/неделя/дата → sticky-заголовки `top-[64px]` с `bg-background/95 backdrop-blur-sm`.
+  - Улучшенное пустое состояние: `hangout.empty_desc`, кнопки `hangout-empty-reset` (сброс фильтров) + `hangout-empty-goout` (скролл к блоку «Куда пойти») + «Создать встречу».
+- **i18n** (`src/context/language-context.tsx`, RU+EN): 24 новых ключей `hangout.group.today/tomorrow`, `hangout.sort.date/popularity/price`, `hangout.filter.sort`, `hangout.action.share/link_copied/liked/responded/joined/already/payment_required/auth_required/error/attend_full`, `hangout.label.remaining/sold_out/rating`, `hangout.empty_desc/empty_reset/empty_goout`.
+- **Тесты**:
+  - `src/test/setup.ts`: добавлен mock `IntersectionObserver` (observe/disconnect/takeRecords).
+  - `src/test/hangouts.test.tsx`: тест load-more заменён на infinite scroll (AutoIO класс с автоматическим `cb([{isIntersecting:true}])` в `observe`, mockFetch возвращает 20 на page1 и 5 на page2 → `hasMore=false`).
+  - **server 366/366**, **front 86/86**, lint 0 errors, `vite build` OK.
+- **DOM (Playwright 390px):** селектор сортировки присутствует, все 4 карточки в bounds 390px (overflow=0), action buttons на каждой (respond + like + share), rating badge на карточке id=4 (rating=4.5), scarcity/remaining badge, attendees avatars, group headings sticky («среда, 2 сентября»/«пятница, 4 сентября»), sentinel absent при <20 записей, sort=popularity в URL.
+
+**Что дальше (этап 98, отложен):** WebSocket real-time для ленты (новые встречи появляются в реальном времени через `hangout:new` event) + touch-оптимизации (virtualized list при >50 карточек).
