@@ -710,4 +710,16 @@
   - Итог (390px): первая карточка top≈988→887 (блок фильтров компактнее ~на 100px).
 - **Проверки**: tsc 0, lint 0 errors, tests 14/14, `vite build` OK. DOM (Playwright 390/768/1440px): go-out карточки в bounds, snap работает; страничного overflow нет.
 
-Следующие кандидаты (не блокируют): virtualized-лист при >50 карточек, мини-карта + «Проложить маршрут» (этап 100), мастер создания встречи + предзаполнение (этап 101).
+
+## ✅ Этап 100 (31.08.2026): мини-карта + «Проложить маршрут» — ЗАКРЫТО
+
+Пункт 🔴 #4 плана (навигация к месту встречи) без API-ключей и доп. зависимостей:
+
+- **Две кнопки на каждой карточке** (HangoutCard в hangouts.tsx), показываются если есть lat/lng **или** название места:
+  - **«Маршрут»** (hangout-route-<id>) — Google Maps dir/?api=1&destination=<coords|название> в новой вкладке (нативный навигатор; без координат — поиск по названию).
+  - **«На карте»** (hangout-map-<id>) — модалка Dialog с мини-картой через **OpenStreetMap embed iframe** (без ключей): marker=lat,lng+bbox если есть координаты, иначе q=название. В модалке дублируется «Маршрут» (hangout-route-modal-<id>) + заголовок места.
+- **Helper-функции:** hasCoords, placeLabel, mapEmbedSrc, openRoute/openMap (с preventDefault+stopPropagation — карточка обёрнута в Link).
+- **i18n (RU+EN):** 2 ключа hangout.map.route («Маршрут»/«Route»), hangout.map.view («На карте»/«Map»).
+- **Тест:** фронт +1 (рендер кнопок hangout-map-1/hangout-route-1, клик → модалка hangout-route-modal-1, iframe src openstreetmap.org/export/embed.html + marker=55.751244). **front 88→89/89, server 363/363, tsc/lint 0 errors, ite build OK.** Live (390px): у demo lat/lng=null → OSM фолбэк на q=название («Aurora Cinema, Moscow»), обе кнопки и модалка работают.
+
+Следующие кандидаты (не блокируют): virtualized-лист при >50 карточек (этап 101), мастер создания встречи + предзаполнение из профиля (этап 102).

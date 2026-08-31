@@ -103,6 +103,8 @@ const sampleHangouts = [
     display_name: "Максим",
     avatar_url: null,
     accepted_count: 1,
+    lat: "55.751244",
+    lng: "37.618423",
   },
 ]
 
@@ -273,6 +275,32 @@ describe("HangoutsPage", () => {
       expect(last).toContain("price=paid")
       expect(last).toContain("max_price=1500")
     })
+  })
+
+  it("renders map 'show map' button and opens OSM modal", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(sampleHangouts) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+    renderPage(<HangoutsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-card-1")).toBeTruthy()
+    })
+
+    expect(screen.getByTestId("hangout-map-1")).toBeTruthy()
+    expect(screen.getByTestId("hangout-route-1")).toBeTruthy()
+
+    fireEvent.click(screen.getByTestId("hangout-map-1"))
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-route-modal-1")).toBeTruthy()
+    })
+    const iframe = screen.getByTitle(/Москва/)
+    expect(iframe.getAttribute("src")).toContain("openstreetmap.org/export/embed.html")
+    expect(iframe.getAttribute("src")).toContain("marker=55.751244")
   })
 
   it("shows disabled state when flag is off", async () => {

@@ -831,4 +831,20 @@
 - tsc 0, lint 0 errors (только 2 pre-existing warning fast-refresh у констант/типов), tests 14/14, `vite build` OK.
 - DOM (Playwright 390/768/1440px): go-out карточки в bounds, первая видна целиком, страничного H-overflow нет; шапка плотнее.
 
-Этапы 94–99 + UX-правки закрыты. Следующие кандидаты: virtualized-лист (>50 карточек, этап ~100), мини-карта + «Проложить маршрут», мастер создания встречи + предзаполнение.
+## Этап 100 (31.08.2026) — мини-карта + «Проложить маршрут» ✅
+
+Пункт 🔴 #4 плана: навигация к месту встречи + мини-карта без API-ключей и доп. зависимостей.
+
+- **Кнопка «Маршрут»** (`hangout-route-<id>`): `window.open('https://www.google.com/maps/dir/?api=1&destination=<coords|название>', '_blank', 'noopener')`. При отсутствии lat/lng — destination = google-search по `placeLabel` (place_name+place_address+city или title).
+- **Кнопка «На карте»** (`hangout-map-<id>`): открывает `Dialog` (shadcn) с мини-картой через **OpenStreetMap embed iframe** `https://www.openstreetmap.org/export/embed.html?...`:
+  - если есть координаты: `bbox=lng±0.004,lat±0.004&layer=mapnik&marker=lat,lng`;
+  - иначе: `q=<placeLabel>` (поиск по названию).
+  В модалке: заголовок места + iframe `aspect-[4/3]` + кнопка «Маршрут» (`hangout-route-modal-<id>`).
+- **Реализация:** в `HangoutCard` добавлены `lat=Number(hangout.lat)`, `lng`, `hasCoords`, `placeLabel`, `mapEmbedSrc`, `openRoute`, `openMap`, `const [showMap]`. Обе кнопки под блоком действий; рендерятся только если `hasCoords || place_name || city`. `preventDefault`+`stopPropagation` (карточка в `Link`).
+- **Imports:** `Navigation` в lucide; `Dialog, DialogContent, DialogHeader, DialogTitle` из ui/dialog.
+- **i18n (RU+EN):** `hangout.map.route` («Маршрут»/«Route»), `hangout.map.view` («На карте»/«Map»).
+- **Тест:** фронт +1 (`renders map ... and opens OSM modal`): sampleHangouts получил `lat:'55.751244', lng:'37.618423'`; проверка кнопок `hangout-map-1`/`hangout-route-1`, клик → `hangout-route-modal-1` видна, iframe src содержит `openstreetmap.org` и `marker=55.751244`.
+- **Проверки: front 88→89/89, server 363/363 (без изменений), tsc/lint 0 errors, `vite build` OK.**
+- **Live (390px):** у demo-встреч lat/lng=null → OSM iframe фолбэк `q=Aurora Cinema, Moscow`; обе кнопки и модалка работают, H-overflow нет.
+
+Этапы 100 завершён. Следующие кандидаты: virtualized-лист при >50 карточек (этап 101), мастер создания встречи + предзаполнение из профиля (этап 102).

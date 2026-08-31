@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLanguage } from "@/context/language-context";
 import { useFeatureFlags } from "@/context/feature-flags-context";
 import { usePremium } from "@/hooks/use-premium";
@@ -15,7 +16,7 @@ import { getToken } from "@/lib/token";
 import { useToast } from "@/components/ui/use-toast";
 import { HangoutSkeletonCard } from "@/components/hangout-skeleton-card";
 import { HANGOUT_CATEGORIES, formatEventDate, type Hangout, type HangoutType } from "@/lib/hangouts";
-import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X, Ticket, Zap, Utensils, BedDouble, Flower2, Car, Gift, ShoppingBag, HandCoins, Share, Star, Loader2, ChevronDown } from "lucide-react";
+import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X, Ticket, Zap, Utensils, BedDouble, Flower2, Car, Gift, ShoppingBag, HandCoins, Share, Star, Loader2, ChevronDown, Navigation } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const categoryIcon = (category: string) => {
@@ -262,6 +263,29 @@ function HangoutCard({ hangout }: { hangout: Hangout }) {
   const showScarcity = typeof hangout.capacity === "number" && Number(hangout.capacity) > 0;
   const showRating = Number(hangout.rating) > 0;
   const isAuthorCard = Boolean(hangout.is_author) || hangout.my_participant_status === "joined" || hangout.my_response_status === "accepted";
+  const [showMap, setShowMap] = useState(false);
+
+  const lat = Number(hangout.lat);
+  const lng = Number(hangout.lng);
+  const hasCoords = !isNaN(lat) && !isNaN(lng) && hangout.lat != null && hangout.lng != null;
+  const placeLabel = [hangout.place_name, hangout.place_address, hangout.city].filter(Boolean).join(", ") || hangout.title;
+
+  const mapEmbedSrc = hasCoords
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.004}%2C${lat - 0.004}%2C${lng + 0.004}%2C${lat + 0.004}&layer=mapnik&marker=${lat}%2C${lng}`
+    : `https://www.openstreetmap.org/export/embed.html?bbox=&layer=mapnik&q=${encodeURIComponent(placeLabel)}`;
+
+  const openRoute = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const dest = hasCoords ? `${lat},${lng}` : encodeURIComponent(placeLabel);
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest}`, "_blank", "noopener");
+  };
+
+  const openMap = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowMap(true);
+  };
 
   return (
     <Link to={`/hangouts/${hangout.id}`} className="block">
@@ -465,6 +489,61 @@ function HangoutCard({ hangout }: { hangout: Hangout }) {
             {t("hangout.action.like")}
           </button>
         </div>
+        {(hasCoords || hangout.place_name || hangout.city) && (
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              data-testid={`hangout-route-${hangout.id}`}
+              onClick={openRoute}
+              aria-label={t("hangout.map.route")}
+              className="flex-1 shrink-0 text-xs font-semibold rounded-full border border-muted bg-background text-muted-foreground px-3 py-1.5 hover:bg-muted/40 transition-colors inline-flex items-center justify-center gap-1"
+            >
+              <Navigation size={12} />
+              {t("hangout.map.route")}
+            </button>
+            <button
+              type="button"
+              data-testid={`hangout-map-${hangout.id}`}
+              onClick={openMap}
+              aria-label={t("hangout.map.view")}
+              className="flex-1 shrink-0 text-xs font-semibold rounded-full border border-muted bg-background text-muted-foreground px-3 py-1.5 hover:bg-muted/40 transition-colors inline-flex items-center justify-center gap-1"
+            >
+              <MapPin size={12} />
+              {t("hangout.map.view")}
+            </button>
+          </div>
+        )}
+        <Dialog open={showMap} onOpenChange={setShowMap}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-base">
+                <MapPin size={14} className="inline mr-1 -mt-0.5 text-primary" />
+                {placeLabel}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="overflow-hidden rounded-xl border border-muted aspect-[4/3] bg-muted/30">
+              <iframe
+                title={placeLabel}
+                src={mapEmbedSrc}
+                loading="lazy"
+                className="h-full w-full border-0"
+              />
+            </div>
+            <div className="flex justify-center">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                data-testid={`hangout-route-modal-${hangout.id}`}
+                onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${hasCoords ? `${lat},${lng}` : encodeURIComponent(placeLabel)}`, "_blank", "noopener")}
+                className="rounded-full"
+              >
+                <Navigation size={12} className="mr-1" />
+                {t("hangout.map.route")}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </Card>
     </Link>
   );
