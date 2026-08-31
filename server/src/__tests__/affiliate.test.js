@@ -54,6 +54,21 @@ describe('GET /api/affiliate/offers', () => {
     expect(sql).toContain('po.status = \'active\'')
   })
 
+  it('passes category filter into query params', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    await request(app).get('/api/affiliate/offers?category=restaurant')
+    const [sql, params] = pool.query.mock.calls[0]
+    expect(params).toContain('restaurant')
+    expect(sql).toContain('po.category = ?')
+  })
+
+  it('ignores unknown category filter (no WHERE category clause)', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    await request(app).get('/api/affiliate/offers?category=unknown')
+    const [sql] = pool.query.mock.calls[0]
+    expect(sql).not.toContain('po.category = ?')
+  })
+
   it('handles error with 500', async () => {
     pool.query.mockRejectedValueOnce(new Error('boom'))
     const res = await request(app).get('/api/affiliate/offers')

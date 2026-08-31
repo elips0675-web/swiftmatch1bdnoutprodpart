@@ -892,4 +892,19 @@
 - **Live-WS перепроверка ограничена средой**: free-юзер admin@mail.ru упёрся в `HANGOUT_DAILY_LIMIT` (1/день; сбрасывал удалением сегодняшних встреч id 9/10/11/12 из БД); WS подключается на `ws://localhost:8081/?token=...` (Vite прокси на 3002) — бейдж в этом прогоне не успел появиться (механика бейджа уже live-подтверждена в этапе 98; изменение — только расширение payload + радиус-фильтр, покрыто тестами).
 - **Внимание для след. сессий:** создание live-встреч у free-юзеров упирается в дневной лимит — для тестов освобождать лимит удалением `hangouts WHERE user_id=? AND created_at >= CURDATE()`, либо тестить под premium-аккаунтом.
 
-Этапы 100–103 закрыты. Следующие кандидаты: улучшение аффилиат-блока (🟠 #8), pull-to-refresh + stagger-анимация, оптимистичный UI respond/join, чип «все» в категориях.
+## Этап 104 (31.08.2026) — улучшение блока «Куда пойти» (аффилиаты) ✅
+
+Пункт 🟠 #8 плана. Реализовано 4 подпункта + расширен бэкенд.
+
+- **Сервер** `server/src/routes/affiliate.js`: `GET /api/affiliate/offers` принимает `category` (+`po.category=?`; неизвестная категория — без WHERE, т.е. игнор). В ответ добавлены `lat`/`lng` (из `partner_offers`; в демо-данных null — карта по городу). `maxCount` до 12.
+- **`src/lib/go-out.ts`** (новая): `GO_OUT_ICONS`, `GO_OUT_COLORS` (вынесены из hangouts.tsx — снимает дублирование, используются в карточках и модалках).
+- **`src/components/hangout-go-out.tsx`** (новая): `GoOutOffer`-тип (расширен `lat/lng/image_url`), `fillDeeplink(...)` (подстановка `{city}/{lat}/{lng}`), `GoOutBookingDialog` (restaurant — /api/partners/booking + deeplink; иначе переход к партнёру), `AffiliateMap` (OSM embed: bbox+marker при координатах, иначе `q=<city>`; список офферов под картой).
+- **`src/pages/hangouts.tsx`**: state `goOutFilter/goOutCity/goOutBooking/goOutMapOpen`; эффект city из `GET /api/profile/me`; offers-fetch с `limit=12&city&category`, deps `[hangoutsEnabled, goOutCity, goOutFilter]`; чип-ряд `hangout-go-out-filter-*`; кнопка «На карте» `hangout-go-out-map`; кнопка «Забронировать» `hangout-go-out-book-<id>` (preventDefault/stopPropagation — карточка осталась `<a href=deeplink target=_blank>`); модалки рендерятся перед `</div>`; `id="hangout-go-out"` (чинит empty-state scroll по getElementById).
+- **i18n** (language-context.tsx RU+EN): `hangout.go_out.map`, `.book`, `.filter_all`, `.cat_restaurant/.cat_hotel/.cat_flowers/.cat_taxi/.cat_gift`, `.map_title`, `.map_hint`.
+- **Тесты:**
+  - server `affiliate.test.js` +2: category-фильтр в SQL/params; игнор неизвестной категории (нет po.category=?); **server 370→372/372**.
+  - front `hangouts.test.tsx` +3: чип-фильтр (клич RESTAURANT → запрос с category=restaurant), модалка брони (поля date + POST /api/partners/booking c offer_id), модалка карты (`affiliate-map-frame` + item). `mockTranslations` дополнен go_out/booking ключами. **front 93→96/96**. tsc 0, lint 0 errors, `vite build` OK.
+- **Live:** сервер был запущен `node src/index.js` без watch → НЕ подхватывал изменения (категория-фильтр/ lat/lng отсутствовали). Перезапущен как `node --watch src/index.js` (`Start-Process`, PID 4388). Проверка на 3002: `?category=restaurant` → 3 оффера (все restaurant), `lat/lng` в ответе есть. UI (390px, 8081): блок, 6 чипов, 12 кнопок брони, модалка карты (iframe) открывается. Примечание: live-клик брони в скрипте упёрся в открытую поверх модалку карты — это артефакт скрипта (Escape на iframe не закрыл Radix), НЕ баг; модалка брони покрыта unit-тестом.
+- **Напоминание:** теперь бэкенд работает под `node --watch` — при следующем рестарте использовать `node --watch src/index.js` (или `npm run dev` в server).
+
+Этапы 100–104 закрыты. Следующие кандидаты: pull-to-refresh + stagger-анимация, оптимистичный UI respond/join, чип «все» в категориях, бейдж-счётчики на чипах «Куда пойти».

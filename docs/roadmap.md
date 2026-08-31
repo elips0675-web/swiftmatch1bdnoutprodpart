@@ -271,6 +271,19 @@ P2: снятие/поднятие лимита ежедневных встреч
 - **Тесты:** серверный emit-тест дополнен (`lat: 55.75, lng: 37.62` в payload — `objectContaining`); фронтовый unit-тест `haversineKm` (Екатеринбург→Москва ~1200–1600 км, совпадение координат ≈0). **server 363→370/370, front 92→93/93, tsc/lint 0 errors, `vite build` OK.** Примечание: live-WS-перепроверка в этой сессии ограничена средой (daily-лимит free + прокси WS 8081/3002); механика бейджа уже live-подтверждена в этапе 98, изменение — только расширение payload (безвредно) + радиус-фильтр (покрыт тестами).
 - **Внешние хвосты:** нативный FCM-push (Capacitor) — требует staging VPS, google-services.json/APNs-ключи, домен+SSL; зарегистрирован в «Плановых хвостах».
 
+## Этап 104 (31.08.2026) — Улучшение блока «Куда пойти» (аффилиаты) ✅
+
+Пункт 🟠 #8 плана. Реализованы 4 направления + расширен бэкенд:
+
+- **Сервер (`server/src/routes/affiliate.js`):** `GET /api/affiliate/offers` теперь принимает `category` (single-фильтр; неизвестное значение игнорируется — WHERE-category не добавляется). В ответ добавлены `lat`/`lng` из `partner_offers` (для будущей карты с маркерами; в демо-данных null). `limit` до 12 (клиент запрашивает 12, чтобы под фильтр был контент).
+- **Фильтр по категории** (`hangouts.tsx`): под заголовком блока — чип-ряд «Все» + категории из фактических офферов (`hangout-go-out-filter-<cat>`), клик перезапрашивает `/api/affiliate/offers?category=...`. Серверный тест +2 (category-фильтр, игнор неизвестной) — **server 370→372/372**.
+- **Персонализация по городу**: отдельный эффект получает `city` из `GET /api/profile/me` и передаёт его в offers (`city`-параметр уже был в роуте), а также подставляет плейсхолдеры `{city}`/`{lat}`/`{lng}` в аффилиатный deeplink (хелпер `fillDeeplink`).
+- **Карта всех офферов**: кнопка «На карте» (`hangout-go-out-map`) → модалка `AffiliateMap` (`src/components/hangout-go-out.tsx`) с OSM embed iframe (bbox+marker если есть координаты, иначе `q=<city>`; список офферов-ссылок ниже). Без react-leaflet (React 18 конфликт) — как этап 100.
+- **Кнопка «Забронировать»** (`hangout-go-out-book-<id>`): модалка `GoOutBookingDialog`. Для `restaurant` — дата/время/гости → `POST /api/partners/booking` → открыть deeplink; для остальных категорий — инфо-карточка + переход к партнёру. Карточка осталась `<a>` (deeplink, `target=_blank`), кнопка через preventDefault/stopPropagation — не ломает существующий тест.
+- **Рефактор**: иконки/цвета вынесены в `src/lib/go-out.ts` (GO_OUT_ICONS/GO_OUT_COLORS, используются и в `hangouts.tsx`, и в модалках). Новые i18n-ключи RU+EN: `hangout.go_out.map/book/filter_all/cat_*`/map_title/map_hint. Добавлен `id="hangout-go-out"` (чинит scroll empty-state).
+- **Тесты:** front +3 (чип-фильтр, модалка брони, модалка карты) — **front 93→96/96**; tsc/lint 0 errors; `vite build` OK. Live: сервер перезапущен `node --watch` (был без watch — стейл), бэкенд-проверка подтвердила category-фильтр и lat/lng; UI-проверка — чипы/кнопки/карта рендерятся.
+- **Хвосты:** у партнёрских офферов пока нет координат (lat/lng null) — карта использует город; наполнение координат и фильтр-бейдж на чипах — в долгосрочных.
+
 ## Плановые хвосты (не блокируют)
 
 - Внешние блокеры (не код): staging VPS + docker compose up, реальные ключи в `.env`, домен + SSL + Google Play, k6 100 VU на staging, UptimeRobot/Grafana-алерты.

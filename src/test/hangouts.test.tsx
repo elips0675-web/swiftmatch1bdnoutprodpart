@@ -55,6 +55,19 @@ const mockTranslations: Record<string, string> = {
   "hangout.empty_my_responses": "Вы пока никуда не откликались",
   "hangout.go_out.title": "Куда пойти вдвоём",
   "hangout.go_out.cashback": "кэшбэк {pct}%",
+  "hangout.go_out.map": "На карте",
+  "hangout.go_out.book": "Забронировать",
+  "hangout.go_out.filter_all": "Все",
+  "hangout.go_out.cat_restaurant": "Рестораны",
+  "hangout.go_out.cat_hotel": "Отели",
+  "hangout.go_out.map_title": "Где найти",
+  "hangout.go_out.map_hint": "Показываем карту вашего города — выберите место, чтобы открыть партнёра",
+  "partner.booking.date": "Дата",
+  "partner.booking.time": "Время",
+  "partner.booking.guests": "Гости",
+  "partner.booking.confirm": "Забронировать",
+  "partner.booking.fill_required": "Выберите дату и время",
+  "partner.booking.error": "Не удалось забронировать",
   "hangout.suggest.upsell_title": "Идеи для пары — Premium",
   "hangout.suggest.go_premium": "Стать Premium",
   "hangout.suggest.title": "Идеи для пары",
@@ -367,6 +380,86 @@ describe("HangoutsPage", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("hangout-go-out")).toBeNull()
     })
+  })
+
+  it("renders category filter chips and calls backend with category param", async () => {
+    const offers = [
+      { id: 28, category: "restaurant", title: "Ресторан для первого свидания", deeplink: "https://go/x", price: 2500, city: "Москва", partner_name: "Restoclub", commission_rate: 12 },
+      { id: 30, category: "flowers", title: "Цветы к свиданию", deeplink: "https://go/y", price: 1500, city: "Москва", partner_name: "Flowwow", commission_rate: 15 },
+    ]
+    const seen: string[] = []
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) {
+        seen.push(u)
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers }) })
+      }
+      if (u.includes("/api/profile/me")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ city: "Москва" }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+    renderPage(<HangoutsPage />)
+    await waitFor(() => expect(screen.getByTestId("hangout-go-out")).toBeTruthy())
+
+    const allChip = screen.getByTestId("hangout-go-out-filter-all")
+    const restChip = screen.getByTestId("hangout-go-out-filter-restaurant")
+    expect(allChip).toBeTruthy()
+    expect(restChip).toBeTruthy()
+    expect(screen.getByText("Рестораны")).toBeTruthy()
+
+    fireEvent.click(restChip)
+    await waitFor(() => {
+      expect(seen.some((u) => u.includes("category=restaurant"))).toBe(true)
+    })
+  })
+
+  it("opens booking dialog from card «Забронировать» button", async () => {
+    const offers = [
+      { id: 28, category: "restaurant", title: "Ресторан для первого свидания", deeplink: "https://go/x", price: 2500, city: "Москва", partner_name: "Restoclub", commission_rate: 12 },
+    ]
+    const bookingCalls: any[] = []
+    mockFetch.mockImplementation((url: string, opts?: any) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers }) })
+      if (u.includes("/api/profile/me")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ city: "Москва" }) })
+      if (u.includes("/api/partners/booking")) {
+        bookingCalls.push({ url: u, body: JSON.parse(opts?.body || "{}") })
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ deeplink: "https://go/x?date=2026-09-01&time=19:00&guests=2", offer_id: 28 }) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+    renderPage(<HangoutsPage />)
+    await waitFor(() => expect(screen.getByTestId("hangout-go-out")).toBeTruthy())
+
+    fireEvent.click(screen.getByTestId("hangout-go-out-book-28"))
+    await waitFor(() => expect(screen.getByTestId("goout-booking-date")).toBeTruthy())
+
+    fireEvent.change(screen.getByTestId("goout-booking-date"), { target: { value: "2026-09-01" } })
+    fireEvent.click(screen.getByTestId("goout-booking-confirm"))
+    await waitFor(() => {
+      expect(bookingCalls.length).toBeGreaterThan(0)
+      expect(bookingCalls[0].body.offer_id).toBe(28)
+    })
+  })
+
+  it("opens affiliate map from «На карте» button", async () => {
+    const offers = [
+      { id: 28, category: "restaurant", title: "Ресторан для первого свидания", deeplink: "https://go/x", price: 2500, city: "Москва", partner_name: "Restoclub", commission_rate: 12 },
+    ]
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers }) })
+      if (u.includes("/api/profile/me")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ city: "Москва" }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+    renderPage(<HangoutsPage />)
+    await waitFor(() => expect(screen.getByTestId("hangout-go-out")).toBeTruthy())
+
+    fireEvent.click(screen.getByTestId("hangout-go-out-map"))
+    await waitFor(() => expect(screen.getByTestId("affiliate-map-frame")).toBeTruthy())
+    expect(screen.getByTestId("affiliate-map-item-28")).toBeTruthy()
   })
 
   it("shows premium upsell for free users and navigates to /premium", async () => {

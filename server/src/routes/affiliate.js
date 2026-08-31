@@ -17,6 +17,9 @@ const AFFILIATE_CATEGORIES = ['restaurant', 'hotel', 'flowers', 'taxi', 'gift']
  *         name: city
  *         schema: { type: string }
  *       - in: query
+ *         name: category
+ *         schema: { type: string }
+ *       - in: query
  *         name: limit
  *         schema: { type: integer }
  *     responses:
@@ -25,13 +28,13 @@ const AFFILIATE_CATEGORIES = ['restaurant', 'hotel', 'flowers', 'taxi', 'gift']
  */
 router.get('/api/affiliate/offers', async (req, res) => {
   try {
-    const { city, limit } = req.query
+    const { city, category, limit } = req.query
     const maxCount = Math.min(Math.max(Number(limit) || 6, 1), 12)
 
     const placeholders = AFFILIATE_CATEGORIES.map(() => '?').join(',')
     const base = `
       SELECT po.id, po.partner_id, po.category, po.title, po.description,
-             po.image_url, po.deeplink, po.price, po.city,
+             po.image_url, po.deeplink, po.price, po.city, po.lat, po.lng,
              p.name AS partner_name, p.commission_rate
       FROM partner_offers po
       JOIN partners p ON p.id = po.partner_id
@@ -41,13 +44,19 @@ router.get('/api/affiliate/offers', async (req, res) => {
         AND (po.valid_to IS NULL OR po.valid_to >= CURDATE())
     `
     const params = [...AFFILIATE_CATEGORIES]
+    if (category && AFFILIATE_CATEGORIES.includes(String(category))) {
+      params.push(String(category))
+    }
+    const whereCategory = category && AFFILIATE_CATEGORIES.includes(String(category))
+      ? ` AND po.category = ?`
+      : ''
     const whereCity = city
       ? ` AND po.city = ?`
       : ''
     if (city) params.push(city)
 
     const [rows] = await pool.query(
-      `${base}${whereCity}
+      `${base}${whereCategory}${whereCity}
        GROUP BY po.id
        ORDER BY (po.pinned = 1) DESC, po.created_at DESC
        LIMIT ?`,
@@ -64,6 +73,8 @@ router.get('/api/affiliate/offers', async (req, res) => {
       deeplink: o.deeplink,
       price: o.price === null ? null : Number(o.price),
       city: o.city,
+      lat: o.lat == null ? null : Number(o.lat),
+      lng: o.lng == null ? null : Number(o.lng),
       partner_name: o.partner_name,
       commission_rate: o.commission_rate === null ? null : Number(o.commission_rate),
     }))

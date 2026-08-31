@@ -759,4 +759,17 @@
 - **Тесты:** server emit-тест дополнен lat/lng; front unit `haversineKm`. **server 363→370/370, front 92→93/93, tsc/lint 0, `vite build` OK.** Live-WS перепроверка ограничена средой (free daily-лимит + WS-прокси 8081/3002); механика бейджа live-подтверждена в 98.
 - **Хвосты:** нативный FCM (Capacitor) — staging VPS + google-services/APNs + SSL.
 
-Следующие кандидаты (не блокируют): улучшение аффилиат-блока (🟠 #8), pull-to-refresh + stagger-анимация, оптимистичный UI respond/join, чип «все» в категориях.
+## ✅ Этап 104 (31.08.2026): улучшение блока «Куда пойти» (аффилиаты) — ЗАКРЫТО
+
+Пункт 🟠 #8 плана. 4 направления + бэкенд.
+
+- **Сервер** (`server/src/routes/affiliate.js`): `GET /api/affiliate/offers` + параметр `category` (single-фильтр, неизвестное игнорируется); в ответ добавлены `lat`/`lng` (в демо null); `limit` до 12.
+- **Фильтр по категории** (`hangouts.tsx`): чип-ряд «Все» + категории из фактических офферов (`hangout-go-out-filter-<cat>`), клик перезапрашивает с `category=`.
+- **Персонализация по городу**: `city` из `GET /api/profile/me` → в offers (`city`-параметр) + подстановка плейсхолдеров `{city}/{lat}/{lng}` в deeplink (`fillDeeplink`).
+- **Карта**: кнопка «На карте» → `AffiliateMap` (OSM embed, bbox+marker если есть координаты, иначе `q=<city>`, список офферов).
+- **Забронировать**: `GoOutBookingDialog` — `restaurant` → дата/время/гости → `POST /api/partners/booking` → deeplink; остальные → переход к партнёру. Карточка осталась `<a>` (deeplink, `_blank`), кнопка preventDefault — тест сохранён.
+- **Рефактор**: `src/lib/go-out.ts` (GO_OUT_ICONS/COLORS), i18n RU+EN `hangout.go_out.map/book/filter_all/cat_*/map_title/map_hint`, `id="hangout-go-out"` (чинит empty-state scroll).
+- **Тесты:** server 370→**372/372** (+2 category), front 93→**96/96** (+3: фильтр/бронь/карта), tsc/lint 0, `vite build` OK. Live: бэкенд перезапущен `node --watch` (был стейл — не подхватывал изменения), category-фильтр и lat/lng подтверждены на 3002.
+- **Хвосты:** координаты у офферов пока null (карта по городу); бейдж-кол-во на чипах — в долгосрочных.
+
+Следующие кандидаты (не блокируют): pull-to-refresh + stagger-анимация, оптимистичный UI respond/join, чип «все» в категориях, бейдж-счётчики на чипах «Куда пойти».

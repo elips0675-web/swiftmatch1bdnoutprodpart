@@ -16,8 +16,10 @@ import { getToken } from "@/lib/token";
 import { useToast } from "@/components/ui/use-toast";
 import { HangoutSkeletonCard } from "@/components/hangout-skeleton-card";
 import { HANGOUT_CATEGORIES, formatEventDate, type Hangout, type HangoutType } from "@/lib/hangouts";
-import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X, Ticket, Zap, Utensils, BedDouble, Flower2, Car, Gift, ShoppingBag, HandCoins, Share, Star, Loader2, ChevronDown, Navigation } from "lucide-react";
+import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X, Ticket, Zap, Utensils, BedDouble, Flower2, Car, Gift, ShoppingBag, HandCoins, Share, Star, Loader2, ChevronDown, Navigation, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { GO_OUT_ICONS, GO_OUT_COLORS } from "@/lib/go-out";
+import { GoOutBookingDialog, AffiliateMap, fillDeeplink, type GoOutOffer } from "@/components/hangout-go-out";
 
 export const categoryIcon = (category: string) => {
   const map: Record<string, React.ElementType> = {
@@ -53,36 +55,6 @@ export function haversineKm(aLat: number, aLng: number, bLat: number, bLng: numb
     Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
   return 2 * R * Math.asin(Math.sqrt(s));
 }
-
-type GoOutOffer = {
-  id: number;
-  category: string;
-  title: string;
-  description?: string;
-  deeplink: string;
-  price?: number | null;
-  city?: string | null;
-  partner_name?: string;
-  commission_rate?: number | null;
-};
-
-const GO_OUT_ICONS: Record<string, React.ElementType> = {
-  restaurant: Utensils,
-  cafe: Utensils,
-  hotel: BedDouble,
-  flowers: Flower2,
-  taxi: Car,
-  gift: ShoppingBag,
-};
-
-const GO_OUT_COLORS: Record<string, string> = {
-  restaurant: "bg-orange-100 text-orange-700",
-  cafe: "bg-orange-100 text-orange-700",
-  hotel: "bg-indigo-100 text-indigo-700",
-  flowers: "bg-pink-100 text-pink-700",
-  taxi: "bg-sky-100 text-sky-700",
-  gift: "bg-amber-100 text-amber-700",
-};
 
 export type HangoutDateFilter = "all" | "today" | "tomorrow" | "weekend";
 
@@ -585,6 +557,10 @@ export default function HangoutsPage() {
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [goOutOffers, setGoOutOffers] = useState<GoOutOffer[] | null>(null);
+  const [goOutFilter, setGoOutFilter] = useState<string>("all");
+  const [goOutCity, setGoOutCity] = useState<string>("");
+  const [goOutBooking, setGoOutBooking] = useState<GoOutOffer | null>(null);
+  const [goOutMapOpen, setGoOutMapOpen] = useState(false);
   const { isPremium } = usePremium();
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [suggestLoading, setSuggestLoading] = useState(false);
@@ -718,18 +694,36 @@ export default function HangoutsPage() {
     setSearchParams(params, { replace: true });
   }, [debouncedSearch, category, dateFilter, hangoutType, sortBy, priceFilter, priceMax, setSearchParams]);
 
+  // Персонализация блока «Куда пойти» по городу из профиля (этап 104)
   useEffect(() => {
     if (!hangoutsEnabled) return;
     let cancelled = false;
     const token = getToken();
-    fetch("/api/affiliate/offers?limit=4", {
+    if (!token) return;
+    fetch("/api/profile/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((me) => { if (!cancelled && me?.city) setGoOutCity(String(me.city)); })
+      .catch(() => { /* профиль недоступен — без персонализации */ });
+    return () => { cancelled = true; };
+  }, [hangoutsEnabled]);
+
+  useEffect(() => {
+    if (!hangoutsEnabled) return;
+    let cancelled = false;
+    const token = getToken();
+    const params = new URLSearchParams({ limit: "12" });
+    if (goOutCity) params.set("city", goOutCity);
+    if (goOutFilter && goOutFilter !== "all") params.set("category", goOutFilter);
+    fetch(`/api/affiliate/offers?${params.toString()}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => { if (!cancelled) setGoOutOffers((data?.offers as GoOutOffer[]) || []); })
       .catch(() => { if (!cancelled) setGoOutOffers([]); });
     return () => { cancelled = true; };
-  }, [hangoutsEnabled]);
+  }, [hangoutsEnabled, goOutCity, goOutFilter]);
 
   useEffect(() => {
     if (!hangoutsEnabled) { setLoading(false); return; }
@@ -1102,11 +1096,43 @@ export default function HangoutsPage() {
             </div>
 
             {goOutOffers && goOutOffers.length > 0 && (
-              <div data-testid="hangout-go-out" className="px-1">
+              <div data-testid="hangout-go-out" id="hangout-go-out" className="px-1">
                 <div className="flex items-center gap-1 mb-2">
                   <Compass size={14} className="text-primary" />
-                  <h3 className="text-sm font-bold">{t("hangout.go_out.title")}</h3>
+                  <h3 className="text-sm font-bold flex-1">{t("hangout.go_out.title")}</h3>
+                  <button
+                    type="button"
+                    data-testid="hangout-go-out-map"
+                    onClick={() => setGoOutMapOpen(true)}
+                    className="inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full border border-muted text-muted-foreground hover:bg-muted/50"
+                  >
+                    <MapPin size={12} />
+                    {t("hangout.go_out.map")}
+                  </button>
                 </div>
+                {(() => {
+                  const cats = Array.from(new Set(goOutOffers.map((o) => o.category).filter(Boolean)));
+                  if (cats.length < 2) return null;
+                  return (
+                    <div className="flex gap-2 overflow-x-auto pb-1 mb-2 -mx-1 px-1" data-testid="hangout-go-out-filters">
+                      {["all", ...cats].map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          data-testid={`hangout-go-out-filter-${c}`}
+                          onClick={() => setGoOutFilter(c)}
+                          className={`shrink-0 text-xs font-bold px-3 py-1 rounded-full border transition-colors ${
+                            goOutFilter === c
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "border-muted text-muted-foreground"
+                          }`}
+                        >
+                          {c === "all" ? t("hangout.go_out.filter_all") : t(`hangout.go_out.cat_${c}`)}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
                 <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-1 -mx-1 px-1">
                   {goOutOffers.map((offer) => {
                     const Icon = GO_OUT_ICONS[offer.category] || MapPin;
@@ -1114,7 +1140,7 @@ export default function HangoutsPage() {
                     return (
                       <a
                         key={offer.id}
-                        href={offer.deeplink}
+                        href={fillDeeplink(offer.deeplink, goOutCity, offer)}
                         target="_blank"
                         rel="noopener noreferrer"
                         data-testid={`hangout-go-out-${offer.id}`}
@@ -1144,6 +1170,23 @@ export default function HangoutsPage() {
                             </span>
                           )}
                         </div>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          data-testid={`hangout-go-out-book-${offer.id}`}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setGoOutBooking(offer); }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setGoOutBooking(offer);
+                            }
+                          }}
+                          className="mt-2 inline-flex w-full items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold px-3 py-1.5"
+                        >
+                          <Ticket size={12} className="mr-1" />
+                          {t("hangout.go_out.book")}
+                        </span>
                       </a>
                     );
                   })}
@@ -1360,6 +1403,18 @@ export default function HangoutsPage() {
         )}
       </main>
       <BottomNav />
+      <GoOutBookingDialog
+        offer={goOutBooking}
+        city={goOutCity}
+        open={!!goOutBooking}
+        onOpenChange={(o) => { if (!o) setGoOutBooking(null); }}
+      />
+      <AffiliateMap
+        offers={goOutOffers || []}
+        city={goOutCity}
+        open={goOutMapOpen}
+        onOpenChange={setGoOutMapOpen}
+      />
     </div>
   );
 }
