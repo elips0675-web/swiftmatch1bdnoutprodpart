@@ -171,7 +171,7 @@ function parseAttendees(row) {
 
 // ─── Feed ──────────────────────────────────────────────────────
 router.get('/api/hangouts', optionalAuth, async (req, res) => {
-  const { category, type, lat, lng, radius, date_from, date_to, city, q } = req.query
+  const { category, type, lat, lng, radius, date_from, date_to, city, q, price, min_price, max_price } = req.query
   const page = Math.max(Number(req.query.page) || 1, 1)
   const limit = parseLimit(req.query.limit)
   const offset = (page - 1) * limit
@@ -197,6 +197,22 @@ router.get('/api/hangouts', optionalAuth, async (req, res) => {
     if (city) {
       where.push('h.city = ?')
       params.push(String(city).slice(0, 100))
+    }
+    const priceParam = String(price || '')
+    if (priceParam === 'free') {
+      where.push('(h.price IS NULL OR h.price = 0)')
+    } else if (priceParam === 'paid') {
+      where.push('(h.price IS NOT NULL AND h.price > 0)')
+    }
+    const minPrice = Number(min_price)
+    if (priceParam === 'paid' && !isNaN(minPrice) && minPrice >= 0) {
+      where.push('h.price >= ?')
+      params.push(minPrice)
+    }
+    const maxPrice = Number(max_price)
+    if (priceParam === 'paid' && !isNaN(maxPrice) && maxPrice > 0) {
+      where.push('h.price <= ?')
+      params.push(maxPrice)
     }
     if (date_from) {
       where.push('h.event_date >= ?')

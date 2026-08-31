@@ -240,6 +240,41 @@ describe("HangoutsPage", () => {
     })
   })
 
+  it("filters feed by price (free/paid/range) with URL sync", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(sampleHangouts) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+    renderPage(<HangoutsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-price-free")).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByTestId("hangout-price-free"))
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-price-free").getAttribute("aria-pressed")).toBe("true")
+      const calls = mockFetch.mock.calls.filter(([url]) => String(url).includes("/api/hangouts"))
+      const last = String(calls[calls.length - 1][0])
+      expect(last).toContain("price=free")
+    })
+
+    fireEvent.click(screen.getByTestId("hangout-price-paid"))
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-price-max-u1500")).toBeTruthy()
+    })
+    fireEvent.click(screen.getByTestId("hangout-price-max-u1500"))
+    await waitFor(() => {
+      const calls = mockFetch.mock.calls.filter(([url]) => String(url).includes("/api/hangouts"))
+      const last = String(calls[calls.length - 1][0])
+      expect(last).toContain("price=paid")
+      expect(last).toContain("max_price=1500")
+    })
+  })
+
   it("shows disabled state when flag is off", async () => {
     mockFlags.hangoutsEnabled = false
     const HangoutsPage = (await import("@/pages/hangouts")).default

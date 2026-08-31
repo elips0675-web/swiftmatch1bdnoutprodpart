@@ -209,6 +209,15 @@ P2: снятие/поднятие лимита ежедневных встреч
 - **i18n (RU+EN):** 3 новых ключа `hangout.new.show`, `hangout.new.title`, `hangout.new.desc`.
 - **Тесты:** серверный тест emit `hangout:new` в комнату `hangout:feed` при создании (mock getIO); фронт-тест подписки на `hangout:new` → появление бейджа → клик → рефетч. **server 360/360, front 87/87, lint 0 errors, `vite build` OK.**
 
+## Этап 99 (31.08.2026) — Фильтр по цене в ленте (бесплатные/платные/диапазон) ✅
+
+Пункт 🔴 #2 плана «Улучшение страницы hangouts» — фильтрация по цене с сохранением в URL:
+
+- **Сервер (`server/src/routes/hangouts.js`):** в feed-route добавлены параметры `price` (`free` → `(h.price IS NULL OR h.price = 0)`, `paid` → `(h.price IS NOT NULL AND h.price > 0)`), а для диапазона — `min_price`/`max_price` (при `price=paid`). Каждое условие валидируется (unknown-значение игнорируется).
+- **Фронт (`src/pages/hangouts.tsx`):** новый тип `HangoutPriceFilter = 'all'|'free'|'paid'`, состояния `priceFilter`/`priceMax`, константа `PRICE_RANGE_PRESETS` (до 500/1500/5000 ₽). Чип-селект «Все/Бесплатные/Платные» (`data-testid="hangout-price-*"`) + при «Платные» — пресеты диапазона max-цены (`hangout-price-max-*`). Синхронизация с URL (`price`, `max_price`), чтение при монтировании, параметры в API-запросе, сброс `page=1`.
+- **i18n (RU+EN):** 7 новых ключей `hangout.filter.price`, `hangout.price.all/free/paid/any/max`.
+- **Тесты:** серверные — free/paid/max_price/unknown (4 шт); фронтовый — выбор free→paid→диапазон, проверка `price=free`, `price=paid&max_price=1500` в запросе + URL. **server 363/363, front 88/88, lint 0 errors, `vite build` OK.** Live: создана платная встреча 900 ₽ → `price=paid` отдаёт её, `max_price=500` — пусто; тестовая удалена.
+
 ## Плановые хвосты (не блокируют)
 
 - Внешние блокеры (не код): staging VPS + docker compose up, реальные ключи в `.env`, домен + SSL + Google Play, k6 100 VU на staging, UptimeRobot/Grafana-алерты.

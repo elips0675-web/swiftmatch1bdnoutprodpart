@@ -777,3 +777,35 @@
 - **server 360/360, front 87/87, lint 0 errors, vite build OK.**
 
 Этапы 94–98 закрыты.
+
+## Этап 99 (31.08.2026): Фильтр по цене — бесплатные/платные/диапазон ✅
+
+Пункт 🔴 #2 плана. Реализован фильтр по цене с сохранением в URL.
+
+### Сервер (`server/src/routes/hangouts.js`)
+
+- Destructure добавлены `price, min_price, max_price`.
+- `price=free` → `(h.price IS NULL OR h.price = 0)`; `price=paid` → `(h.price IS NOT NULL AND h.price > 0)`.
+- Диапазон: `min_price`/`max_price` применяются только если `price=paid`, `!isNaN`, `>=0` / `>0`.
+- Unknown-значение `price` игнорируется (не добавляет WHERE).
+
+### Фронт (`src/pages/hangouts.tsx`)
+
+- Тип `HangoutPriceFilter = 'all'|'free'|'paid'`; константа `PRICE_RANGE_PRESETS = [{key:'u500',max:500},{key:'u1500',max:1500},{key:'u5000',max:5000}]`.
+- Состояния: `priceFilter` (default `'all'`), `priceMax` (default `null`).
+- URL-синхронизация: чтение `price`/`max_price` в mount-эффекте; запись — параметр `price` (если не all) + `max_price` (если paid и не null); deps эффекта записи и загрузки дополнены `priceFilter, priceMax`.
+- API-запрос: `price` (+ `max_price` при paid).
+- UI: чип-селект `hangout-price-all|free|paid`; при выборе `paid` — блок «Любая» + пресеты до 500/1500/5000 ₽ (`hangout-price-max-any|u500|u1500|u5000`); клик → `setPage(1)`.
+
+### i18n (RU+EN): 7 ключей
+
+`hangout.filter.price`, `hangout.price.all/free/paid/any/max`.
+
+### Тесты
+
+- `server` (+4): free-SQL; paid+max_price SQL (содержит `h.price > 0`, `h.price <= ?`, params `1500`); unknown `price=hack` не добавляет price-WHERE.
+- `front` (+1): клик free → запрос `price=free`; клик paid → пресеты; клик u1500 → запрос `price=paid&max_price=1500`.
+- **server 363/363, front 88/88, lint 0 errors, vite build OK.**
+- **Live**: платная встреча 900 ₽ → `price=paid` отдаёт её; `max_price=500` пусто; `price=free` только бесплатные; тестовая удалена.
+
+Этапы 94–99 закрыты.

@@ -111,6 +111,32 @@ describe('GET /api/hangouts (feed)', () => {
     expect(pool.query.mock.calls[0][1]).toContain('cinema')
   })
 
+  it('applies free price filter', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts?price=free')
+    expect(res.status).toBe(200)
+    const sql = pool.query.mock.calls[0][0]
+    expect(sql).toContain('(h.price IS NULL OR h.price = 0)')
+  })
+
+  it('applies paid price filter with max_price range', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts?price=paid&max_price=1500')
+    expect(res.status).toBe(200)
+    const sql = pool.query.mock.calls[0][0]
+    expect(sql).toContain('(h.price IS NOT NULL AND h.price > 0)')
+    expect(sql).toContain('h.price <= ?')
+    expect(pool.query.mock.calls[0][1]).toContain(1500)
+  })
+
+  it('ignores price filter when value is unknown', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    await request(createApp(hangoutsRoutes)).get('/api/hangouts?price=hack')
+    const sql = pool.query.mock.calls[0][0]
+    expect(sql).not.toContain('h.price IS NULL OR h.price = 0')
+    expect(sql).not.toContain('h.price > 0')
+  })
+
   it('applies radius filter with ST_Distance_Sphere', async () => {
     pool.query.mockResolvedValueOnce([[], []])
     const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts?lat=55.75&lng=37.61&radius=5')

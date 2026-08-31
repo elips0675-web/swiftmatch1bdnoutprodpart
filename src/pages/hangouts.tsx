@@ -75,6 +75,15 @@ export type HangoutDateFilter = "all" | "today" | "tomorrow" | "weekend";
 
 export type HangoutSort = "date" | "popularity" | "price";
 
+export type HangoutPriceFilter = "all" | "free" | "paid";
+
+export const PRICE_RANGE_PRESETS: Array<{ key: string; max: number | null }> = [
+  { key: "all", max: null },
+  { key: "u500", max: 500 },
+  { key: "u1500", max: 1500 },
+  { key: "u5000", max: 5000 },
+];
+
 function hangoutDateKey(value: string): string {
   const d = new Date(value);
   const now = new Date();
@@ -472,6 +481,8 @@ export default function HangoutsPage() {
   const [category, setCategory] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState<HangoutDateFilter>("all");
   const [sortBy, setSortBy] = useState<HangoutSort>("date");
+  const [priceFilter, setPriceFilter] = useState<HangoutPriceFilter>("all");
+  const [priceMax, setPriceMax] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [radiusKm, setRadiusKm] = useState(10);
@@ -559,11 +570,18 @@ export default function HangoutsPage() {
     const date = searchParams.get("date") as HangoutDateFilter | null;
     const type = searchParams.get("type") as HangoutType | "all" | null;
     const sort = searchParams.get("sort") as HangoutSort | null;
+    const price = searchParams.get("price") as HangoutPriceFilter | null;
+    const maxPriceRaw = searchParams.get("max_price");
     if (q != null) setSearch(q);
     if (cat != null) setCategory(cat);
     if (date && ["all", "today", "tomorrow", "weekend"].includes(date)) setDateFilter(date);
     if (type && ["all", "date", "company"].includes(type)) setHangoutType(type);
     if (sort && ["date", "popularity", "price"].includes(sort)) setSortBy(sort);
+    if (price && ["all", "free", "paid"].includes(price)) setPriceFilter(price);
+    if (maxPriceRaw != null) {
+      const mp = Number(maxPriceRaw);
+      if (!isNaN(mp) && mp > 0) setPriceMax(mp);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -575,8 +593,10 @@ export default function HangoutsPage() {
     if (dateFilter !== "all") params.set("date", dateFilter);
     if (hangoutType !== "all") params.set("type", hangoutType);
     if (sortBy !== "date") params.set("sort", sortBy);
+    if (priceFilter !== "all") params.set("price", priceFilter);
+    if (priceFilter === "paid" && priceMax != null) params.set("max_price", String(priceMax));
     setSearchParams(params, { replace: true });
-  }, [debouncedSearch, category, dateFilter, hangoutType, sortBy, setSearchParams]);
+  }, [debouncedSearch, category, dateFilter, hangoutType, sortBy, priceFilter, priceMax, setSearchParams]);
 
   useEffect(() => {
     if (!hangoutsEnabled) return;
@@ -603,6 +623,8 @@ export default function HangoutsPage() {
     if (range.from) params.set("date_from", range.from);
     if (range.to) params.set("date_to", range.to);
     if (sortBy !== "date") params.set("sort", sortBy);
+    if (priceFilter !== "all") params.set("price", priceFilter);
+    if (priceFilter === "paid" && priceMax != null) params.set("max_price", String(priceMax));
     params.set("page", String(page));
     params.set("limit", String(PAGE_LIMIT));
     if (coords) {
@@ -639,7 +661,7 @@ export default function HangoutsPage() {
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [category, hangoutType, dateFilter, page, coords, radiusKm, hangoutsEnabled, debouncedSearch, sortBy, refreshKey]);
+  }, [category, hangoutType, dateFilter, page, coords, radiusKm, hangoutsEnabled, debouncedSearch, sortBy, refreshKey, priceFilter, priceMax]);
 
   // Бесконечный скролл: авто-подгрузка следующей страницы при достижении sentinel
   useEffect(() => {
@@ -862,6 +884,68 @@ export default function HangoutsPage() {
                   <option value="price">{t("hangout.sort.price")}</option>
                 </select>
               </div>
+            </div>
+
+            <div className="px-1" data-testid="hangout-price-filter">
+              <div className="flex items-center gap-2 flex-wrap">
+                <label className="text-xs font-semibold text-muted-foreground">
+                  {t("hangout.filter.price")}
+                </label>
+                <div className="flex gap-1.5">
+                  {(["all", "free", "paid"] as HangoutPriceFilter[]).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      aria-pressed={priceFilter === v}
+                      data-testid={`hangout-price-${v}`}
+                      onClick={() => { setPriceFilter(v); setPage(1); }}
+                      className={cn(
+                        "shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors",
+                        priceFilter === v
+                          ? "gradient-bg border-0 text-white shadow-md"
+                          : "bg-background border-muted text-muted-foreground hover:bg-muted/40",
+                      )}
+                    >
+                      {v === "all" ? t("hangout.price.all") : v === "free" ? t("hangout.price.free") : t("hangout.price.paid")}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {priceFilter === "paid" && (
+                <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    aria-pressed={priceMax == null}
+                    data-testid="hangout-price-max-any"
+                    onClick={() => { setPriceMax(null); setPage(1); }}
+                    className={cn(
+                      "shrink-0 px-3 py-1 rounded-full text-[11px] font-semibold border transition-colors",
+                      priceMax == null
+                        ? "bg-primary text-primary-foreground border-0"
+                        : "bg-background border-muted text-muted-foreground hover:bg-muted/40",
+                    )}
+                  >
+                    {t("hangout.price.any")}
+                  </button>
+                  {PRICE_RANGE_PRESETS.filter((p) => p.key !== "all").map((p) => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      aria-pressed={priceMax === p.max}
+                      data-testid={`hangout-price-max-${p.key}`}
+                      onClick={() => { setPriceMax(p.max); setPage(1); }}
+                      className={cn(
+                        "shrink-0 px-3 py-1 rounded-full text-[11px] font-semibold border transition-colors",
+                        priceMax === p.max
+                          ? "bg-primary text-primary-foreground border-0"
+                          : "bg-background border-muted text-muted-foreground hover:bg-muted/40",
+                      )}
+                    >
+                      {t("hangout.price.max", { amount: p.max })}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="px-1" data-testid="hangout-radius">
