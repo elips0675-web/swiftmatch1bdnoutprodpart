@@ -200,6 +200,15 @@ P2: снятие/поднятие лимита ежедневных встреч
 - **i18n** (RU+EN): 24 новых ключа `hangout.group.*`, `hangout.sort.*`, `hangout.filter.*`, `hangout.action.*`, `hangout.label.*`, `hangout.empty_*`.
 - **Тесты:** mock `IntersectionObserver` в `src/test/setup.ts`; тест load-more заменён на infinite scroll (AutoIO → mock → page=2). **server 366/366, front 86/86, lint 0 errors, `vite build` OK.** DOM (Playwright 390px): все карточки в bounds 390px, action buttons на каждой, rating badge на карточке с рейтингом, sorting в URL, group headings sticky, sentinel absent при <20 записей.
 
+## Этап 98 (31.08.2026) — WS real-time: тост + бейдж новой встречи в ленте ✅
+
+Реал-тайм уведомление о только что созданных встречах прямо в открытой ленте /hangouts:
+
+- **Сервер (`server/src/ws.js`, `server/src/routes/hangouts.js`):** в connection-обработчике добавлены комнаты `hangout:join_feed`/`hangout:leave_feed` (join/leave комнаты `hangout:feed`). В create-route после `trackEvent('hangout_created')` эмитится `io.to('hangout:feed').emit('hangout:new', { hangoutId, category, title, city, hangoutType })`.
+- **Фронт (`src/pages/hangouts.tsx`):** при монтировании страницы сокет эмитит `hangout:join_feed` и подписывается на `hangout:new` (`socket.off` + `leave_feed` в cleanup). При первом новом событии показывается тост «Новая встреча», над списком появляется плавающий бейдж-кнопка «Показать новые (N)» (`data-testid="hangouts-new-badge"`), клик перезагружает ленту (сброс счётчика + принудительный рефетч через `refreshKey`).
+- **i18n (RU+EN):** 3 новых ключа `hangout.new.show`, `hangout.new.title`, `hangout.new.desc`.
+- **Тесты:** серверный тест emit `hangout:new` в комнату `hangout:feed` при создании (mock getIO); фронт-тест подписки на `hangout:new` → появление бейджа → клик → рефетч. **server 360/360, front 87/87, lint 0 errors, `vite build` OK.**
+
 ## Плановые хвосты (не блокируют)
 
 - Внешние блокеры (не код): staging VPS + docker compose up, реальные ключи в `.env`, домен + SSL + Google Play, k6 100 VU на staging, UptimeRobot/Grafana-алерты.

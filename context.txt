@@ -748,4 +748,32 @@
 
 ### Статус
 
-Этапы 94–97 полностью закрыты. Этап 98 (WebSocket real-time + virtualized list) отложен — не блокирует релиз.
+Этапы 94–97 полностью закрыты.
+
+## Этап 98 (31.08.2026): WS real-time — тост + бейдж новой встречи в ленте ✅
+
+Реал-тайм уведомление о только что созданных встречах в открытой ленте /hangouts.
+
+### Сервер (`server/src/ws.js`, `server/src/routes/hangouts.js`)
+
+- ws.js connection-обработчик: `socket.on('hangout:join_feed')` → `socket.join('hangout:feed')`, `socket.on('hangout:leave_feed')` → `socket.leave('hangout:feed')` (вставлено после `socket.onAny`).
+- create-route (после `trackEvent('hangout_created', ...)`): `feedIo.to('hangout:feed').emit('hangout:new', { hangoutId, category, title, city, hangoutType })`. `feedIo` — результат `getIO()`.
+
+### Фронт (`src/pages/hangouts.tsx`)
+
+- Эффект WS: `socket = pageSocket.socket`; если socket && hangoutsEnabled → `socket.emit('hangout:join_feed')`, `socket.on('hangout:new', onNew)`. Cleanup: `socket.off` + `emit('hangout:leave_feed')`. Deps: `[pageSocket.socket, hangoutsEnabled, t, pageToast]`.
+- `onNew`: `Number(payload?.hangoutId)`; пропуск если уже в `pendingNew`; при первом (prev.length===0) — `pageToast.toast({ title: t('hangout.new.title'), description: payload?.title || t('hangout.new.desc') })`. Добавляет `{hangoutId, title}` в начало `pendingNew`.
+- Бейдж-кнопка «Показать новые (N)» над списком (`data-testid="hangouts-new-badge"`, `hangout.new.show`, счётчик `pendingNew.length`). Клик → `refreshFeed()`: `setPendingNew([])` + `setPage(1)` + `setRefreshKey(k=>k+1)`.
+- `refreshKey` (новое состояние, deps `[..., refreshKey]` в эффекте загрузки) — принудительный рефетч даже на page=1.
+
+### i18n (RU+EN): 3 ключа
+
+`hangout.new.show` («Показать новые ({count})»/«Show {count} new»), `hangout.new.title` («Новая встреча»/«New hangout»), `hangout.new.desc` («Появилась новая встреча в ленте»/«A new hangout appeared in the feed»).
+
+### Тесты
+
+- `server/src/__tests__/hangouts.test.js` (+1): import `{ getIO }` from `../ws.js`; тест «emits hangout:new to feed room» — `vi.mocked(getIO).mockReturnValue({ to: vi.fn(() => ({ emit: feedEmit })) })`, create (insertId 55) → `to('hangout:feed')` + `emit('hangout:new', {hangoutId:55, category:'cafe', title:'Feed live test', hangoutType:'company'})`. В конце сброс `getIO` к дефолтной форме.
+- `src/test/hangouts.test.tsx`: мок useWebSocket переведён на управляемый `mockWs = vi.hoisted(...)` (`handlers` map + `socket.on/off/emit` vi.fn). Новый тест: `act(() => mockWs.handlers['hangout:new']?.({hangoutId:999,title}))` → бейдж появляется → `fireEvent.click` → бейдж исчезает + число fetch на /api/hangouts растёт. `act` импортирован из RTL.
+- **server 360/360, front 87/87, lint 0 errors, vite build OK.**
+
+Этапы 94–98 закрыты.

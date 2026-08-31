@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, waitFor, fireEvent } from "@testing-library/react"
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react"
 import React from "react"
 import { MemoryRouter } from "react-router-dom"
 
@@ -10,8 +10,18 @@ vi.mock("@/lib/token", () => ({
   getToken: () => "test-token",
 }))
 
+const mockWs = vi.hoisted(() => {
+  const handlers: Record<string, (payload?: any) => void> = {}
+  const socket = {
+    on: vi.fn((ev: string, cb: (payload?: any) => void) => { handlers[ev] = cb }),
+    off: vi.fn(),
+    emit: vi.fn(),
+  }
+  return { socket, handlers }
+})
+
 vi.mock("@/hooks/use-websocket", () => ({
-  useWebSocket: () => ({ socket: null, connected: false }),
+  useWebSocket: () => ({ socket: mockWs.socket, connected: false }),
 }))
 
 const mockUseLanguage = {
@@ -194,6 +204,39 @@ describe("HangoutsPage", () => {
     await waitFor(() => {
       const calls = mockFetch.mock.calls.filter(([url]) => String(url).includes("/api/hangouts"))
       expect(String(calls[calls.length - 1][0])).toContain("page=2")
+    })
+  })
+
+  it("shows 'Show new' badge on hangout:new ws event and refreshes on click", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(sampleHangouts) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+    renderPage(<HangoutsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-card-1")).toBeTruthy()
+    })
+
+    expect(screen.queryByTestId("hangouts-new-badge")).toBeNull()
+
+    await act(async () => {
+      mockWs.handlers["hangout:new"]?.({ hangoutId: 999, title: "Fresh cafe" })
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hangouts-new-badge")).toBeTruthy()
+    })
+
+    const before = mockFetch.mock.calls.filter(([url]) => String(url).includes("/api/hangouts")).length
+    fireEvent.click(screen.getByTestId("hangouts-new-badge"))
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("hangouts-new-badge")).toBeNull()
+      const calls = mockFetch.mock.calls.filter(([url]) => String(url).includes("/api/hangouts"))
+      expect(calls.length).toBeGreaterThan(before)
     })
   })
 

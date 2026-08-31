@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import request from 'supertest'
 import express from 'express'
 import jwt from 'jsonwebtoken'
+import { getIO } from '../ws.js'
 
 vi.mock('../db.js', () => ({
   default: {
@@ -198,6 +199,32 @@ describe('POST /api/hangouts', () => {
       })
     expect(res.status).toBe(201)
     expect(res.body.id).toBe(10)
+  })
+
+  it('emits hangout:new to feed room when a hangout is created', async () => {
+    const feedEmit = vi.fn()
+    const toMock = vi.fn(() => ({ emit: feedEmit }))
+    vi.mocked(getIO).mockReturnValue({ to: toMock })
+
+    pool.query
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ cnt: 0 }], []])
+      .mockResolvedValueOnce([{ insertId: 55 }, []])
+    const res = await request(createApp(hangoutsRoutes))
+      .post('/api/hangouts')
+      .set('Authorization', `Bearer ${authToken(2)}`)
+      .send({
+        category: 'cafe',
+        title: 'Feed live test',
+        city: 'Moscow',
+        hangout_type: 'company',
+        event_date: new Date(Date.now() + 86_400_000).toISOString(),
+        max_companions: 3,
+      })
+    expect(res.status).toBe(201)
+    expect(toMock).toHaveBeenCalledWith('hangout:feed')
+    expect(feedEmit).toHaveBeenCalledWith('hangout:new', expect.objectContaining({ hangoutId: 55, category: 'cafe', title: 'Feed live test', hangoutType: 'company' }))
+    vi.mocked(getIO).mockReturnValue({ to: vi.fn(() => ({ emit: vi.fn() })) })
   })
 
   it('rejects second daily hangout for free user', async () => {

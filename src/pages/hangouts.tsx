@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/context/language-context";
 import { useFeatureFlags } from "@/context/feature-flags-context";
 import { usePremium } from "@/hooks/use-premium";
+import { useWebSocket } from "@/hooks/use-websocket";
 import { getToken } from "@/lib/token";
 import { useToast } from "@/components/ui/use-toast";
 import { HangoutSkeletonCard } from "@/components/hangout-skeleton-card";
@@ -488,6 +489,42 @@ export default function HangoutsPage() {
   const [suggestIdeas, setSuggestIdeas] = useState<Array<{ title: string; category: string; place?: string; description?: string }>>([]);
   const [suggestLang, setSuggestLang] = useState<"ru" | "en">("ru");
   const [suggestError, setSuggestError] = useState(false);
+  const [pendingNew, setPendingNew] = useState<Array<{ hangoutId: number; title: string }>>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const pageToast = useToast();
+  const pageSocket = useWebSocket();
+
+  // Реал-тайм: новые встречи в ленте (этап 98) — join комнаты ленты + подписка на hangout:new
+  useEffect(() => {
+    const socket = pageSocket.socket;
+    if (!socket || !hangoutsEnabled) return;
+    socket.emit("hangout:join_feed");
+    const onNew = (payload: { hangoutId?: number; title?: string }) => {
+      const hid = Number(payload?.hangoutId);
+      if (!hid) return;
+      setPendingNew((prev) => {
+        if (prev.some((n) => n.hangoutId === hid)) return prev;
+        if (prev.length === 0) {
+          pageToast.toast({
+            title: t("hangout.new.title"),
+            description: payload?.title || t("hangout.new.desc"),
+          });
+        }
+        return [{ hangoutId: hid, title: payload?.title || "" }, ...prev];
+      });
+    };
+    socket.on("hangout:new", onNew);
+    return () => {
+      socket.off("hangout:new", onNew);
+      socket.emit("hangout:leave_feed");
+    };
+  }, [pageSocket.socket, hangoutsEnabled, t, pageToast]);
+
+  const refreshFeed = useCallback(() => {
+    setPendingNew([]);
+    setPage(1);
+    setRefreshKey((k) => k + 1);
+  }, [setPage]);
 
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -602,7 +639,7 @@ export default function HangoutsPage() {
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [category, hangoutType, dateFilter, page, coords, radiusKm, hangoutsEnabled, debouncedSearch, sortBy]);
+  }, [category, hangoutType, dateFilter, page, coords, radiusKm, hangoutsEnabled, debouncedSearch, sortBy, refreshKey]);
 
   // Бесконечный скролл: авто-подгрузка следующей страницы при достижении sentinel
   useEffect(() => {
@@ -1081,7 +1118,21 @@ export default function HangoutsPage() {
                 </Button>
               </div>
             ) : (
-              <div className="space-y-6" role="list" aria-label={t("hangout.title")}>
+              <div className="space-y-3">
+                {pendingNew.length > 0 && (
+                  <div className="flex justify-center">
+                    <Button
+                      data-testid="hangouts-new-badge"
+                      onClick={refreshFeed}
+                      size="sm"
+                      className="rounded-full shadow-md font-bold"
+                    >
+                      <Sparkles size={14} className="mr-1.5" />
+                      {t("hangout.new.show", { count: pendingNew.length })}
+                    </Button>
+                  </div>
+                )}
+                <div className="space-y-6" role="list" aria-label={t("hangout.title")}>
                 {groupHangoutsByDate(items).map(([key, group]) => (
                   <section key={key} role="listitem">
                     <h3 className="sticky top-[64px] z-10 bg-background/95 backdrop-blur-sm py-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
@@ -1099,6 +1150,7 @@ export default function HangoutsPage() {
                     {loading && <Loader2 size={18} className="animate-spin text-muted-foreground" />}
                   </div>
                 )}
+                </div>
               </div>
             )}
           </>

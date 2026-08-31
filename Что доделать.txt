@@ -659,4 +659,21 @@
   - **server 366/366**, **front 86/86**, lint 0 errors, `vite build` OK.
 - **DOM (Playwright 390px):** селектор сортировки присутствует, все 4 карточки в bounds 390px (overflow=0), action buttons на каждой (respond + like + share), rating badge на карточке id=4 (rating=4.5), scarcity/remaining badge, attendees avatars, group headings sticky («среда, 2 сентября»/«пятница, 4 сентября»), sentinel absent при <20 записей, sort=popularity в URL.
 
+## ✅ Этап 98 (31.08.2026): WS real-time — тост + бейдж новой встречи в ленте — ЗАКРЫТО
+
+Реал-тайм уведомление о только что созданных встречах в открытой ленте /hangouts:
+
+- **Сервер** (`server/src/ws.js`, `server/src/routes/hangouts.js`):
+  - В connection-обработчик ws.js добавлены `socket.on('hangout:join_feed')` → `socket.join('hangout:feed')` и `socket.on('hangout:leave_feed')` → `socket.leave('hangout:feed')` (после `socket.onAny`).
+  - В create-route после `trackEvent('hangout_created', ...)` — `feedIo.to('hangout:feed').emit('hangout:new', { hangoutId, category, title, city, hangoutType })`.
+- **Фронт** (`src/pages/hangouts.tsx`):
+  - Эффект WS: при монтировании `socket.emit('hangout:join_feed')`, подписка `socket.on('hangout:new')` → в `pendingNew` без дублей; cleanup — `socket.off` + `emit('hangout:leave_feed')`.
+  - При первом новом событии — тост «Новая встреча» (`pageToast.toast`, ключи `hangout.new.title/desc`).
+  - Над списком — плавающий бейдж-кнопка «Показать новые (N)» (`data-testid="hangouts-new-badge"`, ключ `hangout.new.show`), клик → `refreshFeed()` (сброс `pendingNew` + `setPage(1)` + инкремент `refreshKey`, добавлен в deps эффекта загрузки для принудительного рефетча).
+- **i18n** (`src/context/language-context.tsx`, RU+EN): 3 новых ключа `hangout.new.show`, `hangout.new.title`, `hangout.new.desc`.
+- **Тесты**:
+  - `server/src/__tests__/hangouts.test.js`: новый тест «emits hangout:new to feed room» — mock getIO возвращает `{ to: mockReturnValue({ emit }) }`, проверка `to('hangout:feed')` + emit payload `{hangoutId, category, title, hangoutType}`.
+  - `src/test/hangouts.test.tsx`: мок useWebSocket переведён на управляемый `mockWs` (vi.hoisted: `socket.on/off/emit` vi.fn, `handlers` map). Новый тест: триггер `mockWs.handlers['hangout:new']` → бейдж появляется → клик → бейдж исчезает + вызывается рефетч.
+  - **server 360/360**, **front 87/87**, lint 0 errors, `vite build` OK.
+
 **Что дальше (этап 98, отложен):** WebSocket real-time для ленты (новые встречи появляются в реальном времени через `hangout:new` event) + touch-оптимизации (virtualized list при >50 карточек).

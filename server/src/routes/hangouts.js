@@ -445,6 +445,18 @@ router.post('/api/hangouts', auth, createLimiter, async (req, res) => {
     )
 
     trackEvent('hangout_created', req.userId, { category, hangout_id: result.insertId })
+
+    const feedIo = getIO()
+    if (feedIo) {
+      feedIo.to('hangout:feed').emit('hangout:new', {
+        hangoutId: result.insertId,
+        category,
+        title: cleanTitle,
+        city: city ? stripHtml(String(city)).slice(0, 100) : null,
+        hangoutType: validType,
+      })
+    }
+
     res.status(201).json({ id: result.insertId, message: 'Hangout created' })
   } catch (err) {
     logger.error('Hangout create error:', err)

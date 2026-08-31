@@ -104,6 +104,14 @@ export async function initIO(httpServer) {
       trackWsMessage(event)
     })
 
+    // --- Hangouts feed (real-time new-hangout toasts) ---
+    socket.on('hangout:join_feed', () => {
+      socket.join('hangout:feed')
+    })
+    socket.on('hangout:leave_feed', () => {
+      socket.leave('hangout:feed')
+    })
+
     socket.on('disconnect', () => {
       wsConnectionsGauge.dec()
       wsRoomsGauge.set(io.sockets.adapter.rooms.size)
