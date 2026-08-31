@@ -847,4 +847,20 @@
 - **Проверки: front 88→89/89, server 363/363 (без изменений), tsc/lint 0 errors, `vite build` OK.**
 - **Live (390px):** у demo-встреч lat/lng=null → OSM iframe фолбэк `q=Aurora Cinema, Moscow`; обе кнопки и модалка работают, H-overflow нет.
 
-Этапы 100 завершён. Следующие кандидаты: virtualized-лист при >50 карточек (этап 101), мастер создания встречи + предзаполнение из профиля (этап 102).
+## Этап 101 (31.08.2026) — лёгкая виртуализация длинного списка ✅
+
+Пункт 🛠 #13 плана (производительность при >50 карточек). **Подход «лёгкий оконный рендер»** (выбран пользователем): react-window отклонён, т.к. List требует собственный scroll-контейнер и ломает группировку по датам + sticky-заголовки + страничный infinite scroll + WS-бейдж.
+
+- **`src/index.css`** — класс `.hangout-virt`:
+  ```css
+  .hangout-virt {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 220px;
+  }
+  ```
+  Браузер откладывает paint+layout off-screen карточек (это и есть оконный рендер на движке), `contain-intrinsic-size` держит scrollbar без прыжков.
+- **`src/pages/hangouts.tsx`** — класс `hangout-virt` добавлен к outer `<Card>` в `HangoutCard` (`className="hangout-virt p-4 hover:bg-muted/30 transition-colors"`, `data-testid="hangout-card-*"`). Структура рендера не менялась.
+- **Замечание:** в jsdom класс не влияет на видимость (CSS не применяется), поэтому 15/15 фронт-тестов проходят как раньше.
+- **Проверки:** front 89/89, server 363/363, tsc/lint 0 errors, `vite build` OK. Live (390px): у карточек класс `hangout-virt`, `getBoundingClientRect().height>0` (content-visibility не скрывает видимые карточки), H-overflow нет.
+
+Этапы 100–101 закрыты. Следующий кандидат: мастер создания встречи + предзаполнение из профиля (этап 102).

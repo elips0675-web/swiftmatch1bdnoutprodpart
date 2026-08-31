@@ -722,4 +722,14 @@
 - **i18n (RU+EN):** 2 ключа hangout.map.route («Маршрут»/«Route»), hangout.map.view («На карте»/«Map»).
 - **Тест:** фронт +1 (рендер кнопок hangout-map-1/hangout-route-1, клик → модалка hangout-route-modal-1, iframe src openstreetmap.org/export/embed.html + marker=55.751244). **front 88→89/89, server 363/363, tsc/lint 0 errors, ite build OK.** Live (390px): у demo lat/lng=null → OSM фолбэк на q=название («Aurora Cinema, Moscow»), обе кнопки и модалка работают.
 
-Следующие кандидаты (не блокируют): virtualized-лист при >50 карточек (этап 101), мастер создания встречи + предзаполнение из профиля (этап 102).
+
+## ✅ Этап 101 (31.08.2026): лёгкая виртуализация длинного списка — ЗАКРЫТО
+
+Пункт 🛠 #13 плана. Выбран безопасный «лёгкий оконный рендер» (react-window отклонён: конфликтует с группировкой по датам + sticky-заголовками — List требует собственный scroll-контейнер).
+
+- **CSS content-visibility: auto** (класс .hangout-virt в src/index.css) на каждую карточку (src/pages/hangouts.tsx, outer Card в HangoutCard): браузер откладывает paint+layout off-screen карточек, рендеря только видимое окно. contain-intrinsic-size: auto 220px — без прыжков скроллбара.
+- **Сохранено всё:** sticky-заголовки дат, страничный infinite-scroll (sentinel), WS-бейдж «Показать новые», go-out лента — структура не менялась, правки только CSS+класс.
+- **Выигрыш:** при сотнях карточек в DOM (infinite scroll) меньше layout/paint вне вьюпорта — меньше jank при скролле.
+- **Проверки:** front 89/89, server 363/363, tsc/lint 0 errors, ite build OK. Live (390px): у карточек hangout-virt, height>0, H-overflow нет.
+
+Следующий кандидат (не блокирует): мастер создания встречи + предзаполнение из профиля (этап 102).

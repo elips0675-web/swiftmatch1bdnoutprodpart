@@ -289,7 +289,7 @@ function HangoutCard({ hangout }: { hangout: Hangout }) {
 
   return (
     <Link to={`/hangouts/${hangout.id}`} className="block">
-      <Card data-testid={`hangout-card-${hangout.id}`} className="p-4 hover:bg-muted/30 transition-colors">
+      <Card data-testid={`hangout-card-${hangout.id}`} className="hangout-virt p-4 hover:bg-muted/30 transition-colors">
         {Number(hangout.boosted) === 1 && (
           <div className="mb-2 flex items-center gap-1.5 rounded-md bg-violet-50 border border-violet-200 px-2 py-1 w-fit" data-testid={`hangout-boosted-${hangout.id}`}>
             <Zap size={12} className="text-violet-600" />

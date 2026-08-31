@@ -236,6 +236,15 @@ P2: снятие/поднятие лимита ежедневных встреч
 - **i18n (RU+EN):** 2 новых ключа `hangout.map.route` («Маршрут»/«Route»), `hangout.map.view` («На карте»/«Map»).
 - **Тест:** фронт +1 — карточка рендерит `hangout-map-1`/`hangout-route-1`, клик по «На карте» открывает модалку (`hangout-route-modal-1`), iframe src содержит `openstreetmap.org/export/embed.html` и `marker=55.751244`. **front 88→89/89, server 363/363 (без изменений), tsc/lint 0 errors, `vite build` OK.** Live (390px): у демо-встреч lat/lng=null → OSM-iframe фолбэк по `q=название` («Aurora Cinema, Moscow»), модалка и обе кнопки работают.
 
+## Этап 101 (31.08.2026) — Лёгкая виртуализация длинного списка карточек ✅
+
+Пункт 🛠 #13 плана (производительность ленты при >50 карточек). **Выбран безопасный подход «лёгкий оконный рендер»** (без потери фич): react-window не подходит, т.к. конфликтует с группировкой по датам + sticky-заголовками поверх страничного скролла (List требует собственный scroll-контейнер, ломая infinite scroll/WS-бейдж/go-out).
+
+- **Решение: CSS `content-visibility: auto`** (`src/index.css`, класс `.hangout-virt`): браузер откладывает paint+layout off-screen карточек, рендеря только видимое окно — это и есть «оконный рендер» на уровне движка, при этом полностью сохраняются sticky-заголовки дат, страничный infinite-scroll (sentinel), WS-бейдж и go-out лента (ничего в структуре не менялось). `contain-intrinsic-size: auto 220px` предотвращает прыжки скроллбара и сохраняет корректный index скролла.
+- **Применение** (`src/pages/hangouts.tsx`): класс `hangout-virt` добавлен к outer-элементу `Card` в `HangoutCard` (`data-testid="hangout-card-*"`).
+- **Измеримый выигрыш:** при длинной ленте (сотни карточек в DOM из-за infinite scroll) браузер не рассчитывает layout/покраску за пределами вьюпорта — меньше jank при скролле и первичном рендере.
+- **Проверки:** front 89/89 (не менялся), server 363/363, tsc/lint 0 errors, `vite build` OK. Live (390px): карточки получили `hangout-virt`, height>0 (content-visibility не скрывает их от рендера вьюпорта), H-overflow нет.
+
 ## Плановые хвосты (не блокируют)
 
 - Внешние блокеры (не код): staging VPS + docker compose up, реальные ключи в `.env`, домен + SSL + Google Play, k6 100 VU на staging, UptimeRobot/Grafana-алерты.

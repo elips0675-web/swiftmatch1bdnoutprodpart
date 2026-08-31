@@ -85,3 +85,12 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Lightweight windowed rendering for long hangout feeds.
+   content-visibility:auto defers paint/layout of off-screen cards,
+   while contain-intrinsic-size keeps the scrollbar from jumping. */
+.hangout-virt {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 220px;
+}
+
