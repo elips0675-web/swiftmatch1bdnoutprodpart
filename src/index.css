@@ -94,3 +94,45 @@
   contain-intrinsic-size: auto 220px;
 }
 
+/* Staggered entry animation for feed cards (этап 105). */
+@keyframes hangout-stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.hangout-stagger-enter {
+  animation: hangout-stagger-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Pull-to-refresh indicator (этап 105). */
+.ptr-wrap {
+  position: relative;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition: height 200ms ease;
+}
+.ptr-wrap.ptr-visible {
+  height: 56px;
+  visibility: visible;
+}
+.ptr-spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  border: 2px solid hsl(var(--border));
+  border-top-color: hsl(var(--primary));
+  animation: ptr-spin 700ms linear infinite;
+}
+@keyframes ptr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+

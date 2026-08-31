@@ -139,7 +139,7 @@ function formatHumanDate(value: string, t: (key: string) => string): string {
   return formatEventDate(value);
 }
 
-function HangoutCard({ hangout }: { hangout: Hangout }) {
+function HangoutCard({ hangout, className, style }: { hangout: Hangout; className?: string; style?: React.CSSProperties }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -272,7 +272,7 @@ function HangoutCard({ hangout }: { hangout: Hangout }) {
   };
 
   return (
-    <Link to={`/hangouts/${hangout.id}`} className="block">
+    <Link to={`/hangouts/${hangout.id}`} className={`block ${className ?? ""}`} style={style}>
       <Card data-testid={`hangout-card-${hangout.id}`} className="hangout-virt p-4 hover:bg-muted/30 transition-colors">
         {Number(hangout.boosted) === 1 && (
           <div className="mb-2 flex items-center gap-1.5 rounded-md bg-violet-50 border border-violet-200 px-2 py-1 w-fit" data-testid={`hangout-boosted-${hangout.id}`}>
@@ -569,6 +569,9 @@ export default function HangoutsPage() {
   const [suggestError, setSuggestError] = useState(false);
   const [pendingNew, setPendingNew] = useState<Array<{ hangoutId: number; title: string }>>([]);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [ptrState, setPtrState] = useState<"idle" | "pulling" | "refreshing">("idle");
+  const [ptrDist, setPtrDist] = useState(0);
+  const ptrStartY = useRef<number | null>(null);
   const pageToast = useToast();
   const pageSocket = useWebSocket();
 
@@ -632,6 +635,33 @@ export default function HangoutsPage() {
     setPage(1);
     setRefreshKey((k) => k + 1);
   }, [setPage]);
+
+  // Pull-to-refresh (этап 105): свайп вниз с самой верхней позиции скролла
+  const handlePtrTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY > 0 || ptrState === "refreshing") return;
+    ptrStartY.current = e.touches[0].clientY;
+  };
+  const handlePtrTouchMove = (e: React.TouchEvent) => {
+    if (ptrStartY.current == null) return;
+    const dy = e.touches[0].clientY - ptrStartY.current;
+    if (window.scrollY <= 0 && dy > 0) {
+      const dist = Math.min(90, dy * 0.5);
+      setPtrDist(dist);
+      setPtrState("pulling");
+    }
+  };
+  const handlePtrTouchEnd = () => {
+    if (ptrStartY.current == null) return;
+    ptrStartY.current = null;
+    if (ptrState === "pulling" && ptrDist > 64) {
+      setPtrState("refreshing");
+      refreshFeed();
+      window.setTimeout(() => { setPtrState("idle"); setPtrDist(0); }, 900);
+    } else {
+      setPtrState("idle");
+      setPtrDist(0);
+    }
+  };
 
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -859,9 +889,22 @@ export default function HangoutsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+    <div
+      className="min-h-screen bg-gradient-to-b from-background to-muted/20"
+      onTouchStart={handlePtrTouchStart}
+      onTouchMove={handlePtrTouchMove}
+      onTouchEnd={handlePtrTouchEnd}
+      onTouchCancel={handlePtrTouchEnd}
+    >
       <AppHeader title={t("hangout.title")} />
       <main className="px-4 pb-24 pt-3 max-w-2xl mx-auto space-y-3">
+        <div
+          data-testid="hangout-ptr"
+          className={`ptr-wrap flex items-center justify-center ${ptrState === "idle" ? "" : "ptr-visible"}`}
+          style={ptrState === "pulling" ? { transform: `translateY(${ptrDist}px)` } : undefined}
+        >
+          <span className={`ptr-spinner ${ptrState === "refreshing" ? "" : "opacity-40"}`} style={ptrState === "pulling" ? { opacity: Math.min(1, ptrDist / 64) } : undefined} />
+        </div>
         {!hangoutsEnabled ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground" data-testid="hangouts-disabled">
             <Compass size={48} className="mb-4 opacity-30" />
@@ -1385,8 +1428,13 @@ export default function HangoutsPage() {
                       {hangoutGroupLabel(key, t)}
                     </h3>
                     <div className="space-y-3 mt-1.5">
-                      {group.map((h) => (
-                        <HangoutCard key={h.id} hangout={h} />
+                      {group.map((h, idx) => (
+                        <HangoutCard
+                          key={`${refreshKey}-${h.id}`}
+                          hangout={h}
+                          className="hangout-stagger-enter"
+                          style={{ animationDelay: `${Math.min(idx * 40, 320)}ms` }}
+                        />
                       ))}
                     </div>
                   </section>

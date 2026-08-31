@@ -907,4 +907,23 @@
 - **Live:** сервер был запущен `node src/index.js` без watch → НЕ подхватывал изменения (категория-фильтр/ lat/lng отсутствовали). Перезапущен как `node --watch src/index.js` (`Start-Process`, PID 4388). Проверка на 3002: `?category=restaurant` → 3 оффера (все restaurant), `lat/lng` в ответе есть. UI (390px, 8081): блок, 6 чипов, 12 кнопок брони, модалка карты (iframe) открывается. Примечание: live-клик брони в скрипте упёрся в открытую поверх модалку карты — это артефакт скрипта (Escape на iframe не закрыл Radix), НЕ баг; модалка брони покрыта unit-тестом.
 - **Напоминание:** теперь бэкенд работает под `node --watch` — при следующем рестарте использовать `node --watch src/index.js` (или `npm run dev` в server).
 
-Этапы 100–104 закрыты. Следующие кандидаты: pull-to-refresh + stagger-анимация, оптимистичный UI respond/join, чип «все» в категориях, бейдж-счётчики на чипах «Куда пойти».
+## Этап 105 (31.08.2026) — pull-to-refresh + stagger-анимация карточек ✅
+
+UX-улучшение ленты hangouts (следующий кандидат после аффилиат-блока).
+
+- **Pull-to-refresh** (`src/pages/hangouts.tsx`):
+  - state: `ptrState` ("idle"|"pulling"|"refreshing"), `ptrDist`, `ptrStartY` (ref).
+  - `handlePtrTouchStart/Move/End` прикреплены к корневому `<div>` (onTouchStart/Move/End/Cancel).
+  - Move: если `ptrStartY!=null` и `window.scrollY<=0` и `dy>0` → `ptrDist=Math.min(90, dy*0.5)`, `ptrState="pulling"`.
+  - End: если `ptrState==="pulling" && ptrDist>64` → `ptrState="refreshing"` + `refreshFeed()` (сброс page+bump refreshKey) + `setTimeout` 900ms → idle; иначе сброс.
+  - Индикатор в `<main>` top: `<div data-testid="hangout-ptr" class="ptr-wrap ...">` со спиннером; translateY по pull, opacity по прогрессу.
+- **CSS** (`src/index.css`): `@keyframes hangout-stagger-in`, `.hangout-stagger-enter`; `.ptr-wrap/.ptr-visible/.ptr-spinner`, `@keyframes ptr-spin`. hsl-обёртки `hsl(var(--border))`, `hsl(var(--primary))` (переменные хранят компоненты, не готовые цвета).
+- **Stagger**: `HangoutCard` сигнатура расширена `{ hangout, className, style }`, класс/стиль наносятся на outer `<Link className="block">` (внутри `<Card>`). В групповом рендере: класс `.hangout-stagger-enter` + `animationDelay: min(idx*40,320)ms`, key=`{refreshKey}-{id}` (анимация повторяется при refresh).
+- **Тесты** (`src/test/hangouts.test.tsx`) +2:
+  - iterates stagger: `hangout-card-1.closest("a")` содержит класс `hangout-stagger-enter`;
+  - pull-to-refresh: `fireEvent.touchStart/Move/End` на `.min-h-screen` (closest) с touches `[clientY 50→200]` → число запросов `/api/hangouts` увеличивается.
+  - **front 96→98/98**; tsc/lint 0 errors; `vite build` OK; server 372/372 (без изменений в этом этапе).
+- **Live** (390px, 8081): `hangout-ptr` present, 4 карточки с `.hangout-stagger-enter`, первая delay 0ms (далее →40/80...).
+- **Внимание:** нативный pull-to-refresh — только touch; для десктопа фолбэк — кнопка «Показать новые» (`refreshFeed`), уже есть.
+
+Этапы 100–105 закрыты. Следующие кандидаты: оптимистичный UI respond/join, чип «все» в категориях, бейдж-счётчики на чипах «Куда пойти», эмбед-кадры с мероприятиями в карточках.

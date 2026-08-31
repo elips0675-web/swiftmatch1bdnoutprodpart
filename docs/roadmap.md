@@ -284,6 +284,19 @@ P2: снятие/поднятие лимита ежедневных встреч
 - **Тесты:** front +3 (чип-фильтр, модалка брони, модалка карты) — **front 93→96/96**; tsc/lint 0 errors; `vite build` OK. Live: сервер перезапущен `node --watch` (был без watch — стейл), бэкенд-проверка подтвердила category-фильтр и lat/lng; UI-проверка — чипы/кнопки/карта рендерятся.
 - **Хвосты:** у партнёрских офферов пока нет координат (lat/lng null) — карта использует город; наполнение координат и фильтр-бейдж на чипах — в долгосрочных.
 
+## Этап 105 (31.08.2026) — Pull-to-refresh + stagger-анимация карточек ✅
+
+UX-улучшение ленты (следующий по приоритету после 🟠 #8).
+
+- **Pull-to-refresh** (`src/pages/hangouts.tsx`, `src/index.css`):
+  - Touch-обработчики на корневом `<div>` (`onTouchStart/Move/End/Cancel`).
+  - Тянем вниз при `window.scrollY <= 0` → расстояние `min(90, dy*0.5)` в state `ptrDist`; индикатор `.ptr-wrap.ptr-visible` со спиннером `.ptr-spinner` (opacity по прогрессу).
+  - `touchend`: если `ptrDist > 64` → `ptrState="refreshing"` + `refreshFeed()` (сброс page, bump refreshKey → перезапрос ленты), индикатор гаснет через 900ms; иначе сброс.
+  - Индикатор: `data-testid="hangout-ptr"`, CSS ключевые кадры `hangout-stagger-in`, `ptr-spin`.
+- **Stagger-анимация**: `HangoutCard` принимает `className`/`style` (наносятся на outer `<Link className="block">`). В групповом рендере картам добавляется класс `.hangout-stagger-enter` + `animationDelay: min(idx*40, 320)ms`; ключ карты `{refreshKey}-{id}` — при refresh анимация повторяется.
+- **Тесты:** front +2 — stagger (класс на `closest("a")`), pull-to-refresh (touch-жест `touchStart 50 → touchMove 200 → touchEnd` увеличивает число `/api/hangouts` запросов). **front 96→98/98**; tsc/lint 0 errors; `vite build` OK; server 372/372 (не менялся). Live (390px): ptr-индикатор + 4 stagger-карточки, первая delay 0ms.
+- **Примечание:** pull-to-refresh работает на touch-устройствах (мобильный веб / Capacitor); на десктопе пользовательский паттерн от Web-скролла сохраняется (кнопка «Показать новые» для свежих встреч остаётся).
+
 ## Плановые хвосты (не блокируют)
 
 - Внешние блокеры (не код): staging VPS + docker compose up, реальные ключи в `.env`, домен + SSL + Google Play, k6 100 VU на staging, UptimeRobot/Grafana-алерты.

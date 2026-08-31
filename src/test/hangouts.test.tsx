@@ -150,6 +150,45 @@ describe("HangoutsPage", () => {
     expect(screen.getByText("Иду на Дюну")).toBeTruthy()
   })
 
+  it("applies stagger animation to feed cards", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(sampleHangouts) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+    renderPage(<HangoutsPage />)
+    await waitFor(() => { expect(screen.getByTestId("hangout-card-1")).toBeTruthy() })
+    const link = screen.getByTestId("hangout-card-1").closest("a")
+    expect(link).toBeTruthy()
+    expect(link!.className).toContain("hangout-stagger-enter")
+  })
+
+  it("shows pull-to-refresh indicator and triggers refresh on pull gesture", async () => {
+    let feedCalls = 0
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      if (u.includes("/api/hangouts")) {
+        feedCalls++
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([...sampleHangouts]) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+    renderPage(<HangoutsPage />)
+    await waitFor(() => { expect(screen.getByTestId("hangout-card-1")).toBeTruthy() })
+    const before = feedCalls
+
+    const root = screen.getByTestId("hangout-ptr").closest(".min-h-screen") as HTMLElement
+    expect(screen.getByTestId("hangout-ptr")).toBeTruthy()
+    fireEvent.touchStart(root, { touches: [{ clientY: 50 }] })
+    fireEvent.touchMove(root, { touches: [{ clientY: 200 }] })
+    fireEvent.touchEnd(root)
+
+    await waitFor(() => { expect(feedCalls).toBeGreaterThan(before) })
+  })
+
   it("filters by category when chip clicked", async () => {
     mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) })
     const HangoutsPage = (await import("@/pages/hangouts")).default

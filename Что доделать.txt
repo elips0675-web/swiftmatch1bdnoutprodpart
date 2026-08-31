@@ -772,4 +772,13 @@
 - **Тесты:** server 370→**372/372** (+2 category), front 93→**96/96** (+3: фильтр/бронь/карта), tsc/lint 0, `vite build` OK. Live: бэкенд перезапущен `node --watch` (был стейл — не подхватывал изменения), category-фильтр и lat/lng подтверждены на 3002.
 - **Хвосты:** координаты у офферов пока null (карта по городу); бейдж-кол-во на чипах — в долгосрочных.
 
-Следующие кандидаты (не блокируют): pull-to-refresh + stagger-анимация, оптимистичный UI respond/join, чип «все» в категориях, бейдж-счётчики на чипах «Куда пойти».
+## ✅ Этап 105 (31.08.2026): pull-to-refresh + stagger-анимация карточек — ЗАКРЫТО
+
+UX-улучшение ленты (следующий кандидат из списка).
+
+- **Pull-to-refresh** (`hangouts.tsx`, `index.css`): touch-обработчики на корневом `<div>`; тянем вниз при `window.scrollY<=0` → `ptrDist=min(90,dy*0.5)`; indicator `.ptr-wrap.ptr-visible` + `.ptr-spinner` (opacity по прогрессу); `touchend` при `ptrDist>64` → `refreshFeed()` + 900ms. `data-testid="hangout-ptr"`.
+- **Stagger**: `HangoutCard` принимает `className/style` (на outer `<Link>`); класс `.hangout-stagger-enter` + `animationDelay min(idx*40,320)ms`; ключ `{refreshKey}-{id}` — повтор при refresh. CSS `@keyframes hangout-stagger-in`, `ptr-spin`.
+- **Тесты:** front 96→**98/98** (+2: stagger-класс на `closest("a")`, pull-жест `touchStart/Move/End` → перезапрос `/api/hangouts`); tsc/lint 0, `vite build` OK, server 372/372 (не менялся). Live: ptr-индикатор + 4 stagger-карточки, первая delay 0ms.
+- **Примечание:** работает на touch-устройствах; на десктопе паттерн обычный + кнопка «Показать новые».
+
+Следующие кандидаты (не блокируют): оптимистичный UI respond/join, чип «все» в категориях, бейдж-счётчики на чипах «Куда пойти», эмбед-кадры с мероприятиями в карточках.
