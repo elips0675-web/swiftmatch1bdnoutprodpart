@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useLanguage } from "@/context/language-context";
 import { useFeatureFlags } from "@/context/feature-flags-context";
 import { usePremium } from "@/hooks/use-premium";
@@ -546,6 +546,7 @@ function HangoutCard({ hangout, className, style, onOptimistic }: { hangout: Han
                 <MapPin size={14} className="inline mr-1 -mt-0.5 text-primary" />
                 {placeLabel}
               </DialogTitle>
+              <DialogDescription className="sr-only">{placeLabel}</DialogDescription>
             </DialogHeader>
             <div className="overflow-hidden rounded-xl border border-muted aspect-[4/3] bg-muted/30">
               <iframe
