@@ -1,7 +1,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "@/shims/next-navigation";
-import { MapPin, ChevronLeft, ChevronRight, X, Heart, MessageCircle, Flag, Sparkles, Trophy, SlidersHorizontal, Chrome as HomeIcon, LogIn } from "lucide-react";
+import { MapPin, ChevronLeft, ChevronRight, X, Heart, MessageCircle, Flag, Sparkles, Trophy, SlidersHorizontal, Chrome as HomeIcon, LogIn, User as UserIcon } from "lucide-react";
 import Image from "@/shims/next-image";
 import dynamic from "@/shims/next-dynamic";
 import { AppHeader } from "@/components/layout/app-header";
@@ -414,6 +414,17 @@ function SearchContent() {
                     onClick={handleNext}
                 >
                     <X size={26} strokeWidth={3} />
+                </Button>
+                <Button
+                    asChild
+                    variant="outline"
+                    aria-label={t('nav.profile')}
+                    data-testid={`search-profile-btn-${user.id}`}
+                    className="w-[3.5rem] h-[3.5rem] rounded-full bg-white shadow-xl border-0 text-slate-500 hover:text-blue-500 active:scale-90 transition-all flex items-center justify-center"
+                >
+                    <Link href={`/user?id=${user.id}`} onClick={(e) => e.stopPropagation()}>
+                        <UserIcon size={26} />
+                    </Link>
                 </Button>
                 <Button
                     className="relative w-16 h-16 rounded-full bg-blue-500 text-white shadow-2xl shadow-blue-500/40 hover:scale-110 active:scale-95 transition-all border-0 disabled:bg-slate-300 disabled:shadow-none flex items-center justify-center"

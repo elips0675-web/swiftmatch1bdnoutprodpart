@@ -20,6 +20,7 @@
 - **Тесты:** юнит-тест infinite scroll заменён на пагинацию: (1) «shows pagination and replaces feed when next page is clicked» — counter «1 / 3», клик next → `page=2` в запросе, карточки 2-й страницы, первая исчезла; (2) «hides pagination when feed fits a single page». **front 113/113, server 366/366 (get-фид: +tests не добавлялись — контракт сохранён), vite build OK, lint 0 errors.** E2E: `hangouts.spec.ts` 4/4, `admin-content.spec.ts` 15/15, полный прогон 150/150 (этап 111 baseline).
 - Live-проверка: `/api/hangouts?page=1&limit=20` → `items:20, total:36` (2 страницы); `/hangouts` 200, пагинация рендерится.
 - Полный E2E: **150 passed** (в основном прогоне 1 flaky — `audit-full` «Settings switches are interactive», повторно прошёл 1/1; к ленте отношения не имеет).
+- **UX-дополнение по запросу:** на странице поиска `/search` (режимы nearby/autosearch) добавлена явная кнопка «Профиль» (`UserIcon`, `data-testid="search-profile-btn-{id}"`, aria-label) в ряду действий под карточкой (между «X» и «Лайк»), ведёт на `/user?id=…` (stopPropagation, чтобы не дублировать клик карточки). `src/pages/search.tsx`. Проверено вживую (390px): кнопка видна, клик → `/user?id=3`.
 
 ## Этап 74 (29.08.2026) — E2E Premium (mock Stripe), Hangouts 2.0, B2B partner dashboard
 
