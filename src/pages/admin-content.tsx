@@ -63,9 +63,9 @@ function EditableList({ items, onAdd, onDelete, nounKey, section, saving }: Edit
           toast.success(t('admin.content.csv_downloaded'));
         }}><Download size={12} className="mr-1" /> CSV</Button>
       </div>
-      <div className="flex flex-wrap gap-2 p-4 rounded-2xl border bg-muted/30 min-h-[120px]">
+      <div className="flex flex-wrap items-start gap-2 p-4 rounded-2xl border bg-muted/30">
         {items.map((item) => (
-          <Badge key={item} variant="secondary" className="text-sm py-1 px-3 flex items-center gap-2 border bg-background shadow-sm">
+          <Badge key={item} variant="secondary" className="text-xs py-0.5 px-2.5 rounded-full border bg-background shadow-sm flex items-center gap-1 whitespace-nowrap leading-none">
             {itemLabel(item, section, t)}
             <button onClick={(e) => { e.stopPropagation(); if (!confirm(t('admin.content.confirm_delete'))) return; onDelete(item); }} className="text-muted-foreground hover:text-destructive transition-colors">
               <Trash2 size={12} />
@@ -193,26 +193,26 @@ export default function ContentManagementPage() {
               <TabsTrigger value="banned_words" className="rounded-lg py-2 font-bold text-xs">{t('admin.content.forbidden_words')} ({forbiddenWords.length})</TabsTrigger>
             </TabsList>
             <TabsContent value="interests">
-              <EditableList items={interests} nounKey="interests" section="interests" saving={saving === 'interests'} onAdd={i => setInterests(p => [...p, i].sort((a, b) => sortKey(a, 'interest.', t).localeCompare(sortKey(b, 'interest.', t))))} onDelete={i => { const next = interests.filter(x => x !== i); setInterests(next); handleSave('interests', next, setInterests); }} />
+              <EditableList items={interests} nounKey="interests" section="interests" saving={saving === 'interests'} onAdd={i => { const next = [...interests, i].sort((a, b) => sortKey(a, 'interest.', t).localeCompare(sortKey(b, 'interest.', t))); setInterests(next); handleSave('interests', next, setInterests); }} onDelete={i => { const next = interests.filter(x => x !== i); setInterests(next); handleSave('interests', next, setInterests); }} />
               <div className="mt-2 flex justify-end">
                 <Button size="sm" className="rounded-xl" onClick={() => handleSave('interests', interests, setInterests)} disabled={saving === 'interests'}>{saving === 'interests' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null} {t('admin.save')}</Button>
               </div>
             </TabsContent>
             <TabsContent value="goals">
-              <EditableList items={goals} nounKey="goals" section="goals" saving={saving === 'dating_goals'} onAdd={i => setGoals(p => [...p, i].sort((a, b) => sortKey(a, 'goal.', t).localeCompare(sortKey(b, 'goal.', t))))} onDelete={i => { const next = goals.filter(x => x !== i); setGoals(next); handleSave('dating_goals', next, setGoals); }} />
+              <EditableList items={goals} nounKey="goals" section="goals" saving={saving === 'dating_goals'} onAdd={i => { const next = [...goals, i].sort((a, b) => sortKey(a, 'goal.', t).localeCompare(sortKey(b, 'goal.', t))); setGoals(next); handleSave('dating_goals', next, setGoals); }} onDelete={i => { const next = goals.filter(x => x !== i); setGoals(next); handleSave('dating_goals', next, setGoals); }} />
               <div className="mt-2 flex justify-end">
                 <Button size="sm" className="rounded-xl" onClick={() => handleSave('dating_goals', goals, setGoals)} disabled={saving === 'dating_goals'}>{saving === 'dating_goals' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null} {t('admin.save')}</Button>
               </div>
             </TabsContent>
             <TabsContent value="education">
-              <EditableList items={education} nounKey="education" section="education" saving={saving === 'education'} onAdd={i => setEducation(p => [...p, i].sort((a, b) => sortKey(a, 'education.', t).localeCompare(sortKey(b, 'education.', t))))} onDelete={i => { const next = education.filter(x => x !== i); setEducation(next); handleSave('education', next, setEducation); }} />
+              <EditableList items={education} nounKey="education" section="education" saving={saving === 'education'} onAdd={i => { const next = [...education, i].sort((a, b) => sortKey(a, 'education.', t).localeCompare(sortKey(b, 'education.', t))); setEducation(next); handleSave('education', next, setEducation); }} onDelete={i => { const next = education.filter(x => x !== i); setEducation(next); handleSave('education', next, setEducation); }} />
               <div className="mt-2 flex justify-end">
                 <Button size="sm" className="rounded-xl" onClick={() => handleSave('education', education, setEducation)} disabled={saving === 'education'}>{saving === 'education' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null} {t('admin.save')}</Button>
               </div>
             </TabsContent>
             <TabsContent value="cities">
               <div className="space-y-6">
-                <EditableList items={cities} nounKey="cities" section="cities" saving={saving === 'cities'} onAdd={i => setCities(p => [...p, i].sort((a, b) => a.localeCompare(b)))} onDelete={i => { const next = cities.filter(x => x !== i); setCities(next); handleSave('cities', next, setCities); }} />
+                <EditableList items={cities} nounKey="cities" section="cities" saving={saving === 'cities'} onAdd={i => { const next = [...cities, i].sort((a, b) => a.localeCompare(b)); setCities(next); handleSave('cities', next, setCities); }} onDelete={i => { const next = cities.filter(x => x !== i); setCities(next); handleSave('cities', next, setCities); }} />
                 <div className="mt-2 flex justify-end">
                   <Button size="sm" className="rounded-xl" onClick={() => handleSave('cities', cities, setCities)} disabled={saving === 'cities'}>{saving === 'cities' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null} {t('admin.save')}</Button>
                 </div>
@@ -255,7 +255,7 @@ export default function ContentManagementPage() {
                         <CollapsibleContent className="pt-2 pl-4">
                           <div className="flex flex-wrap gap-2 mb-3">
                             {[...cityList].sort((a, b) => a.localeCompare(b)).map(city => (
-                              <Badge key={city} variant="secondary" className="text-sm py-1 px-3 flex items-center gap-2 border bg-background shadow-sm">
+                              <Badge key={city} variant="secondary" className="text-xs py-0.5 px-2.5 rounded-full border bg-background shadow-sm flex items-center gap-1 whitespace-nowrap leading-none">
                                 {city}
                                 <button onClick={() => {
                                   saveCountriesCities({ ...countriesCities, [country]: cityList.filter(c => c !== city) });
@@ -293,7 +293,7 @@ export default function ContentManagementPage() {
               </div>
             </TabsContent>
             <TabsContent value="banned_words">
-              <EditableList items={forbiddenWords} nounKey="words" section="banned_words" saving={saving === 'banned_words'} onAdd={w => setForbiddenWords(p => [...p, w].sort((a, b) => a.localeCompare(b)))} onDelete={w => { const next = forbiddenWords.filter(x => x !== w); setForbiddenWords(next); handleSave('banned_words', next, setForbiddenWords); }} />
+              <EditableList items={forbiddenWords} nounKey="words" section="banned_words" saving={saving === 'banned_words'} onAdd={w => { const next = [...forbiddenWords, w].sort((a, b) => a.localeCompare(b)); setForbiddenWords(next); handleSave('banned_words', next, setForbiddenWords); }} onDelete={w => { const next = forbiddenWords.filter(x => x !== w); setForbiddenWords(next); handleSave('banned_words', next, setForbiddenWords); }} />
               <div className="mt-2 flex justify-end">
                 <Button size="sm" className="rounded-xl" onClick={() => handleSave('banned_words', forbiddenWords, setForbiddenWords)} disabled={saving === 'banned_words'}>{saving === 'banned_words' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null} {t('admin.save')}</Button>
               </div>

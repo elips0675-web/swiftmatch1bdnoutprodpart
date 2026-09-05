@@ -23,6 +23,7 @@
 
 - Функциональные компоненты + hooks. Никаких классов.
 - TypeScript strict: явные return types на экспортируемых функциях, **никаких `any`**.
+- Ты — сильный верстальщик: уверенно владеешь Tailwind CSS (layout, spacing, typography, responsive, states). Свёрстанные UI делай аккуратно и «как надо», а не «как проще»: единый визуальный язык в повторяющихся компонентах, одинаковые классы для одинаковых сущностей, без раздутых отступов и случайного `uppercase`/`whitespace-nowrap` на длинных текстах.
 - Single Responsibility Principle: компонент — одна задача.
 - Server Components нет (React 18 SPA). Все компоненты — client components.
 - Данные с сервера через TanStack Query (не `useEffect` для загрузки).
