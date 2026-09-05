@@ -1,13 +1,17 @@
-# CSS Backup — admin-content.tsx (25.08.2026)
-# Все классы кнопок и бейджей на вкладках Интересы / Цели / Города / Слова
+# CSS Backup — admin-content.tsx (актуально, 05.09.2026)
+# Эталон текущего состояния кнопок/бейджей на вкладках Интересы / Цели / Образование / Города / Запрещённые слова.
+# ЕДИНЫЙ стиль бейджа во ВСЕХ секциях (общий компонент EditableList).
 
-## TabsList (строка 187)
-className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto p-1 bg-muted/50 rounded-xl mb-6"
+## Badge item (EditableList, строка 68) — все секции
+className="text-sm py-1 px-3 rounded-full border bg-background shadow-sm flex items-center gap-1.5 whitespace-nowrap leading-tight"
 
-## TabsTrigger (строки 188-192)
-className="rounded-lg py-2 font-bold text-xs"
+## Badge item in countries cities (строка ~258) — города внутри «Страны»
+className="text-sm py-1 px-3 rounded-full border bg-background shadow-sm flex items-center gap-1.5 whitespace-nowrap leading-tight"
 
-## Save button (строки 197, 203, 209, 216, 297)
+## Items container (строка 66) — НЕ содержит min-h, НЕ растягивает (items-start)
+className="flex flex-wrap items-start gap-2 p-4 rounded-2xl border bg-muted/30"
+
+## Save button
 className="rounded-xl"
 
 ## Add button (строка 78)
@@ -16,41 +20,40 @@ className="rounded-xl h-10 px-6"
 ## CSV button (строка 61)
 className="ml-auto h-7 text-xs"
 
-## Badge item (строка 68)
-className="text-sm py-1 px-3 flex items-center gap-2 border bg-background shadow-sm"
-
-## Delete icon in badge (строка 70)
+## Delete icon in badge
 className="text-muted-foreground hover:text-destructive transition-colors"
 
-## Badge item in countries cities (строка 257)
-className="text-sm py-1 px-3 flex items-center gap-2 border bg-background shadow-sm"
-
-## Delete icon in countries (строка 261)
-className="text-muted-foreground hover:text-destructive transition-colors"
-
-## Country add button (строка 230)
+## Country add button
 className="rounded-xl h-10 px-6"
 
-## City add button (строка 283)
+## City add button
 className="rounded-xl h-9"
 
-## Collapsible trigger (строка 237)
+## Collapsible trigger
 className="flex w-full items-center justify-between p-3 rounded-xl border bg-muted/30 hover:bg-muted/50 transition-colors"
 
-## Delete country (строка 248)
+## Delete country
 className="text-muted-foreground hover:text-destructive transition-colors p-1"
 
-## Input field (строка 77)
+## Input (общий)
 className="h-10 rounded-xl"
 
-## Country input (строка 224)
+## Country input
 className="h-10 rounded-xl"
 
-## City input (строка 268)
+## City input
 className="h-9 rounded-xl text-sm"
 
-## Items container (строка 66)
-className="flex flex-wrap gap-2 p-4 rounded-2xl border bg-muted/30 min-h-[120px]"
+## TabsList
+className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto p-1 bg-muted/50 rounded-xl mb-6"
 
-## Save footer wrapper (строки 196, 202, 208, 215, 296)
+## TabsTrigger
+className="rounded-lg py-2 font-bold text-xs"
+
+## Save footer wrapper
 className="mt-2 flex justify-end"
+
+# Логика (важно при откате):
+# - onAdd ВО ВСЕХ секциях сразу вызывает handleSave (автосохранение добавления).
+# - Секции сохраняются по ключам: interests, dating_goals, education, cities, banned_words.
+# - В БД content_config секции должны лежать как JSON-массивы (не плоские строки).
