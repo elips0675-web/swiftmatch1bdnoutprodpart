@@ -604,6 +604,13 @@ export default function HangoutsPage() {
   const [goOutCity, setGoOutCity] = useState<string>("");
   const [goOutBooking, setGoOutBooking] = useState<GoOutOffer | null>(null);
   const [goOutMapOpen, setGoOutMapOpen] = useState(false);
+  // H-mobile: второстепенные фильтры (сорт/цена/радиус) свёрнуты в «Фильтры» на мобильных,
+  // на десктопе (и в тестах) открыты по умолчанию — функционал не теряется.
+  const [filtersOpen, setFiltersOpen] = useState(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return true;
+    return !window.matchMedia("(max-width: 767px)").matches;
+  });
+  const hasActiveFilters = sortBy !== "date" || priceFilter !== "all" || priceMax != null || radiusKm !== 10 || geoStatus === "ok";
   const { isPremium } = usePremium();
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [suggestLoading, setSuggestLoading] = useState(false);
@@ -1010,22 +1017,23 @@ export default function HangoutsPage() {
               {t("hangout.action.create")}
             </Button>
 
-            <Link
-              to="/hangouts/my"
-              data-testid="hangout-my-link"
-              className="block text-center text-sm font-semibold text-primary hover:underline py-0.5"
-            >
-              {t("hangout.my_listings")} →
-            </Link>
-
-            <Link
-              to="/events"
-              data-testid="events-link"
-              className="flex items-center justify-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-4 py-2 text-sm font-bold text-primary hover:bg-primary/10 transition-colors"
-            >
-              <Sparkles size={16} />
-              {t("events.from_hangouts")}
-            </Link>
+            <div className="grid grid-cols-2 gap-2 -mx-1 px-1">
+              <Link
+                to="/hangouts/my"
+                data-testid="hangout-my-link"
+                className="flex items-center justify-center gap-1 rounded-full border border-muted px-3 py-2 text-xs font-bold text-muted-foreground hover:bg-muted/40 transition-colors"
+              >
+                {t("hangout.my_listings")}
+              </Link>
+              <Link
+                to="/events"
+                data-testid="events-link"
+                className="flex items-center justify-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-bold text-primary hover:bg-primary/10 transition-colors"
+              >
+                <Sparkles size={13} />
+                {t("events.from_hangouts")}
+              </Link>
+            </div>
 
             <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -1070,7 +1078,7 @@ export default function HangoutsPage() {
               ))}
             </div>
 
-            <div className="flex gap-2 flex-wrap -mx-1 px-1" data-testid="hangout-category-chips">
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" data-testid="hangout-category-chips">
               {chips.map((chip) => (
                 <button
                   key={chip.key ?? "all"}
@@ -1110,6 +1118,19 @@ export default function HangoutsPage() {
               ))}
             </div>
 
+            <button
+              type="button"
+              data-testid="hangout-filters-toggle"
+              onClick={() => setFiltersOpen((o) => !o)}
+              aria-expanded={filtersOpen}
+              className="w-full flex items-center justify-center gap-1.5 rounded-full border border-muted bg-background px-3 py-2 text-xs font-bold text-muted-foreground hover:bg-muted/40 transition-colors"
+            >
+              <Filter size={13} />
+              {t("hangout.filter.title")}
+              {hasActiveFilters && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+              <ChevronDown size={13} className={cn("transition-transform", filtersOpen && "rotate-180")} />
+            </button>
+            {filtersOpen && (<>
             <div className="px-1 flex items-center gap-2" data-testid="hangout-sort">
               <label className="text-xs font-semibold text-muted-foreground">
                 {t("hangout.filter.sort")}
@@ -1225,6 +1246,7 @@ export default function HangoutsPage() {
                 </p>
               )}
             </div>
+            </>)}
 
             {goOutOffers && goOutOffers.length > 0 && (
               <div data-testid="hangout-go-out" id="hangout-go-out" className="px-1">

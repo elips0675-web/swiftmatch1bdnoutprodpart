@@ -357,6 +357,22 @@ describe("HangoutsPage", () => {
     })
   })
 
+  it("collapses secondary filters behind toggle without losing controls", async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+
+    renderPage(<HangoutsPage />)
+
+    await waitFor(() => expect(screen.getByTestId("hangout-filters-toggle")).toBeTruthy())
+    expect(screen.getByTestId("hangout-price-free")).toBeTruthy()
+
+    fireEvent.click(screen.getByTestId("hangout-filters-toggle"))
+    await waitFor(() => expect(screen.queryByTestId("hangout-price-free")).toBeNull())
+
+    fireEvent.click(screen.getByTestId("hangout-filters-toggle"))
+    await waitFor(() => expect(screen.getByTestId("hangout-price-free")).toBeTruthy())
+  })
+
   it("renders map 'show map' button and opens OSM modal", async () => {
     mockFetch.mockImplementation((url: string) => {
       const u = String(url)
