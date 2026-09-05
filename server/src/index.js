@@ -13,6 +13,7 @@ import pool from './db.js'
 import { initIO, startMessageCleanup, startCheckinCleanup } from './ws.js'
 import { createLogger, rootLogger } from './logger.js'
 import { idempotency } from './middleware/idempotency.js'
+import { csrf, csrfGuard, csrfRouter } from './middleware/csrf.js'
 import { startRefreshTokenCleanup } from './cleanup.js'
 import { isLocked, recordFailure, recordSuccess } from './lockout.js'
 import twoFaRoutes from './routes/totp-2fa.js'
@@ -84,6 +85,11 @@ if (process.env.NODE_ENV === 'production' && !process.env.CORS_ORIGIN) {
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }))
 app.use(helmet())
 app.use(cookieParser())
+// CSRF double-submit: раздача токена (безопасно на любой точке).
+// Активация guard (блокировка мутирующих запросов без x-csrf-token) — после
+// выноса API на поддомен: раскомментировать app.use(csrfGuard) ниже.
+app.use(csrf)
+// app.use(csrfGuard)
 
 // Sentry must be initialized BEFORE routes and the final error handler,
 // otherwise its errorHandler (registered last) never fires.
@@ -203,6 +209,7 @@ app.post('/api/auth/logout', (req, res) => {
 
 // TOTP 2FA management (этап 38): setup/enable/disable, только админы
 app.use(twoFaRoutes)
+app.use(csrfRouter)
 
 // Public content endpoint (no auth)
 app.get('/api/content', async (req, res) => {

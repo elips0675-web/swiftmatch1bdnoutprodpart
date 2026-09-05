@@ -363,5 +363,7 @@ UX-улучшение ленты (следующий по приоритету �
 ## Плановые хвосты (не блокируют)
 
 - Внешние блокеры (не код): staging VPS + docker compose up, реальные ключи в `.env`, домен + SSL + Google Play, k6 100 VU на staging, UptimeRobot/Grafana-алерты.
-- Код/низкий приоритет (после релиза): CSRF double-submit (при выносе API на поддомен), fingerprint refresh, SMS (Twilio), AI-модерация фото (Rekognition), CDN/S3.
-- Открыт: сверка поведения jsdom/localStorage на Node 25 dev vs 22-alpine Docker.
+- Код/низкий приоритет (после релиза): SMS (Twilio), AI-модерация фото (Rekognition), CDN/S3 — код готов, ждут реальные ключи/бакет в prod `.env`.
+- **CSRF double-submit — код ГОТОВ** (`server/src/middleware/csrf.js` + `GET /api/auth/csrf`; 6 тестов в `csrf.test.js`; suite 395/395 ✅). Раздача токена активна (`app.use(csrf)`), guard отключён: включить одной строкой `app.use(csrfGuard)` при выносе API на поддомен — тогда фронт берёт токен на `/api/auth/csrf` и шлёт его в `x-csrf-token`.
+- **Fingerprint refresh — ЗАКРЫТ**: при ротации refresh-токена сохраняется новый fingerprint; mismatch логируется.
+- Открыт: сверка поведения jsdom/localStorage на Node 25 (dev) vs 22-alpine (Docker) — docker на dev-машине не установлен, сверка переносится на staging при наличии.
