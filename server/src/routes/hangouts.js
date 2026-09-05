@@ -103,7 +103,7 @@ async function resolvePaidGate(hangout, userId) {
 }
 
 const respondLimiter = rateLimit({ windowMs: 60_000, max: 30, message: { message: 'Too many responses' } })
-const createLimiter = rateLimit({ windowMs: 60_000, max: 10, message: { message: 'Too many hangouts created' } })
+const createLimiter = rateLimit({ windowMs: 60_000, max: Number(process.env.HANGOUT_CREATE_RATE_MAX || 10), message: { message: 'Too many hangouts created' } })
 
 const PAGE_SIZE_DEFAULT = 20
 const PAGE_SIZE_MAX = 50

@@ -137,7 +137,7 @@ router.post('/api/partner/offers', auth, requirePartner(async (req, res) => {
     const [result] = await pool.query(
       `INSERT INTO partner_offers (partner_id, category, title, description, deeplink, price, city, placement, status, event_start, event_end, location, poster_url, event_url, capacity)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)`,
-      [req.partner.id, category, String(title).trim(), description || null, deeplink, price || null, city || null, placements.join(',')],
+      [req.partner.id, category, String(title).trim(), description || null, deeplink, price || null, city || null, placements.join(','), eventStart ? new Date(eventStart) : null, eventEnd ? new Date(eventEnd) : null, location || null, posterUrl || null, eventUrl || null, capacity ? Number(capacity) : null],
     )
     await pool.query(
       `UPDATE partner_offers SET event_start = ?, event_end = ?, location = ?, poster_url = ?, event_url = ?, capacity = ? WHERE id = ?`,
