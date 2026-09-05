@@ -104,7 +104,8 @@ function performAutosearch(filters: AutoSearchFilters, allUsers: SearchUser[], c
         })
         .map(user => {
             const normalizedUserInterests = user.interests.map((i: string) => i.startsWith('interest.') ? i.slice(9) : i);
-            const commonInterests = normalizedUserInterests.filter((i: string) => selectedInterests.includes(i)).length;
+            const normalizedSelectedInterests = (selectedInterests || []).map((i: string) => i.startsWith('interest.') ? i.slice(9) : i);
+            const commonInterests = normalizedUserInterests.filter((i: string) => normalizedSelectedInterests.includes(i)).length;
             const hasMatchingGoal = selectedDatingGoal !== "all" && user.goal === selectedDatingGoal;
             const hasMatchingCircadian = currentUser.circadian && user.circadian && currentUser.circadian === user.circadian;
             const attachmentCompatibility = calculateAttachmentCompatibility(currentUser.attachmentStyle, user.attachmentStyle);
