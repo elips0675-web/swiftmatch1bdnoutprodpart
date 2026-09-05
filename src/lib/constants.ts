@@ -56,7 +56,6 @@ export const INTEREST_OPTIONS: readonly string[] = [
     "interest.martial_arts",
     "interest.podcasts",
     "interest.reading",
-    "interest.technology",
 ];
 
 export const ZODIAC_SIGNS: readonly string[] = [

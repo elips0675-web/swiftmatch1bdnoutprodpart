@@ -228,7 +228,7 @@ app.get('/api/content', async (req, res) => {
       'SELECT DISTINCT city FROM user_profiles WHERE city IS NOT NULL AND city != "" ORDER BY city',
     )
     res.json({
-      interests: parseJsonField(row.interests, []),
+      interests: Array.from(new Set(parseJsonField(row.interests, []).map((i) => (i === 'technology' ? 'tech' : i)))),
       dating_goals: parseJsonField(row.dating_goals, []),
       education: parseJsonField(row.education, []),
       banned_words: parseJsonField(row.banned_words, []),

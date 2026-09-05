@@ -27,6 +27,10 @@ function notify() {
   listeners.forEach(fn => fn())
 }
 
+function normalizeInterests(items: string[]): string[] {
+  return [...new Set(items.map(i => (i === 'technology' ? 'tech' : i)))]
+}
+
 function mapKeys(items: string[], prefix: string): string[] {
   return items.map(item => item.startsWith(prefix) ? item : prefix + item).sort()
 }
@@ -37,7 +41,7 @@ async function fetchConfig(): Promise<ContentConfig> {
     if (!res.ok) throw new Error('Failed to fetch')
     const data = await res.json()
     cached = {
-      interests: mapKeys(data.interests || [], 'interest.'),
+      interests: mapKeys(normalizeInterests(data.interests || []), 'interest.'),
       dating_goals: mapKeys(data.dating_goals || [], 'goal.'),
       education: mapKeys(data.education || [], 'education.'),
       banned_words: data.banned_words || [],

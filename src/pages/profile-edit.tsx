@@ -99,11 +99,11 @@ const NAME_TO_KEY: Record<string, string> = {
 
 function normalizeObjectInterests(interests: any): string[] {
   if (!Array.isArray(interests)) return []
-  return interests.map((i: any) => {
-    if (typeof i === 'string') return i
+  return [...new Set(interests.map((i: any) => {
+    if (typeof i === 'string') return i === 'interest.technology' ? 'interest.tech' : i
     const name = i.name_ru && !/^\?+$/.test(i.name_ru) ? i.name_ru : i.name_en
     return NAME_TO_KEY[name] || name
-  }).filter((i: string) => i && !BANNED_WORDS.includes(i))
+  }))].filter((i: string) => i && !BANNED_WORDS.includes(i))
 }
 
 function mapDbProfile(rows: any) {

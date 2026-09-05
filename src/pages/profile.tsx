@@ -85,7 +85,7 @@ type InterestInput = string | { name_ru?: string; name_en?: string };
 function normalizeInterests(interests: InterestInput[]): string[] {
   if (!Array.isArray(interests)) return []
   if (interests.length === 0) return []
-  if (typeof interests[0] === 'string') return interests.filter((i: string) => !BANNED_WORDS.includes(i))
+  if (typeof interests[0] === 'string') return [...new Set(interests.map((i: string) => i === 'interest.technology' ? 'interest.tech' : i))].filter((i: string) => !BANNED_WORDS.includes(i))
   const nameToKey: Record<string, string> = {
     'Спорт': 'interest.sport', 'Музыка': 'interest.music', 'Фотография': 'interest.photography',
     'Путешествия': 'interest.travel', 'Кофе': 'interest.coffee', 'Искусство': 'interest.art',
