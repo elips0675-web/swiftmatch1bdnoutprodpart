@@ -560,8 +560,9 @@ function ChatsContent() {
         <header className="flex items-center gap-2 px-3 py-2 border-b border-border bg-white/90 backdrop-blur-lg z-50 h-16 shrink-0">
           <Button variant="ghost" size="icon" onClick={handleBack} className="rounded-full hover:bg-muted/50"><ChevronLeft size={24} /></Button>
           <div className="relative">
-            <div className="w-10 h-10 rounded-full overflow-hidden relative border-2 border-white shadow-sm bg-muted flex items-center justify-center">
-              <Image src={selectedChat.img} alt={selectedChat.name || ''} fill sizes="40px" className="object-cover" />
+            <div className="w-10 h-10 rounded-full overflow-hidden relative border-2 border-white shadow-sm bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
+              {selectedChat.img ? <Image src={selectedChat.img} alt={selectedChat.name || ''} fill sizes="40px" className="object-cover" />
+              : <span className="text-white font-black text-base">{selectedChat.name ? selectedChat.name.trim().charAt(0).toUpperCase() : '?'}</span>}
             </div>
             {selectedChat.online && <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#2ecc71] border-2 border-white rounded-full shadow-sm"></span>}
           </div>
@@ -791,9 +792,10 @@ function ChatsContent() {
                 )}>
                     <div className="relative flex-shrink-0">
                       <div className={cn(
-                        "w-12 h-12 rounded-xl overflow-hidden border-2 border-white shadow-sm transition-transform group-hover:scale-105 bg-muted"
+                        "w-12 h-12 rounded-xl overflow-hidden border-2 border-white shadow-sm transition-transform group-hover:scale-105 bg-muted flex items-center justify-center"
                       )}>
-                        <Image src={item.img} alt={item.name || ''} fill sizes="48px" className="object-cover" />
+                        {item.img ? <Image src={item.img} alt={item.name || ''} fill sizes="48px" className="object-cover" />
+                        : <span className="text-primary font-black text-lg">{item.name ? item.name.trim().charAt(0).toUpperCase() : '?'}</span>}
                       </div>
                     {item.online && <span className="absolute bottom-0 right-0 w-3 h-3 border-2 border-white rounded-full shadow-md bg-[#2ecc71]"></span>}
                   </div>
