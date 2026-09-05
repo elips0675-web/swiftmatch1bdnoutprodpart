@@ -416,17 +416,6 @@ function SearchContent() {
                     <X size={26} strokeWidth={3} />
                 </Button>
                 <Button
-                    asChild
-                    variant="outline"
-                    aria-label={t('nav.profile')}
-                    data-testid={`search-profile-btn-${user.id}`}
-                    className="w-[3.5rem] h-[3.5rem] rounded-full bg-white shadow-xl border-0 text-slate-500 hover:text-blue-500 active:scale-90 transition-all flex items-center justify-center"
-                >
-                    <Link href={`/user?id=${user.id}`} onClick={(e) => e.stopPropagation()}>
-                        <UserIcon size={26} />
-                    </Link>
-                </Button>
-                <Button
                     className="relative w-16 h-16 rounded-full bg-blue-500 text-white shadow-2xl shadow-blue-500/40 hover:scale-110 active:scale-95 transition-all border-0 disabled:bg-slate-300 disabled:shadow-none flex items-center justify-center"
                     onClick={handleSuperLike}
                     disabled={(currentUser?.superLikes || 0) === 0}
@@ -449,8 +438,28 @@ function SearchContent() {
                         <MessageCircle size={28} />
                     </Link>
                 </Button>
+                <Button
+                    asChild
+                    variant="outline"
+                    data-testid={`search-profile-btn-${user.id}`}
+                    className="w-[3.5rem] h-[3.5rem] rounded-full bg-white shadow-xl border-0 text-blue-400 hover:text-blue-600 active:scale-90 transition-all flex items-center justify-center"
+                >
+                    <Link href={`/user?id=${user.id}`} prefetch={true} onClick={(e) => e.stopPropagation()}>
+                        <UserIcon size={26} strokeWidth={2} />
+                    </Link>
+                </Button>
 
             </div>
+
+            <Button
+                asChild
+                variant="outline"
+                className="mt-8 mb-8 h-9 px-8 rounded-full bg-white shadow-lg border-0 text-primary font-bold active:scale-95 transition-all text-sm"
+            >
+                <Link href={`/user?id=${user.id}`} prefetch={true}>
+                    {t('search.open_profile')}
+                </Link>
+            </Button>
 
           </>
         )}
