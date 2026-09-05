@@ -377,9 +377,17 @@ UX-улучшение ленты (следующий по приоритету �
 - **Подключение (`src/pages/hangout-detail.tsx`):** добавлен `<SeoHead>` с `title="${hangout.title} — SwiftMatch"`, `description` = `description · place_name · city` (обрезается до 200 симв., фолбэк `hangout.seo.feed_desc`), `image=hangout.avatar_url`, `canonical=${origin}/hangouts/{id}`, `type="article"`; корневой `<div>` заменён на fragment `<>...</>`.
 - **Счётчики:** tsc/lint 0 errors, `vite build` OK.
 
+## Этап 113 (05.09.2026) — k6: локальный смоук-базлайн + бласт 100 VU; замер против `/api`-лимитера ✅
+
+- **Смоук** (`k6 run scripts/k6/load-staging.js` против localhost:3002): 20 итераций, **40/40 checks ✅**, `http_req_failed 0%`, `http_req_duration` avg 798µs / med 517µs / **p95 1.66ms**.
+- **Бласт 100 VU** (ramp 15s→100, hold 45s, down 15s): **367 894 запроса → ~4 905 rps устойчиво** (`/health` + `/api/content`), `http_req_duration` avg 16.26ms / med 13.74ms / **p95 26.88ms**, **0 ошибок 5xx** — сервер и MySQL живы весь прогон, пул `DB_POOL_MAX 20` не упирался, mysqld не падал.
+- **Находка:** 49.67% запросов = **429** от собственного `makeApiLimiter` (600/мин на IP, `server/src/middleware/limiters.js`) — сработал **как анти-DoS**, а не деградация ёмкости: все 429 пришлись на `/api/content` (потолок 600/мин), `/health` без лимитера весь зелёный.
+- **Вывод для milestone «k6 100 VU на staging»:** single-IP «бласт» скриптом `load-staging.js` всегда упрётся в порог `<1% errors` из-за лимитера, а не из-за сервера. Варианты: (1) pacing/think-time в скрипте под потолок 600/мин; (2) k6 Cloud / несколько исходных IP; (3) raw-capacity мерить отдельно по `/health`. Лимитер не поднимать — это защитный слой поверх `nginx 30r/s`.
+- **Код/счётчики не менялись** (только запуск k6 + этот документ).
+
 ## Плановые хвосты (не блокируют)
 
-- Внешние блокеры (не код): staging VPS + `docker compose up` — **артефакты готовы** (Dockerfile: `node:22-alpine`, авто-миграции `database/migrations/migrate.js` при старте, healthcheck; docker-compose: app/db/redis/nginx/prometheus/grafana; `scripts/k6/load-staging.js` — smoke + 100 VU); осталось: доступ к VPS, `.env` с реальными ключами, домен + SSL + Google Play, UptimeRobot/Grafana-алерты.
+- Внешние блокеры (не код): staging VPS + `docker compose up` — **артефакты готовы** (Dockerfile: `node:22-alpine`, авто-миграции `database/migrations/migrate.js` при старте, healthcheck; docker-compose: app/db/redis/nginx/prometheus/grafana; `scripts/k6/load-staging.js` — smoke + 100 VU); осталось: доступ к VPS, `.env` с реальными ключами, домен + SSL + Google Play, UptimeRobot/Grafana-алерты. Локальный k6-замер уже сделан (этап 113): смоук p95 ≈ 1.7ms, бласт 100 VU ≈ 4.9k rps без 5xx; single-IP прогон упирается в `/api`-лимитер 600/мин → для staging-прогона нужен pacing или multi-IP.
 - Код/низкий приоритет (после релиза): SMS (Twilio), AI-модерация фото (Rekognition), CDN/S3 — код готов, ждут реальные ключи/бакет в prod `.env`.
 - **CSRF double-submit — код ГОТОВ** (`server/src/middleware/csrf.js` + `GET /api/auth/csrf`; 6 тестов в `csrf.test.js`; suite 395/395 ✅). Раздача токена активна (`app.use(csrf)`), guard отключён: включить одной строкой `app.use(csrfGuard)` при выносе API на поддомен — тогда фронт берёт токен на `/api/auth/csrf` и шлёт его в `x-csrf-token`.
 - **Fingerprint refresh — ЗАКРЫТ**: при ротации refresh-токена сохраняется новый fingerprint; mismatch логируется.
