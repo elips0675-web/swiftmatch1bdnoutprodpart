@@ -65,7 +65,7 @@ function EditableList({ items, onAdd, onDelete, nounKey, section, saving }: Edit
       </div>
       <div className="flex flex-wrap items-start gap-2 p-4 rounded-2xl border bg-muted/30">
         {items.map((item) => (
-          <Badge key={item} variant="secondary" className="text-xs py-0.5 px-2.5 rounded-full border bg-background shadow-sm flex items-center gap-1 whitespace-nowrap leading-none">
+          <Badge key={item} variant="secondary" className="text-sm py-1 px-3 rounded-full border bg-background shadow-sm flex items-center gap-1.5 whitespace-nowrap leading-tight">
             {itemLabel(item, section, t)}
             <button onClick={(e) => { e.stopPropagation(); if (!confirm(t('admin.content.confirm_delete'))) return; onDelete(item); }} className="text-muted-foreground hover:text-destructive transition-colors">
               <Trash2 size={12} />
@@ -255,7 +255,7 @@ export default function ContentManagementPage() {
                         <CollapsibleContent className="pt-2 pl-4">
                           <div className="flex flex-wrap gap-2 mb-3">
                             {[...cityList].sort((a, b) => a.localeCompare(b)).map(city => (
-                              <Badge key={city} variant="secondary" className="text-xs py-0.5 px-2.5 rounded-full border bg-background shadow-sm flex items-center gap-1 whitespace-nowrap leading-none">
+                              <Badge key={city} variant="secondary" className="text-sm py-1 px-3 rounded-full border bg-background shadow-sm flex items-center gap-1.5 whitespace-nowrap leading-tight">
                                 {city}
                                 <button onClick={() => {
                                   saveCountriesCities({ ...countriesCities, [country]: cityList.filter(c => c !== city) });
