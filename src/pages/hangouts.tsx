@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AppHeader } from "@/components/layout/app-header";
 import { BottomNav } from "@/components/navigation/bottom-nav";
@@ -17,7 +17,7 @@ import { captureTiming, captureMessage } from "@/lib/sentry";
 import { useToast } from "@/components/ui/use-toast";
 import { HangoutSkeletonCard } from "@/components/hangout-skeleton-card";
 import { HANGOUT_CATEGORIES, formatEventDate, type Hangout, type HangoutType } from "@/lib/hangouts";
-import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X, Ticket, Zap, Utensils, BedDouble, Flower2, Car, Gift, ShoppingBag, HandCoins, Share, Star, Loader2, ChevronDown, Navigation, Filter, Eye } from "lucide-react";
+import { Clapperboard, Theater, Palette, Coffee, Music, Dumbbell, Sparkles, CalendarDays, MapPin, Users, PlusCircle, Compass, Heart, UserPlus, Search, X, Ticket, Zap, Utensils, BedDouble, Flower2, Car, Gift, ShoppingBag, HandCoins, Share, Star, Loader2, ChevronDown, ChevronLeft, ChevronRight, Navigation, Filter, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GO_OUT_ICONS, GO_OUT_COLORS } from "@/lib/go-out";
 import { GoOutBookingDialog, AffiliateMap, fillDeeplink, type GoOutOffer } from "@/components/hangout-go-out";
@@ -109,7 +109,7 @@ const PAGE_LIMIT = 20;
 
 // H4: клиентский кэш ленты со staleTime 60s — меньше запросов при переключении вкладок/навигации
 const FEED_CACHE_TTL = 60_000;
-type FeedCacheEntry = { data: Hangout[]; time: number };
+type FeedCacheEntry = { data: Hangout[]; total: number; time: number };
 const feedCache = new Map<string, FeedCacheEntry>();
 
 // Для тестов: сброс кэша ленты между кейсами (иначе модульный кэш «протекает» между тестами)
@@ -590,7 +590,7 @@ export default function HangoutsPage() {
   const [priceFilter, setPriceFilter] = useState<HangoutPriceFilter>("all");
   const [priceMax, setPriceMax] = useState<number | null>(null);
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
+  const [totalPages, setTotalPages] = useState(1);
   const [radiusKm, setRadiusKm] = useState(10);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [geoStatus, setGeoStatus] = useState<"pending" | "ok" | "denied">("pending");
@@ -598,7 +598,6 @@ export default function HangoutsPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [goOutOffers, setGoOutOffers] = useState<GoOutOffer[] | null>(null);
   const [goOutFilter, setGoOutFilter] = useState<string>("all");
   const [goOutCity, setGoOutCity] = useState<string>("");
@@ -862,7 +861,7 @@ export default function HangoutsPage() {
       const cached = feedCache.get(cacheKey)!;
       if (Date.now() - cached.time < FEED_CACHE_TTL) {
         setItems(cached.data);
-        setHasMore(cached.data.length >= PAGE_LIMIT);
+        setTotalPages(cached.total > 0 ? Math.max(1, Math.ceil(cached.total / PAGE_LIMIT)) : 1);
         setLoading(false);
         return () => { cancelled = true; };
       }
@@ -871,18 +870,21 @@ export default function HangoutsPage() {
     fetch(`/api/hangouts?${cacheKey}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
-      .then((r) => (r.ok ? r.json() : []))
+      .then((r) => (r.ok ? r.json() : {}))
       .then((data) => {
         if (cancelled) return;
-        const arr = Array.isArray(data) ? data : [];
+        // API возвращает { items, total }; legacy-ответ (массив) поддерживается для тестов/старых клиентов.
+        const raw = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+        const total = Array.isArray(data) ? 0 : Math.max(0, Number(data?.total || 0));
         if (page === 1) {
-          feedCache.set(cacheKey, { data: arr, time: Date.now() });
+          feedCache.set(cacheKey, { data: raw, total, time: Date.now() });
           captureTiming("hangout.feed.load", Date.now() - startedAt);
         }
+        setTotalPages(total > 0 ? Math.max(1, Math.ceil(total / PAGE_LIMIT)) : 1);
         setItems((prev) => {
-          const combined = page > 1 ? [...prev, ...arr] : arr;
+          const list = [...raw];
           if (sortBy === "popularity" || sortBy === "price") {
-            combined.sort((a, b) => {
+            list.sort((a, b) => {
               if (sortBy === "popularity") {
                 const pa = Number(a.participant_count ?? 0) + Number(a.like_count ?? 0) + Number(a.accepted_count ?? 0);
                 const pb = Number(b.participant_count ?? 0) + Number(b.like_count ?? 0) + Number(b.accepted_count ?? 0);
@@ -893,29 +895,27 @@ export default function HangoutsPage() {
               return va - vb;
             });
           }
-          return combined;
+          return list;
         });
-        setHasMore(arr.length >= PAGE_LIMIT);
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [category, hangoutType, dateFilter, page, coords, radiusKm, hangoutsEnabled, debouncedSearch, sortBy, refreshKey, priceFilter, priceMax]);
 
-  // Бесконечный скролл: авто-подгрузка следующей страницы при достижении sentinel
-  useEffect(() => {
-    if (!hangoutsEnabled || !hasMore || loading || !sentinelRef.current) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          setPage((p) => p + 1);
-        }
-      },
-      { rootMargin: "250px" },
-    );
-    observer.observe(sentinelRef.current);
-    return () => observer.disconnect();
-  }, [hangoutsEnabled, hasMore, loading, page, setPage]);
+  const goToPage = useCallback((p: number) => {
+    setPage((cur) => {
+      if (p < 1 || p > (totalPages || 1) || p === cur) return cur;
+      try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch {}
+      return p;
+    });
+  }, [totalPages]);
+
+  const paginationPages = useMemo(() => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    const set = new Set<number>([1, totalPages, page - 1, page, page + 1]);
+    return [...set].filter((p) => p >= 1 && p <= totalPages).sort((a, b) => a - b);
+  }, [page, totalPages]);
 
   const chips = useMemo(
     () => [{ key: null, label: t("hangout.filter.all_categories") }, ...HANGOUT_CATEGORIES.map((c) => ({ key: c as string, label: t(`hangout.category.${c}`) }))],
@@ -1598,9 +1598,17 @@ export default function HangoutsPage() {
                     </div>
                   </section>
                 ))}
-                {hasMore && (
-                  <div ref={sentinelRef} className="h-12 flex items-center justify-center" data-testid="hangout-sentinel">
-                    {loading && <Loader2 size={18} className="animate-spin text-muted-foreground" />}
+                {totalPages > 1 && (
+                  <div className="mt-6 flex items-center justify-center gap-1.5 flex-wrap" data-testid="hangout-pagination">
+                    <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Previous page" data-testid="hangout-page-prev" disabled={page <= 1} onClick={() => goToPage(page - 1)}><ChevronLeft size={16} /></Button>
+                    {paginationPages.map((p, i, arr) => (
+                      <Fragment key={p}>
+                        {i > 0 && arr[i - 1] !== p - 1 ? <span className="px-1 text-muted-foreground">…</span> : null}
+                        <Button variant={p === page ? "default" : "outline"} size="sm" className="h-9 min-w-9 px-2" data-testid={`hangout-page-${p}`} onClick={() => goToPage(p)}>{p}</Button>
+                      </Fragment>
+                    ))}
+                    <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Next page" data-testid="hangout-page-next" disabled={page >= totalPages} onClick={() => goToPage(page + 1)}><ChevronRight size={16} /></Button>
+                    <span className="ml-2 text-xs text-muted-foreground" data-testid="hangout-page-counter">{page} / {totalPages}</span>
                   </div>
                 )}
                 </div>

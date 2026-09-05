@@ -245,7 +245,24 @@ router.get('/api/hangouts', optionalAuth, async (req, res) => {
                  LIMIT ? OFFSET ?`
     const rows = await pool.query(sql, [...params, ...geoParams, limit, offset])
 
-    res.json(rows[0].map(parseAttendees))
+    let countHaving = ''
+    const countParams = [...params]
+    if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+      const radiusKm = Number(radius) > 0 ? Number(radius) : 50
+      countHaving = ' AND ST_Distance_Sphere(ST_SRID(POINT(h.lng, h.lat), 4326), ST_SRID(POINT(?, ?), 4326)) / 1000 <= ?'
+      countParams.push(parsedLng, parsedLat, radiusKm)
+    }
+    const countSql = `SELECT COUNT(*) AS total FROM (
+      SELECT h.id
+      FROM hangouts h
+      JOIN user_profiles up ON up.id = h.user_id
+      ${JOIN_PARTNER_OFFER}
+      WHERE ${where.join(' AND ')}${countHaving}
+    ) t`
+    const [countRows] = await pool.query(countSql, countParams)
+    const total = Number(countRows[0]?.total || 0)
+
+    res.json({ items: rows[0].map(parseAttendees), total })
   } catch (err) {
     logger.error('Hangouts feed error:', err)
     res.status(500).json({ message: 'Failed to fetch hangouts' })

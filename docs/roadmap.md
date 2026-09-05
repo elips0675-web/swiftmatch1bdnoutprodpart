@@ -1,9 +1,25 @@
 # SwiftMatch — Roadmap / журнал этапов
 
-> Актуально: 31.08.2026.
+> Актуально: 05.09.2026.
 > Полная детальная история и сводные аудиты живут в локальных (gitignored) файлах:
 > `test/Что сделано.txt`, `test/Что доделать.txt`, `test/Оценка kimi|qwen|дипсик.txt`.
 > Этот файл — чистая (UTF-8) сводка последних этапов, отслеживаемая в git.
+
+## Этап 112 (05.09.2026) — /hangouts: числовая пагинация страниц + расширенный список запрещённых слов ✅
+
+По запросу пользователя. Бесконечный скролл ленты (sentinel + IntersectionObserver, этап 97) заменён на классическую числовую пагинацию страниц; список «запрещённых слов» расширен в ~2.3 раза (17 → 39).
+
+- **Сервер (`server/src/routes/hangouts.js` GET /api/hangouts):** ответ ленты изменился с массива на `{ items, total }`. `total` — `COUNT(*)` по тому же `WHERE` (фильтры q/category/type/city/price/дата), с гео-режимом через `ST_Distance_Sphere` в подзапросе (фактическое число, не оценка). Клиент сохраняет совместимость: `Array.isArray(data)` (legacy-массив) по-прежнему обрабатывается.
+- **Фронт (`src/pages/hangouts.tsx`):**
+  - state `totalPages` (вместо `hasMore`); `totalPages = ceil(total / PAGE_LIMIT)`.
+  - Убран `IntersectionObserver`/sentinel и авто-append страниц. Каждая страница грузится отдельным запросом и **заменяет** список (`setItems` без `[...prev, ...arr]`).
+  - Блок пагинации `data-testid="hangout-pagination"` под лентой: `‹`, страницы (окно max 7 с `…`), `›`, счётчик `«N / M»`. Кнопки страниц — `hangout-page-{N}`, prev/next — `hangout-page-prev/next`, счётчик — `hangout-page-counter`.
+  - При смене страницы — плавный `window.scrollTo(top)`. Сбрасывание `page=1` на смену фильтра/категории/сортировки сохранено.
+  - Фикс кэш-ветки: `total` кэша теперь переводится в `totalPages` через `ceil`, а не подставлялся как есть (баг «1 / 45»).
+- **Запрещённые слова:** список расширен с 17 до 39 слов — добавлены «заработок в интернете»-кластеры («работа на дому», «пассивный доход», «быстрый доход»), финскам («форекс», «бинарные опционы», «покер», «слоты», «микрозайм», «кидалово», «лохотрон», «обнал», «кардинг», «фишинг», «накрутка»), продажа аккаунтов, наркотики («мефедрон», «кокаин», «амфетамин», «кладмен», «закладчик»). Синхронизированы обе источники: `src/lib/admin-mock-data.ts` (`FORBIDDEN_WORDS_DEFAULT`) и БД `content_config.banned_words` (JSON, 39). Броська работает через существующий `getBannedWords()`/`containsBannedWord()` в create/edit встречи и постах.
+- **Тесты:** юнит-тест infinite scroll заменён на пагинацию: (1) «shows pagination and replaces feed when next page is clicked» — counter «1 / 3», клик next → `page=2` в запросе, карточки 2-й страницы, первая исчезла; (2) «hides pagination when feed fits a single page». **front 113/113, server 366/366 (get-фид: +tests не добавлялись — контракт сохранён), vite build OK, lint 0 errors.** E2E: `hangouts.spec.ts` 4/4, `admin-content.spec.ts` 15/15, полный прогон 150/150 (этап 111 baseline).
+- Live-проверка: `/api/hangouts?page=1&limit=20` → `items:20, total:36` (2 страницы); `/hangouts` 200, пагинация рендерится.
+- Полный E2E: **150 passed** (в основном прогоне 1 flaky — `audit-full` «Settings switches are interactive», повторно прошёл 1/1; к ленте отношения не имеет).
 
 ## Этап 74 (29.08.2026) — E2E Premium (mock Stripe), Hangouts 2.0, B2B partner dashboard
 

@@ -254,39 +254,47 @@ describe("HangoutsPage", () => {
     })
   })
 
-  it("auto-loads next page when sentinel becomes visible (infinite scroll)", async () => {
+  it("shows pagination and replaces feed when next page is clicked", async () => {
     const baseItem = sampleHangouts[0]
     mockFetch.mockImplementation((url: string) => {
       const u = String(url)
       if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
       const page = Number(new URLSearchParams(u.split("?")[1] || "").get("page") || 1)
-      const count = page >= 2 ? 5 : 20
-      const items = Array.from({ length: count }, (_, i) => ({ ...baseItem, id: i + 1 + (page - 1) * 100 }))
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(items) })
+      const items = Array.from({ length: 20 }, (_, i) => ({ ...baseItem, id: (page - 1) * 100 + (i + 1) }))
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ items, total: 45 }) })
     })
-
-    class AutoIO {
-      constructor(private cb: (entries: { isIntersecting: boolean }[]) => void) {}
-      observe() {
-        this.cb([{ isIntersecting: true }])
-      }
-      unobserve() {}
-      disconnect() {}
-      takeRecords() {
-        return []
-      }
-    }
-    ;(globalThis as any).IntersectionObserver = AutoIO
-
     const HangoutsPage = (await import("@/pages/hangouts")).default
     renderPage(<HangoutsPage />)
 
-    expect(screen.queryByTestId("hangouts-load-more")).toBeNull()
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-page-counter").textContent).toContain("1 / 3")
+    })
+    expect(screen.getByTestId("hangout-page-prev")).toBeTruthy()
+    expect(screen.queryByTestId("hangout-card-101")).toBeNull()
+
+    fireEvent.click(screen.getByTestId("hangout-page-next"))
 
     await waitFor(() => {
-      const calls = mockFetch.mock.calls.filter(([url]) => String(url).includes("/api/hangouts"))
-      expect(String(calls[calls.length - 1][0])).toContain("page=2")
+      expect(screen.getByTestId("hangout-card-101")).toBeTruthy()
     })
+    const calls = mockFetch.mock.calls.filter(([url]) => String(url).includes("/api/hangouts"))
+    expect(String(calls[calls.length - 1][0])).toContain("page=2")
+    expect(screen.queryByTestId("hangout-card-1")).toBeNull()
+  })
+
+  it("hides pagination when feed fits a single page", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [...sampleHangouts], total: sampleHangouts.length }) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+    renderPage(<HangoutsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-card-1")).toBeTruthy()
+    })
+    expect(screen.queryByTestId("hangout-pagination")).toBeNull()
   })
 
   it("shows 'Show new' badge on hangout:new ws event and refreshes on click", async () => {
