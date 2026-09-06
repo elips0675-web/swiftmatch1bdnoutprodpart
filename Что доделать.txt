@@ -843,6 +843,8 @@ UX-улучшение ленты (следующий кандидат из сп�
 - `store: getRateLimitStore()` на `sendCommand: (...args) => r.call(...args)`; RedisStore v6 экспортируется именованно.
 - Тесты: ratelimit 3/3 + redis-fallback 7/7 = 10/10 (в тестах REDIS_URL нет → memory); eslint 0; полный server-прогон 395 passed + 10 fail в hangouts.test.js (предсуществующие, падали и на чистом HEAD). Redis есть в docker-compose (сервис `redis:7-alpine` + `REDIS_URL: redis://redis:6379` для API).
 - Механика: при пм2-cluster/Docker-replicas счётчики теперь общие. Требование: задать `REDIS_URL` в .env (уже в .env.example).
+- Локально (06.09): Redis запущен в Laragon (порт 6379, `redis-cli PONG`). Создан `server/.env` (из .env.example). Замечание: `.env.example` содержит VAPID-placeholder'ы `change-me-generate-with-web-push`, которые валидируются web-push и роняют сервер — сгенерированы реальные ключи (`npx web-push generate-vapid-keys`) и вписаны в `.env` (в git не коммитятся). `REDIS_URL=redis://localhost:6379` раскомментирован.
+- Верификация вживую: API поднят (`node src/index.js`), в логах `[redis] client/pub/sub connected` + `[ws] Redis adapter attached — horizontal scaling enabled`; после GET /api/hangouts в Redis появился ключ `rl:::/56` (rate-limit, 5 запросов, TTL остаток 53s) — счётчик живёт в Redis. Process API PID 6032 оставлен запущенным.
 
 ### Этап 121 — S3/CDN для файлов (код готов, нужны ключи — см. этап 118)
 - `server/src/routes/upload.js` полностью готов: `USE_S3 = S3_BUCKET && AWS_ACCESS_KEY_ID` → multer-S3 (S3Client, AUTO_CONTENT_TYPE, ключ uploads/...); иначе diskStorage локально. `ai-moderation.js`: Rekognition при `AWS_ACCESS_KEY_ID` (иначе auto-approve), OpenAI fallback. Удаление файла: DeleteObjectCommand. Public URL отдаётся из s3 Location.
