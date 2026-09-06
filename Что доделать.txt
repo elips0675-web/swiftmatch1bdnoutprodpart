@@ -819,8 +819,12 @@ UX-улучшение ленты (следующий кандидат из сп�
 - Server-тесты `profile.test.js` 12/12 (добавлены 4 регрессионных static-vs-`:id`).
 ## 📋 Доделать: план по этапам (приоритет сверху вниз; источник — оценки ИИ Дипсик 8.6/10, Qwen 8.5/10 от 06.09)
 
-### Этап 116 — Гришки schema (сделано 29–30.08, перепроверить)
-- `mysql_schema.sql` регенерирован (5090f4c, 73 табл) + миграция 043 + CI bootstrap/schema-validate (этап 79), сейчас 74 таблицы. Сверить при поднятой БД, пометить пункт закрытым.
+### ✅ Этап 116 — Schema drift устранён — ЗАКРЫТО (06.09)
+- Проверка с живой БД: раньше `.env` не было — подключился `mysql -u root` к локальной `swiftmatch` (75 таблиц live).
+- Найдено: `event_tickets` (из миграции 047) отсутствовала в `mysql_schema.sql` (74 vs 75); кроме того, при сравнительном дампе обнаружились расхождения структуры (индексы/ключи groups, reactions, refresh_tokens и др.) — старая schema отставала.
+- Регенерация: `mysqldump --no-data swiftmatch` → новый `database/mysql_schema.sql` (75 таблиц, заголовок обновлён 73→75, FK-обёртка сохранена по этапу 79).
+- Верификация: импорт в чистую scratch-БД 0 ошибок → 75/75 таблиц; построчная сверка структур live vs scratch (нормируя AUTO_INCREMENT и COLLATE-формат) — 0 расхождений; `schema-validate.mjs` → «OK: 75 tables validated against live DB (0 extra tables)». Scratch-БД удалена.
+- Оценки Дипсик/Qwen (schema 62/73 таблиц) устарели — пункт закрыт.
 
 ### Этап 117 — VPS + Docker Compose end-to-end (критично, не код)
 - Поднять VPS (2 vCPU/4GB), Docker, склонировать репо. Прогнать `docker compose up -d --build` + healthcheck'и. До этого docker-compose не прогонялся end-to-end — риск сюрпризов.

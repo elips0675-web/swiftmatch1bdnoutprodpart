@@ -1,110 +1,99 @@
-Оценка состояния проекта SwiftMatch (на 31.08.2026)
-Вердикт: 8.5/10 — технически готов к staging/закрытой бете, к открытому проду — 70% (блокеры внешние, не кодовые)
-Консенсус с предыдущими аудитами (kimi 7.5, qwen 8, дипсик 95%): код и тесты на высоком уровне, релиз держат внешние блокеры — ключи, домен, сторы, staging VPS.
-🟢 Что сделано сильно (сильные стороны)
-1. Тестовое покрытие — исключительное
-Server: 366/366, front: 86/86, E2E: 150/150 = 602 теста
-E2E покрывает критические флоу: auth, hangouts, premium, partners, admin, ban-realtime, GDPR cascade, refresh race
-Cross-browser (chromium/firefox/webkit) по флагу
---retries=0 проходит чисто — 0 флейков
-2. Безопасность — проработана на уровне enterprise
-adminAuth ACTIVE с единым гейтом (правило из этапа 37)
-TOTP 2FA для админов (этап 38)
-Refresh rotation + family revoke + race condition закрыт (этап 34)
-Account lockout 5→429/15мин
-Stripe webhook: express.raw + webhook_events идемпотентность (этап 39)
-Circuit breaker для OpenAI/Stripe (этап 76)
-Security headers supertest в CI (этап 35)
-XSS-sanitize на входе (bio/display_name/messages)
-3. Инфраструктура — production-ready
-Docker Compose (app + nginx + redis + prometheus + grafana)
-deploy.yml на Docker (rsync → docker compose up -d --build → migrate.js → schema-validate.mjs)
-Backup/restore: RTO ~3.6 сек (dev), <30 мин (prod, экстраполяция)
-Schema validation в CI — дрейф миграций ловится ДО деплоя
-DEPLOY.md — пошаговый гайд для VPS
-4. Монетизация — закрыт весь план P0–P3
-Premium (Stripe + IAP RevenueCat)
-Hangouts с билетами (платные встречи, capacity-кэп)
-Sponsored-карточки (pinned офферы)
-Событийная интеграция (ивент-организаторы, комиссия 10–30%)
-AI-подбор встреч под пару (OpenAI + DB-fallback)
-Affiliate-блок «Куда пойти вдвоём»
-B2B партнёрский маркетплейс (Wave 1–4)
-5. Документация — зрелая
-AGENTS.md — системный промпт для AI-ассистентов (390 строк, разбит)
-rollback-plan.md — категории инцидентов, диагностика ≤5 мин
-runbook-keys.md — ротация каждого ключа + чеклист при утечке
-roadmap.md — 93 этапа с датами и счётчиками
-🟠 Что осталось (внешние блокеры, не код)
-Блокер
+Оценка проекта SwiftMatch
+🎯 Общий вердикт: 8.5 / 10
+Зрелый, хорошо спроектированный продукт уровня pre-production. Видна серьёзная инженерная культура: 59 итераций, 388 тестов, идемпотентные миграции, circuit breaker, runbook'и, план отката. Это не MVP-прототип, а продукт, готовый к бете с оговорками.
+✅ Сильные стороны
+1. Архитектура и безопасность (9/10)
+JWT в httpOnly cookie + refresh rotation с reuse detection (отзыв всей семьи при replay) — это уровень enterprise
+Account lockout 5→15 мин, rate limiters (30r/s API, 5r/s auth) + nginx-уровень
+Circuit breaker (opossum) для Stripe/OpenAI — защита от каскадных отказов
+Idempotency-Key middleware + дедуп webhook'ов по event_id
+GDPR-compliance из коробки: data export, erase, consent_log
+Soft delete + audit_log на 11 таблицах — полная трассируемость
+2. Тестовое покрытие (9/10)
+388 тестов (307 сервер + 81 фронт) — 0 failures
+E2E Playwright — 55 тестов, включая security-blind-spots (GDPR cascade, refresh race)
+Кросс-браузерность (firefox/webkit)
+Schema-validate в CI — дрейф схемы ломает деплой ДО миграций
+3. Observability и DevOps (8.5/10)
+Prometheus + Grafana (7 панелей), Sentry с фильтрацией PII
+Winston JSON-логи с Request ID
+k6 load-test (ramp 10→100 VU)
+Docker multi-stage + healthcheck + nginx rate limiting
+RTO-замер: restore из бэкапа 3.6 сек (dev), ~10-15 мин на 1GB prod
+4. Документация (9.5/10)
+runbook-keys.md — порядок ротации каждого ключа с проверкой
+rollback-plan.md — категории инцидентов + действия
+environment-setup.md — пошаговый план staging→prod
+AGENTS.md с граблями (#27-53) — бесценно для преемственности
+Чек-листы «готов к проду», «что осталось»
+5. Продуктовый функционал (9/10)
+Полный цикл знакомств + монетизация + социалка:
+Geoпоиск (MySQL Spatial ST_Distance_Sphere)
+Smart Matching, Attachment-тест, AI Icebreakers
+Stripe + RevenueCat IAP + партнёрская экосистема (Wave 1-3)
+Hangouts 2.0 с mutual like → auto-chat
+B2B-маркетплейс, анти-кот верификация, псевдонимы
+⚠️ Пробелы и риски
+🔴 Критичные
+mysql_schema.sql деградировал (этап 77)
+В файле 62 таблицы, в живой БД 73
+Риск: пересоздание prod-БД из schema.sql = нерабочие роуты hangouts/partners/experiments
+Решение: регенерировать через mysqldump --no-data и закоммитить
+Rate-limit in-memory (N+2)
+express-rate-limit + lockout.js НЕ шарятся между процессами
+Запрещено: pm2 cluster, Docker replicas > 1
+Решение: до масштабирования — перевести на rate-limit-redis
+🟠 Средние
+Многие фичи ждут ключей (Stripe live, SMTP, FCM, Twilio, OpenAI, RevenueCat)
+Без них сервис «деградирует, но жив» — это хорошо, но для продакшена нужны все
+Android не в продакшене
+APK собирается, toolchain готов, но нет App Links, keystore, публикации в Play Console
+S3 не внедрён
+Файлы на локальном диске — не масштабируется, нет CDN
+docker-compose не прогонялся end-to-end (environment-setup.md §0)
+Риск сюрпризов при первом деплое
+🟡 Косметические
+Дублирование роутов: /schedule объявлен дважды в project-context.md
+Design System / Storybook — не начато (указано в «Ещё не начато»)
+Log aggregation (Loki/ELK) — отложено на пост-релиз
+📊 Готовность к продакшену (по чеклисту environment-setup.md)
+Пункт
 Статус
-Критичность
-Staging VPS + docker compose up end-to-end
-❌ не прогонялся
-🔴 до релиза
-Реальные ключи (Stripe live, SMTP, Sentry DSN, S3, Twilio, OpenAI, FCM, RevenueCat)
-❌ mock/fallback
-🔴 до первого рубля
-Домен + SSL (Caddy/Let's Encrypt) + App Links (assetlinks.json + SHA256)
-❌
-🔴 для Android
-Keystore + AAB + Google Play (17+)
-❌
-🔴 мобильный релиз
-k6 100 VU на staging (проверка RADAR_PRE_LEAK_64)
-❌
-🟠 перед публичным запуском
-UptimeRobot + Grafana alerts в Telegram
-❌
-🟠
-SMS (Twilio), AI-модерация фото (Rekognition), CDN/S3
-❌ scaffold есть, ключей нет
-🟡 после беты
-🔴 Риски и техдолг
-Windows-центричность workflow — Laragon, Task Scheduler, .bat, PowerShell. При переезде на Linux VPS нужно адаптировать. Docker Compose есть, но не является основным путём.
-mysql_schema.sql деградирован (этап 77/79): schema = 62 таблицы, живая БД = 73. 29 таблиц созданы ТОЛЬКО миграциями. Починено для CI (seed-migrations.mjs), но риск при пересоздании БД с нуля сохраняется.
-Single-instance rate-limit (rollback-plan N+2): express-rate-limit и lockout.js — in-memory, НЕ шарятся между процессами. Запрещён pm2 cluster mode и Docker replicas > 1 до миграции на Redis store.
-CSRF double-submit — отложено. SameSite=Lax не защищает от same-site атак. Критично только при выносе API на отдельный домен.
-Fingerprint refresh (привязка к устройству/IP) — риск сломать мобильный Bearer-flow, делать осторожно после беты.
-📊 Готовность к продакшену
-Критерий
-Оценка
-Код и тесты
-10/10
-Безопасность
-9/10
-Инфраструктура (репо)
-9/10
-Инфраструктура (развёрнуто)
-3/10 (нет staging)
-Монетизация
-9/10 (mock, нет live-ключей)
-Мобильный релиз
-2/10 (APK собран, сторы не начаты)
-Документация
-9/10
-Итого
-8.5/10
-🎯 Рекомендуемые приоритеты (следующие 2 недели)
-Фаза 1 «Первый рубль» (1–2 нед):
-Staging VPS + docker compose up end-to-end
-GitHub secrets → реальные ключи (Stripe test→live, SMTP, Sentry)
-E2E на staging с реальными ключами
-Домен + SSL (Caddy)
-Фаза 2 «Мобильный релиз» (2–3 нед):
-Keystore + AAB
-App Links (assetlinks.json + SHA256)
-RevenueCat проект + VITE_REVENUECAT_API_KEY
-Google Play (17+, Privacy Policy, скриншоты)
-Фаза 3 «Надёжность» (параллельно):
-k6 100 VU на staging + мониторинг free -m / Threads_connected
-UptimeRobot + Grafana alerts
-Тест плана отката (реальный restore из бэкапа)
-Фаза 4 «Масштабирование» (после релиза):
-S3/CDN, FCM, Twilio, Rekognition
-Redis-backed rate-limit (для cluster mode)
-CSRF double-submit (если API на поддомене)
-💡 Резюме
-Проект в исключительно зрелом состоянии для pet-project / indie-стартапа. 93 этапа за ~6 месяцев, 602 теста, production-grade безопасность и инфраструктура в репо.
-Главный разрыв — не код, а операционная готовность: нет развёрнутого staging, нет live-ключей, нет мобильного релиза. Это 1–2 недели работы, не месяцы.
-Консенсус с kimi/qwen/дипсик подтверждается: новый продуктовый код не нужен — разблокировать прод (staging → ключи → домен → релиз Android).
+VPS + Docker + SSH-ключ
+⬜ Не поднято
+Домен + DNS + SSL
+⬜ Не настроено
+Реальные ключи в server/.env
+⬜ Не введены
+GitHub secrets для deploy.yml
+⬜ Не заданы
+Redis постоянно
+✅ Готов к подключению
+Бэкапы + restore smoke
+✅ Скрипты готовы, RTO замерен
+Android AAB + App Links
+🟠 Частично
+Мониторинг + алерты
+🟠 Grafana provisioned, алерты не настроены
+Полный E2E против staging
+⬜ Не прогонялся
+Прогресс: ~60% инфраструктуры готово в коде, ~40% — руки на клавиатуре.
+🎯 Рекомендации (приоритеты)
+Неделя 1 — критично перед продом
+Регенерировать mysql_schema.sql из живой БД — убрать риск неполной схемы
+Прогнать docker-compose end-to-end на staging — найти скрытые проблемы
+Ввести Stripe live + SMTP + Sentry — проверить полный платёжный флоу
+Перевести rate-limit на Redis — снять ограничение single-instance
+Неделя 2 — мобильный релиз
+Android: keystore + App Links + публикация в internal track
+RevenueCat IAP: sandbox-покупка → prod-покупка
+FCM: реальные push на устройство
+Месяц 1 — масштабирование
+S3 + CDN для фото
+Log aggregation (Loki)
+Нагрузочное тестирование на staging (100 VU)
+Design System / Storybook — для скорости разработки
+💡 Итог
+SwiftMatch — это не «ещё один пет-проект», а инженерно зрелый продукт. Уровень документации, тестового покрытия и продуманности отказоустойчивости (circuit breaker, идемпотентность, reuse detection, audit log) соответствует коммерческим SaaS-продуктам.
+Главный риск сейчас — не код, а инфраструктура: неполная mysql_schema.sql, не прогнанный docker-compose, не введённые ключи. Это решается за 1-2 недели системной работы, а не переписыванием.
+Рекомендация: перед релизом закрыть три красных пункта (schema.sql, docker-compose e2e, Redis rate-limit) — и можно смело идти в бету.

@@ -935,3 +935,11 @@ UX-улучшение ленты hangouts (следующий кандидат �
 - **115 — Интересы (12 новых id 26–37) + дубли чипов:** канон `content_config.interests` (38 ключей) был шире таблицы `interests` (id 1–25) → `getCanonicalInterestIds()` выкидывал назначения id 26–36 при GET и PUT. Добавлены строки `interests` 26 Coffee, 27 DIY, 28 Extreme, 29 Films, 30 Food, 31 Hiking, 32 Martial Arts, 33 Podcasts, 34 Astronomy, 35 Board Games, 36 Nature, 37 Design (name_en-слаг = ключ канона). `'interest.design':37` в `INTEREST_KEY_TO_ID`; дополнены `NAME_TO_KEY`/`nameToKey`. Синонимы `movies`+`films` («Фильмы») и `dance`+`dancing` («Танцы») давали дубли чипов → из канона БД+seed удалены `films`,`dancing` (38→36); чипы дедуплицируются по метке `Map(label→key)`. Также добавлен `birth_date` в PUT и пересчёт `age`. seed.js синхронизирован. Docs: pitfalls #36/#37, past-mistakes #62/#63, roadmap этап 115.
 
 Staging для обновления журналов: локальные файлы `test/` (gitignored) — это «Что доделать.txt», `context.txt`.
+
+## Этап 116 (06.09.2026): Schema drift устранён — mysql_schema.sql регенерирован (75 таблиц) ✅
+
+- Подключился к локальной MySQL (Laragon) как `mysql -u root`, БД `swiftmatch`. В живой БД — 75 таблиц.
+- Старый `mysql_schema.sql` (регенерирован 29.08, 73 табл.) отставал: не было `event_tickets` (миграция 047), а сравнительный дамп выявил различия индексов/ключей (groups, message_reactions, refresh_tokens и др.).
+- Регенерация: `mysqldump --no-data swiftmatch` → перезаписан `database/mysql_schema.sql` (75 таблиц, заголовок 73→75, FK-обёртка FOREIGN_KEY_CHECKS=0/1 сохранена по этапу 79).
+- Сверка: импорт в scratch-БД 0 ошибок → 75/75; построчная сверка структур live vs scratch (нормировка AUTO_INCREMENT + COLLATE-формата дампа) → 0 расхождений; `scripts/schema-validate.mjs` → «OK: 75 tables validated against live DB (0 extra tables)». Scratch-БД (swiftmatch_verify) удалена, временные дампы удалены.
+- Итог: оценки Дипсик/Qwen про «62/73 таблицы» больше неактуальны — schema соответствует живой БД на 100%.
