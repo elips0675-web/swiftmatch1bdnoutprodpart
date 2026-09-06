@@ -951,3 +951,11 @@ Staging для обновления журналов: локальные фай�
 - Fallback по паттерну lockout.js: без REDIS_URL (тесты/локально) — in-memory, поведение не меняется; независимость счётчиков между экземплярами в тестах сохраняется.
 - Валидация: ratelimit.test.js 3/3 + redis-fallback.test.js 7/7 = 10/10; eslint 0; полный server-прогон 395 passed + 10 fail в hangouts.test.js (те же 10 падали на чистом HEAD — предсуществующие, к rate-limit отношения не имеют). Docker-compose: сервис `redis:7-alpine` + `REDIS_URL: redis://redis:6379` уже есть.
 - Итог: закрыт пункт из оценок Дипсик/Qwen «express-rate-limit и lockout используют память одного процесса». Для включения нужно `REDIS_URL` в server/.env (ключ уже в .env.example).
+
+## Этап 118 (06.09.2026): Почта + платёжный флоу в mock/локально (частично) 🔶
+
+- **SMTP — Ethereal включён и проверен вживую:** `server/.env` создан (из .env.example); криды получены на лету через `nodemailer.createTestAccount()` (Ethereal preview-инбокс, публичный URL письма). Отправка подтверждена: email job 148 (verify-email) прошёл через Bull-очередь в Redis, плюс прямой тест `transport.sendMail()` → OK, preview-ссылка открывается.
+- **Подводный камень:** placeholder-ключи VAPID в `.env.example` (`change-me-generate-with-web-push`) валидируются web-push и роняют сервер при старте → сгенерированы реальные (`npx web-push generate-vapid-keys`) и вписаны в `.env`. `.env` gitignored — в git не попадёт.
+- **Stripe-флоу прогнан вживую в mock** (без ключей, `STRIPE_LIVE` не задан): premium `/api/premium/create-checkout` → "Subscription activated (mock)"; прод-симуляция события: у оффера 25 `event_end` сдвинут в будущее (был 02.09 — фид скрывает прошедшие, events.js L16-20) → `/api/events` показывает его; `/api/events/25/purchase` → ticket_id 4 `status=paid` amount 1500; partner order `/api/partners/order offer_id=10` → "Order created (mock)" + deeplink.
+- **Вывод по данным:** в БД есть платные офферы-события (id 10–25), но у части `event_end` в прошлом → они не показываются фидом. Для продакшн-сида держать event_end в будущем. Также: 3 запущенных копии `node src/index.js` мешали диагностике (порт держал один; остальные — очереди/WebSocket) — убиты, оставлен один чистый процесс (PID 14684).
+- **Осталось внешнее:** Stripe test-ключи (первый реальный платёж), Sentry DSN, OpenAI, FCM, Twilio, RevenueCat, S3. Всё это требует аккаунтов.

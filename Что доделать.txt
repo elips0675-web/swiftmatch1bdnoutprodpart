@@ -833,6 +833,9 @@ UX-улучшение ленты (следующий кандидат из сп�
 ### Этап 118 — Реальные ключи API (критично для первого платежа/писем)
 - Ввести в `server/.env`: Stripe test (платёжный флоу полностью), SMTP/Mailtrap, Sentry DSN, OpenAI, FCM, Twilio, RevenueCat (все сервисы сейчас в mock/fallback).
 - GitHub secrets для `deploy.yml`. Живые ключи НЕ коммитить.
+- Частично ЗАКРЫТО (06.09): **SMTP — Ethereal** (preview-инбокс генерируется на лету `nodemailer.createTestAccount()`); криды вписаны в `server/.env`, отправка письма проверена вживую (email job 148 completed, preview URL открывается; + прямой тест sendMail OK). **Stripe-флоу в mock** прогнан вживую против запущенного API: premium create-checkout → "Subscription activated (mock)"; event ticket `/api/events/25/purchase` → ticket_id 4, status `paid`, amount 1500; partner order `offer_id=10` → "Order created (mock)" + deeplink. Для теста события сдвинуты `event_start/event_end` оффера 25 в будущее (dev-БД).
+- Вывод по данным: платные события/офферы в БД есть (10–25), но большинство с `event_end` в прошлом → не показываются фидом (правило `event_end > NOW()`, events.js L17-20). Для продакшн-сида обновлять event_end.
+- Осталось внешнее (требует аккаунтов): Stripe test-ключи (`.env` `STRIPE_LIVE`), Sentry DSN, OpenAI, FCM, Twilio, RevenueCat, S3 (этап 121).
 
 ### Этап 119 — Домен + SSL + мониторинг
 - Домен, Caddy/Let's Encrypt (авто-SSL), wss:// для /socket.io.
