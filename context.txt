@@ -943,3 +943,11 @@ Staging для обновления журналов: локальные фай�
 - Регенерация: `mysqldump --no-data swiftmatch` → перезаписан `database/mysql_schema.sql` (75 таблиц, заголовок 73→75, FK-обёртка FOREIGN_KEY_CHECKS=0/1 сохранена по этапу 79).
 - Сверка: импорт в scratch-БД 0 ошибок → 75/75; построчная сверка структур live vs scratch (нормировка AUTO_INCREMENT + COLLATE-формата дампа) → 0 расхождений; `scripts/schema-validate.mjs` → «OK: 75 tables validated against live DB (0 extra tables)». Scratch-БД (swiftmatch_verify) удалена, временные дампы удалены.
 - Итог: оценки Дипсик/Qwen про «62/73 таблицы» больше неактуальны — schema соответствует живой БД на 100%.
+
+## Этап 120 (06.09.2026): Rate-limiter на Redis — multi-instance safe ✅
+
+- Было: `express-rate-limit` (auth/api/like в `middleware/limiters.js`, 9 лимитеров в hangouts.js, like в social.js) держали счётчики в памяти одного процесса; `lockout` уже был Redis-backed (этап 48). При pm2 cluster / Docker replicas лимиты сломались бы.
+- Сделано: общий `getRateLimitStore()` в limiters.js — `new RedisStore({ sendCommand: (...args) => r.call(...args) })` при заданном `REDIS_URL` (через `getRedis()` из redis.js), иначе `undefined` → встроенный MemoryStore. Применено ко всем rateLimit() в limiters.js, hangouts.js, social.js.
+- Fallback по паттерну lockout.js: без REDIS_URL (тесты/локально) — in-memory, поведение не меняется; независимость счётчиков между экземплярами в тестах сохраняется.
+- Валидация: ratelimit.test.js 3/3 + redis-fallback.test.js 7/7 = 10/10; eslint 0; полный server-прогон 395 passed + 10 fail в hangouts.test.js (те же 10 падали на чистом HEAD — предсуществующие, к rate-limit отношения не имеют). Docker-compose: сервис `redis:7-alpine` + `REDIS_URL: redis://redis:6379` уже есть.
+- Итог: закрыт пункт из оценок Дипсик/Qwen «express-rate-limit и lockout используют память одного процесса». Для включения нужно `REDIS_URL` в server/.env (ключ уже в .env.example).

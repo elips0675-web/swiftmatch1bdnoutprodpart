@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import rateLimit from 'express-rate-limit'
+import { getRateLimitStore } from '../middleware/limiters.js'
 import pool from '../db.js'
 import { getIO } from '../ws.js'
 import { getBannedWords, containsBannedWord } from '../banned-words.js'
@@ -10,7 +11,7 @@ import { stripHtml } from '../sanitize.js'
 import { cacheRoutePerUser, invalidate } from '../cache.js'
 import { trackEvent } from './experiments.js'
 
-const likeLimiter = rateLimit({ windowMs: 60_000, max: 30, message: { message: 'Too many likes' } })
+const likeLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: 30, message: { message: 'Too many likes' } })
 
 /**
  * @openapi

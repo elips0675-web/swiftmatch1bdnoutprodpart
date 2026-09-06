@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import rateLimit from 'express-rate-limit'
+import { getRateLimitStore } from '../middleware/limiters.js'
 import pool from '../db.js'
 import { getIO } from '../ws.js'
 import { getBannedWords, containsBannedWord } from '../banned-words.js'
@@ -102,8 +103,8 @@ async function resolvePaidGate(hangout, userId) {
   return null
 }
 
-const respondLimiter = rateLimit({ windowMs: 60_000, max: 30, message: { message: 'Too many responses' } })
-const createLimiter = rateLimit({ windowMs: 60_000, max: Number(process.env.HANGOUT_CREATE_RATE_MAX || 10), message: { message: 'Too many hangouts created' } })
+const respondLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: 30, message: { message: 'Too many responses' } })
+const createLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: Number(process.env.HANGOUT_CREATE_RATE_MAX || 10), message: { message: 'Too many hangouts created' } })
 
 const PAGE_SIZE_DEFAULT = 20
 const PAGE_SIZE_MAX = 50
@@ -928,10 +929,10 @@ router.get('/api/hangouts/by-chat/:chatId', auth, async (req, res) => {
 //  HANGOUTS 2.0 — Date Flow (like / skip / mutual) + Company Flow (join)
 // ═══════════════════════════════════════════════════════════════
 
-const likeLimiter = rateLimit({ windowMs: 60_000, max: 30, message: { message: 'Too many likes' } })
-const joinLimiter = rateLimit({ windowMs: 60_000, max: 20, message: { message: 'Too many joins' } })
-const checkinLimiter = rateLimit({ windowMs: 60_000, max: 5, message: { message: 'Too many check-ins' } })
-const reviewLimiter = rateLimit({ windowMs: 300_000, max: 10, message: { message: 'Too many reviews' } })
+const likeLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: 30, message: { message: 'Too many likes' } })
+const joinLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: 20, message: { message: 'Too many joins' } })
+const checkinLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: 5, message: { message: 'Too many check-ins' } })
+const reviewLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 300_000, max: 10, message: { message: 'Too many reviews' } })
 
 const CHECKIN_RADIUS_M = 500
 const CHECKIN_WINDOW_HOURS = 2
@@ -1278,7 +1279,7 @@ router.post('/api/hangouts/:id/review', auth, reviewLimiter, async (req, res) =>
   }
 })
 
-const hangoutTicketLimiter = rateLimit({ windowMs: 60_000, max: 10, message: { message: 'Too many ticket requests' } })
+const hangoutTicketLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: 10, message: { message: 'Too many ticket requests' } })
 
 router.post('/api/hangouts/:id/purchase', auth, hangoutTicketLimiter, async (req, res) => {
   const { id } = req.params
@@ -1356,7 +1357,7 @@ router.post('/api/hangouts/:id/purchase', auth, hangoutTicketLimiter, async (req
   }
 })
 
-const boostLimiter = rateLimit({ windowMs: 60_000, max: 10, message: { message: 'Too many boost requests' } })
+const boostLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: 10, message: { message: 'Too many boost requests' } })
 
 // ─── Boost / Unboost own hangout (premium perk, author only) ───
 // Продвижение поднимает свою встречу в начало ленты (boosted=1, без срока).
@@ -1413,7 +1414,7 @@ router.post('/api/hangouts/:id/unboost', auth, boostLimiter, async (req, res) =>
 // ─── AI-подбор встреч под пару (premium perk) ───
 // body: { user_id?, language?: 'ru'|'en' } — user_id = профиль второй половины.
 // Перк для premium: free — 403 PREMIUM_REQUIRED. OpenAI + DB/static fallback.
-const suggestLimiter = rateLimit({ windowMs: 60_000, max: 20, message: { message: 'Too many suggest requests' } })
+const suggestLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: 20, message: { message: 'Too many suggest requests' } })
 
 const suggestBreaker = createBreaker(
   async ({ me, partner, lang }) => {

@@ -838,14 +838,19 @@ UX-улучшение ленты (следующий кандидат из сп�
 - Домен, Caddy/Let's Encrypt (авто-SSL), wss:// для /socket.io.
 - UptimeRobot + Grafana alerts (Telegram/Slack); бэкапы/restore smoke на реальном VPS (RTO уже замерен: 3.6s dev).
 
-### Этап 120 — Rate-limit на Redis (при масштабировании >1 инстанса)
-- `express-rate-limit` + `lockout` держат счётчики в памяти одного процесса. Перевести на rate-limit-redis до pm2 cluster / Docker replicas > 1.
+### ✅ Этап 120 — Rate-limit на Redis — ЗАКРЫТО (06.09)
+- `lockout` уже был Redis-backed (этап 48). Переведены на `rate-limit-redis` v6: `middleware/limiters.js` (auth/api/like), `routes/hangouts.js` (9 лимитеров: respond/create/like/join/checkin/review/ticket/boost/suggest), `routes/social.js` (like). Общий `getRateLimitStore()` в limiters.js: Redis при заданном `REDIS_URL`, иначе in-memory fallback (паттерн lockout.js).
+- `store: getRateLimitStore()` на `sendCommand: (...args) => r.call(...args)`; RedisStore v6 экспортируется именованно.
+- Тесты: ratelimit 3/3 + redis-fallback 7/7 = 10/10 (в тестах REDIS_URL нет → memory); eslint 0; полный server-прогон 395 passed + 10 fail в hangouts.test.js (предсуществующие, падали и на чистом HEAD). Redis есть в docker-compose (сервис `redis:7-alpine` + `REDIS_URL: redis://redis:6379` для API).
+- Механика: при пм2-cluster/Docker-replicas счётчики теперь общие. Требование: задать `REDIS_URL` в .env (уже в .env.example).
 
-### Этап 121 — S3/CDN для файлов
-- Сейчас файлы на локальном диске. Подключить S3/CDN (код готов, ключ в .env.example).
+### Этап 121 — S3/CDN для файлов (код готов, нужны ключи — см. этап 118)
+- `server/src/routes/upload.js` полностью готов: `USE_S3 = S3_BUCKET && AWS_ACCESS_KEY_ID` → multer-S3 (S3Client, AUTO_CONTENT_TYPE, ключ uploads/...); иначе diskStorage локально. `ai-moderation.js`: Rekognition при `AWS_ACCESS_KEY_ID` (иначе auto-approve), OpenAI fallback. Удаление файла: DeleteObjectCommand. Public URL отдаётся из s3 Location.
+- Осталось только внешнее: ввести ключи S3 (Selectel/DO/Yandex, `S3_ENDPOINT` поддерживается) + настроить CDN. Это подпункт этапа 118, код-работы нет.
 
 ### Этап 122 — Android-релиз
 - AAB + keystore, assetlinks.json + SHA256 (App Links), Google Play (17+, Privacy Policy, скриншоты), RevenueCat sandbox→prod, FCM на устройство.
 
 ### Этап 123 — Мелочи (не блокируют бету)
-- CSRF double-submit при выносе API на поддомен; Loki/ELK log aggregation; Design System / Storybook; чистка дубля /schedule в project-context.md.
+- Закрыто (06.09): чистка дубля `<Route path="/schedule">` в project-context.md (L119/121 — дублировался, плюс фиктивная строка `/profile/:userId/score`, которой нет в App.tsx; приведено к реальному App.tsx: `/schedule`, `/safety`).
+- Осталось: CSRF double-submit при выносе API на поддомен; Loki/ELK log aggregation; Design System / Storybook.

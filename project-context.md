@@ -117,8 +117,7 @@ import { cn } from "@/lib/utils"
   <Route path="/reset-password" element={<ResetPassword />} />
   <Route path="/verify-email" element={<VerifyEmail />} />
   <Route path="/schedule" element={<Schedule />} />
-  <Route path="/profile/:userId/score" element={<ProfileScore />} />
-  <Route path="/schedule" element={<Schedule />} />
+  <Route path="/safety" element={<Safety />} />
 </Routes>
 ```
 
