@@ -959,3 +959,14 @@ Staging для обновления журналов: локальные фай�
 - **Stripe-флоу прогнан вживую в mock** (без ключей, `STRIPE_LIVE` не задан): premium `/api/premium/create-checkout` → "Subscription activated (mock)"; прод-симуляция события: у оффера 25 `event_end` сдвинут в будущее (был 02.09 — фид скрывает прошедшие, events.js L16-20) → `/api/events` показывает его; `/api/events/25/purchase` → ticket_id 4 `status=paid` amount 1500; partner order `/api/partners/order offer_id=10` → "Order created (mock)" + deeplink.
 - **Вывод по данным:** в БД есть платные офферы-события (id 10–25), но у части `event_end` в прошлом → они не показываются фидом. Для продакшн-сида держать event_end в будущем. Также: 3 запущенных копии `node src/index.js` мешали диагностике (порт держал один; остальные — очереди/WebSocket) — убиты, оставлен один чистый процесс (PID 14684).
 - **Осталось внешнее:** Stripe test-ключи (первый реальный платёж), Sentry DSN, OpenAI, FCM, Twilio, RevenueCat, S3. Всё это требует аккаунтов.
+
+## Этап 117 (06.09.2026): Docker Compose end-to-end — имитация VPS на компе ✅
+
+- VPS имитирован в WSL2 Ubuntu-24.04 (уже настроен как сервер: CyberPanel/LiteSpeed/MariaDB, 12 vCPU/7.7G/1T). Ноутбук: установлен Docker Engine 29.8 + compose v5.5 (офиц. репо). Проект скопирован в `/opt/swiftmatch` (rsync, минус node_modules/.git/docs/test; ~32MB).
+- **Найдены и исправлены 4 деплой-бага, которые никогда не всплывали** (compose до этого не прогонялся end-to-end):
+  1. Dockerfile: migrate.js резолвит mysql2 от корня /app, но npm ci шёл в server/ → ERR_MODULE_NOT_FOUND. Фикс `npm install --no-save --omit=dev mysql2` в /app.
+  2. Миграции 001 и 005 хардкодили `TABLE_SCHEMA='swiftmatch'`, а compose-БД `swiftmatch1bd` → "Duplicate column". Фикс DATABASE().
+  3. migrate.js при полной схеме повторно применял исторические миграции → "Duplicate key". Фикс baseline (пустая _migrations + есть users → запечатать как applied).
+  4. nginx limit_req_zone внутри server{} → "[emerg] not allowed here". Фикс — вынесены на http-уровень.
+- **e2e через nginx :8080:** healthz 200, /health 200, index.html, register→201+JWT, login→JWT, socket.io handshake 200 (sid+websocket). Prometheus :9090 200, Grafana :3001 200. Все контейнеры healthy/up.
+- Ссылки: баги — это пункты из оценок Дипсик/Qwen про "миграции и компоуз могут не пройти с ходу". Теперь деплой на реальный VPS будет `docker compose up -d --build` = та же процедура.

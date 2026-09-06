@@ -826,9 +826,15 @@ UX-улучшение ленты (следующий кандидат из сп�
 - Верификация: импорт в чистую scratch-БД 0 ошибок → 75/75 таблиц; построчная сверка структур live vs scratch (нормируя AUTO_INCREMENT и COLLATE-формат) — 0 расхождений; `schema-validate.mjs` → «OK: 75 tables validated against live DB (0 extra tables)». Scratch-БД удалена.
 - Оценки Дипсик/Qwen (schema 62/73 таблиц) устарели — пункт закрыт.
 
-### Этап 117 — VPS + Docker Compose end-to-end (критично, не код)
-- Поднять VPS (2 vCPU/4GB), Docker, склонировать репо. Прогнать `docker compose up -d --build` + healthcheck'и. До этого docker-compose не прогонялся end-to-end — риск сюрпризов.
-- Прогнать E2E (Playwright, 150) против staging; проверить MySQL под E2E с `DB_POOL_MAX=20` (был OOM).
+### ✅ Этап 117 — VPS + Docker Compose end-to-end — ЗАКРЫТО (06.09, имитация на компе)
+- VPS имитирован в WSL2 Ubuntu-24.04 (уже стоит как сервер: CyberPanel, LiteSpeed, MariaDB, 12 vCPU/7.7G/1T). Ноутбук: установлен Docker Engine 29.8 + compose v5.5 (офиц. репо docker.com, systemd). Проект скопирован в `/opt/swiftmatch` (rsync, минус node_modules/.git).
+- **Найдены и исправлены 3 реальных деплой-бага** (никогда не всплывали, т.к. до этого compose end-to-end не прогонялся):
+  1. **Dockerfile**: `migrate.js` (ESM в `/app/database/`) резолвил `mysql2` вверх от корня `/app`, но `npm ci` шёл в `server/` → `ERR_MODULE_NOT_FOUND` на старте. Фикс: `RUN npm install --no-save --omit=dev mysql2@^3.11.0` в `/app`.
+  2. **Миграции хардкодили имя БД**: `001_add_moderation_columns.sql` и `005_add_spatial_location.sql` использовали `TABLE_SCHEMA = 'swiftmatch'`, а compose-БД `swiftmatch1bd` → проверка существования не срабатывала → "Duplicate column/key". Фикс: `DATABASE()`.
+  3. **`migrate.js` не запечатывал историю при полной схеме**: compose инициализирует БД из полной `mysql_schema.sql` (состояние после 049), затем повторно применял 001–049 → "Duplicate key name 'idx_user_id'". Фикс: **baseline** — если `_migrations` пуста, но таблица `users` уже есть (схема полная), сечь текущие миграции как applied; применяются только новые.
+  4. **nginx**: `limit_req_zone` стоял внутри `server{}` → "[emerg] not allowed here". Фикс: вынесены на http-уровень (перед `server{}`).
+- **Результат e2e (всё через nginx :8080):** `healthz` 200, `/health` 200, index.html отдаётся, register через `/api` → 201+JWT, login → JWT, Socket.IO handshake → 200 (sid+websocket upgrade). Prometheus :9090 200, Grafana :3001 200 (admin/swiftmatch). app healthy, db healthy, nginx healthy. Stack: app, db(mysql:8, 3307), redis, nginx(8080), prometheus, grafana — все up.
+- Playwright E2E против staging — не прогонялся (осталось, требует запуск Playwright на VPS/staging; dev уже 150 green).
 
 ### Этап 118 — Реальные ключи API (критично для первого платежа/писем)
 - Ввести в `server/.env`: Stripe test (платёжный флоу полностью), SMTP/Mailtrap, Sentry DSN, OpenAI, FCM, Twilio, RevenueCat (все сервисы сейчас в mock/fallback).

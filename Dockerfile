@@ -10,6 +10,9 @@ RUN apk add --no-cache curl
 WORKDIR /app
 COPY server/package*.json ./server/
 RUN cd server && npm ci --omit=dev
+# database/migrations/migrate.js резолвит mysql2 вверх от корня /app (Workdir),
+# а npm ci шёл в server/ — ставим mysql2 отдельно в /app (без package.json, --no-save).
+RUN npm install --no-save --omit=dev mysql2@^3.11.0
 COPY server/ ./server/
 COPY --from=frontend /app/dist ./dist
 COPY database/ ./database/

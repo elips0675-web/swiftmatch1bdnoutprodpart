@@ -31,6 +31,24 @@ async function migrate() {
     .filter(f => f.endsWith('.sql'))
     .sort()
 
+  // Baseline: если БД только что инициализирована ИЗ ПОЛНОЙ схемы (docker-entrypoint
+  // применил mysql_schema.sql = состояние после последней миграции), а _migrations пуста,
+  // то текущие исторические миграции уже включены в схему — помечаем их applied,
+  // иначе повторное применение даст "Duplicate key/column". Применяться будут только НОВЫЕ миграции.
+  if (applied.size === 0) {
+    const [[hasUsers]] = await connection.query(
+      'SELECT COUNT(*) AS c FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?',
+      ['users'],
+    )
+    if (Number(hasUsers.c) > 0) {
+      for (const file of files) {
+        await connection.execute('INSERT INTO _migrations (name) VALUES (?)', [file])
+        applied.add(file)
+      }
+      console.log(`[migrate] BASELINE: full schema detected, sealed ${files.length} migrations as applied`)
+    }
+  }
+
   for (const file of files) {
     if (applied.has(file)) {
       console.log(`[migrate] SKIP ${file} (already applied)`)
