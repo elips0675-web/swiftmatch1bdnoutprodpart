@@ -111,3 +111,35 @@ describe('DELETE /api/profile/me', () => {
     expect(res.body.message).toMatch(/deleted/i)
   })
 })
+
+describe('Static routes before /:id (regression: shadowing)', () => {
+  it('GET /api/profile/aliases must NOT be swallowed by /api/profile/:id', async () => {
+    const res = await request(app).get('/api/profile/aliases')
+    expect(res.status).toBe(401)
+  })
+
+  it('GET /api/profile/verification must NOT be swallowed by /api/profile/:id', async () => {
+    const res = await request(app).get('/api/profile/verification')
+    expect(res.status).toBe(401)
+  })
+
+  it('GET /api/profile/aliases returns aliases with auth', async () => {
+    pool.query.mockResolvedValueOnce([[{ id: 1, alias: 'Alex', is_primary: 1 }], []])
+    const res = await request(app)
+      .get('/api/profile/aliases')
+      .set('Authorization', `Bearer ${authToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].alias).toBe('Alex')
+  })
+
+  it('GET /api/profile/verification returns verification state with auth', async () => {
+    pool.query.mockResolvedValueOnce([[{ photo_verified: 0 }], []])
+    pool.query.mockResolvedValueOnce([[], []])
+    const res = await request(app)
+      .get('/api/profile/verification')
+      .set('Authorization', `Bearer ${authToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body.verified).toBe(false)
+  })
+})

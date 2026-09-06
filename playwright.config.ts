@@ -7,6 +7,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 1,
   workers: 1,
   globalSetup: './e2e/setup/global-setup',
+  globalTeardown: './e2e/teardown/global-teardown',
   reporter: [
     ['html', { open: 'never' }],
     ['json', { outputFile: 'test-results.json' }],

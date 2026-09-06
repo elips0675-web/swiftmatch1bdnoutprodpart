@@ -163,7 +163,13 @@ export default function EditProfilePage() {
           if (photoUrls.length > 0) setPhotos(photoUrls)
           else {
             const saved = localStorage.getItem('userProfileGallery')
-            if (saved) try { setPhotos(JSON.parse(saved)) } catch { /* ignored */ }
+            if (saved) {
+              try { setPhotos(JSON.parse(saved)) } catch { setPhotos(getDefaultProfile(t).photos) }
+            } else {
+              const defaults = getDefaultProfile(t).photos
+              setPhotos(defaults)
+              localStorage.setItem('userProfileGallery', JSON.stringify(defaults))
+            }
           }
           localStorage.setItem('userProfile', JSON.stringify(mapped))
           setIsLoading(false)
@@ -349,9 +355,13 @@ export default function EditProfilePage() {
         .map((key: string) => INTEREST_KEY_TO_ID[key])
         .filter(Boolean)
 
-      await fetch(`${PROFILE_API}/${DEMO_USER_ID}`, {
+      const token = getToken()
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers.Authorization = `Bearer ${token}`
+
+      const res = await fetch(`${PROFILE_API}/${DEMO_USER_ID}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           display_name: profile.displayName,
           name: profile.displayName,
@@ -366,8 +376,17 @@ export default function EditProfilePage() {
           interests: interestIds,
         }),
       })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast({ title: t('toast.save_error'), description: err.message || t('toast.save_error_desc'), variant: "destructive" })
+        setIsSaving(false)
+        return
+      }
     } catch (e) {
       if (import.meta.env.DEV) console.error('Failed to save to API', e)
+      toast({ title: t('toast.save_error'), description: t('toast.save_error_desc'), variant: "destructive" })
+      setIsSaving(false)
+      return
     }
 
     toast({ title: t('toast.profile_saved'), description: t('toast.profile_saved_desc') });

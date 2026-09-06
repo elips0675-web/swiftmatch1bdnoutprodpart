@@ -452,16 +452,6 @@ function SearchContent() {
 
             </div>
 
-            <Button
-                asChild
-                variant="outline"
-                className="mt-8 mb-8 h-9 px-8 rounded-full bg-white shadow-lg border-0 text-primary font-bold active:scale-95 transition-all text-sm"
-            >
-                <Link href={`/user?id=${user.id}`} prefetch={true}>
-                    {t('search.open_profile')}
-                </Link>
-            </Button>
-
           </>
         )}
       </main>

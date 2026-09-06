@@ -1,9 +1,18 @@
 # SwiftMatch — Roadmap / журнал этапов
 
-> Актуально: 05.09.2026.
+> Актуально: 06.09.2026.
 > Полная детальная история и сводные аудиты живут в локальных (gitignored) файлах:
 > `test/Что сделано.txt`, `test/Что доделать.txt`, `test/Оценка kimi|qwen|дипсик.txt`.
 > Этот файл — чистая (UTF-8) сводка последних этапов, отслеживаемая в git.
+
+## Этап 113 (05.09.2026) — k6 локальный прогон (смоук p95 1.7ms, бласт 100 VU ~4.9k rps, 0 5xx); находка — 429 от /api-лимитера 600/мин
+
+- **Этап 113 = performance-диагностика `БД отстала`, заканчивается.**
+
+## Этап 114 (06.09.2026) — Production-запуск фронта (build+preview), фикс сейва профиля, кнопка «Открыть профиль» убрана ✅
+
+- **Production-режим фронта:** по жалобе «тупит приложение и админка» — dev-vite (HMR, горячая компиляция, первый заход в админку ~2.6с) заменён на `npx vite build && npx vite preview --port 8081 --host` в `запуск-всего.bat`/`запуск.bat`. `vite.config.ts` получил `preview.proxy` для `/api` и `/socket.io`. Проверено: HTML 23ms, warm-страницы ~340–424ms, `/admin/content` first-load 2.8s (загрузка бандла) / warm 424ms.
+- **Фикс сейва профиля** (`/profile`, `/profile/edit`): (а) server `profile.js` — `GET/PUT /api/profile/:id` были выше статических `/api/profile/aliases`, `/api/profile/verification`, `/api/profile/me` → Express перехватывал их как `:id="aliases"` (404). `:id`-роуты перенесены в конец файла; (б) frontend `profile-edit.tsx` — `handleSave` слал PUT без `Content-Type: application/json` (тело не парсилось, но был тост «Сохранено»), без `res.ok` и без дефолтных фото при пустой БД. Исправлено. Server-тесты: `profile.test.js` 12/12 (добавлены 4 регрессионных на static-vs-`:id`).
 
 ## Этап 112 (05.09.2026) — /hangouts: числовая пагинация страниц + расширенный список запрещённых слов ✅
 
@@ -20,7 +29,7 @@
 - **Тесты:** юнит-тест infinite scroll заменён на пагинацию: (1) «shows pagination and replaces feed when next page is clicked» — counter «1 / 3», клик next → `page=2` в запросе, карточки 2-й страницы, первая исчезла; (2) «hides pagination when feed fits a single page». **front 113/113, server 366/366 (get-фид: +tests не добавлялись — контракт сохранён), vite build OK, lint 0 errors.** E2E: `hangouts.spec.ts` 4/4, `admin-content.spec.ts` 15/15, полный прогон 150/150 (этап 111 baseline).
 - Live-проверка: `/api/hangouts?page=1&limit=20` → `items:20, total:36` (2 страницы); `/hangouts` 200, пагинация рендерится.
 - Полный E2E: **150 passed** (в основном прогоне 1 flaky — `audit-full` «Settings switches are interactive», повторно прошёл 1/1; к ленте отношения не имеет).
-- **UX-дополнение по запросу:** на странице поиска `/search` (режимы nearby/autosearch) возвращена прежняя кнопка перехода в профиль (как в `6e8db4c`): (1) в ряду действий под карточкой — **синяя** круглaya кнопка с иконкой `User` (`text-blue-400 hover:text-blue-600`, `data-testid="search-profile-btn-{id}"`), последняя в ряду (X → Лайк → Чат → Профиль), ведёт на `/user?id=…`; (2) под рядом — текстовая кнопка «Открыть профиль» (`mt-8 mb-8 h-9 px-8 rounded-full bg-white border-0 text-primary font-bold`, i18n `search.open_profile` RU/EN). `src/pages/search.tsx`. Проверено вживую (390px): кнопка видна, клик → `/user?id=3`, cookie-баннер «Принять все» перехватывает клик до закрытия (фича, не баг).
+- **UX-дополнение по запросу:** на странице поиска `/search` (режимы nearby/autosearch) возвращена прежняя кнопка перехода в профиль (как в `6e8db4c`): (1) в ряду действий под карточкой — **синяя** круглaya кнопка с иконкой `User` (`text-blue-400 hover:text-blue-600`, `data-testid="search-profile-btn-{id}"`), последняя в ряду (X → Лайк → Чат → Профиль), ведёт на `/user?id=…`; (2) под рядом — текстовая кнопка «Открыть профиль» (`mt-8 mb-8 h-9 px-8 rounded-full bg-white border-0 text-primary font-bold`, i18n `search.open_profile` RU/EN). `src/pages/search.tsx`. Проверено вживую (390px): кнопка видна, клик → `/user?id=3`, cookie-баннер «Принять все» перехватывает клик до закрытия (фича, не баг). **Наследующее изменение (сент 2026):** текстовая кнопка «Открыть профиль» (`search.open_profile`) удалена по запросу пользователя; в карточке осталась только круглая синяя иконка `User`. `src/pages/search.tsx`.
 
 ## Этап 74 (29.08.2026) — E2E Premium (mock Stripe), Hangouts 2.0, B2B partner dashboard
 

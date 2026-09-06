@@ -39,6 +39,21 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
+  preview: {
+    host: "127.0.0.1",
+    port: 8081,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+      },
+      '/socket.io': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        ws: true,
+      },
+    },
+  },
   plugins: [
     react(),
     utf8Plugin(),
