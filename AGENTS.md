@@ -7,7 +7,7 @@
 | Модуль | Что внутри |
 |--------|-----------|
 | [System Prompt & Core Rules](docs/AGENTS-system-prompt.md) | Персона, стек (React 18, Tailwind v3, shadcn/ui, TS strict), Code Quality, Code Style, Response Format |
-| [Pitfall'ы](docs/AGENTS-pitfalls.md) | 22 грабли из опыта (JSX-скобки, JWT_SECRET, Redis fallback, banned-words, WS-realtime...) |
+| [Pitfall'ы](docs/AGENTS-pitfalls.md) | 37 граблей из опыта (JSX-скобки, JWT_SECRET, Redis fallback, banned-words, WS-realtime, канон интересов vs таблица interests, синонимы-дубли...) |
 | [Workflow (5 этапов) + Prompt Templates](docs/AGENTS-workflow.md) | Этап 0–4: чтение → план → реализация → тесты → верификация; шаблоны для AI |
 | [i18n / translation keys](docs/AGENTS-i18n.md) | Golden Rule «never raw keys», data format, available keys, где лежат переводы |
 | [Admin & auth guardrails](docs/AGENTS-admin-auth.md) | adminAuth ACTIVE, единый гейт `/api/admin`, ограничения админ-роутов |
