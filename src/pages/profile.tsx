@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/context/language-context";
+import { useContentConfig } from "@/lib/useContentConfig";
 import { cn, getUserTitles } from "@/lib/utils";
 import { BANNED_WORDS } from "@/lib/constants";
 import { ZodiacIcon } from "@/components/shared/zodiac-icon";
@@ -54,6 +55,7 @@ const interestIconsMap: Record<string, any> = {
 export default function ProfilePage() {
   const router = useRouter();
   const { t, language } = useLanguage();
+  const { interests: allowedInterests } = useContentConfig();
   const [profile, setProfile] = useState<any>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [isMounted, setIsMounted] = useState(false);
@@ -82,6 +84,18 @@ export default function ProfilePage() {
 
 type InterestInput = string | { name_ru?: string; name_en?: string };
 
+function toLocalDate(value?: string): string {
+  if (!value) return ''
+  const d = new Date(value)
+  if (!Number.isNaN(d.getTime())) {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+  return value.split('T')[0] || ''
+}
+
 function normalizeInterests(interests: InterestInput[]): string[] {
   if (!Array.isArray(interests)) return []
   if (interests.length === 0) return []
@@ -99,6 +113,7 @@ function normalizeInterests(interests: InterestInput[]): string[] {
     'Наука': 'interest.science', 'История': 'interest.history', 'Архитектура': 'interest.architecture',
     'Экстрим': 'interest.extreme', 'Фильмы': 'interest.films', 'Еда': 'interest.food',
     'Походы': 'interest.hiking', 'Единоборства': 'interest.martial_arts', 'Подкасты': 'interest.podcasts',
+    'Питомцы': 'interest.pets', 'Своими руками': 'interest.diy', 'Астрономия': 'interest.astronomy', 'Настольные игры': 'interest.board_games',
     'Sports': 'interest.sport', 'Music': 'interest.music', 'Photography': 'interest.photography',
     'Travel': 'interest.travel', 'Coffee': 'interest.coffee', 'Art': 'interest.art',
     'Movies': 'interest.movies', 'Yoga': 'interest.yoga', 'Business': 'interest.business',
@@ -112,6 +127,7 @@ function normalizeInterests(interests: InterestInput[]): string[] {
     'DIY': 'interest.diy', 'Extreme': 'interest.extreme', 'Films': 'interest.films',
     'Food': 'interest.food', 'Hiking': 'interest.hiking', 'Martial Arts': 'interest.martial_arts',
     'Podcasts': 'interest.podcasts',
+    'Astronomy': 'interest.astronomy', 'Board Games': 'interest.board_games',
     'Sport': 'interest.sport', 'Животные': 'interest.animals',
     'Питомцы': 'interest.pets', 'Pets': 'interest.pets',
   }
@@ -170,6 +186,7 @@ function normalizeInterests(interests: InterestInput[]): string[] {
             const updated = {
               displayName: data.display_name || prev?.displayName || t('profile.someone'),
               age: data.age || prev?.age || 24,
+              birthDate: toLocalDate(data.birth_date) || prev?.birthDate || '',
               city: data.city || prev?.city || t('profile.demo_city'),
               height: data.height || prev?.height || 172,
               gender: data.gender || prev?.gender || 'female',
@@ -620,7 +637,7 @@ function normalizeInterests(interests: InterestInput[]): string[] {
                     </div>
                   </div>
                   <div className="pt-2 flex flex-wrap gap-2">
-                    {[...(profile.interests || [])].filter((interest: string) => !BANNED_WORDS.includes(interest)).sort((a, b) => t(a).localeCompare(t(b))).map((interest: string) => {
+                    {[...(profile.interests || [])].filter((interest: string) => !BANNED_WORDS.includes(interest) && allowedInterests.includes(interest)).sort((a, b) => t(a).localeCompare(t(b))).map((interest: string) => {
                       const Icon = interestIconsMap[interest] || Heart;
                       return (
                         <Badge key={interest} variant="secondary" className="bg-muted/50 text-foreground/80 border-0 gap-2 py-2 px-3 font-bold text-[11px] rounded-lg transition-all hover:bg-muted/70 shadow-sm">

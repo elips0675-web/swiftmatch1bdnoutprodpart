@@ -39,6 +39,18 @@ const INTERESTS = [
   [23, 'История', 'History', 'history', 'Scroll'],
   [24, 'Архитектура', 'Architecture', 'architecture', 'Building'],
   [25, 'Питомцы', 'Pets', 'pets', 'Dog'],
+  [26, 'Кофе', 'Coffee', 'coffee', 'Coffee'],
+  [27, 'Своими руками', 'DIY', 'diy', 'Hammer'],
+  [28, 'Экстрим', 'Extreme', 'extreme', 'Rocket'],
+  [29, 'Фильмы', 'Films', 'films', 'Film'],
+  [30, 'Еда', 'Food', 'food', 'Utensils'],
+  [31, 'Походы', 'Hiking', 'hiking', 'Mountain'],
+  [32, 'Единоборства', 'Martial Arts', 'martial_arts', 'Swords'],
+  [33, 'Подкасты', 'Podcasts', 'podcasts', 'Mic'],
+  [34, 'Астрономия', 'Astronomy', 'astronomy', 'Star'],
+  [35, 'Настольные игры', 'Board Games', 'board_games', 'Gamepad2'],
+  [36, 'Природа', 'Nature', 'nature', 'Leaf'],
+  [37, 'Дизайн', 'Design', 'design', 'Palette'],
 ]
 
 const CITIES = ['Москва', 'Санкт-Петербург', 'Казань', 'Новосибирск', 'Екатеринбург', 'Краснодар', 'Сочи', 'Владивосток']
@@ -215,7 +227,7 @@ async function main() {
   console.log('Inserting feature_flags and content_config...')
   await conn.execute('REPLACE INTO feature_flags (id, video_calls_enabled, ai_icebreakers_enabled, ai_compatibility_enabled, groups_page_enabled, contest_enabled, show_ads, autosearch_enabled) VALUES (1, 1, 1, 1, 1, 1, 0, 1)')
   await conn.execute(`REPLACE INTO content_config (id, interests, dating_goals, education, banned_words) VALUES (1,
-    '["sport","music","movies","books","travel","cooking","games","art","photography","tech","fashion","dance","animals","volunteering","politics","psychology","philosophy","yoga","meditation","gardening","cars","science","history","architecture","pets"]',
+    '["cars","architecture","astronomy","martial_arts","gaming","volunteering","design","food","games","art","history","yoga","books","coffee","cooking","meditation","fashion","music","board_games","science","pets","podcasts","nature","psychology","travel","gardening","diy","sport","dance","tech","hiking","philosophy","movies","photography","reading","extreme"]',
     '["serious_relationship","dating","just_talk","new_friends","one_night","family_kids","travel","co_living","penpal","no_commitment"]',
     '["secondary","vocational","incomplete_higher","higher","bachelor","master","candidate","doctor"]',
     '["spam","scam","bot","admin","support"]'

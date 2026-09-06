@@ -75,6 +75,20 @@ function parseJsonField(val, fallback) {
 
 const PROFILE_TEXT_FIELDS = ['display_name', 'name', 'bio', 'city', 'country', 'passport_city']
 
+// Каноничный список интересов = то, что отредактировано в админке (content_config.interests).
+// Назначения интересов, отсутствующие в каноне, на выдаче отбрасываются и при сохранении игнорируются.
+async function getCanonicalInterestIds() {
+  const [[cfg]] = await pool.query('SELECT interests FROM content_config WHERE id = 1')
+  const canonKeys = new Set(parseJsonField(cfg?.interests, []))
+  const [rows] = await pool.query('SELECT id, name_en FROM interests')
+  const ids = new Set()
+  for (const r of rows) {
+    const slug = String(r.name_en || '').toLowerCase().replace(/\s+/g, '_')
+    if (canonKeys.has(slug)) ids.add(r.id)
+  }
+  return ids
+}
+
 function sanitizeProfileText(profile) {
   for (const field of PROFILE_TEXT_FIELDS) {
     if (typeof profile[field] === 'string') profile[field] = stripHtml(profile[field])
@@ -110,9 +124,11 @@ router.get('/api/profile/me', auth, async (req, res) => {
        WHERE ui.user_id = ?`,
       [req.userId],
     )
+    const canonical = await getCanonicalInterestIds()
+    const canonicalInterests = interests.filter((i) => canonical.has(i.id))
 
     const { location, ...profile } = rows[0]
-    res.json({ ...sanitizeProfileText(profile), photos, interests })
+    res.json({ ...sanitizeProfileText(profile), photos, interests: canonicalInterests })
   } catch (err) {
     logger.error('Profile GET /me error:', err)
     res.status(500).json({ message: 'Failed to fetch profile' })
@@ -377,8 +393,10 @@ router.get('/api/profile/:id', cacheRoute(60), async (req, res) => {
        WHERE ui.user_id = ?`,
       [req.params.id],
     )
+    const canonical = await getCanonicalInterestIds()
+    const canonicalInterests = interests.filter((i) => canonical.has(i.id))
 
-    res.json({ ...sanitizeProfileText(rows[0]), photos, interests })
+    res.json({ ...sanitizeProfileText(rows[0]), photos, interests: canonicalInterests })
   } catch (err) {
     logger.error('Profile GET error:', err)
     res.status(500).json({ message: 'Failed to fetch profile' })
@@ -387,7 +405,7 @@ router.get('/api/profile/:id', cacheRoute(60), async (req, res) => {
 
 router.put('/api/profile/:id', async (req, res) => {
   try {
-    const { display_name, name, age, bio, gender, looking_for, dating_goal, height, city, country, zodiac, circadian, attachment_style, education, interests, incognito, passport_mode, passport_city, passport_lat, passport_lng } = req.body
+    const { display_name, name, age, bio, gender, looking_for, dating_goal, height, city, country, zodiac, circadian, attachment_style, education, interests, incognito, passport_mode, passport_city, passport_lat, passport_lng, birth_date } = req.body
 
     const clean = {
       display_name: stripHtml(display_name),
@@ -399,11 +417,24 @@ router.put('/api/profile/:id', async (req, res) => {
       dating_goal: stripHtml(dating_goal),
     }
 
+    let computedAge = age
+    if (birth_date && /^\d{4}-\d{2}-\d{2}$/.test(String(birth_date))) {
+      const bd = new Date(String(birth_date))
+      if (!Number.isNaN(bd.getTime())) {
+        const today = new Date()
+        let a = today.getFullYear() - bd.getFullYear()
+        const m = today.getMonth() - bd.getMonth()
+        if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) a -= 1
+        computedAge = Math.max(18, a)
+      }
+    }
+
     await pool.query(
       `UPDATE user_profiles SET
         display_name = COALESCE(?, display_name),
         name = COALESCE(?, name),
         age = COALESCE(?, age),
+        birth_date = COALESCE(?, birth_date),
         bio = COALESCE(?, bio),
         gender = COALESCE(?, gender),
         looking_for = COALESCE(?, looking_for),
@@ -421,12 +452,14 @@ router.put('/api/profile/:id', async (req, res) => {
         attachment_style = COALESCE(?, attachment_style),
         education = COALESCE(?, education)
       WHERE id = ?`,
-      [clean.display_name, clean.name, age, clean.bio, gender, looking_for, clean.dating_goal, height, clean.city, incognito, passport_mode, passport_city, passport_lat, passport_lng, clean.country, zodiac, circadian, attachment_style, clean.education, req.params.id],
+      [clean.display_name, clean.name, computedAge, birth_date || null, clean.bio, gender, looking_for, clean.dating_goal, height, clean.city, incognito, passport_mode, passport_city, passport_lat, passport_lng, clean.country, zodiac, circadian, attachment_style, clean.education, req.params.id],
     )
 
     if (interests && Array.isArray(interests)) {
+      const canonical = await getCanonicalInterestIds()
+      const safeInterests = [...new Set(interests)].filter((id) => canonical.has(Number(id)))
       await pool.query('DELETE FROM user_interests WHERE user_id = ?', [req.params.id])
-      for (const interestId of interests) {
+      for (const interestId of safeInterests) {
         await pool.query('INSERT IGNORE INTO user_interests (user_id, interest_id) VALUES (?, ?)', [req.params.id, interestId])
       }
     }

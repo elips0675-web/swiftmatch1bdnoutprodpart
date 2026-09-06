@@ -42,6 +42,7 @@ const INTEREST_KEY_TO_ID: Record<string, number> = {
   'interest.martial_arts': 32, 'interest.podcasts': 33,
   'interest.gaming': 7, 'interest.dancing': 12, 'interest.reading': 4, 'interest.technology': 10,
   'interest.astronomy': 34, 'interest.board_games': 35, 'interest.nature': 36,
+  'interest.design': 37,
 };
 
 const PROFILE_API = '/api/profile'
@@ -81,6 +82,7 @@ const NAME_TO_KEY: Record<string, string> = {
   'Животные': 'interest.animals', 'Экстрим': 'interest.extreme', 'Фильмы': 'interest.films',
   'Еда': 'interest.food', 'Походы': 'interest.hiking', 'Единоборства': 'interest.martial_arts',
   'Подкасты': 'interest.podcasts', 'Питомцы': 'interest.pets',
+  'Своими руками': 'interest.diy', 'Астрономия': 'interest.astronomy', 'Настольные игры': 'interest.board_games',
   'Sports': 'interest.sport', 'Music': 'interest.music', 'Photography': 'interest.photography',
   'Travel': 'interest.travel', 'Coffee': 'interest.coffee', 'Art': 'interest.art',
   'Movies': 'interest.movies', 'Yoga': 'interest.yoga', 'Business': 'interest.business',
@@ -95,6 +97,7 @@ const NAME_TO_KEY: Record<string, string> = {
   'DIY': 'interest.diy', 'Extreme': 'interest.extreme', 'Films': 'interest.films',
   'Food': 'interest.food', 'Hiking': 'interest.hiking', 'Martial Arts': 'interest.martial_arts',
   'Podcasts': 'interest.podcasts',
+  'Astronomy': 'interest.astronomy', 'Board Games': 'interest.board_games',
 }
 
 function normalizeObjectInterests(interests: any): string[] {
@@ -122,7 +125,7 @@ function mapDbProfile(rows: any) {
     interests: normalizeObjectInterests(p.interests),
     match: 87,
     attachmentStyle: p.attachment_style || null,
-    birthDate: p.birth_date || '2001-08-10',
+    birthDate: toLocalDate(p.birth_date) || '2001-08-10',
     location: p.city || '',
     photos: p.photos || [],
   }
@@ -135,6 +138,18 @@ function displayInterestLabel(key: string, t: (k: string) => string): string {
     if (key.startsWith(p)) return key.slice(p.length)
   }
   return key
+}
+
+function toLocalDate(value?: string): string {
+  if (!value) return ''
+  const d = new Date(value)
+  if (!Number.isNaN(d.getTime())) {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+  return value.split('T')[0] || ''
 }
 
 export default function EditProfilePage() {
@@ -339,10 +354,26 @@ export default function EditProfilePage() {
 
     setIsSaving(true);
 
-    const cleanedInterests = (profile.interests || []).filter((i: string) => !BANNED_WORDS.includes(i));
+    const cleanedInterests = (profile.interests || [])
+      .filter((i: string) => !BANNED_WORDS.includes(i) && dynamicInterests.includes(i));
+
+    const birthDateStr = toLocalDate(profile.birthDate) || String(profile.birthDate || '').split('T')[0]
+    let computedAge = profile.age
+    if (birthDateStr && /^\d{4}-\d{2}-\d{2}$/.test(birthDateStr)) {
+      const bd = new Date(birthDateStr)
+      if (!Number.isNaN(bd.getTime())) {
+        const today = new Date()
+        let a = today.getFullYear() - bd.getFullYear()
+        const m = today.getMonth() - bd.getMonth()
+        if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) a -= 1
+        computedAge = Math.max(18, a)
+      }
+    }
 
     const dataToSave = {
       ...profile,
+      age: computedAge,
+      birthDate: birthDateStr,
       interests: cleanedInterests,
       photos: photos.filter(p => !p.startsWith('blob:')),
     };
@@ -352,6 +383,7 @@ export default function EditProfilePage() {
 
     try {
       const interestIds = (profile.interests || [])
+        .filter((key: string) => dynamicInterests.includes(key))
         .map((key: string) => INTEREST_KEY_TO_ID[key])
         .filter(Boolean)
 
@@ -365,7 +397,8 @@ export default function EditProfilePage() {
         body: JSON.stringify({
           display_name: profile.displayName,
           name: profile.displayName,
-          age: profile.age,
+          age: computedAge,
+          birth_date: birthDateStr || null,
           bio: profile.bio,
           gender: profile.gender,
           looking_for: profile.lookingFor,
@@ -563,7 +596,8 @@ export default function EditProfilePage() {
           <div className="space-y-4">
             <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">{t('profile.interests')}</Label>
             <div className="flex flex-wrap gap-2">
-              {[...dynamicInterests].sort((a, b) => displayInterestLabel(a, t).localeCompare(displayInterestLabel(b, t))).map(interest => (
+              {[...new Map([...dynamicInterests].map(k => [displayInterestLabel(k, t), k])).values()]
+                .sort((a, b) => displayInterestLabel(a, t).localeCompare(displayInterestLabel(b, t))).map(interest => (
                 <Badge
                   key={interest}
                   onClick={() => toggleInterest(interest)}

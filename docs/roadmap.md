@@ -9,6 +9,17 @@
 
 - **Этап 113 = performance-диагностика `БД отстала`, заканчивается.**
 
+## Этап 115 (06.09.2026) — Интересы: 12 новых канонических интересов (id 26–37) + фикс дублей «Фильмы»/«Танцы» ✅
+
+По жалобе пользователя «выбрал Кофе, на /profile его нет». Вектор: канон `content_config.interests` (38 ключей) был шире таблицы `interests` (id 1–25), поэтому сервер `getCanonicalInterestIds()` выбрасывал клиентские id 26–36 как «неканонические».
+
+- **БД (`interests`):** добавлены строки id 26–37: Coffee, DIY, Extreme, Films, Food, Hiking, «Martial Arts», Podcasts, Astronomy, «Board Games», Nature, Design — `name_en`-слаг точно совпадает с ключом канона (маппинг `canonicalInterestIds` строково по слагу).
+- **Фронт:** `'interest.design': 37` добавлен в `INTEREST_KEY_TO_ID` (profile-edit.tsx); дополнены `NAME_TO_KEY`/`nameToKey` в profile-edit.tsx/profile.tsx («Своими руками», «Астрономия», «Настольные игры», Astronomy, Board Games).
+- **Дубли чипов:** канон содержал синонимы `movies`+`films` (оба «Фильмы») и `dance`+`dancing` (оба «Танцы») → два одинаковых чипа на «Два раза фильмы!!!». Из канона БД + `seed.js` удалены `films` и `dancing` (38→36 ключей); в profile-edit.tsx добавлена защитная дедупликация чипов по выводимой метке (`Map(label → key)`).
+- **seed.js:** `INTERESTS` синхронизирован с id 26–37, канон-лист `content_config.interests` = 36 ключей.
+- **Тесты:** сервер `profile.test.js` 18/18 (добавлен регресс: интересы Coffee=26/Design=37 проходят канон, Animals=13 отбрасывается); front 113/113; server-полный прогон: 394 passed (10 пре-существующих fail в `hangouts.test.js` — отдельная проблема).
+- Live-проверка: на `/profile/edit` все 36 чипов по одному разу (DUPES=[]), выбор «Кофе»+«Дизайн» сохраняется и отображается на `/profile`; демо-профиль Анна восстановлен (interests [9,5,2,1]).
+
 ## Этап 114 (06.09.2026) — Production-запуск фронта (build+preview), фикс сейва профиля, кнопка «Открыть профиль» убрана ✅
 
 - **Production-режим фронта:** по жалобе «тупит приложение и админка» — dev-vite (HMR, горячая компиляция, первый заход в админку ~2.6с) заменён на `npx vite build && npx vite preview --port 8081 --host` в `запуск-всего.bat`/`запуск.bat`. `vite.config.ts` получил `preview.proxy` для `/api` и `/socket.io`. Проверено: HTML 23ms, warm-страницы ~340–424ms, `/admin/content` first-load 2.8s (загрузка бандла) / warm 424ms.
