@@ -817,3 +817,31 @@ UX-улучшение ленты (следующий кандидат из сп�
 - dev-vite заменён на `npx vite build && npx vite preview --port 8081 --host` (запуск-всего.bat/запуск.bat); `vite.config.ts` + `preview.proxy` для `/api`/`/socket.io`.
 - `profile.js`: `:id`-роуты → конец файла (statics `aliases`/`verification`/`me` не перехватывались как `:id`); `profile-edit.tsx handleSave`: `Content-Type: application/json` + `res.ok` + тост ошибки + `getDefaultProfile(t).photos` при пустой БД.
 - Server-тесты `profile.test.js` 12/12 (добавлены 4 регрессионных static-vs-`:id`).
+## 📋 Доделать: план по этапам (приоритет сверху вниз; источник — оценки ИИ Дипсик 8.6/10, Qwen 8.5/10 от 06.09)
+
+### Этап 116 — Гришки schema (сделано 29–30.08, перепроверить)
+- `mysql_schema.sql` регенерирован (5090f4c, 73 табл) + миграция 043 + CI bootstrap/schema-validate (этап 79), сейчас 74 таблицы. Сверить при поднятой БД, пометить пункт закрытым.
+
+### Этап 117 — VPS + Docker Compose end-to-end (критично, не код)
+- Поднять VPS (2 vCPU/4GB), Docker, склонировать репо. Прогнать `docker compose up -d --build` + healthcheck'и. До этого docker-compose не прогонялся end-to-end — риск сюрпризов.
+- Прогнать E2E (Playwright, 150) против staging; проверить MySQL под E2E с `DB_POOL_MAX=20` (был OOM).
+
+### Этап 118 — Реальные ключи API (критично для первого платежа/писем)
+- Ввести в `server/.env`: Stripe test (платёжный флоу полностью), SMTP/Mailtrap, Sentry DSN, OpenAI, FCM, Twilio, RevenueCat (все сервисы сейчас в mock/fallback).
+- GitHub secrets для `deploy.yml`. Живые ключи НЕ коммитить.
+
+### Этап 119 — Домен + SSL + мониторинг
+- Домен, Caddy/Let's Encrypt (авто-SSL), wss:// для /socket.io.
+- UptimeRobot + Grafana alerts (Telegram/Slack); бэкапы/restore smoke на реальном VPS (RTO уже замерен: 3.6s dev).
+
+### Этап 120 — Rate-limit на Redis (при масштабировании >1 инстанса)
+- `express-rate-limit` + `lockout` держат счётчики в памяти одного процесса. Перевести на rate-limit-redis до pm2 cluster / Docker replicas > 1.
+
+### Этап 121 — S3/CDN для файлов
+- Сейчас файлы на локальном диске. Подключить S3/CDN (код готов, ключ в .env.example).
+
+### Этап 122 — Android-релиз
+- AAB + keystore, assetlinks.json + SHA256 (App Links), Google Play (17+, Privacy Policy, скриншоты), RevenueCat sandbox→prod, FCM на устройство.
+
+### Этап 123 — Мелочи (не блокируют бету)
+- CSRF double-submit при выносе API на поддомен; Loki/ELK log aggregation; Design System / Storybook; чистка дубля /schedule в project-context.md.
