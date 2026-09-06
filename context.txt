@@ -927,3 +927,11 @@ UX-улучшение ленты hangouts (следующий кандидат �
 - **Внимание:** нативный pull-to-refresh — только touch; для десктопа фолбэк — кнопка «Показать новые» (`refreshFeed`), уже есть.
 
 Этапы 100–105 закрыты. Следующие кандидаты: оптимистичный UI respond/join, чип «все» в категориях, бейдж-счётчики на чипах «Куда пойти», эмбед-кадры с мероприятиями в карточках.
+
+## Этапы 113–115 (05–06.09.2026) — k6 локальный прогон; production-запуск фронта; интересы id 26–37 + фикс дублей «Фильмы»/«Танцы» ✅
+
+- **113 — k6:** смоук 20 итераций 40/40 checks p95 1.66ms; бласт 100 VU ≈ 4 905 rps, p95 26.88ms, 0 5xx. 49.67% ответов = 429 от собственного `/api`-лимитера `makeApiLimiter` (600/мин/IP) — анти-DoS, НЕ деградация. Для честного «k6 100 VU <1% errors» нужен pacing/think-time или k6 Cloud/multi-IP (открытый пункт для staging/VPS).
+- **114 — Production-режим фронта + фикс сейва профиля:** dev-vite (HMR) заменён на `npx vite build && npx vite preview --port 8081 --host` в `запуск-всего.bat`/`запуск.bat`; `vite.config.ts` получил `preview.proxy` для `/api`/`/socket.io`. Сервер `profile.js`: `:id`-роуты перенесены В КОНЕЦ файла (были выше статических `/profile/aliases`/`/profile/verification`/`/profile/me` → Express перехватывал их как `:id="aliases"`, 404). `profile-edit.tsx handleSave`: добавлены `Content-Type: application/json` + проверка `res.ok` + тост ошибки + `getDefaultProfile(t).photos` при пустой БД.
+- **115 — Интересы (12 новых id 26–37) + дубли чипов:** канон `content_config.interests` (38 ключей) был шире таблицы `interests` (id 1–25) → `getCanonicalInterestIds()` выкидывал назначения id 26–36 при GET и PUT. Добавлены строки `interests` 26 Coffee, 27 DIY, 28 Extreme, 29 Films, 30 Food, 31 Hiking, 32 Martial Arts, 33 Podcasts, 34 Astronomy, 35 Board Games, 36 Nature, 37 Design (name_en-слаг = ключ канона). `'interest.design':37` в `INTEREST_KEY_TO_ID`; дополнены `NAME_TO_KEY`/`nameToKey`. Синонимы `movies`+`films` («Фильмы») и `dance`+`dancing` («Танцы») давали дубли чипов → из канона БД+seed удалены `films`,`dancing` (38→36); чипы дедуплицируются по метке `Map(label→key)`. Также добавлен `birth_date` в PUT и пересчёт `age`. seed.js синхронизирован. Docs: pitfalls #36/#37, past-mistakes #62/#63, roadmap этап 115.
+
+Staging для обновления журналов: локальные файлы `test/` (gitignored) — это «Что доделать.txt», `context.txt`.

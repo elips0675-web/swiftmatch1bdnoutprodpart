@@ -781,16 +781,39 @@ UX-улучшение ленты (следующий кандидат из сп�
 - **Тесты:** front 96→**98/98** (+2: stagger-класс на `closest("a")`, pull-жест `touchStart/Move/End` → перезапрос `/api/hangouts`); tsc/lint 0, `vite build` OK, server 372/372 (не менялся). Live: ptr-индикатор + 4 stagger-карточки, первая delay 0ms.
 - **Примечание:** работает на touch-устройствах; на десктопе паттерн обычный + кнопка «Показать новые».
 
+Следующие кандидаты (не блокируют): оптимистичный UI respond/join, чип «все» в категориях, бейдж-счётчики на чипах «Куда пойти», эмбед-кадры с мероприятиями в карточках.
+
 ## ✅ Этап 106 (31.08.2026): оптимистичный UI respond/join/like на карточке — ЗАКРЫТО
-
 Пункт из «следующих кандидатов»: состояние карточки меняется сразу, до ответа сервера, при ошибке откатывается.
-
 - **`HangoutCard` (`src/pages/hangouts.tsx`), `doAction(kind: "respond"|"join"|"like")`:** перед сетевой `POST /api/hangouts/:id/{respond,join,like}` применяется оптимистичный патч через `onOptimistic(hangout.id, patch)`: respond → `my_response_status:"pending"`; join → `my_participant_status:"joined"` + `participant_count+1`; like → `my_like_status:"like"` + `like_count+1`. Инверс (`prev`) сохраняется для отката.
 - **Откат:** при `!ok && status!==201` (409/402/401/прочее) или сетевом catch — повторно применяется `prev`, показывается тост (`already`/`payment_required`/`auth_required`/`error`).
 - **`applyOptimistic` (useCallback)** — патчит встречу в state `items` по `id`; передаётся как `onOptimistic={applyOptimistic}` в обе точки рендера `HangoutCard` (лента + H1-рекомендации).
 - **Тесты (`src/test/hangouts.test.tsx`, +2):** «applies optimistic join immediately and keeps it on success (этап 106)» и «rolls back optimistic join when the request fails (этап 106)».
 - **Счётчики:** итог сессии 107–110 — server 389/389, front 111/111, tsc/lint 0, `vite build` OK.
-
 Код этапа 106 был реализован и закоммичен вместе с сессией 107–110 (commit `ddca811`, файлы `hangouts.tsx`/`hangouts.test.tsx`); данная запись фиксирует этап в документации.
 
 Следующие кандидаты (не блокируют): чип «все» в категориях, бейдж-счётчики на чипах «Куда пойти», эмбед-кадры с мероприятиями в карточках. Внешние блокеры (не код): VPS+SSL для FCM push, live Stripe-ключи, координаты офферов.
+
+## 📋 Обновление (05.09.2026): k6 — локальный прогон (смоук + бласт 100 VU)
+
+- ✅ **Смоук** `k6 run scripts/k6/load-staging.js` (localhost:3002): 20 итераций, **40/40 checks**, `http_req_failed 0%`, p95 **1.66ms**.
+- ✅ **Бласт 100 VU** (15s→100, 45s hold, 15s down): **367 894 запроса ≈ 4 905 rps**, p95 **26.88ms**, **0 5xx**; сервер + MySQL выдержали, mysqld не упал (RADAR_PRE_LEAK_64 локально не воспроизведён).
+- ⚠️ **49.67% = 429** от собственного `/api`-лимитера (**600/мин/IP**, `server/src/middleware/limiters.js`) — по дизайну анти-DoS, не деградация ёмкости (все 429 на `/api/content`, `/health` зелёный).
+- **Открыто (для staging):** честный «k6 100 VU с <1% errors» с одного IP невозможен без pacing/think-time под потолок 600/мин (или k6 Cloud / multi-IP / замер raw по `/health`). Пункт «Полный k6 ramp 100 VU на staging» из бэклога остаётся открытым — локальный базлайн есть, нужен VPS.
+- Код не менялся; счётчики server/front/e2e прежние.
+
+## ✅ Этап 115 (06.09.2026): интересы id 26–37 + фикс дублей «Фильмы»/«Танцы» — ЗАКРЫТО
+
+- **БД (`interests`):** добавлены строки id 26–37: Coffee, DIY, Extreme, Films, Food, Hiking, «Martial Arts», Podcasts, Astronomy, «Board Games», Nature, Design — `name_en`-слаг точно совпадает с ключом канона `content_config.interests` (маппинг `getCanonicalInterestIds()` строково по слагу). Канон в БД: 36 ключей (удалены `films`, `dancing`).
+- **Фронт:** `'interest.design': 37` в `INTEREST_KEY_TO_ID`; добавлены RU/EN имена в `NAME_TO_KEY`/`nameToKey` («Своими руками», «Астрономия», «Настольные игры», Astronomy, Board Games) в profile-edit.tsx/profile.tsx; защитная дедупликация чипов по выводимой метке `Map(label→key)`.
+- **seed.js:** `INTERESTS` синхронизирован с id 1–37; канон-лист `content_config.interests` = 36 ключей.
+- **Тесты:** server `profile.test.js` 18/18 (регресс: Coffee=26/Design=37 проходят канон, Animals=13 отбрасывается); front 113/113; полный server-прогон 395 passed (10 пре-существующих fail в `hangouts.test.js` — отдельная незакрытая проблема этапов 112+).
+- **Docs:** `docs/AGENTS-pitfalls.md` #36/#37, `docs/past-mistakes.md` #62/#63, `docs/roadmap.md` этап 115.
+- **Live:** на `/profile/edit` все 36 чипов по одному разу, выбор «Кофе»+«Дизайн» сохраняется и отображается; демо-профиль Анна восстановлен (interests [9,5,2,1]).
+- **Коммит:** `c70dc61` → `origin/main`.
+
+## ✅ Этап 114 (06.09.2026): Production-запуск фронта + фикс сейва профиля — ЗАКРЫТО (сводно в context.txt)
+
+- dev-vite заменён на `npx vite build && npx vite preview --port 8081 --host` (запуск-всего.bat/запуск.bat); `vite.config.ts` + `preview.proxy` для `/api`/`/socket.io`.
+- `profile.js`: `:id`-роуты → конец файла (statics `aliases`/`verification`/`me` не перехватывались как `:id`); `profile-edit.tsx handleSave`: `Content-Type: application/json` + `res.ok` + тост ошибки + `getDefaultProfile(t).photos` при пустой БД.
+- Server-тесты `profile.test.js` 12/12 (добавлены 4 регрессионных static-vs-`:id`).
