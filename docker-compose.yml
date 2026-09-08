@@ -83,6 +83,8 @@ services:
       NODE_ENV: production
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
       REDIS_URL: redis://redis:6379
+      # hangout createLimiter (10/мин по умолчанию) — слишком низкий для E2E-прогонов
+      HANGOUT_CREATE_RATE_MAX: ${HANGOUT_CREATE_RATE_MAX:-10}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
       interval: 30s

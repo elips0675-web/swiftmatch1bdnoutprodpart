@@ -138,8 +138,8 @@ router.post('/api/premium/create-checkout', auth, async (req, res) => {
     }
   }
 
-  if (isLive || isProd) {
-    return res.status(502).json({ message: isProd ? 'Stripe not configured for production' : 'Stripe not configured in live mode' })
+  if (isLive) {
+    return res.status(502).json({ message: 'Stripe not configured in live mode' })
   }
 
   const price = tierConfig.price * duration_months

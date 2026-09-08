@@ -230,7 +230,7 @@ async function main() {
     '["cars","architecture","astronomy","martial_arts","gaming","volunteering","design","food","games","art","history","yoga","books","coffee","cooking","meditation","fashion","music","board_games","science","pets","podcasts","nature","psychology","travel","gardening","diy","sport","dance","tech","hiking","philosophy","movies","photography","reading","extreme"]',
     '["serious_relationship","dating","just_talk","new_friends","one_night","family_kids","travel","co_living","penpal","no_commitment"]',
     '["secondary","vocational","incomplete_higher","higher","bachelor","master","candidate","doctor"]',
-    '["spam","scam","bot","admin","support"]'
+    '["спам","мошенничество","фейк","скам","развод","обман","реклама","казино","ставки","заработок","крипта","инвестиции","наркотики","закладки","продажа","куплю","порно","секс"]'
   )`)
 
   console.log(`Creating ${TARGET_MATCHES} matches and ${TARGET_MESSAGES} messages...`)

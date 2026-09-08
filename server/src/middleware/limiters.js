@@ -22,7 +22,7 @@ export const makeAuthLimiter = () =>
     windowMs: 60_000,
     // 60 → 200 (этап: Е2Е-прогон 133 тестов с одного IP упирается в 60/мин
     // auth-запросов; lockout на 5 неудач остаётся главным анти-брутфорс-барьером)
-    max: 200,
+    max: 1000,
     standardHeaders: true,
     legacyHeaders: false,
     store: getRateLimitStore(),

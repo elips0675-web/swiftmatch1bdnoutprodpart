@@ -83,20 +83,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             })
             return
           }
-          return fetch('/api/auth/dev-login', { method: 'POST' })
-            .then(res => res.ok ? res.json() : null)
-            .then(data => {
-              if (data?.token) {
-                setToken(data.token)
-                dispatch({
-                  type: 'AUTH_SUCCESS',
-                  payload: { id: 2, name: 'Анна', email: 'demo@mail.ru', avatar: '/demo/people/anna.png' },
-                  token: data.token,
-                })
-              } else {
-                dispatch({ type: 'AUTH_LOGOUT' })
-              }
-            })
+          if (!import.meta.env.PROD) {
+            return fetch('/api/auth/dev-login', { method: 'POST' })
+              .then(res => res.ok ? res.json() : null)
+              .then(data => {
+                if (data?.token) {
+                  setToken(data.token)
+                  dispatch({
+                    type: 'AUTH_SUCCESS',
+                    payload: { id: 2, name: 'Анна', email: 'demo@mail.ru', avatar: '/demo/people/anna.png' },
+                    token: data.token,
+                  })
+                } else {
+                  dispatch({ type: 'AUTH_LOGOUT' })
+                }
+              })
+          }
+          dispatch({ type: 'AUTH_LOGOUT' })
         })
         .catch(() => dispatch({ type: 'AUTH_LOGOUT' }))
       return

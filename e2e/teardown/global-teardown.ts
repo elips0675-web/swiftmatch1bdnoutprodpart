@@ -18,7 +18,8 @@ export default async function globalTeardown() {
     )
     const ids = (rows as Array<{ id: number }>).map((r) => r.id)
     if (ids.length > 0) {
-      await conn.execute('DELETE FROM users WHERE id IN (?)', [ids])
+      const placeholders = ids.map(() => '?').join(',')
+      await conn.execute(`DELETE FROM users WHERE id IN (${placeholders})`, ids)
       console.log(`🧹 E2E teardown: deleted ${ids.length} test users`)
     } else {
       console.log('🧹 E2E teardown: nothing to delete')

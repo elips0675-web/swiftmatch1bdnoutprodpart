@@ -11,7 +11,7 @@ import { stripHtml } from '../sanitize.js'
 import { cacheRoutePerUser, invalidate } from '../cache.js'
 import { trackEvent } from './experiments.js'
 
-const likeLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: 30, message: { message: 'Too many likes' } })
+const likeLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: 100, message: { message: 'Too many likes' } })
 
 /**
  * @openapi

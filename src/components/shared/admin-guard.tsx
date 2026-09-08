@@ -10,27 +10,6 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const checkAdmin = async () => {
       const supabase = getSupabase()
-      if (!supabase) {
-        const existing = getToken()
-        if (existing) {
-          try {
-            const res = await fetch('/api/admin/me', { headers: { Authorization: `Bearer ${existing}` } })
-            if (res.ok) { setAuthorized(true); return }
-          } catch { /* stale token */ }
-          clearToken()
-        }
-        try {
-          const res = await fetch('/api/auth/dev-login', { method: 'POST' })
-          if (res.ok) {
-            const data = await res.json()
-            setToken(data.token)
-            setAuthorized(true)
-            return
-          }
-        } catch { /* ignored */ }
-        setAuthorized(true)
-        return
-      }
 
       if (supabase) {
         try {
@@ -49,8 +28,34 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
         } catch {
           /* fall through */
         }
+        navigate('/login', { replace: true })
+        return
       }
 
+      const existing = getToken()
+      const headers = existing ? { Authorization: `Bearer ${existing}` } : {}
+      try {
+        const res = await fetch('/api/admin/me', { headers })
+        if (res.ok) { setAuthorized(true); return }
+        if (res.status === 401 || res.status === 403) clearToken()
+        else { setAuthorized(true); return }
+      } catch {
+        /* сеть временно недоступна — не выкидываем из админки */
+        setAuthorized(true)
+        return
+      }
+
+      if (!import.meta.env.PROD) {
+        try {
+          const res = await fetch('/api/auth/dev-login', { method: 'POST' })
+          if (res.ok) {
+            const data = await res.json()
+            setToken(data.token)
+            setAuthorized(true)
+            return
+          }
+        } catch { /* ignored */ }
+      }
       navigate('/login', { replace: true })
     }
     checkAdmin()
