@@ -896,3 +896,14 @@ UX-улучшение ленты (следующий кандидат из сп�
 - `docker-compose.yml` db volumes: `01-schema.sql`, `02-data.sql`, `03-e2e-seed.sql`, `migrations/`.
 - Верификация на scratch-БД внутри контейнера: `01+02+03` применены без ошибок; users=63 (включая admin/user2/user4/user5), themes=8, questions=40, profiles=59, RU-тексты читабельны (`Что для тебя идеальное первое свидание?`).
 - Коммит: см. git log после `push` (код: `03-e2e-seed.sql` + `demo_data.sql` + `docker-compose.yml`).
+
+## ✅ Этап 126 (08.09.2026): unit-тесты 405/405 — закрыты 12 предсуществующих фейлов — ЗАКРЫТО
+
+| Файл | Фейлы | Причина → Фикс |
+|---|---|---|
+| `server/src/__tests__/hangouts.test.js` | 10 (год feed `GET /api/hangouts`) | Роут после `ae49291` (`/api/hangouts => {items,total}`) делает **2 запроса** (пики `hangouts.js:247` + count `:263`) и отвечает объектом `{ items, total }` (`:266`). Тесты мокали ОДИН `pool.query` и ждали массив напрямую → count-запрос давал `undefined` → 500. Хелпер `mockFeed(rows, total)` закрывает оба запроса (`[[rows],[]]` + `[[{total}],[]]`), ассерты → `res.body.items`/`total` |
+| `server/src/__tests__/ratelimit.test.js` | 2 | Захардкожены под старые лимиты (auth 200, api 600), а в этапе 124 auth поднят до **1000** (`limiters.js:25`). Обновлено 200→1000 (1001-й → 429), «разные экземпляры» тоже 1000 (api 600/601 не менялся) |
+
+- Проверки: `npx vitest run hangouts.test.js ratelimit.test.js` → 65/65; полный `npx vitest run` → **33 файла, 405/405** (было 393/405). Код сервера не менялся — только тесты.
+- **запуск-всего.bat:** окно фронта переведено на `cmd /k` — после `npx vite build && npx vite preview` не закрывается (видно лог, легче диагностировать «8081 не поднялся»).
+- Коммиты: `4463814` (тесты + правила бэкапа в AGENTS.md), `347b46b` (запуск-всего.bat `cmd /k`), запушены; страховка обновлена (зеркало `E:\swiftmatch-backup.git`, bundle verify ok, `swiftmatch-src.zip`).
