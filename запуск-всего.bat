@@ -11,7 +11,7 @@ echo [2/3] API (http://localhost:3002)...
 start "API" cmd /c "cd /d ""%~dp0server"" && node src/index.js"
 
 echo [3/3] Frontend (http://localhost:8081) — build + preview (production)...
-start "Frontend" cmd /c "cd /d ""%~dp0"" && npx vite build && npx vite preview --port 8081 --host"
+start "Frontend" cmd /k "cd /d ""%~dp0"" && npx vite build && npx vite preview --port 8081 --host"
 
 timeout /t 6 /nobreak >nul
 start http://localhost:8081
