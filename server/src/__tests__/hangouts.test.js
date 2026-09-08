@@ -79,6 +79,13 @@ function adminToken() {
   return jwt.sign({ userId: 1, role: 'admin' }, JWT_SECRET, { expiresIn: '1h' })
 }
 
+// Фид выполняет 2 запроса: пики (main) + count. mockFeed закрывает оба.
+function mockFeed(rows, total = rows.length) {
+  pool.query
+    .mockResolvedValueOnce([rows, []])
+    .mockResolvedValueOnce([[{ total }], []])
+}
+
 function mockConnection(handlers) {
   const conn = {
     execute: vi.fn(async (sql, params) => handlers.execute(sql, params)),
@@ -95,15 +102,15 @@ beforeEach(() => {
 
 describe('GET /api/hangouts (feed)', () => {
   it('returns feed without auth (anonymous)', async () => {
-    pool.query.mockResolvedValueOnce([[{ id: 1, title: 'Cinema' }], []])
+    mockFeed([{ id: 1, title: 'Cinema' }])
     const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts')
     expect(res.status).toBe(200)
-    expect(res.body).toHaveLength(1)
-    expect(res.body[0].title).toBe('Cinema')
+    expect(res.body.items).toHaveLength(1)
+    expect(res.body.items[0].title).toBe('Cinema')
   })
 
   it('applies category filter', async () => {
-    pool.query.mockResolvedValueOnce([[], []])
+    mockFeed([])
     const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts?category=cinema')
     expect(res.status).toBe(200)
     const sql = pool.query.mock.calls[0][0]
@@ -112,7 +119,7 @@ describe('GET /api/hangouts (feed)', () => {
   })
 
   it('applies free price filter', async () => {
-    pool.query.mockResolvedValueOnce([[], []])
+    mockFeed([])
     const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts?price=free')
     expect(res.status).toBe(200)
     const sql = pool.query.mock.calls[0][0]
@@ -120,7 +127,7 @@ describe('GET /api/hangouts (feed)', () => {
   })
 
   it('applies paid price filter with max_price range', async () => {
-    pool.query.mockResolvedValueOnce([[], []])
+    mockFeed([])
     const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts?price=paid&max_price=1500')
     expect(res.status).toBe(200)
     const sql = pool.query.mock.calls[0][0]
@@ -130,7 +137,7 @@ describe('GET /api/hangouts (feed)', () => {
   })
 
   it('ignores price filter when value is unknown', async () => {
-    pool.query.mockResolvedValueOnce([[], []])
+    mockFeed([])
     await request(createApp(hangoutsRoutes)).get('/api/hangouts?price=hack')
     const sql = pool.query.mock.calls[0][0]
     expect(sql).not.toContain('h.price IS NULL OR h.price = 0')
@@ -138,7 +145,7 @@ describe('GET /api/hangouts (feed)', () => {
   })
 
   it('applies radius filter with ST_Distance_Sphere', async () => {
-    pool.query.mockResolvedValueOnce([[], []])
+    mockFeed([])
     const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts?lat=55.75&lng=37.61&radius=5')
     expect(res.status).toBe(200)
     const sql = pool.query.mock.calls[0][0]
@@ -149,14 +156,14 @@ describe('GET /api/hangouts (feed)', () => {
   })
 
   it('rejects unknown category silently (no filter)', async () => {
-    pool.query.mockResolvedValueOnce([[], []])
+    mockFeed([])
     await request(createApp(hangoutsRoutes)).get('/api/hangouts?category=hack')
     const sql = pool.query.mock.calls[0][0]
     expect(sql).not.toContain('h.category = ?')
   })
 
   it('applies text search across title/description/place/city', async () => {
-    pool.query.mockResolvedValueOnce([[], []])
+    mockFeed([])
     const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts?q=йога')
     expect(res.status).toBe(200)
     const sql = pool.query.mock.calls[0][0]
@@ -167,48 +174,48 @@ describe('GET /api/hangouts (feed)', () => {
   })
 
   it('ignores empty/whitespace search query', async () => {
-    pool.query.mockResolvedValueOnce([[], []])
+    mockFeed([])
     await request(createApp(hangoutsRoutes)).get('/api/hangouts?q=   ')
     const sql = pool.query.mock.calls[0][0]
     expect(sql).not.toContain('h.title LIKE ?')
   })
 
   it('joins partner offer and returns offer fields', async () => {
-    pool.query.mockResolvedValueOnce([[{ id: 1, title: 'Cinema', offer_id: 12, offer_price: '500.00' }], []])
+    mockFeed([{ id: 1, title: 'Cinema', offer_id: 12, offer_price: '500.00' }])
     const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts')
     expect(res.status).toBe(200)
     const sql = pool.query.mock.calls[0][0]
     expect(sql).toContain('LEFT JOIN partner_offers po ON po.id = h.partner_offer_id')
     expect(sql).toContain('po.id AS offer_id')
-    expect(res.body[0]).toMatchObject({ offer_id: 12, offer_price: '500.00' })
+    expect(res.body.items[0]).toMatchObject({ offer_id: 12, offer_price: '500.00' })
   })
 
   it('returns offer_pinned and sorts pinned offers first', async () => {
-    pool.query.mockResolvedValueOnce([[{ id: 2, offer_id: 5, offer_pinned: 1 }], []])
+    mockFeed([{ id: 2, offer_id: 5, offer_pinned: 1 }])
     const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts')
     expect(res.status).toBe(200)
     const sql = pool.query.mock.calls[0][0]
     expect(sql).toContain('po.pinned AS offer_pinned')
     expect(sql).toMatch(/ORDER BY \(h\.boosted = 1\) DESC, \(po\.pinned IS NOT NULL AND po\.pinned = 1\) DESC/)
-    expect(res.body[0]).toMatchObject({ offer_id: 5, offer_pinned: 1 })
+    expect(res.body.items[0]).toMatchObject({ offer_id: 5, offer_pinned: 1 })
   })
 
   it('selects boosted flag for hangouts', async () => {
-    pool.query.mockResolvedValueOnce([[{ id: 3, boosted: 1 }], []])
+    mockFeed([{ id: 3, boosted: 1 }])
     const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts')
     expect(res.status).toBe(200)
     const sql = pool.query.mock.calls[0][0]
     expect(sql).toContain('h.boosted')
-    expect(res.body[0]).toMatchObject({ boosted: 1 })
+    expect(res.body.items[0]).toMatchObject({ boosted: 1 })
   })
 
   it('selects view_count for hangouts (H2)', async () => {
-    pool.query.mockResolvedValueOnce([[{ id: 7, view_count: 42 }], []])
+    mockFeed([{ id: 7, view_count: 42 }])
     const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts')
     expect(res.status).toBe(200)
     const sql = pool.query.mock.calls[0][0]
     expect(sql).toContain('h.view_count')
-    expect(res.body[0]).toMatchObject({ view_count: 42 })
+    expect(res.body.items[0]).toMatchObject({ view_count: 42 })
   })
 })
 

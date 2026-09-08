@@ -12,10 +12,10 @@ function createApp(limiter) {
 }
 
 describe('rate limiters', () => {
-  it('authLimiter: первые 200 запросов проходят, 201-й -> 429', async () => {
+  it('authLimiter: первые 1000 запросов проходят, 1001-й -> 429', async () => {
     const app = createApp(makeAuthLimiter())
     let last
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 1000; i++) {
       last = await request(app).post('/ping')
       expect(last.status).toBe(200)
     }
@@ -38,7 +38,7 @@ describe('rate limiters', () => {
 
   it('разные экземпляры считаются независимо', async () => {
     const a = createApp(makeAuthLimiter())
-    for (let i = 0; i < 200; i++) await request(a).post('/ping')
+    for (let i = 0; i < 1000; i++) await request(a).post('/ping')
     expect((await request(a).post('/ping')).status).toBe(429)
     // свежий экземпляр — свежий счётчик
     const b = createApp(makeAuthLimiter())

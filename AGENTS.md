@@ -42,6 +42,11 @@
 - `git commit --no-verify` когда changes проверены (тесты зелёные, сборка проходит)
 - Перед PR: `npx vite build`, `npm run test` (frontend), `cd server && npm run test`
 - **Никогда** не коммитить `.env` с секретами. `.env.example` — в репо.
+- **Локальное зеркало репозитория (страховка от недоступности GitHub/2FA):** `E:\swiftmatch-backup.git` — bare-копия, создана `git clone --mirror`. После каждого закоммиченного изменения обновлять: `E:\swiftmatch-backup.git\update.cmd` (`git -C ... remote update --prune`). GitHub — только удалённая копия; полная история всегда есть локально в `.git` и в зеркале.
+- **Облачный бэкап (папка `E:\swiftmatch-backup`, скидывать на облако после значимых изменений):**
+  - git-история одним файлом: `git -C "E:\Eswiftmatch1bdnoutprodpart1" bundle create "E:\swiftmatch-backup\swiftmatch-backup.bundle" --all`
+  - исходники zip (без node_modules/.git/dist/playwright-report/.auth/*.log): `tar.exe -a -c -f "E:\swiftmatch-backup\swiftmatch-src.zip" --exclude=node_modules --exclude=.git --exclude=dist --exclude=playwright-report --exclude=test-results --exclude="e2e/.auth" --exclude="*.log" -C "E:\Eswiftmatch1bdnoutprodpart1" .`
+  - Суммарно ~28 MB; восстановление кода из zip — распаковать + `npm install`; из bundle — `git clone bundle`.
 
 ---
 **Extended docs:** [Architecture](docs/architecture.md) | [Past Mistakes](docs/past-mistakes.md)
