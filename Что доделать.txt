@@ -881,3 +881,18 @@ UX-улучшение ленты (следующий кандидат из сп�
 
 - Заодно закрыт флейк `hangouts2:197` (429 review на первых попытках — счётчик в Redis-стор сохранялся между прогонами; поднятый лимит + окно 60s снимают).
 - Коммит: `8e3282b`. Требования к прогонам: стабильное окно стека (внешний `docker compose up -d` на VPS/WSL пересоздаёт контейнеры и даёт кратковременные 502), свежие `.auth/*.json`, `redis-cli FLUSHALL` опционально перед серией.
+
+## ✅ Этап 125 (08.09.2026): self-contained развёртывание в новой папке (initdb 01+02+03) — ЗАКРЫТО
+
+Проблема: развёртывание из репо в чистую папку (новый volume БД) падало или давало **незелёные e2e** — было ВЫЯВЛЕНО 3 дыры:
+
+| Дыра | Причина → Фикс |
+|---|---|
+| `demo_data.sql` несовместим со свежей схемой | Старый дамп 02-data (REPLACE без списка колонок) падал уже на `chats` (7 значений vs 8 колонок, `ERROR 1136 Column count doesn't match`). Перегенерирован из живой БД (`mysqldump --no-create-info --replace --default-character-set=utf8mb4 --ignore-table=swiftmatch1bd._migrations`) — теперь совпадает с mysql_schema.sql по всем таблицам |
+| admin + user2/user4/user5 (на них завязаны `.auth/*.json`) либо отсутствуют, либо пароль ≠ demo123456 | В 02-data админ-хэш был от старого демо-дампа. Новый `database/03-e2e-seed.sql` (`REPLACE` с явными id) гарантирует: admin(1)+user2(3)+user4(5)+user5(6) с bcrypt **demo123456** + профили с корректной кириллицей + interests |
+| Icebreaker темы/вопросы пусты на свежей БД | `migrate.js` baseline-запечатывает исторические миграции (018_icebreakers_seed.sql не выполнится на полной схеме). `03-e2e-seed.sql` вставляет темы id 1..8 + 40 вопросов с явными id (REPLACE — перезаписывает mojibake из live-дампа), плюс feature_flags/content_config дефолт |
+
+- `03-e2e-seed.sql` начинается с `SET NAMES utf8mb4` и применяется ПОСЛЕ 02-data (имя `03-`), всё идемпотентно (REPLACE/INSERT IGNORE по PK).
+- `docker-compose.yml` db volumes: `01-schema.sql`, `02-data.sql`, `03-e2e-seed.sql`, `migrations/`.
+- Верификация на scratch-БД внутри контейнера: `01+02+03` применены без ошибок; users=63 (включая admin/user2/user4/user5), themes=8, questions=40, profiles=59, RU-тексты читабельны (`Что для тебя идеальное первое свидание?`).
+- Коммит: см. git log после `push` (код: `03-e2e-seed.sql` + `demo_data.sql` + `docker-compose.yml`).

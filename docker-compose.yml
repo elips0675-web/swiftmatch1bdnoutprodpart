@@ -41,6 +41,7 @@ services:
       - db_data:/var/lib/mysql
       - ./database/mysql_schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
       - ./database/demo_data.sql:/docker-entrypoint-initdb.d/02-data.sql
+      - ./database/03-e2e-seed.sql:/docker-entrypoint-initdb.d/03-e2e-seed.sql
       - ./database/migrations:/docker-entrypoint-initdb.d/migrations
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
