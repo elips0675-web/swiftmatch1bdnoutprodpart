@@ -47,6 +47,7 @@
   - git-история одним файлом: `git -C "E:\Eswiftmatch1bdnoutprodpart1" bundle create "E:\swiftmatch-backup\swiftmatch-backup.bundle" --all`
   - исходники zip (без node_modules/.git/dist/playwright-report/.auth/*.log): `tar.exe -a -c -f "E:\swiftmatch-backup\swiftmatch-src.zip" --exclude=node_modules --exclude=.git --exclude=dist --exclude=playwright-report --exclude=test-results --exclude="e2e/.auth" --exclude="*.log" -C "E:\Eswiftmatch1bdnoutprodpart1" .`
   - Суммарно ~28 MB; восстановление кода из zip — распаковать + `npm install`; из bundle — `git clone bundle`.
+  - дамп MySQL в `E:\swiftmatch-backup\db\`: `powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\backup-mysql.ps1" -DbName swiftmatch -BackupDir "E:\swiftmatch-backup\db" -RetentionDays 30` (auto-detect mysqldump, retention 30 дней). Восстановление: `mysql -uroot swiftmatch < swiftmatch_<timestamp>.sql`.
 
 ---
 **Extended docs:** [Architecture](docs/architecture.md) | [Past Mistakes](docs/past-mistakes.md)
