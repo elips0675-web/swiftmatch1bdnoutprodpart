@@ -398,6 +398,30 @@ function HangoutCard({ hangout, className, style, onOptimistic }: { hangout: Han
                 {hangout.offer_title}
               </p>
             )}
+            {hangout.offer_deeplink && (hangout.offer_image_url || hangout.offer_title) && (
+              <a
+                href={hangout.offer_deeplink}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid={`hangout-offer-embed-${hangout.id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="mt-2 block overflow-hidden rounded-xl border border-muted bg-muted/40 hover:shadow-md transition-shadow"
+              >
+                {hangout.offer_image_url && (
+                  <img
+                    src={hangout.offer_image_url}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="h-28 w-full object-cover"
+                  />
+                )}
+                <span className="flex items-center gap-1 px-2.5 py-2 text-xs font-bold text-primary" aria-label={t("hangout.offer.embed_open")}>
+                  <Ticket size={12} />
+                  {hangout.offer_title || t("hangout.offer.buy")}
+                </span>
+              </a>
+            )}
             <div className="mt-2 space-y-1 text-xs text-muted-foreground">
               <p className="flex items-center gap-1.5">
                 <CalendarDays size={12} />
@@ -906,7 +930,7 @@ export default function HangoutsPage() {
   const goToPage = useCallback((p: number) => {
     setPage((cur) => {
       if (p < 1 || p > (totalPages || 1) || p === cur) return cur;
-      try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch {}
+      try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* smooth scroll unsupported */ }
       return p;
     });
   }, [totalPages]);
@@ -1266,6 +1290,8 @@ export default function HangoutsPage() {
                 {(() => {
                   const cats = Array.from(new Set(goOutOffers.map((o) => o.category).filter(Boolean)));
                   if (cats.length < 2) return null;
+                  const countFor = (c: string) =>
+                    c === "all" ? goOutOffers.length : goOutOffers.filter((o) => o.category === c).length;
                   return (
                     <div className="flex gap-2 overflow-x-auto pb-1 mb-2 -mx-1 px-1" data-testid="hangout-go-out-filters">
                       {["all", ...cats].map((c) => (
@@ -1281,6 +1307,12 @@ export default function HangoutsPage() {
                           }`}
                         >
                           {c === "all" ? t("hangout.go_out.filter_all") : t(`hangout.go_out.cat_${c}`)}
+                          <span
+                            data-testid={`hangout-go-out-count-${c}`}
+                            className="ml-1.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-primary/15 text-[10px] font-black"
+                          >
+                            {countFor(c)}
+                          </span>
                         </button>
                       ))}
                     </div>

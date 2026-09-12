@@ -728,6 +728,58 @@ describe("HangoutsPage", () => {
     // В пределах staleTime (60s) повторный запрос ленты не выполняется — отдаётся кэш
     expect(feedCalls()).toBe(callsAfterFirst)
   })
+
+  it("shows offer counts on the «Куда пойти» category chips", async () => {
+    const offers = [
+      { id: 28, category: "restaurant", title: "Ресторан", deeplink: "https://go/x", price: 2500, city: "Москва", commission_rate: 12 },
+      { id: 29, category: "restaurant", title: "Кафе", deeplink: "https://go/y", price: 1000, city: "Москва", commission_rate: 10 },
+      { id: 30, category: "flowers", title: "Цветы", deeplink: "https://go/z", price: 1500, city: "Москва", commission_rate: 15 },
+    ]
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers }) })
+      if (u.includes("/api/profile/me")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ city: "Москва" }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+    renderPage(<HangoutsPage />)
+    await waitFor(() => expect(screen.getByTestId("hangout-go-out")).toBeTruthy())
+
+    expect(screen.getByTestId("hangout-go-out-count-all").textContent).toBe("3")
+    expect(screen.getByTestId("hangout-go-out-count-restaurant").textContent).toBe("2")
+    expect(screen.getByTestId("hangout-go-out-count-flowers").textContent).toBe("1")
+  })
+
+  it("renders an embedded event offer frame on the hangout card", async () => {
+    const withOffer = [{ ...sampleHangouts[0], offer_id: 7, offer_title: "Концерт в Тинькофф Холле", offer_image_url: "https://img.example.com/concert.jpg", offer_deeplink: "https://partner.example.com/concert" }]
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(withOffer) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+    renderPage(<HangoutsPage />)
+
+    await waitFor(() => expect(screen.getByTestId("hangout-card-1")).toBeTruthy())
+    const frame = screen.getByTestId("hangout-offer-embed-1")
+    expect(frame).toBeTruthy()
+    expect(frame.getAttribute("href")).toBe("https://partner.example.com/concert")
+    expect(frame.textContent).toContain("Концерт в Тинькофф Холле")
+  })
+
+  it("does not render the offer embed frame when only offer_id is present", async () => {
+    const withOffer = [{ ...sampleHangouts[0], offer_id: 7 }]
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(withOffer) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+    renderPage(<HangoutsPage />)
+
+    await waitFor(() => expect(screen.getByTestId("hangout-card-1")).toBeTruthy())
+    expect(screen.queryByTestId("hangout-offer-embed-1")).toBeNull()
+  })
 })
 
 describe("HangoutsMyPage", () => {

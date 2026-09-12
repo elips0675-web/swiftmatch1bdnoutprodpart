@@ -873,6 +873,20 @@ UX-улучшение ленты (следующий кандидат из сп�
 
 Проверки: server-юниты **415/415** (было 412, +3 parseServiceAccount в fcm.test.js), eslint по изменённым файлам 0, `tsc --noEmit` чист, живой `/health` 200. Внешние ключи по-прежнему за пользователем (этап 118).
 
+### Дополнение: закрыты оставшиеся без-ключевые код-хвосты (12.09)
+
+| Пункт | Статус |
+|---|---|
+| Redis доступность (дипсик «надо проверить») | ✅ **Живой Redis**: `redis-server` PID 3260 на 6379, PONG, 207 ключей; сервер поднят с `REDIS_URL` (лог `[redis] pub/client/sub connected` + `[ws] Redis adapter attached — horizontal scaling enabled`); лимитер пишет счётчики в Redis (`rl:api:::/56` после GET /api/hangouts), Bull-очереди email/push живут в Redis. Пункт «сервер не поднят» снят — всё на месте |
+| Backup/restore smoke в CI + RTO (kimi 2.5) | ✅ Уже в CI (deploy.yml `server-test` → `node scripts/verify-backup.mjs`); локальный прогон **PASS** (mysqldump → scratch `swiftmatch_verify_backup` → 6 sanity-таблиц → drop); RTO замерен в `docs/rollback-plan.md` N+1 (3.6 сек dev, <30 мин прод) |
+| Чип «все» в категориях | ✅ Уже был (этап 104, `hangout-go-out-filter-all` + `hangout.filter.all_categories`) — подтверждено |
+| Бейдж-счётчики на чипах «Куда пойти» | ✅ `hangouts.tsx`: `countFor(c)` на каждый чип (`hangout-go-out-count-<cat>`, все=всего офферов, category=N) — +1 тест |
+| Эмбед-кадры с мероприятиями в карточках встреч | ✅ `hangouts.tsx` `HangoutCard:` если `offer_deeplink` + (image|title) — превью-кадр `hangout-offer-embed-<id>` с картинкой/подписью; без deeplink кадр не рисуется. i18n `hangout.offer.embed_open` RU/EN. +2 теста |
+| AGENTS.md >1500 строк | ✅ Уже реструктурирован: корневой `AGENTS.md` 52 строки + `docs/AGENTS-{admin-auth,workflow,security,deployment,production,i18n,startup,pitfalls}.md` — порог не актуален |
+| rules-of-hooks / useApi.ts (qwen 🟡) | ✅ Подтверждено: `reactHooks.configs.recommended` в eslint.config.js; eslint ловит такие случаи (0 errors) |
+
+Проверки: front vitest **116/116** (было 113, +3: бейдж-счётчики/эмбед-кадр/отсутствие эмбеда без deeplink), server 415/415, eslint 0 errors (попутно починен пустой `catch {}` в `hangouts.tsx` — единственный известный error), `tsc --noEmit` чист, `vite build` OK.
+
 ### Этап 122 — Android-релиз
 - AAB + keystore, assetlinks.json + SHA256 (App Links), Google Play (17+, Privacy Policy, скриншоты), RevenueCat sandbox→prod, FCM на устройство.
 
