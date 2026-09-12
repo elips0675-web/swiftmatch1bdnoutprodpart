@@ -8,10 +8,11 @@ import { getRedis } from '../redis.js'
 
 // Паттерн как в lockout.js: если Redis сконфигурирован и доступен — общий
 // счётчик между процессами (pm2 cluster / Docker replicas); иначе — memory.
-export function getRateLimitStore() {
+export function getRateLimitStore(prefix = 'rl:') {
   const r = getRedis()
   if (!r) return undefined
   return new RedisStore({
+    prefix,
     sendCommand: (...args) => r.call(...args),
   })
 }
@@ -25,7 +26,7 @@ export const makeAuthLimiter = () =>
     max: 1000,
     standardHeaders: true,
     legacyHeaders: false,
-    store: getRateLimitStore(),
+    store: getRateLimitStore('rl:auth:'),
     message: { message: 'Too many auth attempts' },
   })
 
@@ -35,7 +36,7 @@ export const makeApiLimiter = () =>
     max: 600,
     standardHeaders: true,
     legacyHeaders: false,
-    store: getRateLimitStore(),
+    store: getRateLimitStore('rl:api:'),
     message: { message: 'Too many requests' },
   })
 
@@ -45,7 +46,7 @@ export const makeLikeLimiter = () =>
     max: 30,
     standardHeaders: true,
     legacyHeaders: false,
-    store: getRateLimitStore(),
+    store: getRateLimitStore('rl:like:'),
     message: { message: 'Too many likes' },
   })
 
