@@ -261,9 +261,9 @@ router.post('/api/partner/subscribe', auth, requirePartner(async (req, res) => {
     const stripe = (await import('stripe')).default
     const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY)
     const session = await stripeClient.checkout.sessions.create({
-      mode: 'subscription',
+      mode: 'payment',
       payment_method_types: ['card'],
-      line_items: [{ price_data: { currency: 'rub', product_data: { name: 'SwiftMatch Partner Pro' }, recurring: { interval: 'month' }, unit_amount: PARTNER_TIERS.pro.price * 100 }, quantity: 1 }],
+      line_items: [{ price_data: { currency: 'rub', product_data: { name: 'SwiftMatch Partner Pro' }, unit_amount: PARTNER_TIERS.pro.price * 100 }, quantity: 1 }],
       success_url: `${req.headers.origin || 'https://swiftmatch.app'}/partner/dashboard?upgraded=1`,
       cancel_url: `${req.headers.origin || 'https://swiftmatch.app'}/partner/dashboard?cancelled=1`,
       metadata: { partner_id: String(req.partner.id), tier: 'pro' },
@@ -280,5 +280,72 @@ router.post('/api/partner/subscribe', auth, requirePartner(async (req, res) => {
   await pool.query('UPDATE partners SET commission_rate = 15 WHERE id = ?', [req.partner.id])
   res.json({ message: 'Pro activated (mock)', tier: 'pro', mock: true })
 }))
+
+/**
+ * @openapi
+ * /api/partner/webhook:
+ *   post:
+ *     tags: [Partners]
+ *     summary: Stripe webhook for partner Pro subscription
+ */
+router.post('/api/partner/webhook', async (req, res) => {
+  const stripeKey = process.env.STRIPE_SECRET_KEY
+  if (!stripeKey) return res.status(200).json({ received: true })
+
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET
+  const sig = req.headers['stripe-signature']
+  if (!sig || !endpointSecret) return res.status(400).json({ message: 'Missing signature' })
+
+  let event
+  try {
+    const { default: Stripe } = await import('stripe')
+    const stripe = new Stripe(stripeKey)
+    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret)
+  } catch (err) {
+    logger.error('Partner subscribe webhook signature error:', err)
+    return res.status(400).json({ message: 'Invalid signature' })
+  }
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object
+    const { partner_id: partnerId, tier } = session.metadata || {}
+    if (!partnerId || tier !== 'pro') return res.json({ received: true })
+    if (session.payment_status !== 'paid') return res.json({ received: true })
+    try {
+      const conn = await pool.getConnection()
+      try {
+        await conn.beginTransaction()
+        const [evt] = await conn.query(
+          'INSERT IGNORE INTO webhook_events (provider, event_id) VALUES (?, ?)',
+          ['stripe_partner_sub', String(event.id || '')],
+        )
+        if (!evt || evt.affectedRows === 0) {
+          await conn.rollback()
+          logger.warn(`Partner webhook event ${event.id} already processed, skipping`)
+          return res.json({ received: true })
+        }
+        await conn.query(
+          "UPDATE partner_subscriptions SET status = 'cancelled' WHERE partner_id = ? AND status = 'active'",
+          [Number(partnerId)],
+        )
+        await conn.query(
+          `INSERT INTO partner_subscriptions (partner_id, tier, status, stripe_session_id, expires_at)
+           VALUES (?, 'pro', 'active', ?, DATE_ADD(NOW(), INTERVAL 30 DAY))`,
+          [Number(partnerId), session.id],
+        )
+        await conn.query('UPDATE partners SET commission_rate = 15 WHERE id = ?', [Number(partnerId)])
+        await conn.commit()
+      } catch (err) {
+        await conn.rollback()
+        throw err
+      } finally {
+        conn.release()
+      }
+    } catch (err) {
+      logger.error('Partner subscribe webhook processing error:', err)
+    }
+  }
+  res.json({ received: true })
+})
 
 export default router
