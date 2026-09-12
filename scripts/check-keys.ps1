@@ -9,6 +9,7 @@ $errors = @()
 $checks = @(
   @{Key="STRIPE_SECRET_KEY"; Name="Stripe LIVE"; Doc="https://dashboard.stripe.com/apikeys"},
   @{Key="STRIPE_WEBHOOK_SECRET"; Name="Stripe Webhook"; Doc="https://dashboard.stripe.com/webhooks"},
+  @{Key="SMTP_HOST"; Name="SMTP host"; Doc="smtp.gmail.com / SendGrid / Resend"},
   @{Key="SMTP_USER"; Name="SMTP username"; Doc="SendGrid/Resend/SES"},
   @{Key="SMTP_PASS"; Name="SMTP password"; Doc="SendGrid/Resend/SES"},
   @{Key="FCM_SERVER_KEY"; Name="Firebase FCM"; Doc="https://console.firebase.google.com -> Project settings -> Cloud Messaging"},
@@ -21,11 +22,12 @@ $checks = @(
   @{Key="AWS_ACCESS_KEY_ID"; Name="AWS Access Key"; Doc="https://console.aws.amazon.com/iam"},
   @{Key="AWS_SECRET_ACCESS_KEY"; Name="AWS Secret"; Doc="https://console.aws.amazon.com/iam"},
   @{Key="S3_BUCKET"; Name="S3 Bucket"; Doc="https://console.aws.amazon.com/s3"},
+  @{Key="FCM_SERVICE_ACCOUNT"; Name="FCM Service Account"; Doc="Firebase console -> Service accounts -> Generate new private key"},
   @{Key="REDIS_URL"; Name="Redis URL"; Doc="Upstash / Redis Labs / localhost"},
   @{Key="JWT_SECRET"; Name="JWT Secret"; Doc="!REQUIRED! Used for auth tokens"}
 )
 
-$optional = @("SENTRY_DSN", "REDIS_URL", "AWS_ACCESS_KEY_ID", "S3_BUCKET", "OPENAI_API_KEY")
+$optional = @("SENTRY_DSN", "REDIS_URL", "AWS_ACCESS_KEY_ID", "S3_BUCKET", "OPENAI_API_KEY", "FCM_SERVICE_ACCOUNT", "SMTP_HOST")
 
 Write-Host "`n=== SwiftMatch Key Check ===`n" -ForegroundColor Cyan
 $allOk = $true
@@ -84,7 +86,7 @@ Write-Host "`n=== Quick Start for Each Service ===" -ForegroundColor Cyan
 Write-Host @"
 
 1. Firebase (FCM): console.firebase.google.com -> Create project -> Cloud Messaging -> Server key
-2. RevenueCat: app.revenuecat.com -> Create project -> Add products (premium_monthly $9.99, premium_yearly $59.99)
+2. RevenueCat: app.revenuecat.com -> Create project -> Add products (plus_1m/6m/12m, gold_*, platinum_* — соответствуют src/lib/iap.ts productIdFor)
 3. Twilio: console.twilio.com -> Buy phone number -> Account SID + Auth Token
 4. Stripe: dashboard.stripe.com/apikeys -> Create live keys
 5. SMTP: app.sendgrid.com -> SMTP settings -> Create API key

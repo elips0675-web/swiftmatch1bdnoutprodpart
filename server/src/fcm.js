@@ -5,15 +5,26 @@ const FCM_SERVICE_ACCOUNT = process.env.FCM_SERVICE_ACCOUNT
 let fcmConfigured = false
 let firebaseApp = null
 
+// FCM_SERVICE_ACCOUNT принимает: base64 JSON (старый формат), сырой JSON или путь к файлу
+export async function parseServiceAccount(value) {
+  const trimmed = String(value).trim()
+  if (trimmed.startsWith('{')) {
+    return JSON.parse(trimmed)
+  }
+  if (/\.json$/i.test(trimmed) || /[\\/]/.test(trimmed)) {
+    const { readFile } = await import('fs/promises')
+    return JSON.parse(await readFile(trimmed, 'utf-8'))
+  }
+  return JSON.parse(Buffer.from(trimmed, 'base64').toString('utf-8'))
+}
+
 async function getFirebaseApp() {
   if (firebaseApp) return firebaseApp
 
   if (FCM_SERVICE_ACCOUNT) {
     try {
       const admin = await import('firebase-admin')
-      const serviceAccount = JSON.parse(
-        Buffer.from(FCM_SERVICE_ACCOUNT, 'base64').toString('utf-8'),
-      )
+      const serviceAccount = await parseServiceAccount(FCM_SERVICE_ACCOUNT)
       if (!admin.apps.length) {
         firebaseApp = admin.initializeApp({ credential: admin.credential.cert(serviceAccount) })
       }

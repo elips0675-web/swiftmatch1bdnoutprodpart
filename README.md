@@ -211,11 +211,11 @@ npx vite --port 8081 --host
 | Переменная | Файл | Назначение |
 |---|---|---|
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | `server/.env` | Реальные платежи (без ключа — mock в dev, 502 в prod) |
-| `SMTP_USER`, `SMTP_PASS` | `server/.env` | Email (регистрация, сброс пароля) |
+| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` | `server/.env` | Email (регистрация, сброс пароля) |
 | `SENTRY_DSN` | `server/.env` + `.env` | Мониторинг ошибок |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET` | `server/.env` | Облачное хранение файлов (без — локальный диск) |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_ENDPOINT` | `server/.env` | Облачное хранение файлов + Rekognition-модерация фото (без — локальный диск, варианты и модерация отрабатывают через temp) |
 | `OPENAI_API_KEY` | `server/.env` | AI Icebreakers + AI-модерация текста (без — fallback БД/эвристика) |
-| `FCM_SERVER_KEY` | `server/.env` | Push-уведомления Android (без — mock) |
+| `FCM_SERVER_KEY`, `FCM_SERVICE_ACCOUNT` | `server/.env` | Push-уведомления Android (без — mock) |
 | `REVENUECAT_WEBHOOK_SECRET` | `server/.env` | IAP webhook (без — 503, приём событий отключён) |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | `server/.env` | SMS-верификация (без — mock) |
 | `REDIS_URL` | `server/.env` | Кэш + Bull Queue (email/push/image) + Socket.IO adapter (без — всё off, in-memory) |

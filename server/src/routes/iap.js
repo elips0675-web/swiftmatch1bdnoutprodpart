@@ -53,12 +53,28 @@ router.post('/api/iap/webhook', async (req, res) => {
   }
 })
 
-// GET /api/iap/products — available IAP products
+// GET /api/iap/products — available IAP products (ids = RevenueCat product ids, см. src/lib/iap.ts productIdFor)
 router.get('/api/iap/products', (req, res) => {
-  res.json([
-    { id: 'premium_monthly', name: 'Premium Monthly', price: 9.99, period: 'month' },
-    { id: 'premium_yearly', name: 'Premium Yearly', price: 59.99, period: 'year' },
-  ])
+  const tiers = [
+    { id: 'plus', name: 'Plus', price: 499 },
+    { id: 'gold', name: 'Gold', price: 999 },
+    { id: 'platinum', name: 'Platinum', price: 1990 },
+  ]
+  const durations = [
+    { months: 1, discount: 0, period: 'month' },
+    { months: 6, discount: 20, period: '6months' },
+    { months: 12, discount: 40, period: 'year' },
+  ]
+  res.json(
+    tiers.flatMap((tier) =>
+      durations.map((d) => ({
+        id: `${tier.id}_${d.months >= 12 ? '12m' : d.months >= 6 ? '6m' : '1m'}`,
+        name: `${tier.name} ${d.months} Month`,
+        price: Math.round(tier.price * d.months * (1 - d.discount / 100)),
+        period: d.period,
+      })),
+    ),
+  )
 })
 
 // GET /api/iap/status — check IAP subscription status

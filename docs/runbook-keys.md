@@ -52,9 +52,10 @@
 - **Ротация:** platform.openai.com → API keys → create + revoke.
 - **Проверка:** отправить сообщение с триггер-словом → баннер модерации в логах.
 
-### FCM_SERVER_KEY
-- **Влияние:** пуш-уведомления Android.
-- **Ротация:** Firebase Console → Project settings → Cloud Messaging.
+### FCM_SERVER_KEY / FCM_SERVICE_ACCOUNT
+- **Влияние:** пуш-уведомления Android/iOS (серверная отправка через firebase-admin).
+- **Ротация:** Firebase Console → Project settings → Cloud Messaging (Server key); Service accounts → Generate new private key (service account JSON).
+- **Формат `FCM_SERVICE_ACCOUNT`:** код принимает три варианта — base64 от JSON (легаси), сырой JSON (`{...}`) или путь к файлу `firebase-adminsdk.json`. В `.env` удобнее всего base64: `[Convert]::ToBase64String([IO.File]::ReadAllBytes('firebase-adminsdk.json'))` (PowerShell) или `base64 -w0 firebase-adminsdk.json` (Linux).
 - **Проверка:** пуш через админку/тестовую подписку.
 
 ### RevenueCat: REVENUECAT_WEBHOOK_SECRET

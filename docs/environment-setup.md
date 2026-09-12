@@ -65,7 +65,7 @@
 | FCM | `FCM_SERVER_KEY`, `FCM_SERVICE_ACCOUNT` | пуши Android не идут | пуш на устройство |
 | RevenueCat | `REVENUECAT_WEBHOOK_SECRET` + `VITE_REVENUECAT_API_KEY` (front) | IAP no-op (веб-fallback) | sandbox-покупка |
 
-**Проверка всех ключей разом:** `powershell -File scripts/check-keys.ps1` (по `что доделать` line 40) / `scripts/check-keys.sh` на Linux.
+**Проверка всех ключей разом:** `powershell -File scripts/check-keys.ps1` (Windows) — для Linux используйте `grep` по `server/.env` (скрипт-аналог в репо не заведён; можно вызвать PowerShell из WSL: `pwsh -File scripts/check-keys.ps1`).
 
 ## 6. GitHub secrets (для deploy.yml)
 

@@ -88,7 +88,33 @@ describe('DELETE /api/push/fcm/register', () => {
   })
 })
 
-describe('GET /api/push/fcm/status', () => {
+describe('parseServiceAccount', () => {
+  it('parses raw JSON string', async () => {
+    const { parseServiceAccount } = await import('../fcm.js')
+    const sa = await parseServiceAccount('{"project_id":"raw-json"}')
+    expect(sa.project_id).toBe('raw-json')
+  })
+
+  it('parses base64-encoded JSON', async () => {
+    const { parseServiceAccount } = await import('../fcm.js')
+    const b64 = Buffer.from('{"project_id":"base64-json"}').toString('base64')
+    const sa = await parseServiceAccount(b64)
+    expect(sa.project_id).toBe('base64-json')
+  })
+
+  it('parses JSON from file path', async () => {
+    const { parseServiceAccount } = await import('../fcm.js')
+    const os = await import('os')
+    const path = await import('path')
+    const fs = await import('fs')
+    const file = path.join(os.tmpdir(), `sa-test-${Date.now()}.json`)
+    fs.writeFileSync(file, '{"project_id":"file-json"}')
+    const sa = await parseServiceAccount(file)
+    fs.unlinkSync(file)
+    expect(sa.project_id).toBe('file-json')
+  })
+})
+  describe('GET /api/push/fcm/status', () => {
   const app = createApp()
 
   it('returns registered false when no tokens', async () => {

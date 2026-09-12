@@ -47,8 +47,9 @@
 ## 🟠 В работе / техдолг второй очереди
 
 - **SMS-верификация** — scaffold + mock; реальная после ключей Twilio (kimi #4)
-- **AI-модерация фото** — эвристика/regex fallback; Rekognition после AWS-ключей (kimi #5)
-- **CDN/S3** — локальный диск; S3 после AWS-ключей (kimi #6)
+- **AI-модерация фото** — Rekognition-клиент готов и теперь реально поднимается (пакет `@aws-sdk/client-rekognition` добавлен в deps); эвристика fallback; реальная модерация после AWS-ключей (kimi #5)
+- **CDN/S3** — S3-режим доведён до рабочего состояния: `S3_ENDPOINT` в S3Client (upload+delete), URL из `file.location` (исправлен `/uploads/undefined`), варианты sharp загружаются обратно в бакет, модерация идёт через temp-скачивание; переключение после AWS-ключей (kimi #6)
+- **Push FCM** — исправлены два бага: при активной Redis-очереди FCM молча пропускался (push.job.js игнорировал fcm_tokens) — теперь job шлёт и web, и FCM; `FCM_SERVICE_ACCOUNT` принимает base64 / сырой JSON / путь к файлу (код ранее принимал только base64, доки говорили path-or-json) (kimi #4 масштабирование)
 - **CSRF** — не критично для JWT API-only (дипсик)
 - **Мониторинг доступности** (UptimeRobot) и SSL в docker-compose (дипсик #5 инфра)
 - **AGENTS.md** — разделить при >1500 строк (сейчас ~1180; qwen в свежем аудите называл >1500 — завышено)
@@ -858,6 +859,19 @@ UX-улучшение ленты (следующий кандидат из сп�
 ### Этап 121 — S3/CDN для файлов (код готов, нужны ключи — см. этап 118)
 - `server/src/routes/upload.js` полностью готов: `USE_S3 = S3_BUCKET && AWS_ACCESS_KEY_ID` → multer-S3 (S3Client, AUTO_CONTENT_TYPE, ключ uploads/...); иначе diskStorage локально. `ai-moderation.js`: Rekognition при `AWS_ACCESS_KEY_ID` (иначе auto-approve), OpenAI fallback. Удаление файла: DeleteObjectCommand. Public URL отдаётся из s3 Location.
 - Осталось только внешнее: ввести ключи S3 (Selectel/DO/Yandex, `S3_ENDPOINT` поддерживается) + настроить CDN. Это подпункт этапа 118, код-работы нет.
+
+## 📋 Обновление (12.09): доделка инфраструктурных этапов 118.4/118.6/118.8+ — код-гэпы закрыты до ключей
+
+| Этап | Что было сломано | Чем закрыто |
+|---|---|---|
+| 118.4 OpenAI/Rekognition | `@aws-sdk/client-rekognition` НЕ было в `server/package.json` → динамический import в `ai-moderation.js` всегда бросал → image-модерация молча auto-approve даже с AWS-ключами | Пакет `@aws-sdk/client-rekognition@^3.800.0` добавлен (`npm install` в `server/`); Rekognition поднимется при `AWS_ACCESS_KEY_ID` |
+| 118.6 S3 (upload.js) | 1) `S3_ENDPOINT` не подавался в S3Client (upload и delete) — Selectel/DO/Yandex не работали; 2) URL строился `/uploads/${req.file.filename}`, а multer-S3 кладёт `location`/`key` (не `filename`) → сохранённые URL `/uploads/undefined`; 3) варианты sharp и модерация пропускались в S3-режиме (`if (req.file.path)` — пути нет); 4) delete восстанавливал ключ из `/uploads/`-префикса, а у S3 url абсолютный | `S3_ENDPOINT` во все S3Client; URL из `req.file.location`; S3-ветка скачивает объект в temp (`os.tmpdir`), гонит `processImage` — варианты загружаются обратно в бакет (`PutObjectCommand`), модерация идёт по temp-файлу, tmpDir чистится в finally; `delete` парсит ключ из URL (`s3KeyFromUrl`). Сбои пайплайна/модерации не роняют ответ (Promise.allSettled) |
+| 118.8 FCM | 1) `fcm.js` читал `FCM_SERVICE_ACCOUNT` ТОЛЬКО как base64, а доки/`.env.example` обещали path-or-json → init всегда падал; 2) при активной Redis-очереди FCM молча пропускался: `sendPushToUser` складывал в `pushQueue`, а `push.job.js` слал только webpush по VAPID (fcm-токены игнорировал) | `parseServiceAccount()` принимает base64 / сырой JSON / путь к файлу (+3 теста); `push.job.js` теперь шлёт и web (platform='web'), и FCM из `fcm_tokens` через `sendFcmToAll`, VAPID-блок убран — job работает даже без VAPID |
+| 118.8 RevenueCat | `/api/iap/products` отдавал `premium_monthly/premium_yearly`, а фронт (`src/lib/iap.ts productIdFor`) покупает `plus_1m/6m/12m, gold_*, platinum_*` — product-id рассинхрон | Пакет продуктов собран как `{tier}_{1m|6m|12m}` по периодам 1/6/12 — совпадает с `productIdFor`; check-keys-подсказка обновлена |
+| check-keys.ps1 | Не проверял `SMTP_HOST`, `FCM_SERVICE_ACCOUNT`; RevenueCat-подсказка звала старые product id | Добавлены `SMTP_HOST` и `FCM_SERVICE_ACCOUNT` (optional); строка RevenueCat → `plus_1m/6m/12m, gold_*, platinum_*` |
+| Доки | `docs/environment-setup.md` звал несуществующий `scripts/check-keys.sh`; runbook-keys.md не описывал формат service account | Ссылка заменена на PowerShell/WSL-вариант; в runbook-keys.md добавлен блок «Формат FCM_SERVICE_ACCOUNT» (base64/JSON/путь); README таблица ключей дополнена `SMTP_HOST`, `S3_ENDPOINT`, `FCM_SERVICE_ACCOUNT`; «Что доделать» § «В работе» обновлён; `server/.env.example` закомментирован формат service account |
+
+Проверки: server-юниты **415/415** (было 412, +3 parseServiceAccount в fcm.test.js), eslint по изменённым файлам 0, `tsc --noEmit` чист, живой `/health` 200. Внешние ключи по-прежнему за пользователем (этап 118).
 
 ### Этап 122 — Android-релиз
 - AAB + keystore, assetlinks.json + SHA256 (App Links), Google Play (17+, Privacy Policy, скриншоты), RevenueCat sandbox→prod, FCM на устройство.
