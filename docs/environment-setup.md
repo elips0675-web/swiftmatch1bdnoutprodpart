@@ -16,6 +16,7 @@
 - `server/.env.example`, `.env.example` — актуальные шаблоны всех ключей
 - `docs/runbook-keys.md` — ротация/порядок ввода каждого ключа
 - `docs/rollback-plan.md` — план отката
+- `docs/vps-deploy-checklist.md` — исполняемый пошаговый чек-лист «VPS → secrets → деплой → smoke» (qwen «4 дня» + приоритеты kimi/дипсик)
 
 ---
 

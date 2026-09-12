@@ -1,99 +1,52 @@
-Оценка проекта SwiftMatch
-🎯 Общий вердикт: 8.5 / 10
-Зрелый, хорошо спроектированный продукт уровня pre-production. Видна серьёзная инженерная культура: 59 итераций, 388 тестов, идемпотентные миграции, circuit breaker, runbook'и, план отката. Это не MVP-прототип, а продукт, готовый к бете с оговорками.
-✅ Сильные стороны
-1. Архитектура и безопасность (9/10)
-JWT в httpOnly cookie + refresh rotation с reuse detection (отзыв всей семьи при replay) — это уровень enterprise
-Account lockout 5→15 мин, rate limiters (30r/s API, 5r/s auth) + nginx-уровень
-Circuit breaker (opossum) для Stripe/OpenAI — защита от каскадных отказов
-Idempotency-Key middleware + дедуп webhook'ов по event_id
-GDPR-compliance из коробки: data export, erase, consent_log
-Soft delete + audit_log на 11 таблицах — полная трассируемость
-2. Тестовое покрытие (9/10)
-388 тестов (307 сервер + 81 фронт) — 0 failures
-E2E Playwright — 55 тестов, включая security-blind-spots (GDPR cascade, refresh race)
-Кросс-браузерность (firefox/webkit)
-Schema-validate в CI — дрейф схемы ломает деплой ДО миграций
-3. Observability и DevOps (8.5/10)
-Prometheus + Grafana (7 панелей), Sentry с фильтрацией PII
-Winston JSON-логи с Request ID
-k6 load-test (ramp 10→100 VU)
-Docker multi-stage + healthcheck + nginx rate limiting
-RTO-замер: restore из бэкапа 3.6 сек (dev), ~10-15 мин на 1GB prod
-4. Документация (9.5/10)
-runbook-keys.md — порядок ротации каждого ключа с проверкой
-rollback-plan.md — категории инцидентов + действия
-environment-setup.md — пошаговый план staging→prod
-AGENTS.md с граблями (#27-53) — бесценно для преемственности
-Чек-листы «готов к проду», «что осталось»
-5. Продуктовый функционал (9/10)
-Полный цикл знакомств + монетизация + социалка:
-Geoпоиск (MySQL Spatial ST_Distance_Sphere)
-Smart Matching, Attachment-тест, AI Icebreakers
-Stripe + RevenueCat IAP + партнёрская экосистема (Wave 1-3)
-Hangouts 2.0 с mutual like → auto-chat
-B2B-маркетплейс, анти-кот верификация, псевдонимы
-⚠️ Пробелы и риски
-🔴 Критичные
-mysql_schema.sql деградировал (этап 77)
-В файле 62 таблицы, в живой БД 73
-Риск: пересоздание prod-БД из schema.sql = нерабочие роуты hangouts/partners/experiments
-Решение: регенерировать через mysqldump --no-data и закоммитить
-Rate-limit in-memory (N+2)
-express-rate-limit + lockout.js НЕ шарятся между процессами
-Запрещено: pm2 cluster, Docker replicas > 1
-Решение: до масштабирования — перевести на rate-limit-redis
-🟠 Средние
-Многие фичи ждут ключей (Stripe live, SMTP, FCM, Twilio, OpenAI, RevenueCat)
-Без них сервис «деградирует, но жив» — это хорошо, но для продакшена нужны все
-Android не в продакшене
-APK собирается, toolchain готов, но нет App Links, keystore, публикации в Play Console
-S3 не внедрён
-Файлы на локальном диске — не масштабируется, нет CDN
-docker-compose не прогонялся end-to-end (environment-setup.md §0)
-Риск сюрпризов при первом деплое
-🟡 Косметические
-Дублирование роутов: /schedule объявлен дважды в project-context.md
-Design System / Storybook — не начато (указано в «Ещё не начато»)
-Log aggregation (Loki/ELK) — отложено на пост-релиз
-📊 Готовность к продакшену (по чеклисту environment-setup.md)
-Пункт
-Статус
-VPS + Docker + SSH-ключ
-⬜ Не поднято
-Домен + DNS + SSL
-⬜ Не настроено
-Реальные ключи в server/.env
-⬜ Не введены
-GitHub secrets для deploy.yml
-⬜ Не заданы
-Redis постоянно
-✅ Готов к подключению
-Бэкапы + restore smoke
-✅ Скрипты готовы, RTO замерен
-Android AAB + App Links
-🟠 Частично
-Мониторинг + алерты
-🟠 Grafana provisioned, алерты не настроены
-Полный E2E против staging
-⬜ Не прогонялся
-Прогресс: ~60% инфраструктуры готово в коде, ~40% — руки на клавиатуре.
-🎯 Рекомендации (приоритеты)
-Неделя 1 — критично перед продом
-Регенерировать mysql_schema.sql из живой БД — убрать риск неполной схемы
-Прогнать docker-compose end-to-end на staging — найти скрытые проблемы
-Ввести Stripe live + SMTP + Sentry — проверить полный платёжный флоу
-Перевести rate-limit на Redis — снять ограничение single-instance
-Неделя 2 — мобильный релиз
-Android: keystore + App Links + публикация в internal track
-RevenueCat IAP: sandbox-покупка → prod-покупка
-FCM: реальные push на устройство
-Месяц 1 — масштабирование
-S3 + CDN для фото
-Log aggregation (Loki)
-Нагрузочное тестирование на staging (100 VU)
-Design System / Storybook — для скорости разработки
-💡 Итог
-SwiftMatch — это не «ещё один пет-проект», а инженерно зрелый продукт. Уровень документации, тестового покрытия и продуманности отказоустойчивости (circuit breaker, идемпотентность, reuse detection, audit log) соответствует коммерческим SaaS-продуктам.
-Главный риск сейчас — не код, а инфраструктура: неполная mysql_schema.sql, не прогнанный docker-compose, не введённые ключи. Это решается за 1-2 недели системной работы, а не переписыванием.
-Рекомендация: перед релизом закрыть три красных пункта (schema.sql, docker-compose e2e, Redis rate-limit) — и можно смело идти в бету.
+На основе предоставленных файлов (AGENTS.md, environment-setup.md, context.txt, project-context.md, roadmap.md) я провел комплексную оценку текущего состояния проекта SwiftMatch.
+🏆 Общий вердикт
+Проект находится в состоянии очень высокой готовности к продакшену с точки зрения кодовой базы, архитектуры и тестового покрытия. Кодовая часть закрыта на 95–98%. Основные оставшиеся задачи носят инфраструктурный характер и требуют вмешательства человека (VPS, реальные API-ключи, релизная сборка Android).
+✅ Сильные стороны (Что сделано блестяще)
+Тестовое покрытие и стабильность:
+Unit-тесты: 405/405 (сервер + фронт).
+E2E (Playwright): 150/150 (включая сценарии GDPR, premium, hangouts, partner B2B).
+Нагрузочное тестирование (k6): устойчивые ~4.9k rps при 100 VU, 0 ошибок 5xx. Лимитеры сработали как анти-DoS, а не как деградация.
+Архитектура и отказоустойчивость:
+Реализован graceful degradation: при отсутствии ключей (Redis, OpenAI, Stripe) система не падает, а использует in-memory fallback или мок-ответы с предупреждением в логах.
+Миграции стали полностью идемпотентными, а schema-validate.mjs и EXPLAIN-аудит в CI предотвращают дрейф схемы (актуальная схема: 75 таблиц, полностью синхронизирована с живой БД).
+Rate-limiting переведен на Redis (multi-instance safe).
+Безопасность:
+Аутентификация через httpOnly cookies (__Host-sm_token), защита от XSS (sanitization v2), TOTP 2FA для админки, ротация refresh-токенов с обнаружением replay-атак, строгий adminAuth гейт.
+Документация и процессы:
+AGENTS.md работает как строгий контракт для AI и разработчиков.
+roadmap.md и context.txt дают исчерпывающую историю всех решений, багов и их фиксов (включая грабли вроде двойной кодировки UTF-8 или приоритета Bearer над cookie).
+⚠️ Зоны риска и блокираторы релиза (Что осталось)
+Внешние сервисы (Реальные ключи):
+Код имеет заглушки, но для полноценной работы бизнеса необходимы реальные ключи в server/.env на продакшен-сервере:
+Stripe (для реальных платежей, а не моков).
+SMTP (Resend/SendGrid для сброса паролей и кампаний).
+Sentry (для мониторинга ошибок).
+S3/Selectel (для хранения фото, иначе пишутся на диск контейнера, что плохо для масштабирования).
+FCM / VAPID / Twilio / RevenueCat (для нативных пушей и SMS).
+Инфраструктура (VPS):
+Локальный Docker Compose (этап 117) успешно прогнан в WSL2, но реальный деплой на VPS с настройкой Nginx, SSL (Let's Encrypt) и GitHub Actions Secrets ещё не выполнен.
+Мобильное приложение:
+Debug APK собран, но для Google Play требуется релизный keystore, настройка App Links (assetlinks.json) и прохождение модерации.
+🚀 Рекомендуемый план действий на ближайшую неделю
+Чтобы перейти от "готово локально" к "работает у пользователей", рекомендую следующий порядок (согласно environment-setup.md):
+Подготовка VPS (День 1):
+Поднять Ubuntu LTS VPS (мин. 2 vCPU / 4 GB RAM).
+Установить Docker + Docker Compose, настроить SSH-доступ для деплоя.
+Привязать домен (A-запись) и получить SSL-сертификат через Certbot.
+Конфигурация окружения (День 2):
+Развернуть репозиторий, скопировать server/.env.example в server/.env.
+Вписать реальные ключи (начать с минимального набора: Stripe Test/Live, SMTP, Sentry DSN, VAPID).
+Прогнать скрипт проверки: pwsh -File scripts/check-keys.ps1 (или аналог через grep).
+Деплой и Smoke-тесты (День 3):
+Запустить docker compose up -d --build.
+Проверить: /health (200), WebSocket подключение, отправка тестового email, создание тестовой Stripe-сессии.
+Прогнать E2E-тесты против staging-окружения.
+Мониторинг и бэкапы (День 4):
+Настроить ежедневный бэкап MySQL (scripts/backup-mysql.sh + cron) с выгрузкой во внешнее хранилище.
+Подключить UptimeRobot и проверить алерты в Grafana/Telegram.
+💡 Чем я могу помочь прямо сейчас?
+Выберите направление, и мы углубимся в детали:
+Сгенерировать пошаговый чек-лист для настройки VPS и GitHub Secrets (с конкретными командами).
+Подготовить шаблон server/.env с пояснениями, где взять каждый ключ и как его безопасно сгенерировать.
+Провести финальный код-ревью конкретного модуля (например, Stripe Webhook или Partner B2B) перед выкаткой.
+Настроить CI/CD пайплайн под ваши конкретные условия хостинга.
