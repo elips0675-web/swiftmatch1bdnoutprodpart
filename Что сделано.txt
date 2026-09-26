@@ -1,6 +1,25 @@
 # Что сделано
 
-> Актуально на 30.08.2026. Все тесты: **417/417** — сервер 336/336 ✅ (7 skipped предзаданных), фронт 81/81 ✅. Vite build: ✅. Lint: 0 errors.
+> Актуально на 26.09.2026. Все тесты: **539/539** — сервер 423/423 ✅ (35 файлов), фронт 116/116 ✅ (21 файл). Vite build: ✅. Lint: 0 errors (170 warnings). TypeScript: 0 ошибок. `npm audit`: корень **15** (1 critical + 6 high), `server/` **38** (0 critical + 7 high) — все runtime-достижимые HIGH закрыты.
+
+## Этап 2 (26.09.2026): sharp 0.33.0 → 0.35.4 + тесты на image-pipeline
+
+- **Апгрейд:** `sharp` `^0.33.0` → `^0.35.4` в `server/package.json`. Закрывает HIGH-уязвимость libvips: CVE-2026-33327, CVE-2026-33328, CVE-2026-35590, CVE-2026-35591 + libheif (GHSA-g89c-p67h-r497, GHSA-2jg2-4ch7-h545). Требует Node ≥ 20.9.0 (локально 24.16, в CI 20.x — подходит).
+- **Проверка вживую:** `sharp 0.35.4` + `libvips 8.18.6`; пайплайн отдаёт webp 800/400/200 и avif 800x800 с корректными метаданными (для avif `meta.format === 'heif'`). API-поверхность (`resize` / `webp` / `avif` / `toFile`) между 0.33 и 0.35 не менялась.
+- **Новый тест `server/src/__tests__/image-pipeline.test.js` (8 тестов):** до этого на `image-pipeline.js` и `jobs/image.job.js` было **0 тестов** — то есть 415 серверных тестов регресс sharp не поймали бы. Покрыто: 4 варианта, размеры по `SIZES`, валидность avif, битый файл → пустой результат без падения, `getImageUrls`, `processImageJob`, повторный прогон на тот же файл (ретрай Bull `attempts: 3`).
+- **Найдено при разборе тестовой ошибки — не регресс, предсуществующее поведение:** если в одном процессе сначала прочитать выходной файл через `sharp(path).metadata()`, а потом перезаписать его же, запись на Windows падает: `unable to open for write / system error: Invalid argument`. Причина — input-кэш sharp держит файл открытым. Проверено на **обоих** версиях: 0.33.0 и 0.35.4 ведут себя одинаково, то есть апгрейд это не вызвал. В проде не встречается: image-job только пишет варианты, повторная запись (ретрай) работает. Тесты переписаны на уникальный исходник на тест — как в проде.
+- `npm audit` server: **39 → 38** (high 8 → 7, `sharp` ушёл). Из 7 high только `nodemailer` runtime-достижим, остальные (`brace-expansion`, `fast-uri`, `ip-address`, `js-yaml`, `nanoid`, `postcss`) — сборочный/транзитивный toolchain.
+- Проверено: server 423/423, фронт 116/116, `tsc` 0 ошибок, `eslint src/` 0 errors, `vite build` ✅
+
+## Этап 1 (26.09.2026): закрыты 2 runtime-уязвимости + серверные тесты в CI
+
+- **Апгрейд:** `socket.io` 4.8.3 → 4.8.4, `socket.io-client` 4.8.3 → 4.8.4, `socket.io-parser` 4.2.6 → 4.2.7 (DoS «Zero-attachment Memory Exhaustion» — эксплуатируется любым подключившимся WS-клиентом, без бизнес-логики и без доступа к данным), `multer` 2.2.0 → 2.4.0 (DoS через crafted multipart field names, бьёт по публичному upload-эндпоинту).
+- **Нюанс:** lock-файл держал `socket.io-parser` 4.2.6, хотя диапазон `~4.2.4` допускает 4.2.7 — понадобился `npm update socket.io-parser`, а не просто `npm install`.
+- **`npm audit fix` в этом проекте бесполезен:** dry-run меняет 34/51 пакет, но не закрывает ни одной уязвимости — все требуют ручных апгреймов.
+- **CI:** в job `lint` добавлен шаг `npx vite build` (сборки в CI не было вообще), новый job `test-server` (`working-directory: server` → `npm ci` + `npm test`) — 415 серверных тестов больше не вне CI.
+- `npm audit`: корень 16 → 15, `server/` 41 → 39.
+- Проверено: фронт 116/116, сервер 415/415, `tsc` 0 ошибок, `eslint src/` 0 errors, `vite build` ✅. Один кратковременный флак `login.test.tsx > submits login form successfully` (в изоляции 6/6 и в двух повторных полных прогонах 21/21, к апгрейду не относится).
+- Коммит: `6217a1c`
 
 ## Хотфикс (26.08.2026): admin/content → profile/edit, UI-фиксы, поиск
 
