@@ -1,11 +1,33 @@
 import { emailQueue } from './queue.js'
 import { rootLogger } from './logger.js'
 
+let directSendWarned = false
+
+// Контракт: ни одна из send*() не бросает наружу. Вызовы в auth.js — fire-and-forget
+// без .catch(), а Node завершает процесс на unhandled rejection. Падение SMTP или
+// очереди не должно ломать регистрацию, вход и сброс пароля.
 async function queueMail(data) {
   if (emailQueue) {
-    await emailQueue.add(data)
-  } else {
-    rootLogger.info(`[mail] Queue not available. Would send to ${data.to}: "${data.subject}"`)
+    try {
+      await emailQueue.add(data)
+      return { queued: true }
+    } catch (err) {
+      rootLogger.error(`[mail] queue add failed for ${data.to}: ${err.message}`)
+      return { failed: true, error: err.message }
+    }
+  }
+
+  if (!directSendWarned) {
+    directSendWarned = true
+    rootLogger.warn('[mail] Email queue unavailable — sending directly via SMTP (no queue retries)')
+  }
+
+  try {
+    const { default: processEmail } = await import('./jobs/email.job.js')
+    return await processEmail({ data })
+  } catch (err) {
+    rootLogger.error(`[mail] direct send failed for ${data.to}: ${err.message}`)
+    return { failed: true, error: err.message }
   }
 }
 

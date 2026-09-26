@@ -28,6 +28,7 @@ function createTransporter() {
 }
 
 const FROM = process.env.SMTP_FROM || 'noreply@swiftmatch.app'
+const WEB_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:8081'
 
 export default async function processEmail(job) {
   const { to, subject, html, type, token } = job.data
@@ -40,10 +41,10 @@ export default async function processEmail(job) {
 
   let htmlContent = html
   if (type === 'password-reset') {
-    const resetUrl = `${process.env.CORS_ORIGIN || 'http://localhost:8080'}/reset-password?token=${token}`
+    const resetUrl = `${WEB_ORIGIN}/reset-password?token=${token}`
     htmlContent = `<p>Click <a href="${resetUrl}">here</a> to reset your password. This link expires in 1 hour.</p>`
   } else if (type === 'verify-email') {
-    const verifyUrl = `${process.env.CORS_ORIGIN || 'http://localhost:8080'}/verify-email?token=${token}`
+    const verifyUrl = `${WEB_ORIGIN}/verify-email?token=${token}`
     htmlContent = `<p>Click <a href="${verifyUrl}">here</a> to verify your email address.</p>`
   }
 
