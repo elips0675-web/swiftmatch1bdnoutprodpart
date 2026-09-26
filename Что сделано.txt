@@ -1,6 +1,16 @@
 # Что сделано
 
-> Актуально на 26.09.2026. Все тесты: **566/566** — сервер 437/437 ✅ (36 файлов), фронт 129/129 ✅ (22 файла). Vite build: ✅. Lint: 0 errors (171 warnings). TypeScript: 0 ошибок. `npm audit`: корень **15** (1 critical + 6 high), `server/` **38** (0 critical + 7 high) — все runtime-достижимые HIGH закрыты.
+> Актуально на 26.09.2026. Все тесты: **566/566** — сервер 437/437 ✅ (36 файлов), фронт 129/129 ✅ (22 файла). Vite build: ✅. Lint: 0 errors (171 warnings). TypeScript: 0 ошибок. `npm audit`: корень **15** (1 critical + 6 high), `server/` **37** (0 critical + 6 high) — **все 4 runtime-достижимые уязвимости закрыты**, остальное — сборочный/транзитивный toolchain.
+
+## Этап 5 (26.09.2026): nodemailer 9.0.1 → 9.1.1 — аудит-этап закрыт полностью
+
+- **План был неверен:** в `Что доделать.txt` P3 #25 значился как «`nodemailer` 9.0.1 → 10.x (мажор-переход)». Фактически все 4 адвайзори (GHSA-2x7j-588g-ccc2 **high**, GHSA-8m3c-c648-2xjj, GHSA-wmmp-3585-3rmp, GHSA-cc9r-2j5m-2m83) имеют `range: <=9.1.0` — то есть фикс есть в **патче 9.1.1**, мажорный переход на 10.x не требуется. Сделано `^9.0.1` → `^9.1.1` (patch, без breaking changes).
+- **Суть уязвимостей:** квадратичная сложность O(n²) в `addressparser` → DoS на специально сформированном списке адресов (**high**); обход `disableFileAccess`/`disableUrlAccess` в `resolveContent()`; два обхода проверки домена получателя (IDN/punycode и RFC 5322 comment) → доставка письма на домен злоумышленника.
+- **Реальная достижимость была низкой, но не нулевой:** единственный путь, где адрес приходит из пользовательского ввода, — `POST /api/auth/forgot-password` (`auth.js:205,214`), и там `if (rows.length === 0) return …` отсекает несуществующие адреса **до** отправки. Теперь закрыто в любом случае.
+- **Уточнение по `/about` при сверке:** `firebase-admin ^13.0.0` в `server/package.json` действительно есть, но используется **только для push** (`fcm.js` — FCM, `FCM_SERVICE_ACCOUNT` / `applicationDefault()`), а не для Auth/Firestore. Поэтому в `about.backend.desc` добавлено «Firebase Cloud Messaging — push-уведомления», чтобы не вводить в заблуждение и в другую сторону.
+- `npm audit` `server/`: **38 → 37** (high 7 → 6). Оставшиеся 6 high — все транзитивные и сборочные: `brace-expansion`, `fast-uri`, `ip-address`, `js-yaml`, `nanoid`, `postcss` (`isDirect: false` у всех). **Итог по всем аудитам: 57 → 52** (корень 15 + server 37), runtime-достижимых не осталось.
+- Проверено: сервер 437/437, фронт 129/129, `tsc` 0 ошибок, `eslint src/` 0 errors, `vite build` ✅
+- Коммит: `fix(deps): nodemailer 9.0.1 -> 9.1.1 (patch, а не мажор 10.x) (этап 5)`
 
 ## Этап 4 (26.09.2026): mail.js — без Redis письма реально отправляются (P1 #16)
 
