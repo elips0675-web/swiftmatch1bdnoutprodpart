@@ -1063,7 +1063,7 @@ UX-улучшение ленты (следующий кандидат из сп�
 | 11 | Merge duplicate profiles (qwen #15) | 2 дня | Анти-фрод: объединение дубликатов по email/телефону, перенос мэтчей/сообщений/подписок, UI в админке |
 | 12 | Impersonation + аудит (qwen #18, дипсик #15) | 1 день | «Войти как пользователь» для саппорта + запись в audit_log. Подтверждено 26.09: фичи в коде **нет** (grep `impersonat` — 0 совпадений), дипсик ошибся |
 | 13 | Soft-delete тесты (qwen #24) | 1 день | `deleted_at` есть на **13 таблицах** (уточнено): users, user_profiles, user_photos, chats, messages, notifications, likes, matches, posts, post_comments, group_posts, group_post_comments, reports. Хелперы `softDelete/softDeleteWhere` (`audit.js:23,29`) используются только в `admin/users.js` — тестов нет: 404 на GET /:id, список без удалённых, «нельзя вернуть» |
-| 14 | **CI: гонять серверные тесты и сборку** *(новое 26.09)* | 0.5 дня | `.github/workflows/ci.yml` = только `tsc --noEmit` + `eslint src/` + `npm test` (фронт). **415 серверных тестов вне CI**, `vite build` в CI нет, `eslint` не смотрит `server/`. Добавить job: `cd server && npm ci && npm test` + `npx vite build` + eslint по `server/src` |
+| 14 | ~~CI: гонять серверные тесты и сборку~~ → ✅ **ЗАКРЫТО 26.09** | — | Было: `.github/workflows/ci.yml` = только `tsc --noEmit` + `eslint src/` + `npm test` (фронт) — 415 серверных тестов вне CI, `vite build` нет. **Сделано:** в `lint` добавлен шаг `npx vite build`, новый job `test-server` (`working-directory: server` → `npm ci` + `npm test`, 415 тестов). Не сделано: eslint по `server/src` (в `eslint.config.js` сервер не покрыт) |
 | 15 | **Восстановить i18n parity-тест** *(новое 26.09, из ложного «✅»)* | 0.5 дня | `src/test/i18n.test.ts` отсутствует (см. таблицу «Уже закрыто») — 3 теста на синхронность RU/EN ключей + непустые значения. В `docs/AGENTS-i18n.md` и `Что сделано.txt:560` он описан как существующий |
 | 16 | **mail.js: деградация без Redis** *(новое 26.09)* | 0.5–1 дня | `mail.js:4-10`: если `emailQueue === null` — письмо **не отправляется**, а только логируется (`Would send to …`). Т.е. без `REDIS_URL` (или при мёртвом Redis, `queue.js:52-57`) подтверждения email/сброс пароля/кастомные письма молча теряются. Retry есть только у Bull (`queue.js:20-21`, attempts 3 + exponential 2000) и только с Redis. Нужен прямой fallback через nodemailer |
 
@@ -1084,7 +1084,7 @@ UX-улучшение ленты (следующий кандидат из сп�
 
 | # | Пункт | Оценка |
 |---|---|---|
-| 25 | **Dependency-аудит: `npm audit` + Trivy** *(новое 26.09, qwen #33)* | 0.5–1 дня | Факт 26.09 после `npm ci`: корень — **16 уязвимостей (2 low, 6 moderate, 7 high, 1 critical)**, `server/` — **41 (31 moderate, 10 high)**. Trivy по образам (alpine/nginx/redis) — отдельным шагом |
+| 25 | **Dependency-аудит: `npm audit` + Trivy** *(новое 26.09, qwen #33)* | 0.5 дня осталось | Старт: корень — 16 (1 critical + 7 high), `server/` — 41 (10 high). **Закрыто 26.09 (2 runtime-уязвимости высокого класса):** `socket.io-parser` 4.2.6 → 4.2.7 (DoS «Zero-attachment Memory Exhaustion», эксплуатируется любым WS-клиентом) и `multer` 2.2.0 → 2.4.0 (DoS через multipart field names, бьёт по публичному upload) — апгрейд `socket.io`/`socket.io-client` 4.8.3 → 4.8.4. Итог: корень **15** (1 critical + 6 high), `server/` **39** (8 high). **Осталось:** `sharp` 0.33.0 → 0.35.4 (libvips CVE-2026-33327/33328/35590/35591, риск для `image-pipeline.js`) и `nodemailer` 9.0.1 → 10.x (мажор, эксплуатация низкая). Остальные high (`brace-expansion`, `js-yaml`, `nanoid`, `postcss`, `@xmldom/xmldom`, `browserslist`, `fast-uri`, `ip-address`) — только сборочный/транзитивный toolchain, в рантайме недостижимы. Trivy по образам (alpine/nginx/redis) — отдельным шагом |
 | 26 | Watchers/Relations/Merge для Hangouts/Events (дипсик #16): `hangout_watchers` (подписка без участия), `hangout_relations` («похожие встречи», «та же серия»), Merge hangouts (дубли, перенос участников). qwen #14 — «Интересуют новые люди» (user_watches по критериям+радиусу) | 3–4 дня |
 | 27 | Field-level permissions (qwen #20, дипсик #17): какие поля профиля видит кто (телефон/email/instagram/last_seen — приватность, сейчас хардкод) | 2–3 дня |
 | 28 | Scheduled reports (qwen #28): еженедельная сводка админу — новые юзеры/мэтчи/выручка/жалобы (cron + шаблон) | 2 дня |
@@ -1099,13 +1099,15 @@ UX-улучшение ленты (следующий кандидат из сп�
 - **Custom roles** (дипсик: 5 ролей хватит, dating ≠ enterprise) — qwen #16 даёт 3 дня, но дипсик против
 - **Kanban/Calendar/Wiki/Polls/News** (дипсик: уже не нужно)
 - **Ticket relations/merge для ядра** — только по аналогии для hangouts (см. P3 #26)
-- **OpenTelemetry/SLO/SLI/Storybook/Snowflake** (дипсик: перебор для 50k юзеров); qwen в бэклоге держит SLO/SLI и CDN — не приоритет. **Trivy** из этого списка исключён: `npm audit` уже даёт 57 уязвимостей (P3 #25)
+- **OpenTelemetry/SLO/SLI/Storybook/Snowflake** (дипсик: перебор для 50k юзеров); qwen в бэклоге держит SLO/SLI и CDN — не приоритет. **Trivy** из этого списка исключён: `npm audit` уже даёт 54 уязвимости, из них runtime-достижимы были 2 — обе закрыты 26.09 (P3 #25)
 - **Org chart** (qwen: не нужно для B2C)
 - **Approval chains для фото** (qwen #19) — есть AI-модерация (`ai-moderation.js`), multi-step не окупается
 
 ### Рекомендация (консенсус обоих аудитов + поправки сверки 26.09)
 
-**Спринт 0 (быстрые правки процесса/гигиены, ~1.5 дня):** P1 #14 (серверные тесты в CI) → P1 #15 (восстановить i18n parity-тест) → P1 #16 (fallback отправки писем без Redis). Это дешёвое и снимает риск «зелёные тесты локально, красные в проде».
+**Спринт 0 (быстрые правки процесса/гигиены):** ~~P1 #14 (серверные тесты в CI)~~ ✅ 26.09 → P1 #15 (восстановить i18n parity-тест) → P1 #16 (fallback отправки писем без Redis). Это дешёвое и снимает риск «зелёные тесты локально, красные в проде».
+
+**Отдельно — безопасность зависимостей (26.09, сделано 2 из 4):** `npm audit fix` в этом проекте бесполезен — dry-run меняет 34/51 пакет, но не закрывает ни одной уязвимости (все требуют ручных апгреймов). Закрыты runtime-достижимые `socket.io-parser` (WS-DoS) и `multer` (upload-DoS). Осталось: `sharp` 0.33→0.35.4 и `nodemailer` 9→10 (оба — с риском для кода, делать отдельно с прогоном тестов).
 
 **Спринт 1 (P0, ~7 дней):** IDOR-автотесты + canAccess-хелперы → Race-тесты ядра (like/match) → Contract-тесты (сначала решить: вводить ли envelope ошибок) → Notification preferences → Активные сессии + revoke. Дальше P1 и P2 по порядку. Итог P0+P1: ~16–20 дней; тесты 531 (415 server + 116 front) → ~700.
 
