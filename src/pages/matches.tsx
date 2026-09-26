@@ -42,13 +42,13 @@ export default function Matches() {
     <div className="p-4 max-w-lg mx-auto space-y-4">
       <h1 className="text-2xl font-black flex items-center gap-2">
         <Heart className="text-primary" size={24} fill="currentColor" />
-        {t('matches.title') || 'Мои совпадения'}
+        {t('matches.title')}
       </h1>
 
       {matches.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <Heart size={48} className="mx-auto mb-4 opacity-30" />
-          <p>{t('matches.empty') || 'У вас пока нет совпадений'}</p>
+          <p>{t('matches.empty')}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -66,7 +66,7 @@ export default function Matches() {
               </div>
               <Button size="sm" variant="outline" className="rounded-full" onClick={() => router.push(`/chats/${m.id}`)}>
                 <MessageCircle size={16} className="mr-1" />
-                {t('matches.chat') || 'Чат'}
+                {t('matches.chat')}
               </Button>
             </div>
           ))}

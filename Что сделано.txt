@@ -1,6 +1,23 @@
 # Что сделано
 
-> Актуально на 26.09.2026. Все тесты: **539/539** — сервер 423/423 ✅ (35 файлов), фронт 116/116 ✅ (21 файл). Vite build: ✅. Lint: 0 errors (170 warnings). TypeScript: 0 ошибок. `npm audit`: корень **15** (1 critical + 6 high), `server/` **38** (0 critical + 7 high) — все runtime-достижимые HIGH закрыты.
+> Актуально на 26.09.2026. Все тесты: **552/552** — сервер 423/423 ✅ (35 файлов), фронт 129/129 ✅ (22 файла). Vite build: ✅. Lint: 0 errors (171 warnings). TypeScript: 0 ошибок. `npm audit`: корень **15** (1 critical + 6 high), `server/` **38** (0 critical + 7 high) — все runtime-достижимые HIGH закрыты.
+
+## Этап 3 (26.09.2026): i18n — 12 сырых ключей, анти-паттерн `t() || 'текст'`, ложь о стеке в «О проекте»
+
+Тест на паритет переводов был объявлен «✅», но **не существовал**: `src/test/language-context.test.tsx` проверял mock из 3 ключей внутри себя, а не реальные словари. Написан настоящий тест — и он сразу нашёл реальные баги.
+
+### Найдено и исправлено
+- **12 уникальных ключей отсутствовали в обоих словарях** — пользователю показывались сырые ключи: `time.day_ago` (`activity.tsx:47`), `auth.back_to_login` (`forgot-password/reset-password/verify-email`), `hangout.seo.feed_desc` (SEO-описание в `hangout-detail.tsx:310`), `matches.empty`, `matches.chat`, `premium.back_home`, `premium.cancel_title`, `premium.cancel_desc`, `premium.try_again`, `premium.success_title`, `premium.success_desc`, `common.back`. Все добавлены в RU и EN.
+- **Системный анти-паттерн `t('key') || 'Русский текст'` — мёртвый код.** `t()` при отсутствии ключа возвращает **сам ключ**, а непустая строка всегда truthy, поэтому `|| 'текст'` **никогда не срабатывал**: fallback создавал иллюзию защиты, а пользователь видел `matches.empty`. Убрано 14 вхождений в 7 файлах (`matches.tsx`, `premium.tsx`, `premium-cancel.tsx`, `premium-success.tsx`, `partner-order-cancel.tsx`, `partner-order-success.tsx`, `settings-privacy.tsx`).
+- **Страница «О проекте» (`/about`) описывала чужой стек:** Next.js 15, React 19, Firebase (Auth, Firestore), Genkit (Google AI), Server Components (RSC). В проекте — React 18 + Vite + Express 4 + **MySQL 8** (mysql2) + Socket.io + Redis, свой AI. Переписаны `about.frontend.desc`, `about.backend.desc`, `about.ai.desc`, `about.performance.desc` в RU и EN.
+- **Непереведённые значения в RU:** `admin.partners.sponsored` = «Sponsored» → «Спонсируемое», `admin.partners.sponsored_on` = «Sponsored ✓» → «Спонсируется ✓», `settings.gdpr` = «GDPR / Privacy» → «GDPR / Приватность».
+
+### Тесты
+- **Новый `src/test/i18n-parity.test.ts` (11 тестов)** на реальных словарях: паритет набора ключей RU↔EN, нет пустых значений, кириллица в EN (allowlist только для эндонимов `app.lang.ru`/`app.lang.en` в переключателе языка), латиница в RU **строго по allowlist'у из 21 ключа** (числа `1M+`/`500K`, термины Email/API/SaaS/PRO 💎, бренд SwiftMatch, `FAQ`, `Cookie`, Marvel/DC) — новый латинский ключ валит тест, непереведённый `Sponsored` был найден именно так; плейсхолдеры `{name}` совпадают в RU и EN и не дублируются; **скан всех `t('...')` в 201 файле `src/**` — ни одного несуществующего ключа**; guard на анти-паттерн `t('key') || …`; проверка, что `src/locales/{en,ru}.json` **не импортируются нигде** (79 мёртвых ключей, вторая правда).
+- **`src/test/language-context.test.tsx` переписан с фальшивого на реальный (6 тестов):** дефолт RU, переключение на EN отдаёт другой вариант того же ключа, подстановка плейсхолдеров, неизвестный ключ возвращает себя, сохранение языка в `localStorage['app_lang']`, понятная ошибка вне провайдера. Раньше реальный `LanguageProvider` **не тестировался вообще** — `src/test/test-utils.tsx` глобально мокает `useLanguage` словарём на ~40 ключей (это осознанно для компонентных тестов, но контекст от этого оставался непокрытым).
+- `translations` теперь экспортируется из `src/context/language-context.tsx` (было `const` без экспорта) — иначе тест не может взять реальные словари.
+- Проверено: фронт **129/129** (22 файла), сервер 423/423 (35 файлов), `tsc` 0 ошибок, `eslint src/` 0 errors (171 warnings), `vite build` ✅
+- Коммит: `fix(i18n): restore real parity test...` (этап 3)
 
 ## Этап 2 (26.09.2026): sharp 0.33.0 → 0.35.4 + тесты на image-pipeline
 

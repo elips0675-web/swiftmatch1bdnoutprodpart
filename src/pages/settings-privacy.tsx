@@ -134,7 +134,7 @@ export default function SettingsPrivacy() {
   return (
     <div className="p-4 max-w-lg mx-auto space-y-6">
       <button onClick={() => router.back()} className="flex items-center gap-1 text-sm text-muted-foreground">
-        <ArrowLeft size={16} /> {t('common.back') || 'Назад'}
+        <ArrowLeft size={16} /> {t('common.back')}
       </button>
       <h1 className="text-2xl font-black">{t('settings.privacy')}</h1>
 

@@ -1,59 +1,68 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
-import { renderHook } from "@testing-library/react"
+import { describe, it, expect, beforeEach, afterEach } from "vitest"
+import type { ReactNode } from "react"
+import { renderHook, act } from "@testing-library/react"
+import { LanguageProvider, useLanguage, translations } from "@/context/language-context"
 
-const mockTranslations = {
-  RU: {
-    'interest.sport': 'Спорт',
-    'interest.music': 'Музыка',
-    'common.zodiac.leo': 'Лев',
-  },
-  EN: {
-    'interest.sport': 'Sports',
-    'interest.music': 'Music',
-    'common.zodiac.leo': 'Leo',
-  },
+function wrapper({ children }: { children: ReactNode }) {
+  return <LanguageProvider>{children}</LanguageProvider>
 }
 
-vi.mock("@/context/language-context", () => ({
-  useLanguage: () => ({
-    language: 'RU' as const,
-    setLanguage: vi.fn(),
-    t: (key: string) => (mockTranslations['RU'] as Record<string, string>)[key] || key,
-  }),
-}))
+function renderLanguage() {
+  return renderHook(() => useLanguage(), { wrapper })
+}
 
-describe("useLanguage", () => {
+describe("useLanguage: реальный LanguageProvider", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    localStorage.clear()
   })
 
-  it("returns RU translations by default", async () => {
-    const { useLanguage } = await import("@/context/language-context")
-    const { result } = renderHook(() => useLanguage())
-
-    expect(result.current.language).toBe('RU')
-    expect(result.current.t('interest.sport')).toBe('Спорт')
-    expect(result.current.t('common.zodiac.leo')).toBe('Лев')
-  })
-})
-
-describe("Translation keys exist", () => {
-  const ruKeys = Object.keys(mockTranslations.RU)
-  const enKeys = Object.keys(mockTranslations.EN)
-
-  it("RU and EN have same keys", () => {
-    expect(ruKeys.sort()).toEqual(enKeys.sort())
+  afterEach(() => {
+    localStorage.clear()
   })
 
-  it("all keys return non-empty strings for RU", () => {
-    for (const key of ruKeys) {
-      expect(mockTranslations.RU[key as keyof typeof mockTranslations.RU]).toBeTruthy()
-    }
+  it("по умолчанию RU и возвращает перевод из блока RU", () => {
+    const { result } = renderLanguage()
+    expect(result.current.language).toBe("RU")
+    expect(result.current.t("nav.home")).toBe(translations.RU["nav.home"])
   })
 
-  it("all keys return non-empty strings for EN", () => {
-    for (const key of enKeys) {
-      expect(mockTranslations.EN[key as keyof typeof mockTranslations.EN]).toBeTruthy()
-    }
+  it("переключение на EN отдаёт английский вариант того же ключа", () => {
+    const { result } = renderLanguage()
+    expect(result.current.t("nav.home")).toBe(translations.RU["nav.home"])
+
+    act(() => {
+      result.current.setLanguage("EN")
+    })
+
+    expect(result.current.language).toBe("EN")
+    expect(result.current.t("nav.home")).toBe(translations.EN["nav.home"])
+    expect(result.current.t("nav.home")).not.toBe(translations.RU["nav.home"])
+  })
+
+  it("подставляет плейсхолдеры из options", () => {
+    const { result } = renderLanguage()
+    const ru = result.current.t("invite.title", { name: "Анна" })
+    const en = result.current.t("invite.title", { name: "Anna" })
+    expect(ru).toContain("Анна")
+    expect(ru).not.toContain("{name}")
+    expect(en).toContain("Anna")
+    expect(en).not.toContain("{name}")
+  })
+
+  it("неизвестный ключ возвращает сам ключ (это ловит i18n-parity.test.ts)", () => {
+    const { result } = renderLanguage()
+    expect(result.current.t("no.such.key")).toBe("no.such.key")
+  })
+
+  it("setLanguage сохраняет выбор в localStorage", () => {
+    const { result } = renderLanguage()
+    act(() => {
+      result.current.setLanguage("EN")
+    })
+    expect(localStorage.getItem("app_lang")).toBe("EN")
+  })
+
+  it("useLanguage вне провайдера бросает понятную ошибку", () => {
+    expect(() => renderHook(() => useLanguage())).toThrow(/useLanguage must be used within LanguageProvider/)
   })
 })

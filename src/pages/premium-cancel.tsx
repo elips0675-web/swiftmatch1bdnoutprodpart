@@ -13,16 +13,16 @@ export default function PremiumCancel() {
         <div className="w-20 h-20 rounded-full bg-orange-100 flex items-center justify-center mx-auto mb-6">
           <XCircle size={40} className="text-orange-500" />
         </div>
-        <h1 className="text-2xl font-black tracking-tight mb-2">{t('premium.cancel_title') || 'Оплата отменена'}</h1>
+        <h1 className="text-2xl font-black tracking-tight mb-2">{t('premium.cancel_title')}</h1>
         <p className="text-muted-foreground text-sm mb-8">
-          {t('premium.cancel_desc') || 'Вы отменили оплату. Попробуйте снова, если передумаете.'}
+          {t('premium.cancel_desc')}
         </p>
         <div className="flex flex-col gap-3">
           <Button onClick={() => router.push('/')} className="w-full h-12 rounded-full gradient-bg text-white font-black">
-            {t('premium.back_home') || 'На главную'}
+            {t('premium.back_home')}
           </Button>
           <Button onClick={() => router.back()} variant="outline" className="w-full h-12 rounded-full font-black">
-            {t('premium.try_again') || 'Попробовать снова'}
+            {t('premium.try_again')}
           </Button>
         </div>
       </div>

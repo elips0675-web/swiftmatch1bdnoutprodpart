@@ -24,7 +24,7 @@ export default function PartnerOrderSuccess() {
           onClick={() => router.push("/")}
           className="w-full h-12 rounded-full gradient-bg text-white font-black"
         >
-          {t("premium.back_home") || "На главную"}
+          {t("premium.back_home")}
         </Button>
       </div>
     </div>

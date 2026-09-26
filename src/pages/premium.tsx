@@ -103,7 +103,7 @@ export default function Premium() {
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-4">
       <div className="max-w-md mx-auto space-y-4">
         <button onClick={() => router.back()} className="flex items-center gap-1 text-sm text-muted-foreground">
-          <ArrowLeft size={16} /> {t('common.back') || 'Назад'}
+          <ArrowLeft size={16} /> {t('common.back')}
         </button>
 
         <div className="text-center">

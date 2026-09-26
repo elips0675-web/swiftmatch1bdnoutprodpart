@@ -15,12 +15,12 @@ export default function PremiumSuccess() {
         <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
           <CheckCircle size={40} className="text-green-500" />
         </div>
-        <h1 className="text-2xl font-black tracking-tight mb-2">{t('premium.success_title') || 'Оплата прошла успешно!'}</h1>
+        <h1 className="text-2xl font-black tracking-tight mb-2">{t('premium.success_title')}</h1>
         <p className="text-muted-foreground text-sm mb-8">
-          {t('premium.success_desc') || 'Спасибо за покупку! Ваш премиум-доступ уже активирован.'}
+          {t('premium.success_desc')}
         </p>
         <Button data-testid="back-home-button" onClick={() => router.push('/')} className="w-full h-12 rounded-full gradient-bg text-white font-black">
-          {t('premium.back_home') || 'На главную'}
+          {t('premium.back_home')}
         </Button>
       </div>
     </div>
