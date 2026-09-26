@@ -1,6 +1,8 @@
 # Что доделать — сводный статус по аудитам kimi, дипсик, qwen
 
-> Актуально: 26.09.2026, после этапа 106 (+ сессии 107–110: server 389/389, front 111/111, E2E 134/134) и новых аудитов «Тесты и функционал qwen.txt» / «Тесты и функционал дипсик.txt» (перенос практик Service Desk; полный разбор — в конце файла). Каждый пункт — из аудитов, статус сверен с кодом и тестами.
+> Актуально: 26.09.2026, после этапа 106 (+ сессии 107–110) и новых аудитов «Тесты и функционал qwen.txt» / «Тесты и функционал дипсик.txt» (перенос практик Service Desk; полный разбор — в конце файла). Каждый пункт — из аудитов, статус сверен с кодом и тестами.
+>
+> **Срез 26.09.2026 (фактический прогон):** server **415/415 passed** (34 файла), front **116/116 passed** (21 файл), E2E — статически 19 спеков / 208 тестов (прогон не делался: в `part1` не было `node_modules`, зависимости поставлены при этой сверке). Разбор аудитов пересверен по коду — исправлено 7 ложных «✅», добавлено 5 новых пунктов (P1 #14–16, P2 #17, P3 #25).
 
 ## ✅ Закрыто (в т.ч. этапами 8–22)
 
@@ -996,18 +998,45 @@ UX-улучшение ленты (следующий кандидат из сп�
 - Вывод: приложение → админка → БД → Redis связаны и работают; локальный стек полностью функционален, блокирует только внешняя инфраструктура (ключи/VPS/релиз).
 ## 🆕 Аудиты «Тесты и функционал qwen.txt» + «Тесты и функционал дипсик.txt» (26.09.2026, после этапа 126)
 
-Оба файла — план переноса инженерной культуры **Service Desk (D:\Tickets Cursor nout\repo, 67 этапов / 1572 теста)** в SwiftMatch (521 тест на момент написания). Ниже — консолидированный план с **фактической сверкой статусов по коду** (сверка 26.09.2026, актуальный срез проекта на 12.09: server 415/415, front 116/116, E2E 150/150), учтены «Не брать» из обоих аудитов.
+Оба файла — план переноса инженерной культуры **Service Desk (D:\Tickets Cursor nout\repo, 67 этапов / 1572 теста)** в SwiftMatch (521 тест на момент написания). Ниже — консолидированный план со **сверкой статусов по коду SwiftMatch** (пересверено 26.09.2026), учтены «Не брать» из обоих аудитов.
 
-> ⚠️ Многие пункты аудитов закрыты этапами 112–126, написанными ПОСЛЕ аудитов (см. разделы «Обновление (05.09/12.09)» выше): k6-бласт 100 VU, Docker e2e, rate-limit на Redis, S3/FCM/RevenueCat-код-гэпы, E2E 150/150, unit 405/405. Нижняя оценка «521 тест» неактуальна — актуально server 415/415, front 116/116, E2E 150/150.
+**Метод сверки 26.09:** каждый пункт проверен по живому коду (`glob`/`grep` по файлам + чтение строк), а не по описаниям аудитов. Числа тестов пересчитаны по исходникам: **front 21 файл / 116 тестов, server 34 файла / 415 тестов, E2E 19 спеков / 208 тестов** (статический подсчёт `it(`/`test(`; в `e2e/*.spec.ts` есть циклы, генерирующие доп. тесты — `interests.spec.ts:29`, `premium.spec.ts:30`, `audit-full.spec.ts:191`).
+
+> ⚠️ Нижняя оценка «521 тест» из аудитов неактуальна — см. фактический прогон ниже.
+
+### 🔍 Сверка 26.09.2026: что в предыдущем разборе оказалось неверным
+
+Проверка по коду нашла **7 ложных «✅»/устаревших мест** — все исправлены ниже:
+
+| # | Утверждение было | Факт в коде |
+|---|---|---|
+| 1 | «i18n parity-тест закрыт этапом 40 — `src/test/i18n.test.ts`» | **Файла нет.** `git log --diff-filter=ADR -- src/test/i18n.test.ts` пуст, в HEAD его нет никогда. Тест потерян при копировании/переносе. → пункт qwen #6 **открыт заново** |
+| 2 | «сейчас только `/health/live` + `/health/ready`» | Обоих **нет**. В `server/src/index.js:307` есть только `GET /health` |
+| 3 | «Contract-тесты zod, формат `{error:{code,message,details}}`» | `zod` есть в `package.json`, но **0 импортов** в `src/` и `server/` (мёртвая зависимость). Формат ошибок плоский `{ message }` — вхождений `error:{code` в роутах **0** |
+| 4 | «IDOR-аудит: сейчас дыры» | По коду чаты **закрыты**: 404 не-участнику (`social.js:567`), 403 на чтение (`:618`), 403 на отправку (`:683`), 403 на реакции (`:758`), owner-check на удалении (`:739`). Реальный риск — **нет автотестов-регрессий** (`idor.test.js` отсутствует), а не дыры |
+| 5 | «`deleted_at` есть на 11+ таблицах (миграции 006/016/043)» | **13 таблиц**: users, user_profiles, user_photos, chats, messages, notifications, likes, matches, posts, post_comments, group_posts, group_post_comments, reports |
+| 6 | «8 колонок в `feature_flags`» | **10 boolean-флагов**: video_calls, ai_icebreakers, ai_compatibility, groups_page, contest, show_ads, autosearch, hangouts, partner_offers, b2b_marketplace (`mysql_schema.sql:382-397`). `rollout_percent` отсутствует — подтверждено |
+| 7 | «E2E 150/150» | 19 спеков, 208 тестов статически; фактический прогон в доках — 12.09 |
+
+Дополнительно всплыло при сверке (добавлено в план ниже как новые пункты):
+
+- **Серверные тесты не гоняются в CI**: `.github/workflows/ci.yml` = `tsc --noEmit` + `eslint src/` + `npm test` (только фронт). 415 серверных тестов вне CI, `vite build` в CI тоже нет.
+- **`mail.js` без Redis не отправляет письма, а только логирует** (`mail.js:4-10`): ветка «queue недоступна» → `rootLogger.info('Would send to …')`. Retry есть только у Bull (`queue.js:20-21`, attempts 3 / exponential 2000) и только при `REDIS_URL`.
+- `npm audit` после `npm ci` (26.09): корень — **16 уязвимостей (2 low, 6 moderate, 7 high, 1 critical)**, `server/` — **41 (31 moderate, 10 high)**. До пункта qwen #33 (Trivy) дело уже есть.
+- `audit_log` пишется **только при удалении** (`admin/users.js:138,154`, `report.js:41`) — на UPDATE профиля/фото аудита нет, поэтому «Timeline из audit_log» требует сначала расширить аудит.
+
+> ⚠️ Многие пункты аудитов закрыты этапами 112–126, написанными ПОСЛЕ аудитов (см. разделы «Обновление (05.09/12.09)» выше): k6-бласт 100 VU, Docker e2e, rate-limit на Redis, S3/FCM/RevenueCat-код-гэпы, unit 405/405. Нижняя оценка «521 тест» неактуальна.
+>
+> **Фактический прогон 26.09.2026 (после `npm ci`):** server **34 файла / 415 тестов — 415 passed**, front **21 файл / 116 тестов — 116 passed** (0 failures, ~31 с суммарно). Числа 415/116 в доках подтвердились. **E2E не перегонялся** (нужен живой стек 3002/8081 + Playwright, а по правилу AGENTS E2E без чистки БД запускать нельзя) — статический счёт 19 спеков / 208 тестов, док-число «150/150» относится к 12.09 и устарело.
 
 ### ✅ Уже закрыто этапами (аудиты писались по более раннему срезу)
 
 | Пункт аудита | Где закрыто | Примечание |
 |---|---|---|
 | Admin TOTP 2FA (дипсик #7 🔴, qwen #10) | **Этап 38**: `server/src/totp.js` + `routes/totp-2fa.js` + `users.totp_secret/totp_enabled` + login требует код с TOTP_REQUIRED/TOTP_INVALID + `two-fa-settings.tsx` | Осталось только расширение: обязательный для super_admin, backup-коды — qwen #10 (1 день, P2) |
-| Migration idempotency (дипсик #6, qwen #22) | **Этап 35**: `migrate.js` дважды → 0 errors; найден и исправлен баг миграции 018; 51 миграция идемпотентна | Двойной прогон в CI-проверках — ✅ |
-| Backup verification (дипсик #12) | **Этапы 21 + 67**: `scripts/verify-backup.ps1` (restore в скретч-БД) + `verify-backup.mjs` + `install-backup-task.bat` | ✅ |
-| i18n parity-тест (qwen #6) | **Этап 40**: `src/test/i18n.test.ts` RU↔EN синхронность | qwen просит рекурсивную проверку — мелочь, можно расширить при след. i18n-этапе |
+| Migration idempotency (дипсик #6, qwen #22) | **Этап 35**: `migrate.js` дважды → 0 errors; найден и исправлен баг миграции 018; 51 миграция идемпотентна | Проверка была ручной, **автотеста в CI нет** (см. P1 #14) |
+| Backup verification (дипсик #12) | **Этапы 21 + 67**: `scripts/verify-backup.ps1` (restore в скретч-БД) + `verify-backup.mjs` + `install-backup-task.bat`; подключён в `deploy.yml:99-100` («Backup restore smoke test») | ✅ |
+| ~~i18n parity-тест (qwen #6)~~ → **ОТКРЫТ ЗАНОВО** | ~~Этап 40: `src/test/i18n.test.ts`~~ — **файла нет** | `git log --diff-filter=ADR -- src/test/i18n.test.ts` пуст: тест **никогда не был в репозитории** (потерян при переносе проекта). RU/EN-паритет сейчас не проверяется ничем, хотя `docs/AGENTS-i18n.md` и `Что сделано.txt:560` описывают его как готовый → P1 #15 |
 | XSS-инвариант regression (qwen #5) | **Этап 45**: `sanitize.test.js` (img onerror/script/onmouseover/javascript:) + `profile.test.js` чтение legacy-XSS | ✅ |
 | CSP process-guard (дипсик #6, qwen #23) | **Этап 35**: `security.headers.test.js` — 7 тестов (CSP/XFO/HSTS…) | ✅ |
 | 413 при >10MB upload (дипсик #6, qwen #23) | **Этапы 39**: `upload.js` limits fileSize 10MB + `upload.test.js` (+5: non-image/no-file/auth/traversal/double-ext) | ✅ |
@@ -1016,9 +1045,9 @@ UX-улучшение ленты (следующий кандидат из сп�
 
 | # | Пункт | Оценка | Что именно |
 |---|---|---|---|
-| 1 | **IDOR-аудит всех `:id` + canAccess-хелперы** (qwen #1, дипсик #2) | 1–2 дня | `GET /api/chats/:chatId`, `/api/photos/:id`, `/api/profile/:id`, `/api/hangouts/:id`, `/api/partners/offers/:id` — проверить owner/participant/partner. Часть проверок уже есть (hangouts.js:906 chat_participants, partners.js:672), но системного `canAccessChat/Profile/Hangout` нет |
-| 2 | **Race-тесты ядра** (qwen #2, дипсик #1) | 2–3 дня | `like.race.test.js` (2 параллельных лайка → 1 запись, второй 409), `match.race.test.js` (mutual → 1 мэтч, UNIQUE), `subscription.race.test.js` (двойной checkout → 1 активная), `refresh.race.test.js` (1×200, 2-й 401 + семья отозвана) |
-| 3 | **Contract-тесты zod** (qwen #3, дипсик #3) | 1 день | Топ-5 list-эндпоинтов (`/users/search`, `/matches`, `/chats`, `/hangouts`, `/partners/offers`) — формат `{error:{code,message,details}}` не дрейфует; защита API для мобилки |
+| 1 | **IDOR-аудит + автотесты-регрессии** (qwen #1, дипсик #2) | 1–2 дня | **Переформулировано после сверки 26.09:** в коде дыр в чатах нет — 404 не-участнику (`social.js:567`), 403 на чтение (`:618`), 403 на отправку (`:683`), 403 на реакции (`:758`), owner-check на удалении (`:739`), checkin по `hangout_participants` (`hangouts.js:1063`). Реальный пробел — **нет `idor.test.js`**: проверки не закреплены тестами, регресс сломает молча. Добавить `canAccessChat/Profile/Hangout` (хелперов `canAccess*` в проекте 0) и покрыть ими `/api/photos/:id` (`upload.js:200`), `/api/profile/:id`, `/api/partners/offers/:id` |
+| 2 | **Race-тесты ядра** (qwen #2, дипсик #1) | 2–3 дня | `like.race.test.js` (2 параллельных лайка → 1 запись, второй 409), `match.race.test.js` (mutual → 1 мэтч, UNIQUE), `subscription.race.test.js` (двойной checkout → 1 активная), `refresh.race.test.js` (1×200, 2-й 401 + семья отозвана). Уже есть: атомарный claim + reuse-detection в `index.js` (тест `auth.test.js:parallel race`, E2E `security-blind-spots.spec.ts:40`) — **нужен вынос в отдельный race-файл + like/match** |
+| 3 | **Contract-тесты ответов API** (qwen #3, дипсик #3) | 1 день | **Премис аудитов не подтвердился:** `zod` есть в `package.json`, но импортов **0** (`src/` и `server/`) — мёртвая зависимость; единого формата ошибок `{error:{code,message,details}}` в проекте **нет** (0 вхождений `error:{code`), фактически везде плоский `{ message }`. Либо вводить envelope (рефакторинг всех роутов), либо тестировать фактическую форму `{ success/items }` + `{ message }` на 5 list-эндпоинтах (`/users/search`, `/matches`, `/chats`, `/hangouts`, `/partners/offers`) |
 | 4 | **Notification preferences per user** (qwen #8, дипсик #9) | 2 дня | Таблица `notification_preferences` (user_id UNIQUE + prefs JSON), 7 событий × 3 канала (like/match/message/hangout_response/event_reminder/partner_offer/subscription), фильтры через allowedUserIds во всех notify-функциях, UI таблица 7×3 + мастер-чекбоксы |
 | 5 | **Активные сессии + revoke** (qwen #9, дипсик #8) | 1–2 дня | Колонки `device_name/ip_address/user_agent/last_seen_at` в `refresh_tokens` (сейчас только fingerprint SHA256, миграция 042), `GET /api/auth/sessions`, `POST /:id/revoke` (своя 200/чужая 404/текущая 400), `SessionsSection` в профиле |
 
@@ -1026,50 +1055,58 @@ UX-улучшение ленты (следующий кандидат из сп�
 
 | # | Пункт | Оценка | Что именно |
 |---|---|---|---|
-| 6 | Timeline / история активности (qwen #11, дипсик #10) | 1–2 дня | `GET /api/profile/activity` — свои действия (лайки/мэтчи/сообщения/встречи/покупки) из audit_log, вкладка в профиле + экспорт (уже есть `/api/activity` — но это лента визитов, не timeline действий) |
-| 7 | Query guards + N+1 spy (qwen #7, дипсик #4) | 1 день | Клампинг limit/offset (9999→500, 0→50, -5→1, abc→50) на `/users/search`, `/hangouts`, `/partners/offers` (сейчас частично: affiliate.js:32, admin/hangouts.js:51, hangouts.js:176); N+1 spy на `pool.query` — ровно 1 запрос на список |
-| 8 | Webhooks journal + replay (qwen #17) | 1 день | Есть дедуп `webhook_events` (этап 39), но нет журнала доставок партнёрам/Stripe + кнопки «Повторить» в админке |
-| 9 | Edit сообщений в чатах (qwen #12) | 2 дня | `edited_at` в messages + WS `message:edited` + «Редактировать» в течение 15 мин (сейчас только delete) |
-| 10 | Reply-to / threads (qwen #13) | 2 дня | `reply_to_message_id` + цитирование в UI |
+| 6 | Timeline / история активности (qwen #11, дипсик #10) | 1–2 дня | **Уточнено 26.09:** `audit_log` существует (`audit.js:12`), но пишется **только при удалении** — `admin/users.js:138,154`, `report.js:41`; на UPDATE профиля/фото аудита нет. Поэтому порядок: сначала расширить `auditLog()` на UPDATE (`user_profiles`/`user_photos`), потом `GET /api/profile/activity` + вкладка в профиле. `/api/activity` (`social.js:791`) — это лента визитов, не свои действия |
+| 7 | Query guards + N+1 spy (qwen #7, дипсик #4) | 1 день | **Уточнено 26.09:** limit уже клампится — `hangouts.js:51`, `admin/hangouts.js:51` (1..100), `affiliate.js:32` (1..12), в `/users/search` LIMIT жёстко 50 (`social.js:174`). Реальная дыра — **`radius` не клампится**: `social.js:122` `radius \|\| 50` → `Number(radius)*1000` в `HAVING distance < ?` (`:133`), можно отдать 10 000 000. Добавить клампинг radius (1..500) + проверки offset; N+1 spy на `pool.query` (ровно 1 запрос на список) |
+| 8 | Webhooks journal + replay (qwen #17) | 1 день | Есть дедуп `webhook_events` (`027_webhook_events.sql`, этап 39), но нет журнала доставок партнёрам/Stripe + кнопки «Повторить» в админке |
+| 9 | Edit сообщений в чатах (qwen #12) | 2 дня | `edited_at` в messages **отсутствует** (в схеме только `reply_to`, `ttl_seconds`) → WS `message:edited` + «Редактировать» в течение 15 мин + `edited_at` в API |
+| 10 | Reply-to / threads (qwen #13) | 0.5–1 дня | **Уточнено 26.09 — работа меньше, чем в аудите:** колонка `messages.reply_to` уже есть (FK self, `mysql_schema.sql:778`) и отдаётся в ответах (`social.js:621,698`), но `INSERT` её не заполняет (`:687`) и UI цитирования нет. Нужно: принимать `reply_to` при отправке + рендер цитаты |
 | 11 | Merge duplicate profiles (qwen #15) | 2 дня | Анти-фрод: объединение дубликатов по email/телефону, перенос мэтчей/сообщений/подписок, UI в админке |
-| 12 | Impersonation + аудит (qwen #18, дипсик #15) | 1 день | «Войти как пользователь» для саппорта + запись в audit_log (в коде сейчас фичи НЕТ — дипсик ошибается, «имперсонации» нет; проверено grep'ом) |
-| 13 | Soft-delete тесты (qwen #24) | 1 день | `deleted_at` есть на 11+ таблицах (миграции 006/016/043), но тестов нет: 404 на GET /:id, список без удалённых, «нельзя вернуть» |
+| 12 | Impersonation + аудит (qwen #18, дипсик #15) | 1 день | «Войти как пользователь» для саппорта + запись в audit_log. Подтверждено 26.09: фичи в коде **нет** (grep `impersonat` — 0 совпадений), дипсик ошибся |
+| 13 | Soft-delete тесты (qwen #24) | 1 день | `deleted_at` есть на **13 таблицах** (уточнено): users, user_profiles, user_photos, chats, messages, notifications, likes, matches, posts, post_comments, group_posts, group_post_comments, reports. Хелперы `softDelete/softDeleteWhere` (`audit.js:23,29`) используются только в `admin/users.js` — тестов нет: 404 на GET /:id, список без удалённых, «нельзя вернуть» |
+| 14 | **CI: гонять серверные тесты и сборку** *(новое 26.09)* | 0.5 дня | `.github/workflows/ci.yml` = только `tsc --noEmit` + `eslint src/` + `npm test` (фронт). **415 серверных тестов вне CI**, `vite build` в CI нет, `eslint` не смотрит `server/`. Добавить job: `cd server && npm ci && npm test` + `npx vite build` + eslint по `server/src` |
+| 15 | **Восстановить i18n parity-тест** *(новое 26.09, из ложного «✅»)* | 0.5 дня | `src/test/i18n.test.ts` отсутствует (см. таблицу «Уже закрыто») — 3 теста на синхронность RU/EN ключей + непустые значения. В `docs/AGENTS-i18n.md` и `Что сделано.txt:560` он описан как существующий |
+| 16 | **mail.js: деградация без Redis** *(новое 26.09)* | 0.5–1 дня | `mail.js:4-10`: если `emailQueue === null` — письмо **не отправляется**, а только логируется (`Would send to …`). Т.е. без `REDIS_URL` (или при мёртвом Redis, `queue.js:52-57`) подтверждения email/сброс пароля/кастомные письма молча теряются. Retry есть только у Bull (`queue.js:20-21`, attempts 3 + exponential 2000) и только с Redis. Нужен прямой fallback через nodemailer |
 
 ### 🟡 P2 — nice-to-have, дошлифовка
 
 | # | Пункт | Оценка |
 |---|---|---|
-| 14 | Feature flag rollout % (qwen #39, дипсик #11): `rollout_percent` (0–100) + `getRolloutBucket(userId)` — сейчас все флаги boolean (8 колонок в `feature_flags`) | 1–2 дня |
-| 15 | Health dashboard в админке (дипсик #13): `/admin/health` — MySQL/Redis/SMTP/Stripe/OpenAI/FCM (сейчас только `/health/live` + `/health/ready`) | 1–2 дня |
-| 16 | Queue monitor (дипсик #14): 3 очереди email/push/image (Bull, queue.js) — UI в админке + счётчики | 1 день |
-| 17 | Notify-failure regression (qwen #4, дипсик #5): SMTP/webhook упал → POST /register всё равно 201 (мок `sendCustomEmail` → reject) | 0.5 дня |
-| 18 | Background sub-тесты (qwen #25): cleanup уведомлений >90 дней, очередь забита → email админу, stopPolling без запуска не падает (адаптировать — IMAP у нас нет) | 1 день |
-| 19 | Virtual scroll тест в jsdom (qwen #26): при 1000+ сообщениях DOM содержит < N элементов (у нас CSS content-visibility, этап 101 — нужен только jsdom-тест) | 1 день |
-| 20 | E2E lifecycle вместо smoke (qwen #21, дипсик #19): `dating-lifecycle.spec.ts` — регистрация→анкета→свайп→мэтч→чат→сообщение→видеозвонок→премиум (сейчас E2E 150/150, но много smoke; полной воронки нет) | 3 дня |
-| 21 | Процессные правила в AGENTS.md SwiftMatch (дипсик #18): Rule 12–16 (фича=флаг, DoD, цитата кода, фикс-потом-тест, coverage −2п.п.) + `check-doc-sync.mjs` — сейчас в AGENTS.md их нет | 0.5 дня |
+| 17 | Feature flag rollout % (qwen #39, дипсик #11): `rollout_percent` (0–100) + `getRolloutBucket(userId)`. **Уточнено 26.09:** в `feature_flags` **10** boolean-флагов (video_calls, ai_icebreakers, ai_compatibility, groups_page, contest, show_ads, autosearch, hangouts, partner_offers, b2b_marketplace — `mysql_schema.sql:382-397`), колонки `rollout_percent` нет | 1–2 дня |
+| 18 | Health dashboard в админке (дипсик #13): `/admin/health` — MySQL/Redis/SMTP/Stripe/OpenAI/FCM. **Уточнено 26.09:** ни `/health/live`, ни `/health/ready` в проекте **нет** — есть только `GET /health` (`index.js:307`); дипсик ошибся | 1–2 дня |
+| 19 | Queue monitor (дипсик #14): 3 очереди email/push/image (Bull, `queue.js:59-61`) — UI в админке + счётчики. Плюс: сейчас при недоступном Redis все три очереди молча отключаются (`queue.js:52-57`) — в мониторе это должно быть видно | 1 день |
+| 20 | Notify-failure regression (qwen #4, дипсик #5): SMTP/webhook упал → POST /register всё равно 201 (мок `sendCustomEmail` → reject). **Уточнено 26.09:** в `mail.js` retry нет вовсе (только Bull), а ветка без очереди вообще не шлёт (см. P1 #16) — тест фиксирует именно это поведение | 0.5 дня |
+| 21 | Background sub-тесты (qwen #25): cleanup уведомлений >90 дней, очередь забита → email админу, stopPolling без запуска не падает (адаптировать — IMAP у нас нет; есть `cleanup.js` + `cleanup.test.js` 3 теста) | 1 день |
+| 22 | Virtual scroll тест в jsdom (qwen #26): при 1000+ сообщениях DOM содержит < N элементов (у нас CSS content-visibility, этап 101 — нужен только jsdom-тест) | 1 день |
+| 23 | E2E lifecycle вместо smoke (qwen #21, дипсик #19): `dating-lifecycle.spec.ts` — регистрация→анкета→свайп→мэтч→чат→сообщение→видеозвонок→премиум. **Уточнено 26.09:** спеков 19, тестов 208 статически (док-«150/150» — срез 12.09), полной воронки нет | 3 дня |
+| 24 | Процессные правила в AGENTS.md SwiftMatch (дипсик #18): правила «фича = флаг», DoD, «AI-пункт без цитаты кода», «сначала фикс, потом тест», coverage −2 п.п. + `check-doc-sync.mjs` — сейчас в AGENTS.md их нет, скрипта в `scripts/` тоже нет | 0.5 дня |
 
 ### 🟢 P3 — бэклог, брать после P0–P2
 
 | # | Пункт | Оценка |
 |---|---|---|
-| 22 | Watchers/Relations/Merge для Hangouts/Events (дипсик #16): `hangout_watchers` (подписка без участия), `hangout_relations` («похожие встречи», «та же серия»), Merge hangouts (дубли, перенос участников). qwen #14 — «Интересуют новые люди» (user_watches по критериям+радиусу) | 3–4 дня |
-| 23 | Field-level permissions (qwen #20, дипсик #17): какие поля профиля видит кто (телефон/email/instagram/last_seen — приватность, сейчас хардкод) | 2–3 дня |
-| 24 | Scheduled reports (qwen #28): еженедельная сводка админу — новые юзеры/мэтчи/выручка/жалобы (cron + шаблон) | 2 дня |
-| 25 | GDPR export ZIP (qwen #29): расширить `GET /api/data/export` (+GDPR-джобы) до ZIP с фото/сообщениями/мэтчами | 1 день |
-| 26 | Opening lines library (qwen #27): шаблоны первых сообщений по категориям, `{{firstName}}`/`{{commonInterest}}` | 2 дня |
-| 27 | Team/Group scope для модераторов (qwen #31): модератор видит только свои жалобы (сейчас все) | 2 дня |
-| 28 | Покрытие ядра (дипсик #20): auth-context/use-premium/use-websocket/chats/hangout-detail — оптимистичные сценарии (у SD: ticket-context 35→60%+, TicketDetail 51→75%+) | 4–5 дней |
+| 25 | **Dependency-аудит: `npm audit` + Trivy** *(новое 26.09, qwen #33)* | 0.5–1 дня | Факт 26.09 после `npm ci`: корень — **16 уязвимостей (2 low, 6 moderate, 7 high, 1 critical)**, `server/` — **41 (31 moderate, 10 high)**. Trivy по образам (alpine/nginx/redis) — отдельным шагом |
+| 26 | Watchers/Relations/Merge для Hangouts/Events (дипсик #16): `hangout_watchers` (подписка без участия), `hangout_relations` («похожие встречи», «та же серия»), Merge hangouts (дубли, перенос участников). qwen #14 — «Интересуют новые люди» (user_watches по критериям+радиусу) | 3–4 дня |
+| 27 | Field-level permissions (qwen #20, дипсик #17): какие поля профиля видит кто (телефон/email/instagram/last_seen — приватность, сейчас хардкод) | 2–3 дня |
+| 28 | Scheduled reports (qwen #28): еженедельная сводка админу — новые юзеры/мэтчи/выручка/жалобы (cron + шаблон) | 2 дня |
+| 29 | GDPR export ZIP (qwen #29): расширить `GET /api/data/export` (`gdpr.js:9`) до ZIP с фото/сообщениями/мэтчами | 1 день |
+| 30 | Opening lines library (qwen #27): шаблоны первых сообщений по категориям, `{{firstName}}`/`{{commonInterest}}` | 2 дня |
+| 31 | Team/Group scope для модераторов (qwen #31): модератор видит только свои жалобы (сейчас все) | 2 дня |
+| 32 | Покрытие ядра (дипсик #20): auth-context/use-premium/use-websocket/chats/hangout-detail — оптимистичные сценарии (у SD: ticket-context 35→60%+, TicketDetail 51→75%+). В SwiftMatch **порогов coverage нет вообще** — ни в `vitest.config.ts`, ни в `server/vitest.config.js` | 4–5 дней |
 
 ### ❌ Не брать (консенсус обоих аудитов)
 
 - **SLA/business hours/эскалации** (дипсик: нет аналога в dating)
 - **Custom roles** (дипсик: 5 ролей хватит, dating ≠ enterprise) — qwen #16 даёт 3 дня, но дипсик против
 - **Kanban/Calendar/Wiki/Polls/News** (дипсик: уже не нужно)
-- **Ticket relations/merge для ядра** — только по аналогии для hangouts (см. P3 #22)
-- **OpenTelemetry/Trivy/SLO/Storybook/Snowflake** (дипсик: перебор для 50k юзеров); qwen в бэклоге держит SLO/SLI и CDN — не приоритет
+- **Ticket relations/merge для ядра** — только по аналогии для hangouts (см. P3 #26)
+- **OpenTelemetry/SLO/SLI/Storybook/Snowflake** (дипсик: перебор для 50k юзеров); qwen в бэклоге держит SLO/SLI и CDN — не приоритет. **Trivy** из этого списка исключён: `npm audit` уже даёт 57 уязвимостей (P3 #25)
 - **Org chart** (qwen: не нужно для B2C)
 - **Approval chains для фото** (qwen #19) — есть AI-модерация (`ai-moderation.js`), multi-step не окупается
 
-### Рекомендация (консенсус обоих аудитов)
+### Рекомендация (консенсус обоих аудитов + поправки сверки 26.09)
 
-**Спринт 1 (P0, ~7 дней):** IDOR-аудит + canAccess → Race-тесты ядра → Notification preferences → Активные сессии + revoke. Дальше P1 и P2 по порядку. Итог P0+P1: ~14–18 дней, 521 → ~700 тестов.
+**Спринт 0 (быстрые правки процесса/гигиены, ~1.5 дня):** P1 #14 (серверные тесты в CI) → P1 #15 (восстановить i18n parity-тест) → P1 #16 (fallback отправки писем без Redis). Это дешёвое и снимает риск «зелёные тесты локально, красные в проде».
+
+**Спринт 1 (P0, ~7 дней):** IDOR-автотесты + canAccess-хелперы → Race-тесты ядра (like/match) → Contract-тесты (сначала решить: вводить ли envelope ошибок) → Notification preferences → Активные сессии + revoke. Дальше P1 и P2 по порядку. Итог P0+P1: ~16–20 дней; тесты 531 (415 server + 116 front) → ~700.
+
+**Отдельно про E2E:** прогнать не удалось (в `D:\swiftmatch1bdnoutprodpart1` не было `node_modules`, зависимости установлены 26.09 для этой сверки; E2E требует живого стек 3002/8081 и чистки БД). Актуальный срез по E2E — только статический: **19 спеков / 208 тестов**.

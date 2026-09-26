@@ -1,0 +1,210 @@
+D:\Tickets Cursor nout\repo
+
+Что доделать в SwiftMatch по аналогии с Service Desk
+Проанализировал 67 этапов Service Desk и текущее состояние SwiftMatch (этапы 1–105). Ниже — только то, что реально применимо к dating-app, с приоритетами и оценкой.
+🔴 P0 — критично для production (блокирует масштабирование)
+#
+Фича (аналог из SD)
+Что даст в SwiftMatch
+Оценка
+1
+IDOR-аудит всех :id эндпоинтов (SD Этап 56)
+Защита чужих фото/чатів/лайків/профілів. Сейчас GET /api/chats/:chatId, /api/photos/:id, /api/profile/:id не все проверяют owner/participant
+2 дня
+2
+Race-тесты (SD Этап 57)
+like.race.test.js (2 параллельных лайка → 1 мэтч), match.race.test.js (двойной мэтч), subscription.race.test.js (двойная подписка Stripe+RevenueCat)
+2 дня
+3
+Contract-тесты zod (SD Этап 60)
+Топ-5 list-эндпоинтов (/users/search, /matches, /chats, /hangouts, /partners/offers) — защита от дрейфа API при рефакторинге
+1 день
+4
+Notify-регресс тест (SD Этап 61)
+Падение SMTP/FCM не должно валить POST /api/likes, /api/hangouts — сейчас mail.js retry, но интеграционного теста нет
+1 день
+5
+XSS-инвариант regression (SD Этап 61)
+<img onerror> в bio/сообщениях/постах групп не исполняется. Сейчас sanitize.js есть, но regression-теста нет
+1 день
+6
+i18n parity-тест (SD Этап 60)
+Защита от регресса после 80+ ключей hangout.*/partner.*/events.* — сейчас паритет проверяется в i18n.test.ts, но не рекурсивно
+0.5 дня
+7
+Query guards + N+1 spy (SD Этап 61)
+GET /api/matches и /api/hangouts — клампинг limit, spy на prisma/pool (ровно 1 запрос на список). Сейчас ST_Distance_Sphere + FIND_IN_SET — риск N+1 в гео-лентах
+1 день
+🟠 P1 — важно для UX и монетизации
+#
+Фича (аналог из SD)
+Что даст в SwiftMatch
+Оценка
+8
+Notification preferences per user (SD Этап 63.3)
+Пользователь выбирает: лайки (push/in-app/email), мэтчи (push), сообщения (push/in-app), новые встречи в радиусе (push). Таблица notification_preferences (user_id UNIQUE + prefs JSON), фильтры во всех notify-функциях
+3 дня
+9
+Активные сессии + revoke (SD Этап 63.2)
+«Где я залогинен» (устройство/IP/last_seen), «Завершить все сессии» при утечке. Важно для dating — приватность. Таблица refresh_tokens + колонки device/ip/ua
+2 дня
+10
+2FA для админов (SD Этап 63.1)
+Уже есть TOTP (Этап 38), но можно расширить: обязательный для super_admin, QR в профиле, backup-коды
+1 день
+11
+Timeline истории профиля (аналог SD Этап 62)
+GET /api/profile/:id/history — кто/когда менял bio/фото/интересы (из audit_log). Вкладка «История» в профиле + PDF-экспорт для саппорта
+2 дня
+12
+Edit сообщений в чатах (SD Этап 65)
+edited_at в messages, WS message:edited, UI «Редактировать» в течение 15 мин. Сейчас только delete
+2 дня
+13
+Reply-to / threads в чатах (SD Этап 65)
+reply_to_message_id, цитирование в UI. Улучшит контекст диалогов
+2 дня
+14
+Watchers → «Интересуют новые люди» (аналог SD Этап 64)
+Подписка на уведомления «новые люди в радиусе N км с интересом X» — таблица user_watches (user_id, criteria JSON, radius_km). WS-эмит при создании профиля
+3 дня
+15
+Merge duplicate profiles (аналог SD Этап 64)
+Анти-фрод: объединение дубликатов по email/телефону с переносом мэтчей/сообщений/подписок. UI в админке
+2 дня
+16
+Custom roles (SD Этап 66)
+Роли moderator / content_manager / support вместо хардкода admin. Таблица roles + role_permissions
+3 дня
+17
+Webhooks journal + replay (SD Этап 67)
+Журнал доставок webhook'ов партнёрам/Stripe + кнопка «Повторить» в админке. Сейчас webhooks есть, но без journal
+2 дня
+18
+Impersonation + аудит (SD Этап 67)
+«Войти как пользователь» для саппорта + запись в audit_log. Важно для dating — жалобы пользователей
+2 дня
+19
+Approval chains для фото/профилей (SD Этап 67)
+Multi-step модерация: модератор → старший модератор → авто-approve. Таблица profile_approvals
+3 дня
+20
+Field-level permissions (SD Этап 67)
+Скрытие полей профиля по подписке (телефон/email видны только premium). Таблица field_permissions role×field×entity
+2 дня
+🟡 P2 — nice-to-have, дошлифовка
+#
+Фича (аналог из SD)
+Что даст в SwiftMatch
+Оценка
+21
+E2E lifecycle вместо smoke (SD Этап 55)
+dating-lifecycle.spec.ts: регистрация → заполнение анкеты → свайп → мэтч → чат → сообщение → видеозвонок → премиум → отписка. Сейчас E2E 44/44, но много smoke
+3 дня
+22
+Migration idempotency-тест (SD Этап 60)
+migrate:latest дважды не падает. Сейчас 48 миграций, но теста нет
+0.5 дня
+23
+Process guards (CSP/413) (SD Этап 60)
+CSP script-src 'self' без unsafe-inline, 413 при теле >100kb
+0.5 дня
+24
+Soft-delete тесты (SD Этап 57)
+«Нельзя вернуть удалённого», 404 на GET /:id, список без удалённых. Сейчас deleted_at на 11 таблицах, но тестов нет
+1 день
+25
+Background sub-тесты (SD Этап 57)
+Cleanup уведомлений >90 дней, DLQ >10 → email, stopImapPolling без запуска не падает
+1 день
+26
+Virtual scroll в jsdom (SD Этап 61)
+При 1000 мэтчах DOM содержит < N элементов (или fallback работает)
+1 день
+27
+Ticket templates → Opening lines library (аналог SD Этап 35)
+Библиотека шаблонов первых сообщений по категориям (комплименты/вопросы/юмор), переменные {{firstName}}, {{commonInterest}}
+2 дня
+28
+Scheduled reports (SD Этап 66)
+Еженедельная сводка админу: новые пользователи, мэтчи, выручка, жалобы (cron + шаблон письма)
+2 дня
+29
+GDPR export (SD Этап 66)
+Уже есть GET /api/data/export, но можно расширить: ZIP со всеми фото/сообщениями/мэтчами
+1 день
+30
+Wiki revisions → FAQ versioning (SD Этап 65)
+Версионирование /legal/* и /faq — diff + rollback
+2 дня
+31
+Team/Group scope для модераторов (SD Этап 67)
+Таблицы teams + team_members, модератор видит только свои жалобы
+2 дня
+32
+SLA policies per category (SD Этап 67)
+SLA на ответ саппорта: VIP < 1ч, обычный < 24ч
+2 дня
+🟢 Бэклог — инфраструктура и процесс (не код)
+#
+Что
+Зачем
+Оценка
+33
+Trivy в CI
+npm audit не видит CVE в alpine/nginx/redis-образах
+2–3 часа
+34
+ARCHITECTURE.md
+Data Flow Diagram: свайп→мэтч→чат→звонок, загрузка фото, партнёрский webhook
+1 день
+35
+API_CONTRACTS.md
+Формат ошибок {error:{code,message,details}}, пагинация, rate-limit заголовки
+1 день
+36
+ADR
+Почему localStorage для JWT, почему нет read replica, почему Capacitor
+1 день
+37
+Runbooks
+Восстановление из бэкапа, ротация Stripe/OpenAI/FCM ключей, выгреб DLQ
+1 день
+38
+SLO/SLI + alerting
+Grafana есть, алертов нет: p95 < X, error rate < Y, uptime > Z
+1 день
+39
+Feature flag lifecycle
+Удаление флага после 100% rollout на 2 недели (иначе копятся)
+0.5 дня
+40
+OpenTelemetry
+Distributed tracing между API/WS/Redis/MySQL — must-have для enterprise
+3 дня
+41
+CDN для фото
+CloudFlare/CloudFront — сейчас S3/локальный диск
+1 день
+42
+SPF/DKIM/DMARC
+Email-нотификации уходят, но без DNS-аутентификации — риск спама
+0.5 дня
+📊 Итоговая оценка
+Сейчас SwiftMatch: ~7.5/10 (сильный MVP, но не enterprise-grade)
+После P0 (1–7): 8/10 — production-ready для корп. интранета
+После P1 (8–20): 8.5/10 — полноценный dating-app с монетизацией
+После P2 (21–32): 9/10 — enterprise-grade
+После бэклога (33–42): 9.5/10 — готов к масштабированию
+🎯 Рекомендация: начать с P0
+Самый ROI:
+IDOR-аудит (2 дня) — критично для dating, сейчас дыры
+Race-тесты (2 дня) — лайки/мэтчи/подписки — частый источник багов
+Notification preferences (3 дня) — UX-killer feature для dating
+Активные сессии (2 дня) — приватность, важно для пользователей
+Итого P0+P1: ~30 дней работы, но можно разбить на 4 спринта по 7–8 дней.
+Не брать из Service Desk:
+Ticket relations / watchers / merge — специфично для helpdesk
+SLA/TZ/DST — не актуально для dating
+Custom ticket statuses — в dating статусы фиксированные (active/banned/deleted)
+Org chart — не нужно для B2C
