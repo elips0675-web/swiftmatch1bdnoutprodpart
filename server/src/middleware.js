@@ -17,13 +17,45 @@ function getJwtSecret() {
   return devJwtSecretCache
 }
 
+function getPreviousJwtSecrets() {
+  return (process.env.JWT_SECRET_PREV || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((s) => s !== process.env.JWT_SECRET)
+}
+
+// jsonwebtoken 9 НЕ умеет принимать массив секретов (verify.js:120-130 tries
+// createPublicKey/createSecretKey от массива и падает с 'not valid key
+// material'), поэтому перебор ключей делаем сами. Это graceful rotation: при
+// смене JWT_SECRET токены, подписанные ключом из JWT_SECRET_PREV, остаются
+// валидными, а новые подписываются только текущим. Без этого смена секрета
+// разлогинивает всех пользователей сразу.
+function verifyToken(token) {
+  const previous = getPreviousJwtSecrets()
+  if (previous.length === 0) return jwt.verify(token, getJwtSecret())
+
+  let lastError = null
+  for (const secret of [getJwtSecret(), ...previous]) {
+    try {
+      return jwt.verify(token, secret)
+    } catch (err) {
+      // Подпись совпала, но TTL вышел — такой токен expired при любом ключе,
+      // поэтому сохраняем именно эту ошибку вместо 'invalid signature'.
+      if (err && err.name === 'TokenExpiredError') throw err
+      lastError = err
+    }
+  }
+  throw lastError
+}
+
 function decodeAny(...tokens) {
   // Cookie — приоритетный источник: легаси-Bearer из storage может принадлежать
   // другому пользователю и не должен перекрывать актуальную веб-сессию
   for (const token of tokens) {
     if (!token) continue
     try {
-      return jwt.verify(token, getJwtSecret())
+      return verifyToken(token)
     } catch { /* невалидный токен — проверяем следующий источник */ }
   }
   return null
@@ -56,4 +88,4 @@ export function optionalAuth(req, res, next) {
   next()
 }
 
-export { getJwtSecret as JWT_SECRET }
+export { getJwtSecret as JWT_SECRET, verifyToken }

@@ -1111,17 +1111,14 @@ router.post('/api/hangouts/:id/join', auth, joinLimiter, async (req, res) => {
       } else {
         const [chatResult] = await pool.query('INSERT INTO chats (is_group) VALUES (1)')
         chatId = chatResult.insertId
-        const [members] = await pool.query(
-          "SELECT user_id FROM hangout_participants WHERE hangout_id = ? AND status = 'joined'",
-          [id],
-        )
         await pool.query('INSERT INTO chat_participants (chat_id, user_id) VALUES (?, ?)', [chatId, hangout.user_id])
-        for (const m of members) {
-          await pool.query(
-            'INSERT IGNORE INTO chat_participants (chat_id, user_id) VALUES (?, ?)',
-            [chatId, m.user_id],
-          )
-        }
+        // INSERT ... SELECT вместо цикла: один запрос вместо N+1 по участникам встречи
+        await pool.query(
+          `INSERT IGNORE INTO chat_participants (chat_id, user_id)
+           SELECT ?, hp.user_id FROM hangout_participants hp
+           WHERE hp.hangout_id = ? AND hp.status = 'joined'`,
+          [chatId, id],
+        )
         await pool.query(
           'INSERT IGNORE INTO hangout_chats (hangout_id, chat_id) VALUES (?, ?)',
           [id, chatId],

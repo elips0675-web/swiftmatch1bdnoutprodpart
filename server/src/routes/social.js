@@ -380,16 +380,13 @@ router.get('/api/groups/:groupId/chat', auth, async (req, res) => {
     )
     const chatId = result.insertId
 
-    const [members] = await pool.query(
-      'SELECT user_id FROM group_members WHERE group_id = ?',
-      [req.params.groupId],
+    // INSERT ... SELECT вместо цикла: один запрос вместо N+1 по участникам группы
+    await pool.query(
+      `INSERT INTO chat_participants (chat_id, user_id)
+       SELECT ?, gm.user_id FROM group_members gm WHERE gm.group_id = ?
+       ON DUPLICATE KEY UPDATE chat_id = chat_id`,
+      [chatId, req.params.groupId],
     )
-    for (const m of members) {
-      await pool.query(
-        'INSERT INTO chat_participants (chat_id, user_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE chat_id = chat_id',
-        [chatId, m.user_id],
-      )
-    }
 
     res.json({ id: chatId, isGroup: true })
   } catch (err) {
@@ -414,17 +411,37 @@ router.get('/api/groups/:groupId/posts', auth, async (req, res) => {
       [req.userId, req.params.groupId],
     )
     const posts = []
-    for (const row of rows) {
-      const [comments] = await pool.query(
-        `SELECT gpc.id, gpc.post_id, gpc.user_id, gpc.text, gpc.image_url, gpc.created_at,
-                up.display_name, up.avatar_url
-         FROM group_post_comments gpc
-         JOIN user_profiles up ON up.id = gpc.user_id
-         WHERE gpc.post_id = ?
-         ORDER BY gpc.created_at ASC
-         LIMIT 20`,
-        [row.id],
+    // Один запрос на все комментарии ленты вместо запроса на каждый пост:
+    // раньше 50 постов давали 51 запрос. ROW_NUMBER() по post_id сохраняет
+    // прежнее ограничение "20 комментариев на пост" и порядок ASC внутри поста.
+    const postIds = rows.map((r) => r.id)
+    const commentsByPost = new Map()
+    if (postIds.length > 0) {
+      const [commentRows] = await pool.query(
+        `SELECT t.id, t.post_id, t.user_id, t.text, t.image_url, t.created_at,
+                t.display_name, t.avatar_url
+         FROM (
+           SELECT gpc.id, gpc.post_id, gpc.user_id, gpc.text, gpc.image_url, gpc.created_at,
+                  up.display_name, up.avatar_url,
+                  ROW_NUMBER() OVER (PARTITION BY gpc.post_id ORDER BY gpc.created_at ASC) AS rn
+           FROM group_post_comments gpc
+           JOIN user_profiles up ON up.id = gpc.user_id
+           WHERE gpc.post_id IN (?)
+         ) t
+         WHERE t.rn <= 20
+         ORDER BY t.post_id, t.created_at ASC`,
+        [postIds],
       )
+      for (const c of commentRows) {
+        if (!commentsByPost.has(c.post_id)) commentsByPost.set(c.post_id, [])
+        commentsByPost.get(c.post_id).push({
+          id: c.id, postId: c.post_id, userId: c.user_id,
+          text: c.text, imageUrl: c.image_url, createdAt: c.created_at,
+          author: c.display_name, avatar: c.avatar_url,
+        })
+      }
+    }
+    for (const row of rows) {
       posts.push({
         id: row.id,
         groupId: row.group_id,
@@ -433,11 +450,7 @@ router.get('/api/groups/:groupId/posts', auth, async (req, res) => {
         images: Array.isArray(row.images) ? row.images : (row.images ? JSON.parse(row.images) : []),
         likes: row.likes_count,
         likedByMe: !!row.liked_by_me,
-        comments: comments.map(c => ({
-          id: c.id, postId: c.post_id, userId: c.user_id,
-          text: c.text, imageUrl: c.image_url, createdAt: c.created_at,
-          author: c.display_name, avatar: c.avatar_url,
-        })),
+        comments: commentsByPost.get(Number(row.id)) || [],
         createdAt: row.created_at,
         author: row.display_name,
         avatar: row.avatar_url,

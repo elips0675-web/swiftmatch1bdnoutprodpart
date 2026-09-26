@@ -59,7 +59,7 @@ import adminPartners from './routes/admin/partners.js'
 import adminBackup from './routes/admin/backup.js'
 import notificationsRoutes from './routes/notifications.js'
 import { metricsMiddleware, metricsRoute } from './metrics.js'
-import { JWT_SECRET } from './middleware.js'
+import { JWT_SECRET, verifyToken } from './middleware.js'
 import { setAuthCookies, clearAuthCookies, extractToken, REFRESH_COOKIE } from './cookies.js'
 import { setupSwagger } from './swagger.js'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -268,7 +268,7 @@ app.get('/api/admin/me', async (req, res) => {
     return res.status(401).json({ message: 'No token' })
   }
   try {
-    const decoded = jwt.verify(token, JWT_SECRET())
+    const decoded = verifyToken(token)
     const [rows] = await pool.query(
       'SELECT u.id, u.role, up.display_name as name, u.email FROM users u LEFT JOIN user_profiles up ON u.id = up.id WHERE u.id = ?',
       [decoded.userId],

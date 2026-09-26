@@ -1,7 +1,6 @@
 import { Server } from 'socket.io'
 import { createAdapter } from '@socket.io/redis-adapter'
-import jwt from 'jsonwebtoken'
-import { JWT_SECRET } from './middleware.js'
+import { verifyToken } from './middleware.js'
 import { isRedisReady, getRedisPub, getRedisSub } from './redis.js'
 import { rootLogger } from './logger.js'
 import pool from './db.js'
@@ -85,7 +84,7 @@ export async function initIO(httpServer) {
     const token = socket.handshake.auth?.token
     if (!token) return next(new Error('Authentication required'))
     try {
-      const decoded = jwt.verify(token, JWT_SECRET())
+      const decoded = verifyToken(token)
       socket.userId = decoded.userId
       next()
     } catch {

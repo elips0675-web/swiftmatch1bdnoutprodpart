@@ -2,7 +2,7 @@ import { Router } from 'express'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import pool from '../db.js'
-import { JWT_SECRET, auth } from '../middleware.js'
+import { JWT_SECRET, auth, verifyToken } from '../middleware.js'
 import { sendVerificationEmail, sendPasswordResetEmail } from '../mail.js'
 import logger from '../logger.js'
 import { trackEvent } from './experiments.js'
@@ -360,7 +360,7 @@ router.get('/api/auth/me', async (req, res) => {
   if (!token) return unauthenticated()
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET())
+    const decoded = verifyToken(token)
     const [rows] = await pool.query(
       `SELECT u.id, u.email, u.role, up.display_name, up.avatar_url
        FROM users u LEFT JOIN user_profiles up ON u.id = up.id WHERE u.id = ?`,

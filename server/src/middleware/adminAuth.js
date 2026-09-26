@@ -1,7 +1,6 @@
-import jwt from 'jsonwebtoken'
 import pool from '../db.js'
 import { rootLogger } from '../logger.js'
-import { JWT_SECRET } from '../middleware.js'
+import { verifyToken } from '../middleware.js'
 import { ACCESS_COOKIE } from '../cookies.js'
 
 function decodeAny(...tokens) {
@@ -10,7 +9,7 @@ function decodeAny(...tokens) {
   for (const token of tokens) {
     if (!token) continue
     try {
-      return jwt.verify(token, JWT_SECRET())
+      return verifyToken(token)
     } catch { /* невалидный токен — проверяем следующий источник */ }
   }
   return null
