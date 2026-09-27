@@ -38,6 +38,7 @@
 
 ## Git & CI
 
+- Правила вклада (для новых участников): `CONTRIBUTING.md` — стек, гейты, шаблон PR. Рубика «Оценка и улучшение промтов» — `docs/AGENTS-workflow.md`.
 - Conventional Commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
 - `git commit --no-verify` когда changes проверены (тесты зелёные, сборка проходит)
 - Перед PR: `npx vite build`, `npm run test` (frontend), `cd server && npm run test`
