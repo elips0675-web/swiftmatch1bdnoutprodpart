@@ -5,6 +5,7 @@ import { auth } from '../middleware.js'
 import logger from '../logger.js'
 import { getIO } from '../ws.js'
 import { getCached, setCached, invalidate } from '../cache.js'
+import { parseRadiusKm } from '../geo.js'
 
 const router = Router()
 
@@ -53,12 +54,14 @@ router.get('/api/partners/offers', auth, async (req, res) => {
     params.push(String(placement))
   }
   let geoSelect = ''
+  let having = ''
   if (lat !== undefined && lng !== undefined && !Number.isNaN(Number(lat)) && !Number.isNaN(Number(lng))) {
     geoSelect = ', ST_Distance_Sphere(POINT(?, ?), POINT(o.lng, o.lat)) AS distance_m'
     params.push(Number(lng), Number(lat))
-    if (radius !== undefined && !Number.isNaN(Number(radius))) {
-      where.push('HAVING distance_m < ?')
-      params.push(Number(radius) * 1000)
+    const radiusKm = parseRadiusKm(radius)
+    if (radiusKm !== null) {
+      having = ' HAVING distance_m < ?'
+      params.push(radiusKm * 1000)
     }
   }
   try {
@@ -68,7 +71,7 @@ router.get('/api/partners/offers', auth, async (req, res) => {
                  JOIN partners p ON p.id = o.partner_id
                  WHERE ${where.join(' AND ')}
                    AND (o.valid_from IS NULL OR o.valid_from <= CURDATE())
-                   AND (o.valid_to IS NULL OR o.valid_to >= CURDATE())
+                   AND (o.valid_to IS NULL OR o.valid_to >= CURDATE())${having}
                  ORDER BY o.created_at DESC
                  LIMIT 20`
     const [rows] = await pool.query(sql, params)

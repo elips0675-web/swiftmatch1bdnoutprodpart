@@ -8,6 +8,7 @@ import { sendPushToUser } from './push.js'
 import { auth, optionalAuth } from '../middleware.js'
 import logger from '../logger.js'
 import { stripHtml } from '../sanitize.js'
+import { parseRadiusKm, RADIUS_DEFAULT_KM } from '../geo.js'
 import { trackEvent } from './experiments.js'
 import { createBreaker } from '../circuit-breaker.js'
 
@@ -230,7 +231,7 @@ router.get('/api/hangouts', optionalAuth, async (req, res) => {
     const parsedLat = lat !== undefined && lat !== '' ? parseFloat(lat) : NaN
     const parsedLng = lng !== undefined && lng !== '' ? parseFloat(lng) : NaN
     if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
-      const radiusKm = Number(radius) > 0 ? Number(radius) : 50
+      const radiusKm = parseRadiusKm(radius) ?? RADIUS_DEFAULT_KM
       distanceExpr = `, ROUND(ST_Distance_Sphere(ST_SRID(POINT(h.lng, h.lat), 4326), ST_SRID(POINT(?, ?), 4326)) / 1000, 1) AS distance_km`
       having = ' HAVING distance_km <= ?'
       geoParams.push(parsedLng, parsedLat, radiusKm)
@@ -249,7 +250,7 @@ router.get('/api/hangouts', optionalAuth, async (req, res) => {
     let countHaving = ''
     const countParams = [...params]
     if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
-      const radiusKm = Number(radius) > 0 ? Number(radius) : 50
+      const radiusKm = parseRadiusKm(radius) ?? RADIUS_DEFAULT_KM
       countHaving = ' AND ST_Distance_Sphere(ST_SRID(POINT(h.lng, h.lat), 4326), ST_SRID(POINT(?, ?), 4326)) / 1000 <= ?'
       countParams.push(parsedLng, parsedLat, radiusKm)
     }

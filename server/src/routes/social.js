@@ -8,6 +8,7 @@ import { sendPushToUser } from './push.js'
 import { auth } from '../middleware.js'
 import logger from '../logger.js'
 import { stripHtml } from '../sanitize.js'
+import { parseRadiusKm, RADIUS_DEFAULT_KM } from '../geo.js'
 import { cacheRoutePerUser, invalidate } from '../cache.js'
 import { trackEvent } from './experiments.js'
 
@@ -119,7 +120,7 @@ router.get('/api/users/search', auth, async (req, res) => {
     const userPassportLng = userPassportMode ? self?.passport_lng : null
     const searchLat = lat || userPassportLat || self?.lat
     const searchLng = lng || userPassportLng || self?.lng
-    const searchRadius = radius || 50
+    const searchRadiusKm = parseRadiusKm(radius) ?? RADIUS_DEFAULT_KM
     const hasGeo = searchLat && searchLng
     let distanceExpr = ''
     let having = ''
@@ -130,7 +131,7 @@ router.get('/api/users/search', auth, async (req, res) => {
       if (!isNaN(userLat) && !isNaN(userLng)) {
         distanceExpr = `, ROUND(ST_Distance_Sphere(up.location, ST_SRID(POINT(?, ?), 4326)), 1) AS distance`
         having = ' HAVING distance < ?'
-        geoParams.push(userLng, userLat, Number(searchRadius) * 1000)
+        geoParams.push(userLng, userLat, searchRadiusKm * 1000)
       }
     }
 
