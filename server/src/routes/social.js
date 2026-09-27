@@ -205,10 +205,11 @@ router.post('/api/likes', auth, likeLimiter, async (req, res) => {
     }
 
     const likeType = type === 'super_like' ? 'super_like' : 'like'
-    await pool.query(
+    const [likeResult] = await pool.query(
       'INSERT IGNORE INTO likes (from_user_id, to_user_id, type) VALUES (?, ?, ?)',
       [req.userId, liked_user_id, likeType],
     )
+    const isNewLike = (likeResult?.affectedRows ?? 1) > 0
 
     const [reciprocal] = await pool.query(
       'SELECT id FROM likes WHERE from_user_id = ? AND to_user_id = ?',
@@ -217,35 +218,31 @@ router.post('/api/likes', auth, likeLimiter, async (req, res) => {
 
     let matched = false
     if (reciprocal.length > 0) {
-      const [existing] = await pool.query(
-        'SELECT id FROM matches WHERE (user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id = ?)',
-        [req.userId, liked_user_id, liked_user_id, req.userId],
+      await pool.query(
+        'INSERT IGNORE INTO matches (user1_id, user2_id, matched) VALUES (?, ?, 1)',
+        [Math.min(req.userId, liked_user_id), Math.max(req.userId, liked_user_id)],
       )
-      if (existing.length === 0) {
-        await pool.query(
-          'INSERT INTO matches (user1_id, user2_id, matched) VALUES (?, ?, 1)',
-          [Math.min(req.userId, liked_user_id), Math.max(req.userId, liked_user_id)],
-        )
-      }
       matched = true
       invalidate(`user:${req.userId}:/api/matches*`).catch(() => {})
       invalidate(`user:${liked_user_id}:/api/matches*`).catch(() => {})
     }
 
-    const [notifResult] = await pool.query(
-      'INSERT INTO notifications (user_id, type, payload) VALUES (?, ?, ?)',
-      [liked_user_id, 'like', JSON.stringify({ from_user_id: req.userId, type: likeType })],
-    )
-    const io = getIO()
-    if (io) {
-      const [[notif]] = await pool.query('SELECT id, type, payload, created_at FROM notifications WHERE id = ?', [notifResult.insertId])
-      io.to(`user:${liked_user_id}`).emit('notification:new', notif)
-    }
+    if (isNewLike) {
+      const [notifResult] = await pool.query(
+        'INSERT INTO notifications (user_id, type, payload) VALUES (?, ?, ?)',
+        [liked_user_id, 'like', JSON.stringify({ from_user_id: req.userId, type: likeType })],
+      )
+      const io = getIO()
+      if (io) {
+        const [[notif]] = await pool.query('SELECT id, type, payload, created_at FROM notifications WHERE id = ?', [notifResult.insertId])
+        io.to(`user:${liked_user_id}`).emit('notification:new', notif)
+      }
 
-    const [[liker]] = await pool.query('SELECT display_name FROM user_profiles WHERE id = ?', [req.userId])
-    sendPushToUser(liked_user_id, 'SwiftMatch', matched
-      ? `It\'s a match with ${liker?.display_name || 'someone'}!`
-      : `${liker?.display_name || 'Someone'} liked you!`)
+      const [[liker]] = await pool.query('SELECT display_name FROM user_profiles WHERE id = ?', [req.userId])
+      sendPushToUser(liked_user_id, 'SwiftMatch', matched
+        ? `It\'s a match with ${liker?.display_name || 'someone'}!`
+        : `${liker?.display_name || 'Someone'} liked you!`)
+    }
     trackEvent(likeType, req.userId, { target_user_id: liked_user_id, matched })
 
     res.status(201).json({ message: matched ? 'It\'s a match!' : 'Like sent', matched })
