@@ -182,7 +182,9 @@ router.post('/api/auth/register', async (req, res) => {
         [userId, 'data_processing', req.ip],
       )
     }
-    sendVerificationEmail(email, verification_token)
+    sendVerificationEmail(email, verification_token).catch(err => {
+      logger.error('Verification email send failed:', err)
+    })
     trackEvent('registration', userId, { referral: !!referredBy, has_phone: !!phone })
 
     res.status(201).json({
@@ -211,7 +213,9 @@ router.post('/api/auth/forgot-password', async (req, res) => {
       [token, rows[0].id],
     )
 
-    sendPasswordResetEmail(email, token)
+    sendPasswordResetEmail(email, token).catch(err => {
+      logger.error('Password reset email send failed:', err)
+    })
     res.json({ message: 'If the email exists, a reset link has been sent' })
   } catch (err) {
     logger.error('Forgot password error:', err)
@@ -264,7 +268,9 @@ router.post('/api/auth/resend-verification', async (req, res) => {
       [verification_token, rows[0].id],
     )
 
-    sendVerificationEmail(email, verification_token)
+    sendVerificationEmail(email, verification_token).catch(err => {
+      logger.error('Verification email resend failed:', err)
+    })
     res.json({ message: 'Verification email sent' })
   } catch (err) {
     logger.error('Resend verification error:', err)
