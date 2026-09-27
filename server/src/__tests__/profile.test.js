@@ -30,7 +30,7 @@ beforeEach(() => {
 describe('GET /api/profile/:id', () => {
   it('returns 404 for missing profile', async () => {
     pool.query.mockResolvedValue([[], []])
-    const res = await request(app).get('/api/profile/999')
+    const res = await request(app).get('/api/profile/999').set('Authorization', `Bearer ${authToken(1)}`)
     expect(res.status).toBe(404)
     expect(res.body.message).toMatch(/not found/i)
   })
@@ -43,7 +43,7 @@ describe('GET /api/profile/:id', () => {
       .mockResolvedValueOnce([[{ interests: '["sport","music"]' }], []])
       .mockResolvedValueOnce([[{ id: 1, name_en: 'Sport' }, { id: 2, name_en: 'Music' }], []])
 
-    const res = await request(app).get('/api/profile/1')
+    const res = await request(app).get('/api/profile/1').set('Authorization', `Bearer ${authToken(1)}`)
     expect(res.status).toBe(200)
     expect(res.body.display_name).toBe('Test')
     expect(res.body.photos).toHaveLength(1)
@@ -58,7 +58,7 @@ describe('GET /api/profile/:id', () => {
       .mockResolvedValueOnce([[{ interests: '[]' }], []])
       .mockResolvedValueOnce([[], []])
 
-    const res = await request(app).get('/api/profile/1')
+    const res = await request(app).get('/api/profile/1').set('Authorization', `Bearer ${authToken(1)}`)
     expect(res.status).toBe(200)
     expect(res.body.birth_date).toBe('1995-06-15')
     expect(res.body.age).toBe(30)
@@ -78,7 +78,7 @@ describe('GET /api/profile/:id', () => {
       .mockResolvedValueOnce([[{ interests: '["sport"]' }], []])
       .mockResolvedValueOnce([[{ id: 13, name_en: 'Animals' }, { id: 1, name_en: 'Sport' }], []])
 
-    const res = await request(app).get('/api/profile/1')
+    const res = await request(app).get('/api/profile/1').set('Authorization', `Bearer ${authToken(1)}`)
     expect(res.status).toBe(200)
     expect(res.body.interests).toHaveLength(1)
     expect(res.body.interests[0].id).toBe(1)
@@ -95,7 +95,7 @@ describe('GET /api/profile/:id', () => {
       .mockResolvedValueOnce([[{ interests: '[]' }], []])
       .mockResolvedValueOnce([[], []])
 
-    const res = await request(app).get('/api/profile/2')
+    const res = await request(app).get('/api/profile/2').set('Authorization', `Bearer ${authToken(1)}`)
     expect(res.status).toBe(200)
     expect(res.body.bio).not.toContain('<script>')
     expect(res.body.bio).not.toContain('alert(')
@@ -104,7 +104,7 @@ describe('GET /api/profile/:id', () => {
 
   it('handles database error', async () => {
     pool.query.mockRejectedValue(new Error('DB error'))
-    const res = await request(app).get('/api/profile/1')
+    const res = await request(app).get('/api/profile/1').set('Authorization', `Bearer ${authToken(1)}`)
     expect(res.status).toBe(500)
   })
 })
@@ -117,6 +117,7 @@ describe('PUT /api/profile/:id', () => {
 
     const res = await request(app)
       .put('/api/profile/1')
+      .set('Authorization', `Bearer ${authToken(1)}`)
       .send({ display_name: 'Updated', bio: 'New bio' })
     expect(res.status).toBe(200)
     expect(res.body.display_name).toBe('Updated')
@@ -131,6 +132,7 @@ describe('PUT /api/profile/:id', () => {
 
     const res = await request(app)
       .put('/api/profile/1')
+      .set('Authorization', `Bearer ${authToken(1)}`)
       .send({ display_name: 'Test', interests: [1, 2, 3] })
     expect(res.status).toBe(200)
     const insertCalls = pool.query.mock.calls.filter(
@@ -148,6 +150,7 @@ describe('PUT /api/profile/:id', () => {
 
     const res = await request(app)
       .put('/api/profile/1')
+      .set('Authorization', `Bearer ${authToken(1)}`)
       .send({ display_name: 'Test', interests: [13, 1] })
     expect(res.status).toBe(200)
     const insertCalls = pool.query.mock.calls.filter(
@@ -172,6 +175,7 @@ describe('PUT /api/profile/:id', () => {
 
     const res = await request(app)
       .put('/api/profile/1')
+      .set('Authorization', `Bearer ${authToken(1)}`)
       .send({ display_name: 'Test', interests: [26, 37, 13] })
     expect(res.status).toBe(200)
     const insertCalls = pool.query.mock.calls.filter(
@@ -194,6 +198,7 @@ describe('PUT /api/profile/:id', () => {
 
     const res = await request(app)
       .put('/api/profile/1')
+      .set('Authorization', `Bearer ${authToken(1)}`)
       .send({ display_name: 'Updated', birth_date: '2000-01-01' })
     expect(res.status).toBe(200)
 
@@ -216,6 +221,7 @@ describe('PUT /api/profile/:id', () => {
 
     const res = await request(app)
       .put('/api/profile/1')
+      .set('Authorization', `Bearer ${authToken(1)}`)
       .send({ display_name: 'Baby', birth_date: birthDateStr })
     expect(res.status).toBe(200)
 

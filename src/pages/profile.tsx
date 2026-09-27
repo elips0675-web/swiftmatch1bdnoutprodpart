@@ -178,7 +178,9 @@ function normalizeInterests(interests: InterestInput[]): string[] {
 
     (async () => {
       try {
-        const res = await fetch('/api/profile/2')
+        const res = await fetch('/api/profile/me', {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        })
         if (res.ok) {
           const data = await res.json()
           const apiInterests = normalizeInterests(data.interests)

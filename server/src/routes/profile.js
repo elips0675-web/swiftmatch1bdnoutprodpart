@@ -373,12 +373,16 @@ router.post('/api/profile/verification', auth, async (req, res) => {
   }
 })
 
-router.get('/api/profile/:id', cacheRoute(60), async (req, res) => {
+router.get('/api/profile/:id', auth, cacheRoute(60), async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT up.*, u.email FROM user_profiles up
-       JOIN users u ON u.id = up.id
-       WHERE up.id = ?`,
+      `SELECT up.id, up.display_name, up.name, up.age, up.birth_date, up.bio, up.avatar_url,
+              up.gender, up.looking_for, up.dating_goal, up.height, up.city, up.country,
+              up.zodiac, up.circadian, up.attachment_style, up.education,
+              up.super_likes, up.boost_until, up.online, up.last_seen,
+              up.created_at, up.updated_at
+       FROM user_profiles up
+       WHERE up.id = ? AND up.deleted_at IS NULL`,
       [req.params.id],
     )
     if (rows.length === 0) return res.status(404).json({ message: 'Profile not found' })
@@ -403,8 +407,12 @@ router.get('/api/profile/:id', cacheRoute(60), async (req, res) => {
   }
 })
 
-router.put('/api/profile/:id', async (req, res) => {
+router.put('/api/profile/:id', auth, async (req, res) => {
   try {
+    if (String(req.userId) !== String(req.params.id)) {
+      return res.status(403).json({ message: 'You can only edit your own profile' })
+    }
+
     const { display_name, name, age, bio, gender, looking_for, dating_goal, height, city, country, zodiac, circadian, attachment_style, education, interests, incognito, passport_mode, passport_city, passport_lat, passport_lng, birth_date } = req.body
 
     const clean = {

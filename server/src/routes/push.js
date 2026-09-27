@@ -19,7 +19,7 @@ router.get('/api/push/vapid-public-key', (req, res) => {
   res.json({ publicKey: vapidPublic || '' })
 })
 
-router.post('/api/push/subscribe', async (req, res) => {
+router.post('/api/push/subscribe', auth, async (req, res) => {
   const { endpoint, p256dh, auth: authKey, platform } = req.body
   if (!endpoint) {
     return res.status(400).json({ message: 'endpoint is required' })
@@ -31,7 +31,7 @@ router.post('/api/push/subscribe', async (req, res) => {
         `INSERT INTO push_subscriptions (user_id, endpoint, platform)
          VALUES (?, ?, 'fcm')
          ON DUPLICATE KEY UPDATE platform = 'fcm'`,
-        [req.userId || 1, endpoint],
+        [req.userId, endpoint],
       )
     } else {
       if (!p256dh || !authKey) {
@@ -41,7 +41,7 @@ router.post('/api/push/subscribe', async (req, res) => {
         `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, platform)
          VALUES (?, ?, ?, ?, 'web')
          ON DUPLICATE KEY UPDATE p256dh = VALUES(p256dh), auth = VALUES(auth), platform = 'web'`,
-        [req.userId || 1, endpoint, p256dh, authKey],
+        [req.userId, endpoint, p256dh, authKey],
       )
     }
     res.status(201).json({ message: 'Subscribed' })
@@ -51,12 +51,12 @@ router.post('/api/push/subscribe', async (req, res) => {
   }
 })
 
-router.delete('/api/push/subscribe', async (req, res) => {
+router.delete('/api/push/subscribe', auth, async (req, res) => {
   const { endpoint } = req.body
   try {
     await pool.query(
       'DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?',
-      [req.userId || 1, endpoint || ''],
+      [req.userId, endpoint || ''],
     )
     res.json({ message: 'Unsubscribed' })
   } catch (err) {

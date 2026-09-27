@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url'
 import fs from 'fs'
 import os from 'os'
 import pool from '../db.js'
-import { auth, optionalAuth } from '../middleware.js'
+import { auth } from '../middleware.js'
 import logger from '../logger.js'
 import { processImage } from '../image-pipeline.js'
 import { moderateImage } from '../ai-moderation.js'
@@ -101,7 +101,7 @@ async function updateModeration(photoId, modResult) {
   }
 }
 
-router.post('/api/upload', optionalAuth, async (req, res) => {
+router.post('/api/upload', auth, async (req, res) => {
   try {
     const single = await getUpload()
     await new Promise((resolve, reject) => {
@@ -113,10 +113,7 @@ router.post('/api/upload', optionalAuth, async (req, res) => {
 
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' })
 
-    if (!req.userId && !req.body.user_id) {
-      return res.status(401).json({ message: 'Authentication required' })
-    }
-    const userId = req.userId || req.body.user_id
+    const userId = req.userId
     const sortOrder = req.body.sort_order || 0
     // S3: multer-s3 кладёт location/key (не filename), локально — filename
     const url = USE_S3 ? req.file.location : `/uploads/${req.file.filename}`
@@ -199,7 +196,7 @@ async function s3KeyFromUrl(url) {
 
 router.delete('/api/photos/:id', auth, async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT url FROM user_photos WHERE id = ?', [req.params.id])
+    const [rows] = await pool.query('SELECT url FROM user_photos WHERE id = ? AND user_id = ?', [req.params.id, req.userId])
     if (rows.length === 0) return res.status(404).json({ message: 'Photo not found' })
 
     if (USE_S3) {
@@ -212,7 +209,7 @@ router.delete('/api/photos/:id', auth, async (req, res) => {
       try { fs.unlinkSync(filePath) } catch {}
     }
 
-    await pool.query('DELETE FROM user_photos WHERE id = ?', [req.params.id])
+    await pool.query('DELETE FROM user_photos WHERE id = ? AND user_id = ?', [req.params.id, req.userId])
     res.json({ success: true })
   } catch (err) {
     logger.error('Delete photo error:', err)

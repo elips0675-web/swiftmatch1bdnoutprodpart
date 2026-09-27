@@ -46,7 +46,6 @@ const INTEREST_KEY_TO_ID: Record<string, number> = {
 };
 
 const PROFILE_API = '/api/profile'
-const DEMO_USER_ID = 2
 
 function getDefaultProfile(t: (key: string) => string) {
   return {
@@ -169,7 +168,10 @@ export default function EditProfilePage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${PROFILE_API}/${DEMO_USER_ID}`)
+        const loadToken = getToken()
+        const res = await fetch(`${PROFILE_API}/me`, {
+          headers: loadToken ? { Authorization: `Bearer ${loadToken}` } : {},
+        })
         if (res.ok) {
           const data = await res.json()
           const photoUrls = (data.photos || []).map((ph: any) => ph.url)
@@ -300,9 +302,13 @@ export default function EditProfilePage() {
 
       const formData = new FormData()
       formData.append('photo', file)
-      formData.append('user_id', String(DEMO_USER_ID))
       formData.append('sort_order', String(photos.length))
-      fetch('/api/upload', { method: 'POST', body: formData }).catch(() => {})
+      const uploadToken = getToken()
+      fetch('/api/upload', {
+        method: 'POST',
+        headers: uploadToken ? { Authorization: `Bearer ${uploadToken}` } : {},
+        body: formData,
+      }).catch(() => {})
 
       const reader = new FileReader();
       reader.onload = () => {
@@ -391,7 +397,13 @@ export default function EditProfilePage() {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (token) headers.Authorization = `Bearer ${token}`
 
-      const res = await fetch(`${PROFILE_API}/${DEMO_USER_ID}`, {
+      // id берём у сервера из /me: жёсткий DEMO_USER_ID писал правку в чужой профиль
+      const meRes = await fetch(`${PROFILE_API}/me`, { headers })
+      if (!meRes.ok) throw new Error('Failed to resolve own profile id')
+      const ownId = (await meRes.json())?.id
+      if (!ownId) throw new Error('Own profile id is missing')
+
+      const res = await fetch(`${PROFILE_API}/${ownId}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({

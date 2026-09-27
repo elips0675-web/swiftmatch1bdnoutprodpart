@@ -1,6 +1,11 @@
+vi.hoisted(() => {
+  process.env.JWT_SECRET = 'test-secret'
+})
+
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import request from 'supertest'
 import express from 'express'
+import jwt from 'jsonwebtoken'
 
 vi.mock('../db.js', () => ({
   default: { query: vi.fn() },
@@ -14,6 +19,12 @@ vi.mock('../logger.js', () => ({
 
 import pool from '../db.js'
 import pushRoutes from '../routes/push.js'
+
+const JWT_SECRET = process.env.JWT_SECRET || 'test-secret'
+
+function authHeader(userId = 5) {
+  return 'Bearer ' + jwt.sign({ userId, role: 'user' }, JWT_SECRET, { expiresIn: '1h' })
+}
 
 function createApp() {
   const app = express()
@@ -42,6 +53,7 @@ describe('POST /api/push/subscribe', () => {
   it('validates required fields', async () => {
     const res = await request(app)
       .post('/api/push/subscribe')
+      .set('Authorization', authHeader())
       .send({ endpoint: 'https://example.com' })
     expect(res.status).toBe(400)
   })
@@ -50,6 +62,7 @@ describe('POST /api/push/subscribe', () => {
     pool.query.mockResolvedValueOnce([[], []])
     const res = await request(app)
       .post('/api/push/subscribe')
+      .set('Authorization', authHeader())
       .send({ endpoint: 'https://example.com', p256dh: 'key1', auth: 'auth1' })
     expect(res.status).toBe(201)
   })
@@ -58,6 +71,7 @@ describe('POST /api/push/subscribe', () => {
     pool.query.mockRejectedValue(new Error('DB error'))
     const res = await request(app)
       .post('/api/push/subscribe')
+      .set('Authorization', authHeader())
       .send({ endpoint: 'https://example.com', p256dh: 'key1', auth: 'auth1' })
     expect(res.status).toBe(500)
   })
@@ -70,6 +84,7 @@ describe('DELETE /api/push/subscribe', () => {
     pool.query.mockResolvedValueOnce([[], []])
     const res = await request(app)
       .delete('/api/push/subscribe')
+      .set('Authorization', authHeader())
       .send({ endpoint: 'https://example.com' })
     expect(res.status).toBe(200)
   })
@@ -78,6 +93,7 @@ describe('DELETE /api/push/subscribe', () => {
     pool.query.mockRejectedValue(new Error('DB error'))
     const res = await request(app)
       .delete('/api/push/subscribe')
+      .set('Authorization', authHeader())
       .send({ endpoint: 'https://example.com' })
     expect(res.status).toBe(500)
   })

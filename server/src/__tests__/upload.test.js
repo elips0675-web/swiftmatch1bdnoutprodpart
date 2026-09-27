@@ -124,13 +124,27 @@ describe('POST /api/upload security', () => {
     expect(res.body.message).toBe('No file uploaded')
   })
 
-  it('неавторизованный без user_id -> 401', async () => {
-    mockSingle.mockImplementationOnce((req, res, cb) => {
-      req.file = { filename: '123-456.jpg', originalname: 'ok.jpg', path: '/tmp/x.jpg' }
-      cb(null)
-    })
+  it('неавторизованный запрос отклоняется до multer (файл не пишется на диск)', async () => {
     const res = await request(app2).post('/api/upload').attach('photo', Buffer.from('x'), { filename: 'a.jpg' })
     expect(res.status).toBe(401)
+    expect(mockSingle).not.toHaveBeenCalled()
+    expect(pool.query).not.toHaveBeenCalled()
+  })
+
+  it('user_id из тела запроса не позволяет вешать фото на чужой профиль', async () => {
+    mockSingle.mockImplementationOnce((req, res, cb) => {
+      req.file = { filename: 'a.jpg', originalname: 'a.jpg' }
+      cb(null)
+    })
+    pool.query.mockResolvedValue([{ insertId: 9 }, []])
+    const res = await request(app2)
+      .post('/api/upload')
+      .set('Authorization', authHeader(1))
+      .field('user_id', '999')
+      .attach('photo', Buffer.from('x'), { filename: 'a.jpg', contentType: 'image/jpeg' })
+    expect(res.status).toBe(200)
+    const insert = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO user_photos'))
+    expect(insert[1][0]).toBe(1)
   })
 
   it('path traversal в имени не попадает в url: хранится uuid.ext', async () => {

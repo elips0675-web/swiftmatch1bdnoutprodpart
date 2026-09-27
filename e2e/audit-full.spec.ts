@@ -276,10 +276,17 @@ test.describe('10. Negative & security tests', () => {
     })
     if (loginRes.ok) {
       const token = (await loginRes.json()).token
-      await request.put('http://localhost:3002/api/profile/2', {
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        data: { bio: '<script>alert("xss")</script>' },
+      // id берём у сервера: /api/profile/:id теперь правится только владельцем
+      const meRes = await request.get('http://localhost:3002/api/profile/me', {
+        headers: { Authorization: `Bearer ${token}` },
       })
+      const ownId = meRes.ok() ? (await meRes.json()).id : null
+      if (ownId) {
+        await request.put(`http://localhost:3002/api/profile/${ownId}`, {
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          data: { bio: '<script>alert("xss")</script>' },
+        })
+      }
     }
 
     // Navigate to profile page and check tags were stripped server-side (этап 34+)

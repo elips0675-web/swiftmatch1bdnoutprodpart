@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import pool from '../db.js'
+import { auth } from '../middleware.js'
 import logger from '../logger.js'
 
 const router = Router()
@@ -78,10 +79,9 @@ router.get('/api/iap/products', (req, res) => {
 })
 
 // GET /api/iap/status — check IAP subscription status
-router.get('/api/iap/status', async (req, res) => {
+router.get('/api/iap/status', auth, async (req, res) => {
   try {
-    const userId = req.userId || req.query.userId
-    if (!userId) return res.status(400).json({ message: 'userId required' })
+    const userId = req.userId
 
     const [rows] = await pool.query(
       "SELECT tier, status, current_period_end FROM subscriptions WHERE user_id = ? AND provider = 'revenuecat' ORDER BY created_at DESC LIMIT 1",
