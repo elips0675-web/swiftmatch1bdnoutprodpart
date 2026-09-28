@@ -20,6 +20,9 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY
  *   get:
  *     tags: [Hangouts]
  *     summary: Hangouts feed with filters (category, geo radius, dates, city)
+ *     security:
+ *       - bearerAuth: []
+ *       - {}
  *     parameters:
  *       - in: query
  *         name: category
@@ -56,6 +59,9 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY
  *   get:
  *     tags: [Hangouts]
  *     summary: Hangout detail with author profile
+ *     security:
+ *       - bearerAuth: []
+ *       - {}
  *     parameters:
  *       - in: path
  *         name: id

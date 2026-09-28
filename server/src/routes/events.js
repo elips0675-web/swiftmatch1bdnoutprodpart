@@ -24,7 +24,9 @@ const EVENT_WHERE = `o.status = 'active' AND p.status = 'active'
  * /api/events:
  *   get:
  *     tags: [Events]
- *     summary: Public events showcase (speed-dating, mixers, master-classes)
+ *     summary: Events showcase (speed-dating, mixers, master-classes)
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: city
@@ -66,6 +68,8 @@ router.get('/api/events', auth, async (req, res) => {
  *   get:
  *     tags: [Events]
  *     summary: Single event details
+ *     security:
+ *       - bearerAuth: []
  */
 router.get('/api/events/:id', auth, async (req, res) => {
   const { id } = req.params
@@ -99,6 +103,8 @@ router.get('/api/events/:id', auth, async (req, res) => {
  *   post:
  *     tags: [Events]
  *     summary: Buy an event ticket (Stripe Checkout or mock)
+ *     security:
+ *       - bearerAuth: []
  */
 router.post('/api/events/:id/purchase', auth, async (req, res) => {
   const { id } = req.params

@@ -113,8 +113,8 @@ export default function AdminPartnersPage() {
         fetch('/api/admin/partners', { headers }),
         fetch('/api/admin/offers', { headers }),
         fetch('/api/admin/conversions', { headers }),
-        fetch('/api/admin/partners/payouts', { headers }),
-        fetch('/api/admin/partners/stats/daily', { headers }),
+        fetch('/api/admin/payouts', { headers }),
+        fetch('/api/admin/stats/daily', { headers }),
       ]);
       const pData = pRes.ok ? await pRes.json() : [];
       const oData = oRes.ok ? await oRes.json() : [];
@@ -239,7 +239,7 @@ export default function AdminPartnersPage() {
     setBusy(true);
     try {
       const token = getToken();
-      const res = await fetch('/api/admin/partners/payouts', {
+      const res = await fetch('/api/admin/payouts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
@@ -264,7 +264,7 @@ export default function AdminPartnersPage() {
   const updatePayout = async (id: number, status: string) => {
     try {
       const token = getToken();
-      const res = await fetch(`/api/admin/partners/payouts/${id}`, {
+      const res = await fetch(`/api/admin/payouts/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ status }),

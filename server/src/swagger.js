@@ -1,5 +1,10 @@
 import swaggerJsdoc from 'swagger-jsdoc'
 import swaggerUi from 'swagger-ui-express'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const HERE = path.dirname(fileURLToPath(import.meta.url))
+const ROUTES_DIR = path.resolve(HERE, 'routes').replace(/\\/g, '/')
 
 const options = {
   definition: {
@@ -79,10 +84,18 @@ const options = {
       },
     },
   },
-  apis: ['./server/src/routes/*.js', './server/src/routes/**/*.js'],
+  // Glob привязан к модулю и обязательно в POSIX-виде: swagger-jsdoc резолвит
+  // паттерн относительно process.cwd() и на Windows не понимает обратные слэши
+  // (проверено: абсолютный путь с '\' даёт 0 путей, с '/' — все). Прежний
+  // './server/src/routes/*.js' совпадал только при старте из корня репо (в Docker
+  // WORKDIR=/app), а локально по запуск-всего.bat — из server/ — и тогда
+  // /api-docs.json отдавал пустую документацию: 0 путей, 0 операций.
+  apis: [`${ROUTES_DIR}/*.js`, `${ROUTES_DIR}/**/*.js`],
 }
 
 const swaggerSpec = swaggerJsdoc(options)
+
+export { swaggerSpec }
 
 export function setupSwagger(app) {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {

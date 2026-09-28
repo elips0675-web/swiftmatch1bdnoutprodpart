@@ -15,6 +15,8 @@ const router = Router()
  *   get:
  *     tags: [Partners]
  *     summary: Partner offers feed (Wave 1 deeplink partners)
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: category
@@ -88,6 +90,8 @@ router.get('/api/partners/offers', auth, async (req, res) => {
  *   post:
  *     tags: [Partners]
  *     summary: Track a click/conversion and return the tagged deeplink
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200: { description: "{ deeplink } with utm_source=swiftmatch&ref=<referral_code>" }
  *       404: { description: Offer not found or paused }
@@ -375,6 +379,8 @@ router.post('/api/partners/spa/book', auth, async (req, res) => {
  *   get:
  *     tags: [Partners]
  *     summary: Single offer details
+ *     security:
+ *       - bearerAuth: []
  */
 router.get('/api/partners/offers/:id', auth, async (req, res) => {
   const { id } = req.params
@@ -403,6 +409,8 @@ router.get('/api/partners/offers/:id', auth, async (req, res) => {
  *   post:
  *     tags: [Partners]
  *     summary: Create a Stripe Checkout order (flowers/gifts)
+ *     security:
+ *       - bearerAuth: []
  */
 router.post('/api/partners/order', auth, async (req, res) => {
   const { offer_id: offerId, recipient_name: recipientName, recipient_address: recipientAddress, gift_message: giftMessage } = req.body || {}
@@ -568,6 +576,8 @@ router.post('/api/partners/order/webhook', async (req, res) => {
  *   get:
  *     tags: [Partners]
  *     summary: User's partner order history
+ *     security:
+ *       - bearerAuth: []
  */
 router.get('/api/partners/orders/my', auth, async (req, res) => {
   try {
@@ -595,6 +605,8 @@ router.get('/api/partners/orders/my', auth, async (req, res) => {
  *   post:
  *     tags: [Partners]
  *     summary: Create a restaurant table booking
+ *     security:
+ *       - bearerAuth: []
  */
 router.post('/api/partners/booking', auth, async (req, res) => {
   const { offer_id: offerId, date, time, guests, message } = req.body || {}
@@ -653,6 +665,8 @@ router.post('/api/partners/booking', auth, async (req, res) => {
  *   post:
  *     tags: [Partners]
  *     summary: Share a restaurant booking card in a chat (WS event)
+ *     security:
+ *       - bearerAuth: []
  */
 router.post('/api/partners/booking/share', auth, async (req, res) => {
   const { chat_id: chatId, offer_id: offerId, date, time, guests, message: bookMsg } = req.body || {}

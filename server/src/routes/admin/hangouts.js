@@ -8,6 +8,8 @@ import logger from '../../logger.js'
  *   get:
  *     tags: [Admin]
  *     summary: Hangouts list for moderation
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: status
@@ -26,6 +28,8 @@ import logger from '../../logger.js'
  *   put:
  *     tags: [Admin]
  *     summary: Update hangout moderation status (blocked/active)
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id

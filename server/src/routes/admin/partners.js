@@ -15,6 +15,8 @@ const PLACEMENTS = ['hangout', 'chat', 'profile', 'passport', 'attachment_result
  *   get:
  *     tags: [Admin]
  *     summary: Partners list with click/conversion stats
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200: { description: Array of partners with stats }
  */
@@ -42,6 +44,8 @@ router.get('/partners', async (req, res) => {
  *   post:
  *     tags: [Admin]
  *     summary: Create a partner
+ *     security:
+ *       - bearerAuth: []
  */
 router.post('/partners', async (req, res) => {
   const { name, type, affiliate_token: affiliateToken, commission_rate: commissionRate } = req.body || {}
@@ -74,6 +78,8 @@ router.post('/partners', async (req, res) => {
  *   put:
  *     tags: [Admin]
  *     summary: Update partner (status/name/commission/type/token)
+ *     security:
+ *       - bearerAuth: []
  */
 router.put('/partners/:id', async (req, res) => {
   const { id } = req.params
@@ -110,6 +116,8 @@ router.put('/partners/:id', async (req, res) => {
  *   get:
  *     tags: [Admin]
  *     summary: Latest partner conversions (filter by partner_id)
+ *     security:
+ *       - bearerAuth: []
  */
 router.get('/conversions', async (req, res) => {
   try {
@@ -142,6 +150,8 @@ router.get('/conversions', async (req, res) => {
  *   get:
  *     tags: [Admin]
  *     summary: All partner offers with partner name
+ *     security:
+ *       - bearerAuth: []
  */
 router.get('/offers', async (req, res) => {
   try {
@@ -166,6 +176,8 @@ router.get('/offers', async (req, res) => {
  *   post:
  *     tags: [Admin]
  *     summary: Create an offer for a partner
+ *     security:
+ *       - bearerAuth: []
  */
 router.post('/partners/:id/offers', async (req, res) => {
   const { id } = req.params
@@ -213,6 +225,8 @@ router.post('/partners/:id/offers', async (req, res) => {
  *   put:
  *     tags: [Admin]
  *     summary: Update an offer (status/title/deeplink/etc.)
+ *     security:
+ *       - bearerAuth: []
  */
 router.put('/offers/:offerId', async (req, res) => {
   const { offerId } = req.params
@@ -256,10 +270,12 @@ router.put('/offers/:offerId', async (req, res) => {
 
 /**
  * @openapi
- * /api/admin/partners/payouts:
+ * /api/admin/payouts:
  *   get:
  *     tags: [Admin]
  *     summary: List all payout requests
+ *     security:
+ *       - bearerAuth: []
  */
 router.get('/payouts', async (req, res) => {
   try {
@@ -280,10 +296,12 @@ router.get('/payouts', async (req, res) => {
 
 /**
  * @openapi
- * /api/admin/partners/payouts:
+ * /api/admin/payouts:
  *   post:
  *     tags: [Admin]
  *     summary: Create a payout to a partner
+ *     security:
+ *       - bearerAuth: []
  */
 router.post('/payouts', async (req, res) => {
   const { partner_id: partnerId, amount, method, details } = req.body || {}
@@ -311,10 +329,12 @@ router.post('/payouts', async (req, res) => {
 
 /**
  * @openapi
- * /api/admin/partners/payouts/{id}:
+ * /api/admin/payouts/{id}:
  *   put:
  *     tags: [Admin]
  *     summary: Update payout status (process/reject)
+ *     security:
+ *       - bearerAuth: []
  */
 router.put('/payouts/:id', async (req, res) => {
   const { id } = req.params
@@ -340,10 +360,12 @@ router.put('/payouts/:id', async (req, res) => {
 
 /**
  * @openapi
- * /api/admin/partners/stats/daily:
+ * /api/admin/stats/daily:
  *   get:
  *     tags: [Admin]
  *     summary: Daily conversion stats for charts (last 30 days)
+ *     security:
+ *       - bearerAuth: []
  */
 router.get('/stats/daily', async (req, res) => {
   try {

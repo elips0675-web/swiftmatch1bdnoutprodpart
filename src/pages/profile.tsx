@@ -177,12 +177,16 @@ function normalizeInterests(interests: InterestInput[]): string[] {
     }
 
     (async () => {
+      let apiPhotos: string[] = [];
       try {
         const res = await fetch('/api/profile/me', {
           headers: { Authorization: `Bearer ${getToken()}` },
         })
         if (res.ok) {
           const data = await res.json()
+          apiPhotos = Array.isArray(data.photos)
+            ? data.photos.map((p: { url: string }) => p.url).filter(Boolean)
+            : []
           const apiInterests = normalizeInterests(data.interests)
           setProfile(prev => {
             const updated = {
@@ -203,24 +207,17 @@ function normalizeInterests(interests: InterestInput[]): string[] {
             localStorage.setItem('userProfile', JSON.stringify(updated))
             return { ...prev, ...updated }
           })
-          return
         }
       } catch { /* ignored */ }
-    })();
-    
-    (async () => {
-      try {
-        const res = await fetch('/api/photos/2', {
-          headers: { Authorization: `Bearer ${getToken()}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
-          if (data.length > 0) {
-            setPhotos(data.map((p: { url: string }) => p.url))
-            return
-          }
-        }
-      } catch { /* ignored */ }
+
+      // Фото приходят в том же ответе /api/profile/me. Раньше здесь был отдельный
+      // запрос к '/api/photos/2' — захардкоженный id и несуществующий на сервере
+      // маршрут, поэтому он всегда 404-ил и молча уводил на localStorage.
+      if (apiPhotos.length > 0) {
+        setPhotos(apiPhotos);
+        localStorage.setItem('userProfileGallery', JSON.stringify(apiPhotos));
+        return;
+      }
       const savedPhotos = localStorage.getItem('userProfileGallery');
       if (savedPhotos) {
         setPhotos(JSON.parse(savedPhotos));

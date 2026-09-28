@@ -13,6 +13,8 @@ const router = Router()
  *   get:
  *     tags: [Profile]
  *     summary: Get user profile by ID
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -30,6 +32,8 @@ const router = Router()
  *   put:
  *     tags: [Profile]
  *     summary: Update user profile
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
