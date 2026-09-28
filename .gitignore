@@ -29,6 +29,7 @@ dist-ssr
 
 # Local artifacts
 backups/
+server/.jwt-dev-secret
 test-results/
 e2e/.auth/
 _check_servers.ps1

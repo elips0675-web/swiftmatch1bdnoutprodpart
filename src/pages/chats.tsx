@@ -143,13 +143,21 @@ function ChatsContent() {
   const router = useRouter();
   const { t, language } = useLanguage();
   const { videoCallsEnabled, aiIcebreakersEnabled } = useFeatureFlags();
-  const { token: authToken, user } = useAuth();
+  const { token: authToken, user, isLoading: isAuthLoading } = useAuth();
   const { socket: wsSocket } = useWebSocket();
   const webrtc = useWebRTC(wsSocket, user?.id ?? null);
   const [isCallMuted, setIsCallMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const matchId = searchParams.get('matchId');
   const groupId = searchParams.get('groupId');
+
+  // Без сессии страница раньше молча рисовала пустую оболочку: список чатов
+  // грузится только при authToken, а редиректа на вход не было — непонятно,
+  // что делать. Теперь уводим на /login, дождавшись резолва сессии.
+  useEffect(() => {
+    if (isAuthLoading) return;
+    if (!authToken) router.replace('/login');
+  }, [isAuthLoading, authToken, router]);
 
   const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
 

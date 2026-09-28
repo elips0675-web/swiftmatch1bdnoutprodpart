@@ -66,9 +66,18 @@ function ChatRoomSkeleton() {
 export default function ChatPage({ params }: { params: { chatId: string } }) {
   const router = useRouter();
   const { t } = useLanguage();
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { socket } = useWebSocket();
   const { partnerOffersEnabled } = useFeatureFlags();
+
+  // Тот же гейт, что на /chats: без сессии сообщения не загрузятся (токен
+  // берётся из хранилища, запрос уйдёт без заголовка и получит 401), поэтому
+  // страница молча показывала бы пустой диалог. Уводим на вход.
+  useEffect(() => {
+    if (isAuthLoading) return;
+    if (!user) router.replace('/login');
+  }, [isAuthLoading, user, router]);
+
   const [inputValue, setInputValue] = useState("");
   const [selectedTtl, setSelectedTtl] = useState<number | null>(null);
   const [optimisticMessages, setOptimisticMessages] = useState<any[]>([]);

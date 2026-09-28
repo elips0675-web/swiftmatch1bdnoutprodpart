@@ -1,18 +1,38 @@
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { ACCESS_COOKIE } from './cookies.js'
 
+const DEV_SECRET_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.jwt-dev-secret')
+
 let devJwtSecretCache = null
+
+// В dev без JWT_SECRET секрет обязан переживать перезапуск процесса: иначе
+// каждый рестарт API перестаёт проверять ранее выданные токены, и все сессии
+// молча умирают (пользователь видит пустые приватные страницы вместо входа).
+// Поэтому секрет хранится в git-игнорируемом файле рядом с server/.
+function loadOrCreateDevSecret() {
+  try {
+    const saved = fs.readFileSync(DEV_SECRET_FILE, 'utf8').trim()
+    if (saved) return saved
+  } catch { /* файла ещё нет — создаём ниже */ }
+  const secret = crypto.randomBytes(32).toString('hex')
+  try {
+    fs.writeFileSync(DEV_SECRET_FILE, secret, { mode: 0o600 })
+    console.warn(`[auth] JWT_SECRET не задан: создан dev-секрет ${DEV_SECRET_FILE}. Сессии переживут перезапуск.`)
+  } catch { /* ФС только для чтения — остаёмся на секрете в памяти процесса */ }
+  return secret
+}
 
 function getJwtSecret() {
   if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
     throw new Error('JWT_SECRET must be set in environment for production')
   }
   if (process.env.JWT_SECRET) return process.env.JWT_SECRET
-  // В dev без JWT_SECRET генерируем и кешируем один секрет на время процесса,
-  // чтобы подпись и проверка токенов использовали один и тот же ключ.
   if (!devJwtSecretCache) {
-    devJwtSecretCache = crypto.randomBytes(32).toString('hex')
+    devJwtSecretCache = loadOrCreateDevSecret()
   }
   return devJwtSecretCache
 }
