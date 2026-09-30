@@ -622,6 +622,7 @@ export default function HangoutsPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const appliedSearch = useRef(search);
   const [goOutOffers, setGoOutOffers] = useState<GoOutOffer[] | null>(null);
   const [goOutFilter, setGoOutFilter] = useState<string>("all");
   const [goOutCity, setGoOutCity] = useState<string>("");
@@ -746,6 +747,8 @@ export default function HangoutsPage() {
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
+      if (appliedSearch.current === search) return;
+      appliedSearch.current = search;
       setDebouncedSearch(search);
       setPage(1);
     }, 300);

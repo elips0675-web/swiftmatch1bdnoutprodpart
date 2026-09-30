@@ -282,6 +282,36 @@ describe("HangoutsPage", () => {
     expect(screen.queryByTestId("hangout-card-1")).toBeNull()
   })
 
+  // Регресс: дебаунс поиска при монтировании безусловно делал setPage(1) через
+  // 300 мс — клик «следующая страница» в первые 300 мс молча откатывался на 1-ю.
+  it("keeps page 2 after the search debounce elapses when search was not touched", async () => {
+    const baseItem = sampleHangouts[0]
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      const page = Number(new URLSearchParams(u.split("?")[1] || "").get("page") || 1)
+      const items = Array.from({ length: 20 }, (_, i) => ({ ...baseItem, id: (page - 1) * 100 + (i + 1) }))
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ items, total: 45 }) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+    renderPage(<HangoutsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-page-counter").textContent).toContain("1 / 3")
+    })
+    fireEvent.click(screen.getByTestId("hangout-page-next"))
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-card-101")).toBeTruthy()
+    })
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 450))
+    })
+
+    expect(screen.getByTestId("hangout-page-counter").textContent).toContain("2 / 3")
+    expect(screen.queryByTestId("hangout-card-1")).toBeNull()
+  })
+
   it("hides pagination when feed fits a single page", async () => {
     mockFetch.mockImplementation((url: string) => {
       const u = String(url)
