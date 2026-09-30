@@ -2,8 +2,52 @@ import { Router } from 'express'
 import pool from '../db.js'
 import { auth } from '../middleware.js'
 import logger from '../logger.js'
+import {
+  getPrefs, savePrefs, normalizePrefs, defaultPrefs, describeMatrix, CHANNELS,
+} from '../notification-prefs.js'
 
 const router = Router()
+
+/**
+ * GET /api/notifications/preferences
+ * Текущие настройки уведомлений: полная матрица 9 событий x 2 канала.
+ * Отсутствие строки в БД = всё включено (fail-open), ответ всё равно полный.
+ */
+router.get('/api/notifications/preferences', auth, async (req, res) => {
+  try {
+    const stored = await getPrefs(req.userId)
+    const { prefs } = normalizePrefs(stored)
+    res.json({ prefs, events: describeMatrix(), channels: CHANNELS, defaults: defaultPrefs() })
+  } catch (err) {
+    logger.error('Notification prefs read error:', err)
+    res.status(500).json({ message: 'Failed to fetch notification preferences' })
+  }
+})
+
+/**
+ * PUT /api/notifications/preferences
+ * Полная замена матрицы. Непереданные и невалидные ячейки = включены (дефолт),
+ * поэтому частичный PATCH здесь означал бы тихое обнуление остальных настроек.
+ * Неизвестные события и нереализованные каналы игнорируются; значения не boolean
+ * отклоняются с 400 и перечисляются списком — иначе опечатка затирала бы настройки.
+ */
+router.put('/api/notifications/preferences', auth, async (req, res) => {
+  const input = req.body?.prefs !== undefined ? req.body.prefs : req.body
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+    return res.status(400).json({ message: 'prefs must be an object' })
+  }
+  try {
+    const { prefs, invalid } = normalizePrefs(input)
+    if (invalid.length > 0) {
+      return res.status(400).json({ message: 'Values must be booleans', invalid })
+    }
+    await savePrefs(req.userId, prefs)
+    res.json({ prefs, events: describeMatrix(), channels: CHANNELS })
+  } catch (err) {
+    logger.error('Notification prefs write error:', err)
+    res.status(500).json({ message: 'Failed to save notification preferences' })
+  }
+})
 
 /**
  * GET /api/notifications

@@ -503,6 +503,7 @@ describe('POST /api/hangouts/:id/respond', () => {
       .mockResolvedValueOnce([{}, []])
       .mockResolvedValueOnce([{}, []])
       .mockResolvedValueOnce([[{ display_name: 'Anna' }], []])
+      .mockResolvedValueOnce([[], []])
       .mockResolvedValueOnce([{ insertId: 77 }, []])
       .mockResolvedValueOnce([[{ id: 77, type: 'hangout_response', payload: '{}', created_at: new Date() }], []])
     const res = await respond(createApp(hangoutsRoutes))
@@ -548,6 +549,7 @@ describe('POST /api/hangouts/:id/respond', () => {
       .mockResolvedValueOnce([{}, []])
       .mockResolvedValueOnce([{}, []])
       .mockResolvedValueOnce([[{ display_name: 'Anna' }], []])
+      .mockResolvedValueOnce([[], []])
       .mockResolvedValueOnce([{ insertId: 77 }, []])
       .mockResolvedValueOnce([[{ id: 77, type: 'hangout_response', payload: '{}', created_at: new Date() }], []])
       .mockResolvedValue([{}, []])
@@ -615,6 +617,7 @@ describe('GET /api/hangouts/:id/responses', () => {
 describe('PUT /api/hangouts/:id/responses/:responseId (accept/decline)', () => {
   it('accept creates chat + participants + hangout_chats link', async () => {
     pool.query
+      .mockResolvedValueOnce([[], []])
       .mockResolvedValueOnce([{ insertId: 88 }, []])
       .mockResolvedValueOnce([[{ id: 88, type: 'hangout_accepted', payload: '{}', is_read: 0, created_at: new Date() }], []])
       .mockResolvedValueOnce([[{ display_name: 'Author' }], []])

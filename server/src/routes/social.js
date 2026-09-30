@@ -11,6 +11,7 @@ import { stripHtml } from '../sanitize.js'
 import { parseRadiusKm, RADIUS_DEFAULT_KM } from '../geo.js'
 import { cacheRoutePerUser, invalidate } from '../cache.js'
 import { trackEvent } from './experiments.js'
+import { getPrefs, isAllowed, isAllowedIn } from '../notification-prefs.js'
 
 const likeLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: 100, message: { message: 'Too many likes' } })
 
@@ -228,20 +229,27 @@ router.post('/api/likes', auth, likeLimiter, async (req, res) => {
     }
 
     if (isNewLike) {
-      const [notifResult] = await pool.query(
-        'INSERT INTO notifications (user_id, type, payload) VALUES (?, ?, ?)',
-        [liked_user_id, 'like', JSON.stringify({ from_user_id: req.userId, type: likeType })],
-      )
-      const io = getIO()
-      if (io) {
-        const [[notif]] = await pool.query('SELECT id, type, payload, created_at FROM notifications WHERE id = ?', [notifResult.insertId])
-        io.to(`user:${liked_user_id}`).emit('notification:new', notif)
+      const prefs = await getPrefs(liked_user_id)
+      const prefsMap = new Map([[Number(liked_user_id), prefs]])
+
+      if (isAllowedIn(prefsMap, liked_user_id, 'like', 'inApp')) {
+        const [notifResult] = await pool.query(
+          'INSERT INTO notifications (user_id, type, payload) VALUES (?, ?, ?)',
+          [liked_user_id, 'like', JSON.stringify({ from_user_id: req.userId, type: likeType })],
+        )
+        const io = getIO()
+        if (io) {
+          const [[notif]] = await pool.query('SELECT id, type, payload, created_at FROM notifications WHERE id = ?', [notifResult.insertId])
+          io.to(`user:${liked_user_id}`).emit('notification:new', notif)
+        }
       }
 
       const [[liker]] = await pool.query('SELECT display_name FROM user_profiles WHERE id = ?', [req.userId])
-      sendPushToUser(liked_user_id, 'SwiftMatch', matched
-        ? `It\'s a match with ${liker?.display_name || 'someone'}!`
-        : `${liker?.display_name || 'Someone'} liked you!`)
+      if (isAllowedIn(prefsMap, liked_user_id, 'like', 'push')) {
+        sendPushToUser(liked_user_id, 'SwiftMatch', matched
+          ? `It\'s a match with ${liker?.display_name || 'someone'}!`
+          : `${liker?.display_name || 'Someone'} liked you!`)
+      }
     }
     trackEvent(likeType, req.userId, { target_user_id: liked_user_id, matched })
 
@@ -284,14 +292,16 @@ router.post('/api/invites', auth, async (req, res) => {
       [req.userId, invitee_id, type, message ? String(message).slice(0, 500) : null, 'pending'],
     )
 
-    const [notifResult] = await pool.query(
-      'INSERT INTO notifications (user_id, type, payload) VALUES (?, ?, ?)',
-      [invitee_id, 'invite', JSON.stringify({ from_user_id: req.userId, type })],
-    )
-    const io = getIO()
-    if (io) {
-      const [[notif]] = await pool.query('SELECT id, type, payload, created_at FROM notifications WHERE id = ?', [notifResult.insertId])
-      io.to(`user:${invitee_id}`).emit('notification:new', notif)
+    if (await isAllowed(invitee_id, 'invite', 'inApp')) {
+      const [notifResult] = await pool.query(
+        'INSERT INTO notifications (user_id, type, payload) VALUES (?, ?, ?)',
+        [invitee_id, 'invite', JSON.stringify({ from_user_id: req.userId, type })],
+      )
+      const io = getIO()
+      if (io) {
+        const [[notif]] = await pool.query('SELECT id, type, payload, created_at FROM notifications WHERE id = ?', [notifResult.insertId])
+        io.to(`user:${invitee_id}`).emit('notification:new', notif)
+      }
     }
 
     res.status(201).json({ message: 'Invite sent' })
@@ -720,7 +730,10 @@ router.post('/api/chats/:chatId/messages', auth, async (req, res) => {
     )
     if (otherParticipant.length > 0) {
       const [[sender]] = await pool.query('SELECT display_name FROM user_profiles WHERE id = ?', [req.userId])
-      sendPushToUser(otherParticipant[0].user_id, sender?.display_name || 'New message', text.substring(0, 100), `/chats?matchId=${otherParticipant[0].user_id}`)
+      const recipientId = otherParticipant[0].user_id
+      if (await isAllowed(recipientId, 'chat_message', 'push')) {
+        sendPushToUser(recipientId, sender?.display_name || 'New message', text.substring(0, 100), `/chats?matchId=${recipientId}`)
+      }
       try {
         const io = getIO()
         if (io) {

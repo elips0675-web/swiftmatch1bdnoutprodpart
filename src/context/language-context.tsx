@@ -1431,6 +1431,29 @@ export const translations = {
     // Settings
     'settings.notifications': 'Уведомления',
 
+    // Notification preferences (P0 #4)
+    'notif.section': 'Уведомления по событиям',
+    'notif.title': 'Что присылать',
+    'notif.subtitle': 'Выберите события и каналы. Письма по этим событиям не отправляются.',
+    'notif.loading': 'Загрузка настроек…',
+    'notif.saved': 'Настройки сохранены',
+    'notif.save_failed': 'Не удалось сохранить',
+    'notif.save_failed_desc': 'Настройки не изменились. Попробуйте ещё раз.',
+    'notif.event_column': 'Событие',
+    'notif.channel_inapp': 'В приложении',
+    'notif.channel_push': 'Пуш-уведомления',
+    'notif.all': 'Все события',
+    'notif.all_on': 'Все вкл',
+    'notif.event.like': 'Лайки и взаимности',
+    'notif.event.invite': 'Приглашения на свидания',
+    'notif.event.hangout_response': 'Отклики на мои встречи',
+    'notif.event.hangout_accepted': 'Подтверждение моих откликов',
+    'notif.event.hangout_declined': 'Отказы по моим откликам',
+    'notif.event.hangout_cancelled': 'Отмена встреч',
+    'notif.event.hangout_mutual_like': 'Взаимные лайки встреч',
+    'notif.event.hangout_joined': 'Новые участники моих встреч',
+    'notif.event.chat_message': 'Сообщения в чатах',
+
     // Time
     'time.hours_ago': '{hours} ч. назад',
     'time.min_ago_2': '{mins} мин. назад',
@@ -3130,6 +3153,29 @@ export const translations = {
 
     // Settings
     'settings.notifications': 'Notifications',
+
+    // Notification preferences (P0 #4)
+    'notif.section': 'Notifications by event',
+    'notif.title': 'What to send me',
+    'notif.subtitle': 'Pick events and channels. No emails are sent for these events.',
+    'notif.loading': 'Loading preferences…',
+    'notif.saved': 'Preferences saved',
+    'notif.save_failed': 'Could not save',
+    'notif.save_failed_desc': 'Preferences did not change. Please try again.',
+    'notif.event_column': 'Event',
+    'notif.channel_inapp': 'In-app',
+    'notif.channel_push': 'Push',
+    'notif.all': 'All events',
+    'notif.all_on': 'All on',
+    'notif.event.like': 'Likes and matches',
+    'notif.event.invite': 'Date invitations',
+    'notif.event.hangout_response': 'Responses to my hangouts',
+    'notif.event.hangout_accepted': 'Acceptances of my responses',
+    'notif.event.hangout_declined': 'Rejections of my responses',
+    'notif.event.hangout_cancelled': 'Cancelled hangouts',
+    'notif.event.hangout_mutual_like': 'Mutual hangout likes',
+    'notif.event.hangout_joined': 'New people joining my hangouts',
+    'notif.event.chat_message': 'Chat messages',
 
     // Time
     'time.hours_ago': '{hours}h ago',

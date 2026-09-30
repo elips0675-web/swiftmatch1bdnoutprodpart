@@ -11,6 +11,7 @@ import { stripHtml } from '../sanitize.js'
 import { parseRadiusKm, RADIUS_DEFAULT_KM } from '../geo.js'
 import { trackEvent } from './experiments.js'
 import { createBreaker } from '../circuit-breaker.js'
+import { getPrefs, getPrefsMap, isAllowed, isAllowedIn } from '../notification-prefs.js'
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 
@@ -635,18 +636,23 @@ router.delete('/api/hangouts/:id', auth, async (req, res) => {
       [id],
     )
     const io = getIO()
+    const cancelPrefs = await getPrefsMap(respondents.map((r) => r.user_id))
     for (const r of respondents) {
-      try {
-        const [nr] = await pool.query(
-          'INSERT INTO notifications (user_id, type, payload) VALUES (?, ?, ?)',
-          [r.user_id, 'hangout_cancelled', JSON.stringify({ hangout_id: Number(id) })],
-        )
-        if (io) {
-          const [[row]] = await pool.query('SELECT id, type, payload, is_read, created_at FROM notifications WHERE id = ?', [nr.insertId])
-          io.to(`user:${r.user_id}`).emit('notification:new', row)
-        }
-      } catch {}
-      sendPushToUser(r.user_id, 'SwiftMatch', 'The hangout was cancelled by its author').catch(() => {})
+      if (isAllowedIn(cancelPrefs, r.user_id, 'hangout_cancelled', 'inApp')) {
+        try {
+          const [nr] = await pool.query(
+            'INSERT INTO notifications (user_id, type, payload) VALUES (?, ?, ?)',
+            [r.user_id, 'hangout_cancelled', JSON.stringify({ hangout_id: Number(id) })],
+          )
+          if (io) {
+            const [[row]] = await pool.query('SELECT id, type, payload, is_read, created_at FROM notifications WHERE id = ?', [nr.insertId])
+            io.to(`user:${r.user_id}`).emit('notification:new', row)
+          }
+        } catch {}
+      }
+      if (isAllowedIn(cancelPrefs, r.user_id, 'hangout_cancelled', 'push')) {
+        sendPushToUser(r.user_id, 'SwiftMatch', 'The hangout was cancelled by its author').catch(() => {})
+      }
       try {
         if (io) io.to(`user:${r.user_id}`).emit('hangout:cancelled', { hangoutId: Number(id) })
       } catch {}
@@ -722,14 +728,20 @@ router.post('/api/hangouts/:id/respond', auth, respondLimiter, async (req, res) 
 
     const [[respondent]] = await pool.query('SELECT display_name FROM user_profiles WHERE id = ?', [req.userId])
 
-    const [notifResult] = await pool.query(
-      'INSERT INTO notifications (user_id, type, payload) VALUES (?, ?, ?)',
-      [hangout.user_id, 'hangout_response', JSON.stringify({ from_user_id: req.userId, hangout_id: Number(id), response_id: result.insertId })],
-    )
+    const responsePrefs = await getPrefs(hangout.user_id)
+    const responsePrefsMap = new Map([[Number(hangout.user_id), responsePrefs]])
     const io = getIO()
+    if (isAllowedIn(responsePrefsMap, hangout.user_id, 'hangout_response', 'inApp')) {
+      const [notifResult] = await pool.query(
+        'INSERT INTO notifications (user_id, type, payload) VALUES (?, ?, ?)',
+        [hangout.user_id, 'hangout_response', JSON.stringify({ from_user_id: req.userId, hangout_id: Number(id), response_id: result.insertId })],
+      )
+      if (io) {
+        const [[notif]] = await pool.query('SELECT id, type, payload, created_at FROM notifications WHERE id = ?', [notifResult.insertId])
+        io.to(`user:${hangout.user_id}`).emit('notification:new', notif)
+      }
+    }
     if (io) {
-      const [[notif]] = await pool.query('SELECT id, type, payload, created_at FROM notifications WHERE id = ?', [notifResult.insertId])
-      io.to(`user:${hangout.user_id}`).emit('notification:new', notif)
       io.to(`user:${hangout.user_id}`).emit('hangout:new_response', {
         hangoutId: Number(id),
         responseId: result.insertId,
@@ -738,7 +750,9 @@ router.post('/api/hangouts/:id/respond', auth, respondLimiter, async (req, res) 
       })
     }
 
-    sendPushToUser(hangout.user_id, 'SwiftMatch', `${respondent?.display_name || 'Someone'} wants to join: ${hangout.title}`).catch(() => {})
+    if (isAllowedIn(responsePrefsMap, hangout.user_id, 'hangout_response', 'push')) {
+      sendPushToUser(hangout.user_id, 'SwiftMatch', `${respondent?.display_name || 'Someone'} wants to join: ${hangout.title}`).catch(() => {})
+    }
     trackEvent('hangout_response_sent', req.userId, { hangout_id: Number(id), response_id: result.insertId })
 
     res.status(201).json({ id: result.insertId, message: 'Response sent', chat_id: preChatId })
@@ -879,21 +893,26 @@ router.put('/api/hangouts/:id/responses/:responseId', auth, async (req, res) => 
       }
     } catch {}
 
-    try {
-      const notifType = status === 'accepted' ? 'hangout_accepted' : 'hangout_declined'
-      const [notifResult] = await pool.query(
-        'INSERT INTO notifications (user_id, type, payload) VALUES (?, ?, ?)',
-        [response.user_id, notifType, JSON.stringify({ hangout_id: Number(id), chat_id: chatId, from_user_id: req.userId })],
-      )
-      if (io) {
-        const [[row]] = await pool.query('SELECT id, type, payload, is_read, created_at FROM notifications WHERE id = ?', [notifResult.insertId])
-        io.to(`user:${response.user_id}`).emit('notification:new', row)
-      }
-    } catch {}
+    const notifType = status === 'accepted' ? 'hangout_accepted' : 'hangout_declined'
+    const decisionPrefsMap = new Map([[Number(response.user_id), await getPrefs(response.user_id)]])
+    if (isAllowedIn(decisionPrefsMap, response.user_id, notifType, 'inApp')) {
+      try {
+        const [notifResult] = await pool.query(
+          'INSERT INTO notifications (user_id, type, payload) VALUES (?, ?, ?)',
+          [response.user_id, notifType, JSON.stringify({ hangout_id: Number(id), chat_id: chatId, from_user_id: req.userId })],
+        )
+        if (io) {
+          const [[row]] = await pool.query('SELECT id, type, payload, is_read, created_at FROM notifications WHERE id = ?', [notifResult.insertId])
+          io.to(`user:${response.user_id}`).emit('notification:new', row)
+        }
+      } catch {}
+    }
 
     if (status === 'accepted') {
-      const [[author]] = await pool.query('SELECT display_name FROM user_profiles WHERE id = ?', [req.userId])
-      sendPushToUser(response.user_id, 'SwiftMatch', `${author?.display_name || 'The author'} accepted your response!`).catch(() => {})
+      if (isAllowedIn(decisionPrefsMap, response.user_id, 'hangout_accepted', 'push')) {
+        const [[author]] = await pool.query('SELECT display_name FROM user_profiles WHERE id = ?', [req.userId])
+        sendPushToUser(response.user_id, 'SwiftMatch', `${author?.display_name || 'The author'} accepted your response!`).catch(() => {})
+      }
       trackEvent('hangout_match', req.userId, { hangout_id: Number(id), response_id: Number(responseId), chat_id: chatId })
     }
 
@@ -1006,16 +1025,21 @@ router.post('/api/hangouts/:id/like', auth, likeLimiter, async (req, res) => {
         chatId: chatId ? Number(chatId) : null,
         fromUserId: req.userId,
       })
-      try {
-        const [notifResult] = await pool.query(
-          'INSERT INTO notifications (user_id, type, payload) VALUES (?, ?, ?)',
-          [hangout.user_id, 'hangout_mutual_like', JSON.stringify({ hangout_id: Number(id), chat_id: chatId, from_user_id: req.userId })],
-        )
-        const [[notif]] = await pool.query('SELECT id, type, payload, is_read, created_at FROM notifications WHERE id = ?', [notifResult.insertId])
-        io.to(`user:${hangout.user_id}`).emit('notification:new', notif)
-      } catch {}
-      const [[author]] = await pool.query('SELECT display_name FROM user_profiles WHERE id = ?', [hangout.user_id])
-      sendPushToUser(hangout.user_id, 'SwiftMatch', `${author?.display_name || 'Someone'} liked your hangout: ${hangout.title}`).catch(() => {})
+      const mutualPrefsMap = new Map([[Number(hangout.user_id), await getPrefs(hangout.user_id)]])
+      if (isAllowedIn(mutualPrefsMap, hangout.user_id, 'hangout_mutual_like', 'inApp')) {
+        try {
+          const [notifResult] = await pool.query(
+            'INSERT INTO notifications (user_id, type, payload) VALUES (?, ?, ?)',
+            [hangout.user_id, 'hangout_mutual_like', JSON.stringify({ hangout_id: Number(id), chat_id: chatId, from_user_id: req.userId })],
+          )
+          const [[notif]] = await pool.query('SELECT id, type, payload, is_read, created_at FROM notifications WHERE id = ?', [notifResult.insertId])
+          io.to(`user:${hangout.user_id}`).emit('notification:new', notif)
+        } catch {}
+      }
+      if (isAllowedIn(mutualPrefsMap, hangout.user_id, 'hangout_mutual_like', 'push')) {
+        const [[author]] = await pool.query('SELECT display_name FROM user_profiles WHERE id = ?', [hangout.user_id])
+        sendPushToUser(hangout.user_id, 'SwiftMatch', `${author?.display_name || 'Someone'} liked your hangout: ${hangout.title}`).catch(() => {})
+      }
       trackEvent('hangout_mutual_like', req.userId, { hangout_id: Number(id), chat_id: chatId })
     }
 
@@ -1143,7 +1167,9 @@ router.post('/api/hangouts/:id/join', auth, joinLimiter, async (req, res) => {
     }
 
     const [[joiner]] = await pool.query('SELECT display_name FROM user_profiles WHERE id = ?', [req.userId])
-    sendPushToUser(hangout.user_id, 'SwiftMatch', `${joiner?.display_name || 'Someone'} joined your hangout: ${hangout.title}`).catch(() => {})
+    if (await isAllowed(hangout.user_id, 'hangout_joined', 'push')) {
+      sendPushToUser(hangout.user_id, 'SwiftMatch', `${joiner?.display_name || 'Someone'} joined your hangout: ${hangout.title}`).catch(() => {})
+    }
     trackEvent('hangout_joined', req.userId, { hangout_id: Number(id) })
 
     res.status(201).json({ joined: true, chat_id: chatId, participant_count: cntAfter })

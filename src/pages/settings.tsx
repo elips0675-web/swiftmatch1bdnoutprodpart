@@ -11,7 +11,6 @@ import {
   Trash2,
   MapPin,
   ChevronRight,
-  Mail,
   Info,
   Scale,
   Sun,
@@ -25,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { useLanguage } from "@/context/language-context";
 import { subscribeToPush, unsubscribeFromPush } from "@/lib/push-notifications";
+import { NotificationPreferencesSection } from "@/components/settings/notification-preferences-section";
 import { getToken } from "@/lib/token";
 
 
@@ -35,7 +35,6 @@ export default function SettingsPage() {
   
   const [settings, setSettings] = useState({
     pushNotifications: true,
-    emailNewsletter: false,
     discovery: true,
     incognito: false,
     smartPhotos: true,
@@ -176,18 +175,6 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between py-3 border-b border-border/50">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                    <Mail size={18} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold">{t('settings.email_newsletter')}</p>
-                  </div>
-                </div>
-                <Switch data-testid="switch-email-newsletter" checked={isClient ? settings.emailNewsletter : false} onCheckedChange={(val) => setSettings({...settings, emailNewsletter: val})} />
-              </div>
-
-              <div className="flex items-center justify-between py-3 border-b border-border/50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                     <MapPin size={18} />
                   </div>
                   <div>
@@ -209,6 +196,11 @@ export default function SettingsPage() {
                 <Switch data-testid="switch-discovery" checked={isClient ? settings.discovery : true} onCheckedChange={(val) => setSettings({...settings, discovery: val})} />
               </div>
             </div>
+          </section>
+
+          <section className="space-y-4">
+            <h5 className="text-[10px] font-black uppercase tracking-[2px] text-muted-foreground">{t('notif.section')}</h5>
+            <NotificationPreferencesSection />
           </section>
 
           <section className="space-y-4">
