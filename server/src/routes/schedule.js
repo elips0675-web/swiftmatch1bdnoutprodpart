@@ -3,6 +3,7 @@ import pool from '../db.js'
 import { auth } from '../middleware.js'
 import { getIO } from '../ws.js'
 import logger from '../logger.js'
+import { activeUser } from '../active-user.js'
 
 const router = Router()
 
@@ -12,7 +13,7 @@ router.get('/api/schedule', auth, async (req, res) => {
     let sql = `SELECT ds.*, up.display_name as partner_name, up.avatar_url as partner_avatar
                FROM date_schedules ds
                JOIN user_profiles up ON (CASE WHEN ds.proposer_id = ? THEN ds.invitee_id ELSE ds.proposer_id END) = up.id
-               WHERE (ds.proposer_id = ? OR ds.invitee_id = ?)`
+               WHERE (ds.proposer_id = ? OR ds.invitee_id = ?) AND ${activeUser('up')}`
     const params = [req.userId, req.userId, req.userId]
     if (status && status !== 'all') {
       sql += ' AND ds.status = ?'
@@ -61,7 +62,7 @@ router.post('/api/schedule', auth, async (req, res) => {
       `SELECT ds.*, up.display_name as partner_name, up.avatar_url as partner_avatar
        FROM date_schedules ds
        JOIN user_profiles up ON up.id = ?
-       WHERE ds.id = ?`,
+       WHERE ds.id = ? AND ${activeUser('up')}`,
       [req.userId, result.insertId],
     )
 

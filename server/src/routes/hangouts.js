@@ -9,6 +9,7 @@ import { auth, optionalAuth } from '../middleware.js'
 import logger from '../logger.js'
 import { stripHtml } from '../sanitize.js'
 import { parseRadiusKm, RADIUS_DEFAULT_KM } from '../geo.js'
+import { activeUser } from '../active-user.js'
 import { trackEvent } from './experiments.js'
 import { createBreaker } from '../circuit-breaker.js'
 import { getPrefs, getPrefsMap, isAllowed, isAllowedIn } from '../notification-prefs.js'
@@ -155,7 +156,7 @@ const HANGOUT_LIST_SELECT = `
               SELECT hp3.user_id, up3.display_name, up3.avatar_url, hp3.joined_at
               FROM hangout_participants hp3
               JOIN user_profiles up3 ON up3.id = hp3.user_id
-              WHERE hp3.hangout_id = h.id AND hp3.status = 'joined'
+              WHERE hp3.hangout_id = h.id AND hp3.status = 'joined' AND ${activeUser('up3')}
               ORDER BY hp3.joined_at ASC
               LIMIT 3
             ) hp2
@@ -186,7 +187,7 @@ router.get('/api/hangouts', optionalAuth, async (req, res) => {
   const offset = (page - 1) * limit
 
   try {
-    const where = ["h.status IN ('active','completed')"]
+    const where = ["h.status IN ('active','completed')", activeUser('up')]
     const params = []
 
     if (q && String(q).trim()) {
@@ -307,7 +308,7 @@ router.get('/api/hangouts/responses/my', auth, async (req, res) => {
        FROM hangout_responses hr
        JOIN hangouts h ON h.id = hr.hangout_id
        JOIN user_profiles up ON up.id = h.user_id
-       WHERE hr.user_id = ? AND hr.status != 'cancelled'
+       WHERE hr.user_id = ? AND hr.status != 'cancelled' AND ${activeUser('up')}
        ORDER BY hr.created_at DESC`,
       [req.userId],
     )
@@ -334,7 +335,7 @@ router.get('/api/hangouts/:id', optionalAuth, async (req, res) => {
      FROM hangouts h
      JOIN user_profiles up ON up.id = h.user_id
      ${JOIN_PARTNER_OFFER}
-     WHERE h.id = ?`
+     WHERE h.id = ? AND ${activeUser('up')}`
     const [rows] = await pool.query(sql, [req.userId || 0, req.userId || 0, req.userId || 0, req.userId || 0, id])
     if (rows.length === 0) return res.status(404).json({ message: 'Hangout not found' })
 
@@ -357,7 +358,7 @@ router.get('/api/hangouts/:id', optionalAuth, async (req, res) => {
                 up.display_name, up.avatar_url, up.age, up.city
          FROM hangout_responses hr
          JOIN user_profiles up ON up.id = hr.user_id
-         WHERE hr.hangout_id = ? AND hr.status != 'cancelled'
+         WHERE hr.hangout_id = ? AND hr.status != 'cancelled' AND ${activeUser('up')}
          ORDER BY hr.created_at ASC`,
         [id],
       )
@@ -369,7 +370,7 @@ router.get('/api/hangouts/:id', optionalAuth, async (req, res) => {
                 up.display_name, up.avatar_url, up.age
          FROM hangout_participants hp
          JOIN user_profiles up ON up.id = hp.user_id
-         WHERE hp.hangout_id = ? AND hp.status = 'joined'
+         WHERE hp.hangout_id = ? AND hp.status = 'joined' AND ${activeUser('up')}
          ORDER BY hp.role = 'organizer' DESC, hp.joined_at ASC`,
         [id],
       )
@@ -798,7 +799,7 @@ router.get('/api/hangouts/:id/responses', auth, async (req, res) => {
               up.display_name, up.avatar_url, up.age, up.city
        FROM hangout_responses hr
        JOIN user_profiles up ON up.id = hr.user_id
-       WHERE hr.hangout_id = ? AND hr.status != 'cancelled'
+       WHERE hr.hangout_id = ? AND hr.status != 'cancelled' AND ${activeUser('up')}
        ORDER BY hr.created_at ASC`,
       [id],
     )
@@ -1037,7 +1038,10 @@ router.post('/api/hangouts/:id/like', auth, likeLimiter, async (req, res) => {
         } catch {}
       }
       if (isAllowedIn(mutualPrefsMap, hangout.user_id, 'hangout_mutual_like', 'push')) {
-        const [[author]] = await pool.query('SELECT display_name FROM user_profiles WHERE id = ?', [hangout.user_id])
+        const [[author]] = await pool.query(
+          `SELECT up.display_name FROM user_profiles up WHERE up.id = ? AND ${activeUser('up')}`,
+          [hangout.user_id],
+        )
         sendPushToUser(hangout.user_id, 'SwiftMatch', `${author?.display_name || 'Someone'} liked your hangout: ${hangout.title}`).catch(() => {})
       }
       trackEvent('hangout_mutual_like', req.userId, { hangout_id: Number(id), chat_id: chatId })
@@ -1502,7 +1506,9 @@ router.post('/api/hangouts/suggest', auth, suggestLimiter, async (req, res) => {
     let partner = null
     if (userId && /^\d+$/.test(String(userId))) {
       [[partner]] = await pool.query(
-        `SELECT display_name, age, bio, city, dating_goal FROM user_profiles WHERE id = ? LIMIT 1`,
+        `SELECT up.display_name, up.age, up.bio, up.city, up.dating_goal
+         FROM user_profiles up
+         WHERE up.id = ? AND ${activeUser('up')} LIMIT 1`,
         [userId],
       )
     }

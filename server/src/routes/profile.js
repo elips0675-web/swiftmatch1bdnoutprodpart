@@ -4,6 +4,7 @@ import { auth } from '../middleware.js'
 import logger from '../logger.js'
 import { cacheRoute, invalidate } from '../cache.js'
 import { stripHtml } from '../sanitize.js'
+import { activeUser } from '../active-user.js'
 
 const router = Router()
 
@@ -386,7 +387,7 @@ router.get('/api/profile/:id', auth, cacheRoute(60), async (req, res) => {
               up.super_likes, up.boost_until, up.online, up.last_seen,
               up.created_at, up.updated_at
        FROM user_profiles up
-       WHERE up.id = ? AND up.deleted_at IS NULL`,
+       WHERE up.id = ? AND ${activeUser('up')}`,
       [req.params.id],
     )
     if (rows.length === 0) return res.status(404).json({ message: 'Profile not found' })

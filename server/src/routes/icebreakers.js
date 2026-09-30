@@ -3,6 +3,7 @@ import { auth } from '../middleware.js'
 import pool from '../db.js'
 import { rootLogger } from '../logger.js'
 import { createBreaker } from '../circuit-breaker.js'
+import { activeUser } from '../active-user.js'
 
 const router = Router()
 
@@ -52,7 +53,9 @@ router.post('/api/icebreakers/suggest', auth, async (req, res) => {
     const lang = language === 'en' ? 'en' : 'ru'
 
     const [profiles] = await pool.query(
-      `SELECT display_name, age, bio, city, dating_goal, zodiac FROM user_profiles WHERE id = ?`,
+      `SELECT up.display_name, up.age, up.bio, up.city, up.dating_goal, up.zodiac
+       FROM user_profiles up
+       WHERE up.id = ? AND ${activeUser('up')}`,
       [chat_user_id],
     )
     const target = profiles[0]

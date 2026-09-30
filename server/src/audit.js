@@ -29,4 +29,5 @@ export async function softDelete(tableName, id, userId, ipAddress) {
 export async function softDeleteWhere(tableName, whereClause, params, userId, ipAddress) {
   validateTableName(tableName)
   await pool.query(`UPDATE \`${tableName}\` SET deleted_at = NOW() WHERE ${whereClause}`, params)
+  await auditLog({ tableName, recordId: null, action: 'delete_bulk', oldValues: { where: whereClause }, userId, ipAddress })
 }

@@ -12,6 +12,7 @@ import { parseRadiusKm, RADIUS_DEFAULT_KM } from '../geo.js'
 import { cacheRoutePerUser, invalidate } from '../cache.js'
 import { trackEvent } from './experiments.js'
 import { getPrefs, isAllowed, isAllowedIn } from '../notification-prefs.js'
+import { activeUser } from '../active-user.js'
 
 const likeLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: 100, message: { message: 'Too many likes' } })
 
@@ -140,7 +141,7 @@ router.get('/api/users/search', auth, async (req, res) => {
     const blockJoin = ' LEFT JOIN user_blocks bl ON (bl.blocker_id = ? AND bl.blocked_id = up.id) OR (bl.blocker_id = up.id AND bl.blocked_id = ?)'
     const blockWhere = ' AND bl.blocker_id IS NULL'
 
-    const whereClauses = ['up.id != ?', 'up.deleted_at IS NULL', 'up.incognito = 0']
+    const whereClauses = ['up.id != ?', 'up.incognito = 0', activeUser('up')]
     const whereParams = [req.userId]
 
     if (interest) {
@@ -267,7 +268,7 @@ router.get('/api/matches', auth, cacheRoutePerUser(30), async (req, res) => {
       `SELECT m.id, m.created_at as matched_at, up.id as user_id, up.display_name, up.name, up.age, up.avatar_url, up.city, up.online
        FROM matches m
        JOIN user_profiles up ON up.id = CASE WHEN m.user1_id = ? THEN m.user2_id ELSE m.user1_id END
-       WHERE m.matched = 1 AND (m.user1_id = ? OR m.user2_id = ?)
+       WHERE m.matched = 1 AND (m.user1_id = ? OR m.user2_id = ?) AND ${activeUser('up')}
        ORDER BY m.created_at DESC`,
       [req.userId, req.userId, req.userId],
     )
@@ -318,7 +319,7 @@ router.get('/api/invites', auth, async (req, res) => {
               i.from_user_id as sender_id, up.display_name as sender_name, up.avatar_url as sender_avatar
        FROM invites i
        JOIN user_profiles up ON i.from_user_id = up.id
-       WHERE i.to_user_id = ?
+       WHERE i.to_user_id = ? AND ${activeUser('up')}
        ORDER BY i.created_at DESC`,
       [req.userId],
     )
@@ -413,7 +414,7 @@ router.get('/api/groups/:groupId/posts', auth, async (req, res) => {
               EXISTS(SELECT 1 FROM group_post_likes WHERE post_id = gp.id AND user_id = ?) AS liked_by_me
        FROM group_posts gp
        JOIN user_profiles up ON up.id = gp.user_id
-       WHERE gp.group_id = ?
+       WHERE gp.group_id = ? AND ${activeUser('up')}
        ORDER BY gp.created_at DESC
        LIMIT 50`,
       [req.userId, req.params.groupId],
@@ -434,7 +435,7 @@ router.get('/api/groups/:groupId/posts', auth, async (req, res) => {
                   ROW_NUMBER() OVER (PARTITION BY gpc.post_id ORDER BY gpc.created_at ASC) AS rn
            FROM group_post_comments gpc
            JOIN user_profiles up ON up.id = gpc.user_id
-           WHERE gpc.post_id IN (?)
+           WHERE gpc.post_id IN (?) AND ${activeUser('up')}
          ) t
          WHERE t.rn <= 20
          ORDER BY t.post_id, t.created_at ASC`,
@@ -486,7 +487,7 @@ router.post('/api/groups/:groupId/posts', auth, async (req, res) => {
               up.display_name, up.avatar_url
        FROM group_posts gp
        JOIN user_profiles up ON up.id = gp.user_id
-       WHERE gp.id = ?`,
+       WHERE gp.id = ? AND ${activeUser('up')}`,
       [result.insertId],
     )
     res.status(201).json({
@@ -532,7 +533,7 @@ router.post('/api/groups/:groupId/posts/:postId/comments', auth, async (req, res
               up.display_name, up.avatar_url
        FROM group_post_comments gpc
        JOIN user_profiles up ON up.id = gpc.user_id
-       WHERE gpc.id = ?`,
+       WHERE gpc.id = ? AND ${activeUser('up')}`,
       [result.insertId],
     )
     res.status(201).json({
@@ -558,7 +559,7 @@ router.get('/api/chats', auth, async (req, res) => {
        JOIN chat_participants cp ON cp.chat_id = c.id AND cp.user_id = ?
        JOIN chat_participants other ON other.chat_id = c.id AND other.user_id != ?
        JOIN user_profiles up ON up.id = other.user_id
-       WHERE c.is_group = 0
+       WHERE c.is_group = 0 AND ${activeUser('up')}
        ORDER BY c.updated_at DESC`,
       [req.userId, req.userId, req.userId],
     )
@@ -581,7 +582,7 @@ router.get('/api/chats/:chatId', auth, async (req, res) => {
        JOIN chat_participants cp ON cp.chat_id = c.id AND cp.user_id = ?
        JOIN chat_participants other ON other.chat_id = c.id AND other.user_id != ?
        JOIN user_profiles up ON up.id = other.user_id
-       WHERE c.id = ?
+       WHERE c.id = ? AND ${activeUser('up')}
        LIMIT 1`,
       [req.userId, req.userId, req.params.chatId],
     )
@@ -645,6 +646,7 @@ router.get('/api/chats/:chatId/messages', auth, async (req, res) => {
        JOIN user_profiles up ON m.sender_id = up.id
        WHERE m.chat_id = ?
          AND (m.ttl_seconds IS NULL OR m.created_at > DATE_SUB(NOW(), INTERVAL m.ttl_seconds SECOND))
+         AND ${activeUser('up')}
        ORDER BY m.created_at ASC
        LIMIT 100`,
       [req.params.chatId],
@@ -663,7 +665,7 @@ router.get('/api/chats/:chatId/messages', auth, async (req, res) => {
                 up.display_name as user_name
          FROM message_reactions mr
          JOIN user_profiles up ON mr.user_id = up.id
-         WHERE mr.message_id IN (?)`,
+         WHERE mr.message_id IN (?) AND ${activeUser('up')}`,
         [msgIds],
       )
       for (const r of reactions) {
@@ -720,7 +722,7 @@ router.post('/api/chats/:chatId/messages', auth, async (req, res) => {
               up.display_name as sender_name
        FROM messages m
        JOIN user_profiles up ON m.sender_id = up.id
-       WHERE m.id = ?`,
+       WHERE m.id = ? AND ${activeUser('up')}`,
       [result.insertId],
     )
 
@@ -800,7 +802,7 @@ router.post('/api/chats/:chatId/messages/:msgId/reactions', auth, async (req, re
               up.display_name as user_name
        FROM message_reactions mr
        JOIN user_profiles up ON mr.user_id = up.id
-       WHERE mr.id = ?`,
+       WHERE mr.id = ? AND ${activeUser('up')}`,
       [result.insertId],
     )
     res.status(201).json(reaction)
@@ -818,8 +820,8 @@ router.get('/api/activity', auth, async (req, res) => {
       `SELECT al.id, al.action_type, al.user_id, al.target_id, al.created_at,
               up.display_name as user_name, up.avatar_url as user_avatar
        FROM activity_log al
-       LEFT JOIN user_profiles up ON al.user_id = up.id
-       WHERE al.target_id = ? AND (up.incognito = 0 OR up.incognito IS NULL)
+       JOIN user_profiles up ON al.user_id = up.id
+       WHERE al.target_id = ? AND (up.incognito = 0 OR up.incognito IS NULL) AND ${activeUser('up')}
        ORDER BY al.created_at DESC
        LIMIT 50`,
       [req.userId],
@@ -859,7 +861,10 @@ router.delete('/api/block/:blocked_id', auth, async (req, res) => {
 router.get('/api/block/list', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT ub.blocked_id, up.display_name, up.avatar_url FROM user_blocks ub JOIN user_profiles up ON up.id = ub.blocked_id WHERE ub.blocker_id = ?',
+      `SELECT ub.blocked_id, up.display_name, up.avatar_url
+       FROM user_blocks ub
+       JOIN user_profiles up ON up.id = ub.blocked_id
+       WHERE ub.blocker_id = ? AND ${activeUser('up')}`,
       [req.userId],
     )
     res.json(rows)
