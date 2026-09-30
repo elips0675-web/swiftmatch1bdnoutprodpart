@@ -16,6 +16,7 @@
 | `Dockerfile` с `COPY server/ ./server/` | В образ **нет** `server/.env`, `server/.jwt-dev-secret` и `server/node_modules` (`node scripts/secrets-leak-audit.mjs` — exit 0) |
 | Прод-`.env` на VPS | Переживает `rsync --delete`: в строке `switches:` есть `--exclude .env`. Иначе деплой тихо подменяет `JWT_SECRET` публичным значением из `.env.example` |
 | Каталог с данными в коде | Смонтирован **именованным** volume'ом (`node scripts/deploy-persistence-audit.mjs` — exit 0). Иначе `docker compose up --build` удалит его, и страницы будут отдавать 200 со ссылками на несуществующие файлы |
+| Маршрут, отдающий данные другого юзера | Учитывает `user_blocks` **в SQL** (`server/src/user-blocks.js`, `notBlocked`) — не только фид. Возвращает **404**, не 403, чтобы не подтверждать существование. Если ответ зависит от смотрящего — middleware кэша `cacheRoutePerUser`, и **все** `invalidate()` под этот маршрут переписаны под префикс `user:` |
 
 ---
 
@@ -104,6 +105,7 @@ app.get('/health', (req, res) => {
 - [ ] **Секреты и мусор не уезжают в артефакты:** `node scripts/secrets-leak-audit.mjs` — exit 0. Проверяет, что в контекст образа не попадают `.env`/`*.secret`/`*.pem`/`*.key` и вложенные `node_modules`/`dist`, а rsync-строка в `deploy.yml` исключает `.env`/`*.secret`/`uploads`. Правило: `COPY server/ ./server/` требует `**/`-паттернов — `.env` и `node_modules` без `**/` исключают только корневой файл (питфолл 43), а `--delete` в rsync стирает всё, что живёт только на сервере (питфолл 44)
 - [ ] **Данные на диске переживают деплой:** `node scripts/deploy-persistence-audit.mjs` — exit 0. Правило: `docker compose up -d --build` пересоздаёт контейнер, и всё, что не смонтировано **именованным** volume'ом, исчезает. Если задача добавляет запись на диск — новый путь обязан быть под volume'ом и указан в гейте (питфолл 45)
 - [ ] **Миграция применена:** `cd database/migrations && node migrate.js` — `All migrations applied`, и новая колонка видна в `information_schema`. Правило: любая колонка, которую читает код, появляется и в `database/migrations/` (питфолл 38)
+- [ ] **Фильтр блокировок стоит везде, а не только в фиде:** сплошной поиск `FROM user_profiles` по `server/src/routes/` — каждый маршрут, отдающий данные **другого** юзера, содержит `notBlocked(...)` (питфолл 46). Правила: предикат живёт **в SQL** (отдельный запрос «проверил, потом прочитал» оставляет окно гонки), зритель передаётся параметрами, ответ при блокировке — **404**, и если ответ зависит от смотрящего, middleware кэша обязан быть `cacheRoutePerUser`, а все `invalidate()` под маршрут — переписаны под префикс `user:` (иначе правка профиля живёт в кэше до TTL)
 
 ### 11. Запись в БД — обязательный смоук на живой стойке
 
