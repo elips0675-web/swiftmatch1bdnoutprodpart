@@ -72,6 +72,14 @@ services:
     ports:
       - "3002:3002"
     mem_limit: 512m
+    # Загруженные пользователями фото лежат в /app/server/uploads (UPLOAD_DIR в
+    # server/src/routes/upload.js, отдаётся express.static в index.js:123). Без
+    # volume каталог жил внутри контейнера, а деплой делает
+    # `docker compose up -d --build` → пересоздание контейнера удаляло все фото.
+    # Именованный volume переживает пересоздание; bind-mount в /app/swiftmatch
+    # не годится — его вытирал бы rsync --delete.
+    volumes:
+      - uploads_data:/app/server/uploads
     env_file:
       - .env
     environment:
@@ -112,5 +120,6 @@ services:
 volumes:
   db_data:
   redis_data:
+  uploads_data:
   prometheus_data:
   grafana_data:

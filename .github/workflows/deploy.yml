@@ -28,6 +28,8 @@ jobs:
       # стартует с публичным JWT_SECRET, а node_modules с хоста (dev-зависимости
       # и Windows-бинарники sharp) затирает npm ci --omit=dev внутри образа.
       - run: node scripts/secrets-leak-audit.mjs
+      # Этап 21 (P0 #37): фото не должны теряться при `docker compose up --build`.
+      - run: node scripts/deploy-persistence-audit.mjs
 
   frontend-test:
     name: Frontend Tests (Vitest)

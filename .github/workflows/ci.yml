@@ -62,3 +62,17 @@ jobs:
         with:
           node-version: 20
       - run: node scripts/secrets-leak-audit.mjs
+
+  # Данные на диске переживают пересоздание контейнера (этап 21, P0 #37).
+  # `docker compose up -d --build` пересоздаёт контейнер, и всё, что не
+  # смонтировано volume'ом, исчезает. Гейт выводит путь записи фото из кода
+  # и сверяет его с compose: раньше каталога не было вовсе, и каждый деплой
+  # удалял загруженные фото без единой записи в логах.
+  deploy-persistence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/deploy-persistence-audit.mjs
