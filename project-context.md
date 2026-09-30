@@ -329,3 +329,9 @@ UI: зелёный badge ≥80, жёлтый ≥50, красный <50; спис
 - **Этап 57:** Псевдонимы — миграция 039 (user_aliases), CRUD (GET/POST/PUT primary/DELETE), UI в profile-edit (бейджи + ввод + выбор primary), отображение в profile под именем, 7 ключей i18n, 388/388
 - **Этап 58:** B2B-маркетплейс — миграция 040 (partners user_id, partner_subscriptions, b2b flag), 8 эндпоинтов (register, dashboard, offers CRUD, conversions, subscribe), PartnerGuard, PartnerRegister, PartnerDashboard (4 вкладки), 80 ключей i18n, 388/388
 - **Этап 59:** Анти-кот верификация — миграция 041 (user_verifications + photo_verified), 4 эндпоинта (submit/status/admin approve), VerificationBadge + VerificationDialog, интеграция в profile, 17 ключей i18n, 388/388
+
+> ⚠️ Лог выше обрывается на этапе 59 и счётчиках 388/388 — это состояние на конец первой серии этапов.
+> **Дальше** история идёт в `Что сделано.txt` (секции «Этап 15…18», нумерация отдельная) и в
+> `Что доделать.txt`. Актуальный срез на 30.09.2026: **779/779** тестов
+> (сервер 632/632 в 48 файлах, фронт 147/147 в 24 файлах), E2E 19 спеков / 208 `test()`
+> (живой прогон не выполнялся), `npm audit --omit=dev`: 0 high / 0 critical.
