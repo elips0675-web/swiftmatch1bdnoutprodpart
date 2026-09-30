@@ -13,6 +13,8 @@
 | Тесты Vitest/Playwright | **0 failures** — «pre-existing» не оправдание. Упавший тест = баг или мок сломан |
 | Миграция применена | В VALUES, которые реально пишет код, **умещаются в колонку**: `CHECK`, `ENUM`, `UNSIGNED`, длина строки |
 | Код сохранения формы | Форма на живой стойке заполняется и **читается обратно из БД**, а не просто отдаёт 200 |
+| `Dockerfile` с `COPY server/ ./server/` | В образ **нет** `server/.env`, `server/.jwt-dev-secret` и `server/node_modules` (`node scripts/secrets-leak-audit.mjs` — exit 0) |
+| Прод-`.env` на VPS | Переживает `rsync --delete`: в строке `switches:` есть `--exclude .env`. Иначе деплой тихо подменяет `JWT_SECRET` публичным значением из `.env.example` |
 
 ---
 
@@ -98,6 +100,7 @@ app.get('/health', (req, res) => {
 - [ ] `cd server && npm run test` — 0 failures. «Pre-existing» — не причина оставлять. Если тест мокает БД — мок должен возвращать ту же структуру, что реальный `mysql2`
 - [ ] Playwright: `npx playwright test` проходит (требует запущенного сервера; добавить `webServer` в `playwright.config.ts`)
 - [ ] **Дрейф схемы:** `node scripts/schema-drift-audit.mjs --offline` — exit 0 (код ↔ `database/mysql_schema.sql`). Если доступна живая БД: `$env:MYSQL_BIN="<путь к mysql.exe>"; node scripts/schema-drift-audit.mjs` — exit 0. Ненулевой exit = в коде есть колонка, которой нет в БД → живой 500
+- [ ] **Секреты и мусор не уезжают в артефакты:** `node scripts/secrets-leak-audit.mjs` — exit 0. Проверяет, что в контекст образа не попадают `.env`/`*.secret`/`*.pem`/`*.key` и вложенные `node_modules`/`dist`, а rsync-строка в `deploy.yml` исключает `.env`/`*.secret`/`uploads`. Правило: `COPY server/ ./server/` требует `**/`-паттернов — `.env` и `node_modules` без `**/` исключают только корневой файл (питфолл 43), а `--delete` в rsync стирает всё, что живёт только на сервере (питфолл 44)
 - [ ] **Миграция применена:** `cd database/migrations && node migrate.js` — `All migrations applied`, и новая колонка видна в `information_schema`. Правило: любая колонка, которую читает код, появляется и в `database/migrations/` (питфолл 38)
 
 ### 11. Запись в БД — обязательный смоук на живой стойке
