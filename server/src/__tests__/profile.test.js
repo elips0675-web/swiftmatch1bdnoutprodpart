@@ -248,6 +248,34 @@ describe('DELETE /api/profile/me', () => {
   })
 })
 
+describe('GET /api/profile/me (what /profile/edit loads)', () => {
+  it('returns birth_date, otherwise the date input is always empty', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 1, display_name: 'Test', age: 30, birth_date: '1995-06-15' }], []])
+      .mockResolvedValueOnce([[{ id: 7, url: '/uploads/a.jpg', sort_order: 0, is_avatar: 0 }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ interests: '[]' }], []])
+
+    const res = await request(app).get('/api/profile/me').set('Authorization', `Bearer ${authToken(1)}`)
+    expect(res.status).toBe(200)
+    expect(res.body.birth_date).toBe('1995-06-15')
+    expect(res.body.photos).toEqual([{ id: 7, url: '/uploads/a.jpg', sort_order: 0, is_avatar: 0 }])
+  })
+
+  it('SELECT of /me contains up.birth_date (regression: column was missing)', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 1, display_name: 'Test', age: 30 }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ interests: '[]' }], []])
+
+    await request(app).get('/api/profile/me').set('Authorization', `Bearer ${authToken(1)}`)
+
+    const meSql = pool.query.mock.calls[0][0]
+    expect(meSql).toMatch(/up\.birth_date/)
+  })
+})
+
 describe('Static routes before /:id (regression: shadowing)', () => {
   it('GET /api/profile/aliases must NOT be swallowed by /api/profile/:id', async () => {
     const res = await request(app).get('/api/profile/aliases')

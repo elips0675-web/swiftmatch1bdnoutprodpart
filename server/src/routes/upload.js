@@ -50,6 +50,7 @@ async function initStorage() {
       },
     })
   } else {
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true })
     storage = multer.diskStorage({
       destination: (req, file, cb) => cb(null, UPLOAD_DIR),
       filename: (req, file, cb) => {

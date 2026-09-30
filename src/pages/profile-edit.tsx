@@ -61,7 +61,7 @@ function getDefaultProfile(t: (key: string) => string) {
     interests: ["interest.photography", "interest.travel", "interest.music", "interest.sport"].filter(i => !BANNED_WORDS.includes(i)),
     match: 87,
     attachmentStyle: null as string | null,
-    birthDate: "2001-08-10",
+    birthDate: "",
     location: t('profile.demo_city'),
     photos: [PlaceHolderImages[0].imageUrl, PlaceHolderImages[2].imageUrl, PlaceHolderImages[4].imageUrl],
   };
@@ -124,9 +124,9 @@ function mapDbProfile(rows: any) {
     interests: normalizeObjectInterests(p.interests),
     match: 87,
     attachmentStyle: p.attachment_style || null,
-    birthDate: toLocalDate(p.birth_date) || '2001-08-10',
+    birthDate: toLocalDate(p.birth_date) || '',
     location: p.city || '',
-    photos: p.photos || [],
+    photos: normalizePhotos(p.photos),
   }
 }
 
@@ -137,6 +137,29 @@ function displayInterestLabel(key: string, t: (k: string) => string): string {
     if (key.startsWith(p)) return key.slice(p.length)
   }
   return key
+}
+
+type PhotoRow = { id: number; url: string };
+
+function mapPhotoIds(photos: unknown): Record<string, number> {
+  const ids: Record<string, number> = {};
+  if (!Array.isArray(photos)) return ids;
+  for (const ph of photos as PhotoRow[]) {
+    if (ph && typeof ph.url === 'string' && typeof ph.id === 'number') {
+      ids[ph.url] = ph.id;
+    }
+  }
+  return ids;
+}
+
+function normalizePhotos(photos: unknown): string[] {
+  if (!Array.isArray(photos)) return [];
+  const urls: string[] = [];
+  for (const ph of photos as (string | PhotoRow)[]) {
+    const url = typeof ph === 'string' ? ph : ph?.url;
+    if (typeof url === 'string' && url.length > 0) urls.push(url);
+  }
+  return urls;
 }
 
 function toLocalDate(value?: string): string {
@@ -158,6 +181,7 @@ export default function EditProfilePage() {
 
   const [profile, setProfile] = useState<any>(null);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [photoIds, setPhotoIds] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingBio, setIsGeneratingBio] = useState(false);
@@ -174,7 +198,8 @@ export default function EditProfilePage() {
         })
         if (res.ok) {
           const data = await res.json()
-          const photoUrls = (data.photos || []).map((ph: any) => ph.url)
+          const photoUrls = normalizePhotos(data.photos)
+          setPhotoIds(mapPhotoIds(data.photos))
           const mapped = mapDbProfile(data)
           setProfile(mapped)
           if (photoUrls.length > 0) setPhotos(photoUrls)
@@ -293,45 +318,65 @@ export default function EditProfilePage() {
     localStorage.setItem('userProfileGallery', JSON.stringify(newPhotos.filter(p => !p.startsWith('blob:'))));
   };
 
-  const handleAddPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const previewUrl = URL.createObjectURL(file);
-      const updated = [...photos, previewUrl];
-      setPhotos(updated);
+  const handleAddPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = "";
+    if (files.length === 0) return;
 
-      const formData = new FormData()
-      formData.append('photo', file)
-      formData.append('sort_order', String(photos.length))
-      const uploadToken = getToken()
-      fetch('/api/upload', {
-        method: 'POST',
-        headers: uploadToken ? { Authorization: `Bearer ${uploadToken}` } : {},
-        body: formData,
-      }).catch(() => {})
+    const uploadToken = getToken();
+    const baseSortOrder = photos.length;
 
-      const reader = new FileReader();
-      reader.onload = () => {
-        const dataUrl = String(reader.result);
+    for (const [offset, file] of files.entries()) {
+      const formData = new FormData();
+      formData.append('photo', file);
+      formData.append('sort_order', String(baseSortOrder + offset));
+      try {
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          headers: uploadToken ? { Authorization: `Bearer ${uploadToken}` } : {},
+          body: formData,
+        });
+        if (!uploadRes.ok) throw new Error(`upload failed: ${uploadRes.status}`);
+        const saved = await uploadRes.json();
+        setPhotoIds(prev => ({ ...prev, [saved.url]: saved.id }));
         setPhotos(prev => {
-          const next = [...prev];
-          const idx = next.lastIndexOf(previewUrl);
-          if (idx !== -1) next[idx] = dataUrl;
+          const next = [...prev, saved.url];
           localStorage.setItem('userProfileGallery', JSON.stringify(next.filter(p => !p.startsWith('blob:'))));
           return next;
         });
-      };
-      reader.readAsDataURL(file);
-      e.target.value = "";
+      } catch (err) {
+        if (import.meta.env.DEV) console.error('Photo upload failed', err);
+        toast({ title: t('toast.save_error'), description: t('toast.save_error_desc'), variant: "destructive" });
+      }
     }
   };
 
-  const handleRemovePhoto = (index: number) => {
+  const handleRemovePhoto = async (index: number) => {
     if (photos.length <= 1) {
       toast({ title: t('toast.cannot_delete'), description: t('toast.cannot_delete_desc'), variant: "destructive" });
       return;
     }
     const url = photos[index];
+    const photoId = photoIds[url];
+    if (photoId !== undefined) {
+      const deleteToken = getToken();
+      try {
+        const delRes = await fetch(`/api/photos/${photoId}`, {
+          method: 'DELETE',
+          headers: deleteToken ? { Authorization: `Bearer ${deleteToken}` } : {},
+        });
+        if (!delRes.ok && delRes.status !== 404) throw new Error(`delete failed: ${delRes.status}`);
+      } catch (err) {
+        if (import.meta.env.DEV) console.error('Photo delete failed', err);
+        toast({ title: t('toast.save_error'), description: t('toast.save_error_desc'), variant: "destructive" });
+        return;
+      }
+      setPhotoIds(prev => {
+        const next = { ...prev };
+        delete next[url];
+        return next;
+      });
+    }
     if (url.startsWith('blob:')) URL.revokeObjectURL(url);
     const next = photos.filter((_, i) => i !== index);
     setPhotos(next);
@@ -496,6 +541,7 @@ export default function EditProfilePage() {
                   <img src={photo} alt={`Photo ${index + 1}`} className="object-cover w-full h-full" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <button
+                      data-testid={`profile-photo-remove-${index}`}
                       onClick={() => handleRemovePhoto(index)}
                       className="w-9 h-9 rounded-full bg-red-500/80 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
                     >
@@ -554,7 +600,7 @@ export default function EditProfilePage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">{t('profile.label.birth_date')}</Label>
-                <Input type="date" value={profile.birthDate?.split('T')[0] || ''} onChange={e => setProfile({ ...profile, birthDate: e.target.value })} className="rounded-xl bg-muted/30 border-0 h-11 font-bold px-4 focus-visible:ring-primary/20" />
+                <Input data-testid="profile-birth-date" type="date" value={profile.birthDate?.split('T')[0] || ''} onChange={e => setProfile({ ...profile, birthDate: e.target.value })} className="rounded-xl bg-muted/30 border-0 h-11 font-bold px-4 focus-visible:ring-primary/20" />
               </div>
             </div>
 

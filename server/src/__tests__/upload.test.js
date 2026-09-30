@@ -6,6 +6,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import request from 'supertest'
 import express from 'express'
 import jwt from 'jsonwebtoken'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
 vi.mock('../db.js', () => ({
   default: { query: vi.fn() },
@@ -95,6 +98,19 @@ describe('DELETE /api/photos/:id', () => {
     pool.query.mockRejectedValue(new Error('DB error'))
     const res = await request(app).delete('/api/photos/1').set('Authorization', authHeader())
     expect(res.status).toBe(500)
+  })
+})
+
+// Регрессия: на чистом чекауте server/uploads не существует, и multer падал с
+// ENOENT -> 500 "Upload failed" при любой загрузке фото. Каталог создаётся сам.
+describe('POST /api/upload: каталог назначения', () => {
+  const app2 = createApp()
+
+  it('uploads/ создан до записи файла', async () => {
+    mockSingle.mockImplementationOnce((req, res, cb) => cb(null))
+    const res = await request(app2).post('/api/upload').set('Authorization', authHeader())
+    expect(res.status).toBe(400)
+    expect(fs.existsSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../uploads'))).toBe(true)
   })
 })
 

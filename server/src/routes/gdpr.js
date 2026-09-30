@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import pool from '../db.js'
 import { auth } from '../middleware.js'
 import logger from '../logger.js'
+import { dateOnly } from '../date-only.js'
 
 const router = Router()
 
@@ -11,7 +12,8 @@ router.get('/api/data/export', auth, async (req, res) => {
     const [[user]] = await pool.query('SELECT id, email, is_active, created_at FROM users WHERE id = ?', [req.userId])
     if (!user) return res.status(404).json({ message: 'User not found' })
 
-    const [[profile]] = await pool.query('SELECT * FROM user_profiles WHERE id = ?', [req.userId])
+    const [[profileRow]] = await pool.query('SELECT * FROM user_profiles WHERE id = ?', [req.userId])
+    const profile = profileRow ? { ...profileRow, birth_date: dateOnly(profileRow.birth_date) } : undefined
     const [photos] = await pool.query('SELECT id, url, sort_order, is_avatar, created_at FROM user_photos WHERE user_id = ?', [req.userId])
     const [likes] = await pool.query('SELECT id, from_user_id, to_user_id, type, created_at FROM likes WHERE from_user_id = ? OR to_user_id = ?', [req.userId, req.userId])
     const [matches] = await pool.query('SELECT id, user1_id, user2_id, created_at FROM matches WHERE user1_id = ? OR user2_id = ?', [req.userId, req.userId])

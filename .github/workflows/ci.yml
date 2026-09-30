@@ -37,3 +37,16 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npm test
+
+  # Дрейф схемы: каждая колонка, которую читает код в server/src, должна
+  # существовать в эталоне database/mysql_schema.sql. Без MySQL — только эта
+  # половина проверки; полный режим (с живой БД) ловит ещё и «колонка есть в
+  # эталоне, но не создана миграцией» — см. бэклог (P1: MySQL-service в CI).
+  schema-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/schema-drift-audit.mjs --offline

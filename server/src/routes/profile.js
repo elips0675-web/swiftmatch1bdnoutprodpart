@@ -5,6 +5,7 @@ import logger from '../logger.js'
 import { cacheRoute, invalidate } from '../cache.js'
 import { stripHtml } from '../sanitize.js'
 import { activeUser } from '../active-user.js'
+import { dateOnly } from '../date-only.js'
 
 const router = Router()
 
@@ -104,7 +105,7 @@ function sanitizeProfileText(profile) {
 router.get('/api/profile/me', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT up.id, up.display_name, up.name, up.age, up.bio, up.avatar_url,
+      `SELECT up.id, up.display_name, up.name, up.age, up.birth_date, up.bio, up.avatar_url,
               up.gender, up.looking_for, up.dating_goal, up.height,
               up.city, up.country, up.lat, up.lng,
               up.zodiac, up.circadian, up.attachment_style, up.education,
@@ -133,7 +134,7 @@ router.get('/api/profile/me', auth, async (req, res) => {
     const canonicalInterests = interests.filter((i) => canonical.has(i.id))
 
     const { location, ...profile } = rows[0]
-    res.json({ ...sanitizeProfileText(profile), photos, interests: canonicalInterests })
+    res.json({ ...sanitizeProfileText({ ...profile, birth_date: dateOnly(profile.birth_date) }), photos, interests: canonicalInterests })
   } catch (err) {
     logger.error('Profile GET /me error:', err)
     res.status(500).json({ message: 'Failed to fetch profile' })
@@ -405,7 +406,7 @@ router.get('/api/profile/:id', auth, cacheRoute(60), async (req, res) => {
     const canonical = await getCanonicalInterestIds()
     const canonicalInterests = interests.filter((i) => canonical.has(i.id))
 
-    res.json({ ...sanitizeProfileText(rows[0]), photos, interests: canonicalInterests })
+    res.json({ ...sanitizeProfileText({ ...rows[0], birth_date: dateOnly(rows[0].birth_date) }), photos, interests: canonicalInterests })
   } catch (err) {
     logger.error('Profile GET error:', err)
     res.status(500).json({ message: 'Failed to fetch profile' })
