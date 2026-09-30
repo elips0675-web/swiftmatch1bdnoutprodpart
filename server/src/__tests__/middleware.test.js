@@ -2,7 +2,7 @@ vi.hoisted(() => {
   process.env.JWT_SECRET = 'test-secret'
 })
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import jwt from 'jsonwebtoken'
 import { auth, optionalAuth, JWT_SECRET } from '../middleware.js'
 
@@ -105,7 +105,6 @@ describe('optionalAuth middleware', () => {
     expect(req.userId).toBeNull()
     expect(next).toHaveBeenCalled()
   })
-
   it('sets userId with valid token', () => {
     const token = jwt.sign({ userId: 7, role: 'user' }, JWT_SECRET(), { expiresIn: '1h' })
     const { req, res, next } = mockReqRes()
@@ -131,5 +130,59 @@ describe('optionalAuth middleware', () => {
     optionalAuth(req, res, next)
     expect(req.userId).toBe(33)
     expect(next).toHaveBeenCalled()
+  })
+})
+
+// Этап 20 (P0-C). Прод поднимался с JWT_SECRET из публичного .env.example:
+// rsync --delete стирал .env на VPS, следом шло `cp .env.example .env`, и ключ
+// подписи становился константой из репозитория — по нему подписывается admin.
+describe('JWT_SECRET: прода не принимает публичный плейсхолдер', () => {
+  const savedNodeEnv = process.env.NODE_ENV
+  const savedSecret = process.env.JWT_SECRET
+
+  beforeEach(() => {
+    process.env.NODE_ENV = 'production'
+  })
+
+  afterEach(() => {
+    if (savedNodeEnv === undefined) delete process.env.NODE_ENV
+    else process.env.NODE_ENV = savedNodeEnv
+    process.env.JWT_SECRET = savedSecret
+  })
+
+  it('кидает, если секрет не задан вовсе', () => {
+    delete process.env.JWT_SECRET
+    expect(() => JWT_SECRET()).toThrow(/must be set/)
+  })
+
+  it.each([
+    'change-me-to-a-long-random-secret',
+    'change-this-to-a-random-256-bit-secret',
+    'change-me-in-production',
+    'change-me',
+  ])('кидает на плейсхолдер из репозитория: %s', (placeholder) => {
+    process.env.JWT_SECRET = placeholder
+    expect(() => JWT_SECRET()).toThrow(/placeholder/)
+  })
+
+  it('кидает на плейсхолдер, отличающийся регистром и пробелами', () => {
+    process.env.JWT_SECRET = '  Change-Me-To-A-Long-Random-Secret  '
+    expect(() => JWT_SECRET()).toThrow(/placeholder/)
+  })
+
+  it('кидает на слишком короткий секрет (HS256 перебирается тривиально)', () => {
+    process.env.JWT_SECRET = 'a'.repeat(31)
+    expect(() => JWT_SECRET()).toThrow(/shorter than 32/)
+  })
+
+  it('пропускает настоящий длинный секрет', () => {
+    process.env.JWT_SECRET = 'f'.repeat(64)
+    expect(JWT_SECRET()).toBe('f'.repeat(64))
+  })
+
+  it('в dev плейсхолдер пропускает — локальный запуск не должен ломаться', () => {
+    process.env.NODE_ENV = 'development'
+    process.env.JWT_SECRET = 'change-me-to-a-long-random-secret'
+    expect(JWT_SECRET()).toBe('change-me-to-a-long-random-secret')
   })
 })

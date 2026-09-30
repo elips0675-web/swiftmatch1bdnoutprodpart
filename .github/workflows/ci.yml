@@ -50,3 +50,15 @@ jobs:
         with:
           node-version: 20
       - run: node scripts/schema-drift-audit.mjs --offline
+
+  # Секреты и мусор не должны попадать в артефакты (этап 20, P0-C). Ловит два
+  # канала: контекст сборки образа (.dockerignore) и rsync --delete на деплое
+  # (deploy.yml) — оба молчаливые, оба срабатывали на каждом пуше в main.
+  secrets-leak:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/secrets-leak-audit.mjs

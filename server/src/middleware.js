@@ -26,11 +26,41 @@ function loadOrCreateDevSecret() {
   return secret
 }
 
+// Плейсхолдеры из .env.example / .env / docker-compose.yml. Пока JWT_SECRET
+// равно одному из них, ключ лежит в публичном репозитории:anyone может подписать
+// себе admin-токен. Пустой секрет проверялся (строка ниже), плейсхолдерный — нет,
+// а именно он и получается, когда прод-`.env` потерян и пересоздан из примера
+// (этап 20, P0-C: rsync --delete стирал .env на VPS, дальше шла строка
+// `test -f .env || cp .env.example .env`).
+const INSECURE_JWT_SECRETS = new Set([
+  'change-me-to-a-long-random-secret',
+  'change-this-to-a-random-256-bit-secret',
+  'change-me-in-production',
+  'change-me',
+  'secret',
+  'test',
+])
+
+function isInsecureJwtSecret(value) {
+  if (typeof value !== 'string') return false
+  const normalized = value.trim().toLowerCase()
+  if (INSECURE_JWT_SECRETS.has(normalized)) return true
+  return normalized.length < 32
+}
+
 function getJwtSecret() {
   if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
     throw new Error('JWT_SECRET must be set in environment for production')
   }
-  if (process.env.JWT_SECRET) return process.env.JWT_SECRET
+  if (process.env.JWT_SECRET) {
+    if (process.env.NODE_ENV === 'production' && isInsecureJwtSecret(process.env.JWT_SECRET)) {
+      throw new Error(
+        'JWT_SECRET is a known placeholder from .env.example or is shorter than 32 chars. '
+        + 'Set a random secret (openssl rand -hex 32) before starting in production.',
+      )
+    }
+    return process.env.JWT_SECRET
+  }
   if (!devJwtSecretCache) {
     devJwtSecretCache = loadOrCreateDevSecret()
   }

@@ -23,6 +23,11 @@ jobs:
       - run: npm run check:ports
       - run: npm run lint
       - run: npx tsc --noEmit
+      # Блокирующий гейт перед любым деплоем (этап 20, P0-C). Проверяет, что
+      # .dockerignore и rsync-строка ниже не пропускают секреты: иначе прод
+      # стартует с публичным JWT_SECRET, а node_modules с хоста (dev-зависимости
+      # и Windows-бинарники sharp) затирает npm ci --omit=dev внутри образа.
+      - run: node scripts/secrets-leak-audit.mjs
 
   frontend-test:
     name: Frontend Tests (Vitest)
@@ -320,7 +325,7 @@ jobs:
       - name: Push raw files to VPS via rsync
         uses: burnett01/rsync-deployments@7.0.1
         with:
-          switches: -avz --delete --exclude node_modules --exclude .git --exclude test-results --exclude playwright-report --exclude e2e/.auth
+          switches: -avz --delete --exclude node_modules --exclude .git --exclude test-results --exclude playwright-report --exclude e2e/.auth --exclude .env --exclude '*.secret' --exclude '*.pem' --exclude '*.key' --exclude '*.p12' --exclude uploads
           path: ./
           remote_path: /app/swiftmatch
           remote_host: ${{ secrets.DEPLOY_HOST }}
@@ -336,7 +341,12 @@ jobs:
           script: |
             set -e
             cd /app/swiftmatch
-            # прод-секреты (.env с реальными ключами) должны лежать на VPS (не в git)
+            # Прод-секреты лежат на VPS в /app/swiftmatch/.env (в git их нет).
+            # Этап 20: rsync выше теперь исключает .env, поэтому --delete больше
+            # НЕ стирает файл и эта строка срабатывает только на первом деплое.
+            # Если .env всё же отсутствует, compose поднимет контейнер с
+            # JWT_SECRET из шаблона, а middleware.js в production такой старт
+            # отвергает — намеренно громко, вместо тихо сломанной подписи.
             test -f .env || cp .env.example .env
             # Собрать образы и запустить compose (schema применяется при первичном старте
             # пустого DB volume через docker-entrypoint-initdb.d — см. docker-compose.yml)
