@@ -4,6 +4,7 @@ import pool from '../db.js'
 import { rootLogger } from '../logger.js'
 import { createBreaker } from '../circuit-breaker.js'
 import { activeUser } from '../active-user.js'
+import { notBlocked } from '../user-blocks.js'
 
 const router = Router()
 
@@ -52,11 +53,12 @@ router.post('/api/icebreakers/suggest', auth, async (req, res) => {
     }
     const lang = language === 'en' ? 'en' : 'ru'
 
+    const blockFilter = notBlocked('up', req.userId)
     const [profiles] = await pool.query(
       `SELECT up.display_name, up.age, up.bio, up.city, up.dating_goal, up.zodiac
        FROM user_profiles up
-       WHERE up.id = ? AND ${activeUser('up')}`,
-      [chat_user_id],
+       WHERE up.id = ? AND ${activeUser('up')} AND ${blockFilter.sql}`,
+      [chat_user_id, ...blockFilter.params],
     )
     const target = profiles[0]
 

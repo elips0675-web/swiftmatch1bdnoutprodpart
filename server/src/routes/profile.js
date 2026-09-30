@@ -2,9 +2,10 @@ import { Router } from 'express'
 import pool from '../db.js'
 import { auth } from '../middleware.js'
 import logger from '../logger.js'
-import { cacheRoute, invalidate } from '../cache.js'
+import { cacheRoutePerUser, invalidate } from '../cache.js'
 import { stripHtml } from '../sanitize.js'
 import { activeUser } from '../active-user.js'
+import { notBlocked } from '../user-blocks.js'
 import { dateOnly } from '../date-only.js'
 import { FieldError, blankToUndef, dateField, enumField, intField, numField, textField } from '../profile-fields.js'
 
@@ -251,7 +252,9 @@ router.put('/api/settings/privacy', auth, async (req, res) => {
       WHERE id = ?`,
       [incognito, passport_mode, passport_city, passport_lat, passport_lng, req.userId],
     )
-    invalidate(`route:/api/profile/${req.userId}*`).catch(() => {})
+    // Префикс `user:*` — под ключ `cacheRoutePerUser`, и шире старого: приватность
+    // меняет то, что видят ДРУГИЕ, поэтому сбрасываем кэш у всех, а не у владельца.
+    invalidate(`user:*:/api/profile/${req.userId}*`).catch(() => {})
     res.json({ message: 'Privacy settings updated' })
   } catch (err) {
     logger.error('Privacy PUT error:', err)
@@ -385,8 +388,9 @@ router.post('/api/profile/verification', auth, async (req, res) => {
   }
 })
 
-router.get('/api/profile/:id', auth, cacheRoute(60), async (req, res) => {
+router.get('/api/profile/:id', auth, cacheRoutePerUser(60), async (req, res) => {
   try {
+    const blockFilter = notBlocked('up', req.userId)
     const [rows] = await pool.query(
       `SELECT up.id, up.display_name, up.name, up.age, up.birth_date, up.bio, up.avatar_url,
               up.gender, up.looking_for, up.dating_goal, up.height, up.city, up.country,
@@ -394,8 +398,8 @@ router.get('/api/profile/:id', auth, cacheRoute(60), async (req, res) => {
               up.super_likes, up.boost_until, up.online, up.last_seen,
               up.created_at, up.updated_at
        FROM user_profiles up
-       WHERE up.id = ? AND ${activeUser('up')}`,
-      [req.params.id],
+       WHERE up.id = ? AND ${activeUser('up')} AND ${blockFilter.sql}`,
+      [req.params.id, ...blockFilter.params],
     )
     if (rows.length === 0) return res.status(404).json({ message: 'Profile not found' })
 
@@ -514,7 +518,7 @@ router.put('/api/profile/:id', auth, async (req, res) => {
       }
     }
 
-    invalidate(`route:/api/profile/${req.params.id}*`).catch(() => {})
+    invalidate(`user:*:/api/profile/${req.params.id}*`).catch(() => {})
 
     const [rows] = await pool.query('SELECT * FROM user_profiles WHERE id = ?', [req.params.id])
     const row = rows[0]

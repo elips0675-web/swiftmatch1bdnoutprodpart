@@ -10,6 +10,7 @@ import logger from '../logger.js'
 import { stripHtml } from '../sanitize.js'
 import { parseRadiusKm, RADIUS_DEFAULT_KM } from '../geo.js'
 import { activeUser } from '../active-user.js'
+import { notBlocked } from '../user-blocks.js'
 import { trackEvent } from './experiments.js'
 import { createBreaker } from '../circuit-breaker.js'
 import { getPrefs, getPrefsMap, isAllowed, isAllowedIn } from '../notification-prefs.js'
@@ -1500,17 +1501,20 @@ router.post('/api/hangouts/suggest', auth, suggestLimiter, async (req, res) => {
 
     // Профили обоих для персонализации (optional)
     const [[me]] = await pool.query(
-      `SELECT display_name, age, bio, city, dating_goal FROM user_profiles WHERE id = ? LIMIT 1`,
+      `SELECT up.display_name, up.age, up.bio, up.city, up.dating_goal
+       FROM user_profiles up WHERE up.id = ? AND ${activeUser('up')} LIMIT 1`,
       [req.userId],
     )
     let partner = null
     if (userId && /^\d+$/.test(String(userId))) {
-      [[partner]] = await pool.query(
+      const blockFilter = notBlocked('up', req.userId)
+      const [partnerRows] = await pool.query(
         `SELECT up.display_name, up.age, up.bio, up.city, up.dating_goal
          FROM user_profiles up
-         WHERE up.id = ? AND ${activeUser('up')} LIMIT 1`,
-        [userId],
+         WHERE up.id = ? AND ${activeUser('up')} AND ${blockFilter.sql} LIMIT 1`,
+        [userId, ...blockFilter.params],
       )
+      partner = partnerRows[0]
     }
 
     if (OPENAI_API_KEY) {
