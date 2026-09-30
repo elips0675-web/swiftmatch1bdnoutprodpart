@@ -7,7 +7,7 @@
 | Модуль | Что внутри |
 |--------|-----------|
 | [System Prompt & Core Rules](docs/AGENTS-system-prompt.md) | Персона, стек (React 18, Tailwind v3, shadcn/ui, TS strict), Code Quality, Code Style, Response Format |
-| [Pitfall'ы](docs/AGENTS-pitfalls.md) | 46 грабли из опыта (JSX-скобки, JWT_SECRET, Redis fallback, banned-words, WS-realtime, канон интересов vs таблица interests, синонимы-дубли, колонка без миграции, мок-хук вешает vitest, DATE уезжает на сутки, `\|\| 0` ломает CHECK, мок БД принимает любые параметры, семантика `.dockerignore`, `rsync --delete` vs прод-`.env`, деплой удаляет непримонтированные данные, блок-лист фильтрует только фид + смена кэш-ключа ломает `invalidate()`, ASI склейка `const f = …` + `[[x]] = …`) |
+| [Pitfall'ы](docs/AGENTS-pitfalls.md) | 48 грабли из опыта (JSX-скобки, JWT_SECRET, Redis fallback, banned-words, WS-realtime, канон интересов vs таблица interests, синонимы-дубли, колонка без миграции, мок-хук вешает vitest, DATE уезжает на сутки, `\|\| 0` ломает CHECK, мок БД принимает любые параметры, семантика `.dockerignore`, `rsync --delete` vs прод-`.env`, деплой удаляет непримонтированные данные, блок-лист фильтрует только фид + смена кэш-ключа ломает `invalidate()`, ASI склейка `const f = …` + `[[x]] = …`, счётчики тестов в доках устаревают молча, падение 1 из 4 = гонка по времени, а не флак) |
 | [Workflow (5 этапов) + Prompt Templates](docs/AGENTS-workflow.md) | Этап 0–4: чтение → план → реализация → тесты → верификация; шаблоны для AI |
 | [i18n / translation keys](docs/AGENTS-i18n.md) | Golden Rule «never raw keys», data format, available keys, где лежат переводы |
 | [Admin & auth guardrails](docs/AGENTS-admin-auth.md) | adminAuth ACTIVE, единый гейт `/api/admin`, ограничения админ-роутов |
