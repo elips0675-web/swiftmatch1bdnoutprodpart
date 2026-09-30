@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { generateProfileBio } from "@/shims/ai-flows";
 import { toast } from "@/hooks/use-toast";
-import { getToken } from "@/lib/token";
+import { getToken, clearToken } from "@/lib/token";
 import {
   Select,
   SelectContent,
@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { ZODIAC_SIGNS } from "@/lib/constants";
 import { useContentConfig } from "@/lib/useContentConfig";
 import { useLanguage } from "@/context/language-context";
+import { useAuth } from "@/context/auth-context";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { BANNED_WORDS } from "@/lib/constants";
 import { VerificationDialog } from "@/components/shared/verification";
@@ -115,7 +116,7 @@ function mapDbProfile(rows: any) {
     displayName: p.display_name || p.displayName || '',
     age: p.age || 24,
     city: p.city || '',
-    height: p.height || 0,
+    height: p.height || '',
     gender: p.gender || 'female',
     lookingFor: p.looking_for || 'male',
     datingGoal: p.dating_goal || '',
@@ -177,7 +178,16 @@ function toLocalDate(value?: string): string {
 export default function EditProfilePage() {
   const router = useRouter();
   const { t } = useLanguage();
+  const { token: authToken, isLoading: isAuthLoading } = useAuth();
   const { interests: dynamicInterests, dating_goals: dynamicGoals } = useContentConfig();
+
+  // Без сессии страница раньше рисовала редактируемую форму по данным из
+  // localStorage: поля менялись, «Сохранить» уходил в 401, и пользователь видел
+  // «Ошибка сохранения» вместо «войдите заново». Теперь уводим на /login.
+  useEffect(() => {
+    if (isAuthLoading) return;
+    if (!authToken) router.replace('/login');
+  }, [isAuthLoading, authToken, router]);
 
   const [profile, setProfile] = useState<any>(null);
   const [photos, setPhotos] = useState<string[]>([]);
@@ -405,6 +415,14 @@ export default function EditProfilePage() {
 
     setIsSaving(true);
 
+    if (!getToken()) {
+      clearToken();
+      toast({ title: t('toast.session_expired'), description: t('toast.session_expired_desc'), variant: "destructive" });
+      setIsSaving(false);
+      router.replace('/login');
+      return;
+    }
+
     const cleanedInterests = (profile.interests || [])
       .filter((i: string) => !BANNED_WORDS.includes(i) && dynamicInterests.includes(i));
 
@@ -444,6 +462,13 @@ export default function EditProfilePage() {
 
       // id берём у сервера из /me: жёсткий DEMO_USER_ID писал правку в чужой профиль
       const meRes = await fetch(`${PROFILE_API}/me`, { headers })
+      if (meRes.status === 401) {
+        clearToken();
+        toast({ title: t('toast.session_expired'), description: t('toast.session_expired_desc'), variant: "destructive" });
+        setIsSaving(false);
+        router.replace('/login');
+        return;
+      }
       if (!meRes.ok) throw new Error('Failed to resolve own profile id')
       const ownId = (await meRes.json())?.id
       if (!ownId) throw new Error('Own profile id is missing')
@@ -466,6 +491,13 @@ export default function EditProfilePage() {
           interests: interestIds,
         }),
       })
+      if (res.status === 401) {
+        clearToken();
+        toast({ title: t('toast.session_expired'), description: t('toast.session_expired_desc'), variant: "destructive" });
+        setIsSaving(false);
+        router.replace('/login');
+        return;
+      }
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         toast({ title: t('toast.save_error'), description: err.message || t('toast.save_error_desc'), variant: "destructive" })
@@ -497,7 +529,7 @@ export default function EditProfilePage() {
     });
   };
 
-  if (isLoading || !profile) {
+  if (isLoading || isAuthLoading || !authToken || !profile) {
     return (
       <div className="flex flex-col min-h-screen bg-[#f8f9fb]">
         <AppHeader />
@@ -612,7 +644,7 @@ export default function EditProfilePage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">{t('profile.label.height_cm')}</Label>
-                <Input type="number" value={profile.height || ''} onChange={e => setProfile({ ...profile, height: parseInt(e.target.value) || 0 })} className="rounded-xl bg-muted/30 border-0 h-11 font-bold px-4 focus-visible:ring-primary/20" />
+                <Input type="number" data-testid="profile-height" value={profile.height || ''} onChange={e => setProfile({ ...profile, height: e.target.value })} className="rounded-xl bg-muted/30 border-0 h-11 font-bold px-4 focus-visible:ring-primary/20" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">{t('profile.label.zodiac_sign')}</Label>

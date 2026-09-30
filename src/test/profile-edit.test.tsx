@@ -6,8 +6,15 @@ import { MemoryRouter } from "react-router-dom";
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
 
+const clearTokenMock = vi.fn();
 vi.mock("@/lib/token", () => ({
   getToken: () => "test-token",
+  clearToken: () => clearTokenMock(),
+}));
+
+const authState = { token: "test-token" as string | null, isLoading: false };
+vi.mock("@/context/auth-context", () => ({
+  useAuth: () => authState,
 }));
 
 const mockLanguage = { t: (key: string) => key, language: "RU", setLanguage: vi.fn() };
@@ -117,6 +124,8 @@ describe("ProfileEditPage: дата рождения", () => {
     mockFetch.mockReset();
     localStorage.clear();
     meOverrides = {};
+    authState.token = "test-token";
+    authState.isLoading = false;
     mockFetch.mockImplementation((url: string, opts?: { method?: string }) => routeFetch(url, opts));
   });
 
@@ -165,6 +174,35 @@ describe("ProfileEditPage: дата рождения", () => {
     expect(opts.headers["Content-Type"]).toBe("application/json");
     expect(opts.headers.Authorization).toBe("Bearer test-token");
   });
+
+  it("очищенный рост не уходит числом 0 (CHECK 100..250 ронял сохранение в 500)", async () => {
+    meOverrides = { height: 168 };
+    await renderEditPage();
+
+    fireEvent.change(screen.getByTestId("profile-height"), { target: { value: "" } });
+    fireEvent.click(screen.getByTestId("save-profile"));
+
+    await waitFor(() => {
+      expect(putBody()).toBeTruthy();
+    });
+    expect(putBody().height).toBe("");
+  });
+
+  it("рост из БД попадает в инпут и уходит на сохранение", async () => {
+    meOverrides = { height: 168 };
+    await renderEditPage();
+
+    await waitFor(() => {
+      const input = screen.getByTestId("profile-height") as HTMLInputElement;
+      expect(input.value).toBe("168");
+    });
+
+    fireEvent.click(screen.getByTestId("save-profile"));
+    await waitFor(() => {
+      expect(putBody()).toBeTruthy();
+    });
+    expect(putBody().height).toBe(168);
+  });
 });
 
 describe("ProfileEditPage: фото", () => {
@@ -173,6 +211,8 @@ describe("ProfileEditPage: фото", () => {
     mockFetch.mockReset();
     localStorage.clear();
     meOverrides = {};
+    authState.token = "test-token";
+    authState.isLoading = false;
     mockFetch.mockImplementation((url: string, opts?: { method?: string }) => routeFetch(url, opts));
   });
 
@@ -221,5 +261,69 @@ describe("ProfileEditPage: фото", () => {
     const stored = localStorage.getItem("userProfileGallery") || "";
     expect(stored).not.toContain("data:");
     expect(stored).toContain("/uploads/new.jpg");
+  });
+});
+
+describe("ProfileEditPage: потерянная сессия", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockReset();
+    localStorage.clear();
+    meOverrides = {};
+    authState.isLoading = false;
+    mockFetch.mockImplementation((url: string, opts?: { method?: string }) => routeFetch(url, opts));
+  });
+
+  it("без токена уводит на /login, а не рисует редактируемую форму", async () => {
+    localStorage.setItem("userProfile", JSON.stringify({ displayName: "Анна", age: 30, interests: [] }));
+    authState.token = null;
+
+    const Page = (await import("@/pages/profile-edit")).default;
+    renderPage(<Page />);
+
+    await waitFor(() => {
+      expect(routerMock.replace).toHaveBeenCalledWith("/login");
+    });
+    // форма с полями не показывается: иначе правки уходят в никуда
+    expect(screen.queryByTestId("profile-name")).toBeNull();
+  });
+
+  it("не показывает форму, пока сессия резолвится (чтобы не мигал кэш из localStorage)", async () => {
+    authState.isLoading = true;
+    authState.token = null;
+
+    const Page = (await import("@/pages/profile-edit")).default;
+    renderPage(<Page />);
+
+    expect(screen.queryByTestId("profile-name")).toBeNull();
+    expect(routerMock.replace).not.toHaveBeenCalled();
+  });
+
+  it("при 401 от сервера чистит токен и уводит на /login, а не «ошибка сохранения»", async () => {
+    authState.token = "test-token";
+    // загрузка проходит, 401 прилетает на /me внутри handleSave
+    let meCalls = 0;
+    mockFetch.mockImplementation((url: string, opts?: { method?: string }) => {
+      if (String(url) === "/api/profile/me") {
+        meCalls += 1;
+        if (meCalls > 1) {
+          return Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({ error: "unauthorized" }) });
+        }
+      }
+      return routeFetch(url, opts);
+    });
+
+    const Page = (await import("@/pages/profile-edit")).default;
+    renderPage(<Page />);
+    await waitFor(() => {
+      expect((screen.getByTestId("profile-name") as HTMLInputElement).value).toBe(ME_DEFAULTS.display_name);
+    });
+
+    fireEvent.click(screen.getByTestId("save-profile"));
+
+    await waitFor(() => {
+      expect(clearTokenMock).toHaveBeenCalled();
+      expect(routerMock.replace).toHaveBeenCalledWith("/login");
+    });
   });
 });

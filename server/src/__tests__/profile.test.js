@@ -2,7 +2,7 @@ vi.hoisted(() => {
   process.env.JWT_SECRET = 'test-secret'
 })
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import request from 'supertest'
 import express from 'express'
 import jwt from 'jsonwebtoken'
@@ -229,6 +229,123 @@ describe('PUT /api/profile/:id', () => {
       (c) => typeof c[0] === 'string' && c[0].startsWith('UPDATE user_profiles'),
     )
     expect(updateCall[1][2]).toBe(18)
+  })
+})
+
+// Регрессия: пустой number/select-инпут отдавал '' в COALESCE(?, col), MySQL
+// отвечал ER_WARN_DATA_OUT_OF_RANGE, а маршрут — 500 на весь PUT, из-за чего
+// одно незаполненное поле блокировало сохранение всех остальных.
+describe('PUT /api/profile/:id: незаполненные поля не роняют сохранение', () => {
+  // Мок по SQL, а не очередью mockResolvedValueOnce: в ветках 400 ни одного
+  // запроса не уходит, и непрочитанная очередь утекала бы в соседние describe.
+  let stored
+
+  beforeEach(() => {
+    pool.query.mockReset()
+    stored = { id: 1, display_name: 'Stored', age: 30, birth_date: '1990-07-04' }
+    pool.query.mockImplementation((sql) => {
+      if (typeof sql === 'string' && sql.startsWith('SELECT * FROM user_profiles')) {
+        return Promise.resolve([[stored], []])
+      }
+      return Promise.resolve([[], []])
+    })
+  })
+
+  afterEach(() => {
+    pool.query.mockReset()
+  })
+
+  async function put(body) {
+    return request(app)
+      .put('/api/profile/1')
+      .set('Authorization', `Bearer ${authToken(1)}`)
+      .send(body)
+  }
+
+  function updateCall() {
+    return pool.query.mock.calls.find(
+      (c) => typeof c[0] === 'string' && c[0].startsWith('UPDATE user_profiles'),
+    )
+  }
+
+  it('пустые height, age, gender, looking_for сохраняются как 200', async () => {
+    const res = await put({ display_name: 'Updated', height: '', age: '', gender: '', looking_for: '' })
+    expect(res.status).toBe(200)
+  })
+
+  it("пустой height чистится в NULL, а не уходит в COALESCE как ''", async () => {
+    const res = await put({ display_name: 'Updated', height: '' })
+    expect(res.status).toBe(200)
+    expect(updateCall()[0]).toMatch(/height = \?/)
+    expect(updateCall()[0]).not.toMatch(/height = COALESCE/)
+    expect(updateCall()[1][8]).toBeNull()
+  })
+
+  it('height=0 от клиента (поле не заполнено) чистится, а не роняет CHECK 100..250', async () => {
+    const res = await put({ display_name: 'Updated', height: 0 })
+    expect(res.status).toBe(200)
+    expect(updateCall()[1][8]).toBeNull()
+  })
+
+  it('неприсланный height оставляет прежний (COALESCE), а не затирает', async () => {
+    const res = await put({ display_name: 'Updated' })
+    expect(res.status).toBe(200)
+    expect(updateCall()[0]).toMatch(/height = COALESCE/)
+    expect(updateCall()[1][8]).toBeUndefined()
+  })
+
+  it('рост вне 100..250 отвечает 400, а не ER_CHECK_CONSTRAINT_VIOLATED -> 500', async () => {
+    const res = await put({ display_name: 'Updated', height: 300 })
+    expect(res.status).toBe(400)
+    expect(res.body.field).toBe('height')
+  })
+
+  it('строка из number-инпута приводится к числу', async () => {
+    await put({ display_name: 'Updated', height: '172' })
+    expect(updateCall()[1][8]).toBe(172)
+  })
+
+  it('неизвестный ENUM отвечает 400 с именем поля, а не 500', async () => {
+    const res = await put({ display_name: 'Updated', gender: 'bogus' })
+    expect(res.status).toBe(400)
+    expect(res.body.field).toBe('gender')
+  })
+
+  it('рост вне диапазона отвечает 400, а не 500', async () => {
+    const res = await put({ display_name: 'Updated', height: -5 })
+    expect(res.status).toBe(400)
+    expect(res.body.field).toBe('height')
+  })
+
+  it('мусор в birth_date отвечает 400, а не 500', async () => {
+    const res = await put({ display_name: 'Updated', birth_date: 'мусор' })
+    expect(res.status).toBe(400)
+    expect(res.body.field).toBe('birth_date')
+  })
+
+  it('слишком длинное имя обрезается под varchar(100) вместо 500', async () => {
+    const res = await put({ display_name: 'x'.repeat(101) })
+    expect(res.status).toBe(200)
+    expect(updateCall()[1][0]).toHaveLength(100)
+  })
+
+  it('очистка bio пустой строкой сохраняется (поле можно очистить)', async () => {
+    await put({ display_name: 'Updated', bio: '' })
+    expect(updateCall()[1][4]).toBe('')
+  })
+
+  it('явная очистка birth_date (null) пишет NULL, а не игнорируется COALESCE', async () => {
+    await put({ display_name: 'Updated', birth_date: null })
+    expect(updateCall()[0]).toMatch(/birth_date = \?/)
+    expect(updateCall()[0]).not.toMatch(/birth_date = COALESCE/)
+    expect(updateCall()[1][3]).toBeNull()
+  })
+
+  it('ответ отдаёт birth_date как дату, а не Date с уходом на сутки', async () => {
+    stored = { id: 1, display_name: 'Updated', birth_date: new Date('1990-07-04T00:00:00Z') }
+    const res = await put({ display_name: 'Updated' })
+    expect(res.status).toBe(200)
+    expect(res.body.birth_date).toBe('1990-07-04')
   })
 })
 

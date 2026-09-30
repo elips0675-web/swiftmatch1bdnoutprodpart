@@ -6,6 +6,12 @@ import { cacheRoute, invalidate } from '../cache.js'
 import { stripHtml } from '../sanitize.js'
 import { activeUser } from '../active-user.js'
 import { dateOnly } from '../date-only.js'
+import { FieldError, blankToUndef, dateField, enumField, intField, numField, textField } from '../profile-fields.js'
+
+const GENDERS = ['male', 'female', 'other']
+const LOOKING_FOR = ['male', 'female', 'both']
+const CIRCADIAN = ['lark', 'owl', 'flexible']
+const ATTACHMENT_STYLES = ['secure', 'anxious', 'avoidant']
 
 const router = Router()
 
@@ -419,21 +425,51 @@ router.put('/api/profile/:id', auth, async (req, res) => {
       return res.status(403).json({ message: 'You can only edit your own profile' })
     }
 
-    const { display_name, name, age, bio, gender, looking_for, dating_goal, height, city, country, zodiac, circadian, attachment_style, education, interests, incognito, passport_mode, passport_city, passport_lat, passport_lng, birth_date } = req.body
+    const { interests, birth_date } = req.body
 
+    // Рост: клиент шлёт 0, когда поле не заполнено (mapDbProfile отдаёт
+    // p.height || 0), а CHECK user_profiles_chk_2 требует 100..250 — без этой
+    // ветки сохранение профиля без роста падало в ER_CHECK_CONSTRAINT_VIOLATED -> 500.
+    // Поле не прислали вовсе — не трогаем; '', null и 0 — пользователь очистил.
+    const heightSent = Object.prototype.hasOwnProperty.call(req.body, 'height')
+    const rawHeight = blankToUndef(req.body.height)
+    const clearHeight = heightSent && (rawHeight === undefined || Number(rawHeight) === 0)
+
+    // Значения приводим к тому, что MySQL примет: пустая строка в числовом или
+    // ENUM-поле раньше роняла весь PUT в 500, а несоразмерный текст — тоже.
     const clean = {
-      display_name: stripHtml(display_name),
-      name: stripHtml(name),
-      bio: stripHtml(bio),
-      city: stripHtml(city),
-      country: stripHtml(country),
-      education: stripHtml(education),
-      dating_goal: stripHtml(dating_goal),
+      display_name: textField(stripHtml(req.body.display_name), 100),
+      name: textField(stripHtml(req.body.name), 100),
+      // TEXT держит 65535 байт; в utf8b4 это ~16k символов — обрезаем по этому
+      // пределу, а не по произвольному круглому числу, чтобы длинное био не падало
+      // в ER_DATA_TOO_LONG и не терялось молча сверх нужного.
+      bio: textField(stripHtml(req.body.bio), 16000),
+      city: textField(stripHtml(req.body.city), 100),
+      country: textField(stripHtml(req.body.country), 100),
+      education: textField(stripHtml(req.body.education), 100),
+      dating_goal: textField(stripHtml(req.body.dating_goal), 100),
+      zodiac: textField(stripHtml(req.body.zodiac), 50),
+      age: intField(req.body.age, 'age', { min: 16, max: 120, zeroBlank: true }),
+      height: clearHeight || !heightSent ? undefined : intField(rawHeight, 'height', { min: 100, max: 250 }),
+      gender: enumField(req.body.gender, 'gender', GENDERS),
+      looking_for: enumField(req.body.looking_for, 'looking_for', LOOKING_FOR),
+      circadian: enumField(req.body.circadian, 'circadian', CIRCADIAN),
+      attachment_style: enumField(req.body.attachment_style, 'attachment_style', ATTACHMENT_STYLES),
+      incognito: intField(req.body.incognito, 'incognito', { min: 0, max: 1 }),
+      passport_mode: intField(req.body.passport_mode, 'passport_mode', { min: 0, max: 1 }),
+      passport_city: textField(stripHtml(req.body.passport_city), 100),
+      passport_lat: numField(req.body.passport_lat, 'passport_lat', { min: -90, max: 90 }),
+      passport_lng: numField(req.body.passport_lng, 'passport_lng', { min: -180, max: 180 }),
     }
 
-    let computedAge = age
-    if (birth_date && /^\d{4}-\d{2}-\d{2}$/.test(String(birth_date))) {
-      const bd = new Date(String(birth_date))
+    const cleanBirthDate = dateField(birth_date, 'birth_date')
+    // birth_date клиент шлёт как null, когда пользователь очистил поле: COALESCE
+    // такое значение проглотил бы молча, поэтому явную очистку пишем без него.
+    const clearBirthDate = birth_date === null
+
+    let computedAge = clean.age
+    if (cleanBirthDate) {
+      const bd = new Date(`${cleanBirthDate}T00:00:00`)
       if (!Number.isNaN(bd.getTime())) {
         const today = new Date()
         let a = today.getFullYear() - bd.getFullYear()
@@ -448,12 +484,12 @@ router.put('/api/profile/:id', auth, async (req, res) => {
         display_name = COALESCE(?, display_name),
         name = COALESCE(?, name),
         age = COALESCE(?, age),
-        birth_date = COALESCE(?, birth_date),
+        birth_date = ${clearBirthDate ? '?' : 'COALESCE(?, birth_date)'},
         bio = COALESCE(?, bio),
         gender = COALESCE(?, gender),
         looking_for = COALESCE(?, looking_for),
         dating_goal = COALESCE(?, dating_goal),
-        height = COALESCE(?, height),
+        height = ${clearHeight ? '?' : 'COALESCE(?, height)'},
         city = COALESCE(?, city),
         incognito = COALESCE(?, incognito),
         passport_mode = COALESCE(?, passport_mode),
@@ -466,7 +502,7 @@ router.put('/api/profile/:id', auth, async (req, res) => {
         attachment_style = COALESCE(?, attachment_style),
         education = COALESCE(?, education)
       WHERE id = ?`,
-      [clean.display_name, clean.name, computedAge, birth_date || null, clean.bio, gender, looking_for, clean.dating_goal, height, clean.city, incognito, passport_mode, passport_city, passport_lat, passport_lng, clean.country, zodiac, circadian, attachment_style, clean.education, req.params.id],
+      [clean.display_name, clean.name, computedAge, clearBirthDate ? null : cleanBirthDate, clean.bio, clean.gender, clean.looking_for, clean.dating_goal, clearHeight ? null : clean.height, clean.city, clean.incognito, clean.passport_mode, clean.passport_city, clean.passport_lat, clean.passport_lng, clean.country, clean.zodiac, clean.circadian, clean.attachment_style, clean.education, req.params.id],
     )
 
     if (interests && Array.isArray(interests)) {
@@ -481,8 +517,13 @@ router.put('/api/profile/:id', auth, async (req, res) => {
     invalidate(`route:/api/profile/${req.params.id}*`).catch(() => {})
 
     const [rows] = await pool.query('SELECT * FROM user_profiles WHERE id = ?', [req.params.id])
-    res.json(rows[0])
+    const row = rows[0]
+    if (!row) return res.json(null)
+    res.json(sanitizeProfileText({ ...row, birth_date: dateOnly(row.birth_date) }))
   } catch (err) {
+    if (err instanceof FieldError) {
+      return res.status(400).json({ message: err.message, field: err.field })
+    }
     logger.error('Profile PUT error:', err)
     res.status(500).json({ message: 'Failed to update profile' })
   }
