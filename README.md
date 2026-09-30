@@ -149,10 +149,11 @@ npx vite --port 8081 --host
 
 ### 🧪 Тестирование
 - **Фронтенд (Vitest):** 147 тестов, 24 файла — **0 failures**
-- **Сервер (Vitest):** 632 теста, 47 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
+- **Сервер (Vitest):** 632 теста, 48 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 208 тестов, 19 spec-файлов — живой прогон не выполнялся (нужен стек 3002/8081 + чистка БД через `globalTeardown`)
 - **Pre-flight:** `npm run check:ports` — сверка портов (vite/proxy/.env/CORS_ORIGIN) + warn на `console.log` в `server/src`
 - **Дрейф схемы:** `node scripts/schema-drift-audit.mjs --offline` (код ↔ `database/mysql_schema.sql`, без MySQL) и `node scripts/schema-drift-audit.mjs` (+ живая БД, нужен `MYSQL_BIN`). Ловит «код использует колонку, которой нет в БД» — это уже стоило 500 на `/profile/edit`
+- **Зависимости:** `npm audit --omit=dev` — **0 critical, 0 high** в prod-зависимостях (корень: 2 moderate, `server/`: 25 moderate — остаток требует мажорных обновлений `@sentry/node`, `firebase-admin`, `react-router-dom`). Проверять после каждого `npm install`, а не по отчёту об аудите
 - **Swagger:** OpenAPI-документация с JSDoc-аннотациями
 
 ### ⚙️ Фоновые задачи (Bull Queue)
