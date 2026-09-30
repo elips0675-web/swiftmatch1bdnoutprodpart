@@ -12,6 +12,7 @@
     "cap:sync": "npx cap sync",
     "lint": "eslint .",
     "check:ports": "node scripts/check-ports.mjs",
+    "audit:prod": "npm audit --omit=dev --audit-level=high",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

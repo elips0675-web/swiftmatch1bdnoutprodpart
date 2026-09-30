@@ -93,3 +93,23 @@ jobs:
         with:
           node-version: 20
       - run: node scripts/deploy-persistence-audit.mjs
+
+  # Уязвимости в prod-зависимостях — гейт без `npm ci`: аудиту нужен только
+  # lock-файл, поэтому джоба делает ровно две команды (корень и server) и
+  # проверяет обе половины: в контейнер едут обе, а не только фронт.
+  # `--omit=dev` — в образ ставится только прод-часть (`npm ci --omit=dev` в
+  # Dockerfile), `--audit-level=high` — иначе джоба краснеет от moderate и
+  # low, которые чинятся мажорными обновлениями и не являются нашим регрессом.
+  # Гейт блокирующий сразу: измерено 0 high / 0 critical в корне и в server.
+  # Trivy в deploy.yml смотрит образы (базовые слои), этот — resolved-зависимости
+  # по lock-файлу; дублируют друг друга на уровнях ОС и npm.
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm run audit:prod
+      - run: npm run audit:prod
+        working-directory: server

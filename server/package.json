@@ -7,7 +7,8 @@
     "dev": "node --watch src/index.js",
     "db:seed": "node src/seed.js",
     "db:reset": "node src/seed.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
     "@aws-sdk/client-rekognition": "^3.1131.0",

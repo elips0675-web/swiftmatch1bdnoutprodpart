@@ -153,7 +153,7 @@ npx vite --port 8081 --host
 - **E2E (Playwright):** 150 тестов, 19 spec-файлов — живой прогон не выполнялся (нужен стек 3002/8081 + чистка БД через `globalTeardown`)
 - **Pre-flight:** `npm run check:ports` — сверка портов (vite/proxy/.env/CORS_ORIGIN) + warn на `console.log` в `server/src`
 - **Дрейф схемы:** `node scripts/schema-drift-audit.mjs --offline` (код ↔ `database/mysql_schema.sql`, без MySQL) и `node scripts/schema-drift-audit.mjs` (+ живая БД, нужен `MYSQL_BIN`). Ловит «код использует колонку, которой нет в БД» — это уже стоило 500 на `/profile/edit`
-- **Зависимости:** `npm audit --omit=dev` — **0 critical, 0 high** в prod-зависимостях (корень: 2 moderate, `server/`: 25 moderate — остаток требует мажорных обновлений `@sentry/node`, `firebase-admin`, `react-router-dom`). Проверять после каждого `npm install`, а не по отчёту об аудите
+- **Зависимости:** `npm run audit:prod` (корень) и `npm run audit:prod` в `server/` = `npm audit --omit=dev --audit-level=high` — **0 critical, 0 high** в prod-зависимостях (корень: 2 moderate, `server/`: 25 moderate — остаток требует мажорных обновлений `@sentry/node`, `firebase-admin`, `react-router-dom`). Гейт блокирующий: джоба `dependency-audit` в `ci.yml` + шаги в `lint-and-typecheck` в `deploy.yml`. Проверять после каждого `npm install`, а не по отчёту об аудите
 - **Swagger:** OpenAPI-документация с JSDoc-аннотациями
 
 ### ⚙️ Фоновые задачи (Bull Queue)

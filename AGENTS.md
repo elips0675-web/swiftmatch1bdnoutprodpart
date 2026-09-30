@@ -27,6 +27,7 @@
 - **JWT_SECRET** — lazy getter `JWT_SECRET()`, устанавливать до `jwt.sign()` в тестах.
 - **Перед «готово»** — `npx vite build`; перед коммитом — зелёные тесты.
 - **Дрейф схемы = живой 500.** Колонка, которую читает код, обязана быть и в `database/mysql_schema.sql`, **и создаваться миграцией**. Проверка: `node scripts/schema-drift-audit.mjs --offline` (без MySQL) и `node scripts/schema-drift-audit.mjs` (с живой БД, нужен `MYSQL_BIN`). Мок БД не доказывает, что колонка существует.
+- **Прод-зависимости = два lock-файла.** `npm run audit:prod` (корень) и `npm run audit:prod` в `server/` — exit 0 = нет high/critical. Флаги обязательны: `--omit=dev` (в образ едет только прод-часть) и `--audit-level=high` (иначе гейт красный от moderate/low, которые чинятся мажорными обновлениями). Гейт в CI блокирующий: джоба `dependency-audit` + шаги в `lint-and-typecheck` (`deploy.yml`).
 - **Никогда** не коммитить `.env` с секретами; `.env.example` — в репо.
 
 ## Требования пользователя (обязательные, верить не могу)

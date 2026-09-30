@@ -30,6 +30,14 @@ jobs:
       - run: node scripts/secrets-leak-audit.mjs
       # Этап 21 (P0 #37): фото не должны теряться при `docker compose up --build`.
       - run: node scripts/deploy-persistence-audit.mjs
+      # Уязвимости high/critical в prod-зависимостях (этап 23). Блокирует деплой
+      # так же, как secrets-leak выше: в образ едет только прод-часть
+      # (`npm ci --omit=dev`), и именно её дерево резолвится по lock-файлу.
+      # Аудит не требует `npm ci` — достаточно lock-файла, поэтому джоба делает
+      # ровно две быстрые команды вместо полной установки зависимостей.
+      - run: npm run audit:prod
+      - run: npm run audit:prod
+        working-directory: server
 
   frontend-test:
     name: Frontend Tests (Vitest)
