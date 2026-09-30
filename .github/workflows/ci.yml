@@ -63,6 +63,23 @@ jobs:
           node-version: 20
       - run: node scripts/secrets-leak-audit.mjs
 
+  # Счётчики тестов в документации не должны расходиться с прогоном. Гейт
+  # перезапускает vitest (корень + server) и `playwright test --list`, сверяет
+  # измеренные числа с README / project-context / test/ИНВЕНТАРЬ-ТЕСТОВ.md и
+  # падает на расхождении. Нужен отдельный job: `lint-and-typecheck`-подобные
+  # джобы делают только root `npm ci`, а без `server/node_modules` измерить
+  # серверные тесты нечем. E2E считается статически (--list), БД не нужна.
+  test-counters:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm ci --prefix server
+      - run: node scripts/test-counter-audit.mjs
+
   # Данные на диске переживают пересоздание контейнера (этап 21, P0 #37).
   # `docker compose up -d --build` пересоздаёт контейнер, и всё, что не
   # смонтировано volume'ом, исчезает. Гейт выводит путь записи фото из кода

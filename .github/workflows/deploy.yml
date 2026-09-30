@@ -120,6 +120,26 @@ jobs:
           JWT_SECRET: ci-test-jwt-secret-key
           PORT: 3002
 
+  # Счётчики тестов в документации сверяются с прогоном: README,
+  # project-context и test/ИНВЕНТАРЬ-ТЕСТОВ.md хранят числа, и они устаревают
+  # каждый раз, когда добавлен тест. Отдельная джоба (нужны root и server
+  # node_modules), в needs деплоя — иначе расхождение всплывёт уже на VPS.
+  test-counters:
+    name: Test counters vs docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix server
+      - run: node scripts/test-counter-audit.mjs
+
   e2e-test:
     name: E2E Tests (Playwright)
     needs: [lint-and-typecheck, frontend-test, server-test]
@@ -319,7 +339,7 @@ jobs:
 
   deploy:
     name: Deploy to Production (Docker)
-    needs: [lint-and-typecheck, frontend-test, server-test, e2e-test]
+    needs: [lint-and-typecheck, frontend-test, server-test, e2e-test, test-counters]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:

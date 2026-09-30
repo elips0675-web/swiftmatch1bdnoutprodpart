@@ -10,7 +10,7 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"],
     testTimeout: 15000,
     hookTimeout: 10000,
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    include: ["src/**/*.{test,spec}.{ts,tsx}", "scripts/**/*.test.mjs"],
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },
