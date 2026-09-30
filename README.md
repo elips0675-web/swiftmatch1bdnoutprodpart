@@ -148,10 +148,11 @@ npx vite --port 8081 --host
 - `GET /api/referral/code`, `POST /api/referral/apply`, `GET /api/referral/stats`
 
 ### 🧪 Тестирование
-- **Фронтенд (Vitest):** 58 тестов, 12 файлов — **0 failures**
-- **Сервер (Vitest):** 149 тестов, 14 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize)
-- **E2E (Playwright):** 44 теста, 5 spec-файлов (audit-full, features, login, profile, register) — **0 failures**
+- **Фронтенд (Vitest):** 147 тестов, 24 файла — **0 failures**
+- **Сервер (Vitest):** 632 теста, 47 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
+- **E2E (Playwright):** 208 тестов, 19 spec-файлов — живой прогон не выполнялся (нужен стек 3002/8081 + чистка БД через `globalTeardown`)
 - **Pre-flight:** `npm run check:ports` — сверка портов (vite/proxy/.env/CORS_ORIGIN) + warn на `console.log` в `server/src`
+- **Дрейф схемы:** `node scripts/schema-drift-audit.mjs --offline` (код ↔ `database/mysql_schema.sql`, без MySQL) и `node scripts/schema-drift-audit.mjs` (+ живая БД, нужен `MYSQL_BIN`). Ловит «код использует колонку, которой нет в БД» — это уже стоило 500 на `/profile/edit`
 - **Swagger:** OpenAPI-документация с JSDoc-аннотациями
 
 ### ⚙️ Фоновые задачи (Bull Queue)
