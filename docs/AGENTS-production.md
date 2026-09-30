@@ -15,6 +15,7 @@
 | Код сохранения формы | Форма на живой стойке заполняется и **читается обратно из БД**, а не просто отдаёт 200 |
 | `Dockerfile` с `COPY server/ ./server/` | В образ **нет** `server/.env`, `server/.jwt-dev-secret` и `server/node_modules` (`node scripts/secrets-leak-audit.mjs` — exit 0) |
 | Прод-`.env` на VPS | Переживает `rsync --delete`: в строке `switches:` есть `--exclude .env`. Иначе деплой тихо подменяет `JWT_SECRET` публичным значением из `.env.example` |
+| Каталог с данными в коде | Смонтирован **именованным** volume'ом (`node scripts/deploy-persistence-audit.mjs` — exit 0). Иначе `docker compose up --build` удалит его, и страницы будут отдавать 200 со ссылками на несуществующие файлы |
 
 ---
 
@@ -101,6 +102,7 @@ app.get('/health', (req, res) => {
 - [ ] Playwright: `npx playwright test` проходит (требует запущенного сервера; добавить `webServer` в `playwright.config.ts`)
 - [ ] **Дрейф схемы:** `node scripts/schema-drift-audit.mjs --offline` — exit 0 (код ↔ `database/mysql_schema.sql`). Если доступна живая БД: `$env:MYSQL_BIN="<путь к mysql.exe>"; node scripts/schema-drift-audit.mjs` — exit 0. Ненулевой exit = в коде есть колонка, которой нет в БД → живой 500
 - [ ] **Секреты и мусор не уезжают в артефакты:** `node scripts/secrets-leak-audit.mjs` — exit 0. Проверяет, что в контекст образа не попадают `.env`/`*.secret`/`*.pem`/`*.key` и вложенные `node_modules`/`dist`, а rsync-строка в `deploy.yml` исключает `.env`/`*.secret`/`uploads`. Правило: `COPY server/ ./server/` требует `**/`-паттернов — `.env` и `node_modules` без `**/` исключают только корневой файл (питфолл 43), а `--delete` в rsync стирает всё, что живёт только на сервере (питфолл 44)
+- [ ] **Данные на диске переживают деплой:** `node scripts/deploy-persistence-audit.mjs` — exit 0. Правило: `docker compose up -d --build` пересоздаёт контейнер, и всё, что не смонтировано **именованным** volume'ом, исчезает. Если задача добавляет запись на диск — новый путь обязан быть под volume'ом и указан в гейте (питфолл 45)
 - [ ] **Миграция применена:** `cd database/migrations && node migrate.js` — `All migrations applied`, и новая колонка видна в `information_schema`. Правило: любая колонка, которую читает код, появляется и в `database/migrations/` (питфолл 38)
 
 ### 11. Запись в БД — обязательный смоук на живой стойке
