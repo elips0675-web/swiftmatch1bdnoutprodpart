@@ -8,6 +8,56 @@ import { wsConnectionsGauge, wsRoomsGauge, trackWsMessage } from './metrics.js'
 
 let io = null
 const CLEANUP_INTERVAL = 10000
+// Access-токен живёт 24 ч (routes/auth.js, expiresIn: '24h'), а сокет держится,
+// пока открыта вкладка: pingInterval/pingTimeout ниже его не рвут. Проверка
+// токена только в handshake (этап 68) означала, что истёкшая сессия продолжает
+// получать realtime-события неограниченно долго. Перепроверка раз в минуту.
+const TOKEN_REVERIFY_INTERVAL = 60000
+let reverifyTimer = null
+
+export function reverifySockets() {
+  if (!io) return 0
+  const revoked = []
+  for (const socket of io.sockets.sockets.values()) {
+    if (!socket.token) continue
+    let decoded = null
+    try {
+      decoded = verifyToken(socket.token)
+    } catch {
+      // TokenExpiredError или invalid signature — сессия мертва, рвём сокет.
+      revoked.push(socket)
+      continue
+    }
+    // Подпись сошлась, но subject другой: такой токен выдан на другого юзера.
+    if (decoded.userId !== socket.userId) revoked.push(socket)
+  }
+  for (const socket of revoked) {
+    // Обработчик socket.on('disconnect') ниже сам снимет gauge и залогирует,
+    // поэтому здесь метрики не трогаем — иначе счётчик уходит в минус.
+    socket.emit('auth:unauthorized', { reason: 'token-expired-or-invalid' })
+    socket.disconnect(true)
+  }
+  return revoked.length
+}
+
+function startTokenReverify() {
+  if (reverifyTimer) return
+  reverifyTimer = setInterval(() => {
+    try {
+      reverifySockets()
+    } catch (err) {
+      rootLogger.error('[ws] Token re-verify error:', err)
+    }
+  }, TOKEN_REVERIFY_INTERVAL)
+  rootLogger.info(`[ws] Token re-verify started every ${TOKEN_REVERIFY_INTERVAL / 1000}s`)
+}
+
+export function stopWsTimers() {
+  if (reverifyTimer) {
+    clearInterval(reverifyTimer)
+    reverifyTimer = null
+  }
+}
 
 export function startMessageCleanup() {
   setInterval(async () => {
@@ -86,6 +136,9 @@ export async function initIO(httpServer) {
     try {
       const decoded = verifyToken(token)
       socket.userId = decoded.userId
+      // Токен сохраняем на сокете: reverifySockets() перепроверяет его по таймеру,
+      // иначе истёкшая сессия живёт, пока открыта вкладка.
+      socket.token = token
       next()
     } catch {
       next(new Error('Invalid token'))
@@ -184,6 +237,8 @@ export async function initIO(httpServer) {
       })
     })
   })
+
+  startTokenReverify()
 
   return io
 }

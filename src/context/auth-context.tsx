@@ -206,6 +206,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'AUTH_LOGOUT' })
   }, [])
 
+  // api.ts диспатчит 'auth:unauthorized', когда refresh не удался и сессия мертва
+  // окончательно. Подписчика не было ни одного: токен стирался, а React-состояние
+  // оставалось «залогинен» — приложение продолжало показывать пользователя и
+  // получать 401 на каждый запрос. Само событие и есть команда разлогиниться.
+  useEffect(() => {
+    const onUnauthorized = () => {
+      clearToken()
+      dispatch({ type: 'AUTH_LOGOUT' })
+    }
+    window.addEventListener('auth:unauthorized', onUnauthorized)
+    return () => window.removeEventListener('auth:unauthorized', onUnauthorized)
+  }, [])
+
   const clearError = useCallback(() => {
     dispatch({ type: 'CLEAR_ERROR' })
   }, [])

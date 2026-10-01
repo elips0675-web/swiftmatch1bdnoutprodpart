@@ -122,4 +122,40 @@ describe("AuthContext", () => {
 
     expect(result.current.error).toBeNull()
   })
+
+  // Этап 25: api.ts диспатчит 'auth:unauthorized', когда refresh не удался.
+  // Подписчика не было — токен стирался, а состояние оставалось «залогинен».
+  it("logs out on window event 'auth:unauthorized'", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ id: 7, email: "user7@mail.ru", name: "Ольга", avatar: "" }),
+    })
+
+    const { result } = renderHook(() => useAuth(), { wrapper: Wrapper })
+    await waitFor(() => expect(result.current.token).not.toBeNull())
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent("auth:unauthorized"))
+    })
+
+    expect(result.current.user).toBeNull()
+    expect(result.current.token).toBeNull()
+  })
+
+  it("removes the 'auth:unauthorized' listener on unmount", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ id: 7, email: "user7@mail.ru", name: "Ольга", avatar: "" }),
+    })
+
+    const removeSpy = vi.spyOn(window, "removeEventListener")
+    const { result, unmount } = renderHook(() => useAuth(), { wrapper: Wrapper })
+    await waitFor(() => expect(result.current.token).not.toBeNull())
+
+    unmount()
+
+    const names = removeSpy.mock.calls.map((call) => call[0])
+    expect(names).toContain("auth:unauthorized")
+    removeSpy.mockRestore()
+  })
 })

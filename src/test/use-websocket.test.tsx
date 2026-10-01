@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { renderHook, act } from "@testing-library/react"
+import { renderHook, act, waitFor } from "@testing-library/react"
 
-const mockSocket = { on: vi.fn(), disconnect: vi.fn() }
+const mockSocket = {
+  on: vi.fn(),
+  disconnect: vi.fn(),
+  connect: vi.fn(),
+  removeAllListeners: vi.fn(),
+  auth: {} as { token?: string },
+}
 const mockIo = vi.fn(() => mockSocket)
 
 vi.mock("socket.io-client", () => ({ io: (...args: unknown[]) => mockIo(...args) }))
@@ -13,18 +19,25 @@ vi.mock("@/context/auth-context", () => ({
   useAuth: () => mockAuth,
 }))
 
-const events = new Map<string, () => void>()
+const mockRefresh = vi.hoisted(() => ({
+  refreshAuthToken: vi.fn<() => Promise<string | null>>(),
+  notifyUnauthorized: vi.fn(),
+}))
+
+vi.mock("@/lib/auth-refresh", () => mockRefresh)
+
+const events = new Map<string, (arg?: unknown) => void>()
 
 function setupSocketHandlers() {
   events.clear()
-  mockSocket.on.mockImplementation((event: string, cb: () => void) => {
+  mockSocket.on.mockImplementation((event: string, cb: (arg?: unknown) => void) => {
     events.set(event, cb)
     return mockSocket
   })
 }
 
-function trigger(event: string) {
-  events.get(event)?.()
+function trigger(event: string, arg?: unknown) {
+  events.get(event)?.(arg)
 }
 
 describe("useWebSocket", () => {
@@ -34,6 +47,11 @@ describe("useWebSocket", () => {
     mockAuth.logout.mockReset()
     mockSocket.on.mockReset()
     mockSocket.disconnect.mockReset()
+    mockSocket.connect.mockReset()
+    mockSocket.removeAllListeners.mockReset()
+    mockSocket.auth = {}
+    mockRefresh.refreshAuthToken.mockReset()
+    mockRefresh.notifyUnauthorized.mockReset()
     setupSocketHandlers()
   })
 
@@ -104,5 +122,85 @@ describe("useWebSocket", () => {
 
     act(() => unmount())
     expect(mockSocket.disconnect).toHaveBeenCalledTimes(1)
+  })
+
+  // --- этап 25, P0-B: истёкший токен больше не оставляет WS мёртвым навсегда ---
+
+  it("connect_error с auth-ошибкой: обновляет токен и переподключается с новым", async () => {
+    mockRefresh.refreshAuthToken.mockResolvedValue("fresh-token")
+    const { useWebSocket } = await import("@/hooks/use-websocket")
+    const { result } = renderHook(() => useWebSocket())
+
+    act(() => trigger("connect"))
+    expect(result.current.connected).toBe(true)
+
+    await act(async () => {
+      trigger("connect_error", new Error("Invalid token"))
+    })
+
+    await waitFor(() => expect(mockSocket.connect).toHaveBeenCalledTimes(1))
+    expect(mockSocket.auth).toEqual({ token: "fresh-token" })
+    expect(mockAuth.logout).not.toHaveBeenCalled()
+    expect(mockRefresh.notifyUnauthorized).not.toHaveBeenCalled()
+  })
+
+  it("connect_error с auth-ошибкой и неудачным refresh: разлогин, а не бесконечный круг", async () => {
+    mockRefresh.refreshAuthToken.mockResolvedValue(null)
+    const { useWebSocket } = await import("@/hooks/use-websocket")
+    renderHook(() => useWebSocket())
+
+    await act(async () => {
+      trigger("connect_error", new Error("Invalid token"))
+    })
+
+    await waitFor(() => expect(mockAuth.logout).toHaveBeenCalledTimes(1))
+    expect(mockRefresh.notifyUnauthorized).toHaveBeenCalledTimes(1)
+    expect(mockSocket.connect).not.toHaveBeenCalled()
+  })
+
+  it("сетевая ошибка не разлогинивает — обрыв Wi-Fi не должен выкидывать из аккаунта", async () => {
+    mockRefresh.refreshAuthToken.mockResolvedValue("fresh-token")
+    const { useWebSocket } = await import("@/hooks/use-websocket")
+    renderHook(() => useWebSocket())
+
+    await act(async () => {
+      trigger("connect_error", new Error("xhr poll error"))
+    })
+
+    expect(mockAuth.logout).not.toHaveBeenCalled()
+    expect(mockRefresh.refreshAuthToken).not.toHaveBeenCalled()
+    expect(mockSocket.connect).not.toHaveBeenCalled()
+  })
+
+  it("не запускает refresh второй раз, пока первый ещё идёт", async () => {
+    let resolveRefresh: (value: string | null) => void = () => {}
+    mockRefresh.refreshAuthToken.mockReturnValue(
+      new Promise<string | null>((resolve) => {
+        resolveRefresh = resolve
+      })
+    )
+    const { useWebSocket } = await import("@/hooks/use-websocket")
+    renderHook(() => useWebSocket())
+
+    await act(async () => {
+      trigger("connect_error", new Error("Invalid token"))
+      trigger("connect_error", new Error("Invalid token"))
+      trigger("connect_error", new Error("Invalid token"))
+    })
+
+    expect(mockRefresh.refreshAuthToken).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveRefresh("fresh-token")
+    })
+    await waitFor(() => expect(mockSocket.connect).toHaveBeenCalledTimes(1))
+  })
+
+  it("auth:unauthorized от сервера (истёк токен на живом сокете) → logout", async () => {
+    const { useWebSocket } = await import("@/hooks/use-websocket")
+    renderHook(() => useWebSocket())
+
+    trigger("auth:unauthorized")
+    expect(mockAuth.logout).toHaveBeenCalledTimes(1)
   })
 })

@@ -1,5 +1,6 @@
 import { config } from './env'
 import { getToken } from './token'
+import { refreshAuthToken, notifyUnauthorized } from './auth-refresh'
 
 interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown
@@ -89,27 +90,14 @@ class ApiClient {
 
           if (response.status === 401 && !refreshed) {
             refreshed = true
-            const { isNative } = await import('./native')
-            const refreshToken = isNative() ? sessionStorage.getItem('swiftmatch_refresh_token') : null
-            try {
-              // Web: refresh_token сервер читает из httpOnly cookie (пустой body)
-              const refreshRes = await fetch('/api/auth/refresh', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                ...(refreshToken ? { body: JSON.stringify({ refresh_token: refreshToken }) } : {}),
-              })
-              if (refreshRes.ok) {
-                const { token: newToken, refresh_token: newRefresh } = await refreshRes.json()
-                const { setToken } = await import('./token')
-                setToken(newToken)
-                if (refreshToken) sessionStorage.setItem('swiftmatch_refresh_token', newRefresh)
-                headers['Authorization'] = `Bearer ${newToken}`
-                continue
-              }
-            } catch { /* ignored */ }
+            const newToken = await refreshAuthToken()
+            if (newToken) {
+              headers['Authorization'] = `Bearer ${newToken}`
+              continue
+            }
             const { clearToken } = await import('./token')
             clearToken()
-            window.dispatchEvent(new CustomEvent('auth:unauthorized'))
+            notifyUnauthorized()
           }
 
           throw error

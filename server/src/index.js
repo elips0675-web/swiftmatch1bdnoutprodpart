@@ -10,7 +10,7 @@ import { apiLimiter as limiter, authLimiter } from './middleware/limiters.js'
 import helmet from 'helmet'
 import cookieParser from 'cookie-parser'
 import pool from './db.js'
-import { initIO, startMessageCleanup, startCheckinCleanup } from './ws.js'
+import { initIO, startMessageCleanup, startCheckinCleanup, stopWsTimers } from './ws.js'
 import { createLogger, rootLogger } from './logger.js'
 import { idempotency } from './middleware/idempotency.js'
 import { csrf, csrfGuard, csrfRouter } from './middleware/csrf.js'
@@ -336,6 +336,7 @@ httpServer.listen(PORT, () => {
 
 process.on('SIGTERM', async () => {
   rootLogger.info('SIGTERM received — shutting down')
+  stopWsTimers()
   await closeQueues()
   await disconnectRedis()
   await pool.end().catch(() => {})
