@@ -25,6 +25,7 @@ import { toast } from "@/hooks/use-toast";
 import { useLanguage } from "@/context/language-context";
 import { subscribeToPush, unsubscribeFromPush } from "@/lib/push-notifications";
 import { NotificationPreferencesSection } from "@/components/settings/notification-preferences-section";
+import { SessionsSection } from "@/components/settings/sessions-section";
 import { getToken } from "@/lib/token";
 
 
@@ -44,6 +45,7 @@ export default function SettingsPage() {
     dataProcessingConsent: true
   });
   const [isClient, setIsClient] = useState(false);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -225,10 +227,26 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <p className="text-sm font-bold">{t('settings.security')}</p>
+                    <p className="text-[11px] text-muted-foreground">{t('sessions.desc')}</p>
                   </div>
                 </div>
-                <Badge variant="outline" className="text-[10px] text-primary border-primary/20">{t('settings.security.status')}</Badge>
+                <button
+                  type="button"
+                  data-testid="sessions-toggle"
+                  className="flex items-center gap-2"
+                  onClick={() => setSessionsOpen((v) => !v)}
+                aria-expanded={sessionsOpen}
+                >
+                  <Badge variant="outline" className="text-[10px] text-primary border-primary/20">{t('settings.security.status')}</Badge>
+                  <ChevronRight size={16} className={cn('text-muted-foreground transition-transform', sessionsOpen && 'rotate-90')} />
+                </button>
               </div>
+
+              {sessionsOpen && (
+                <div className="pb-3">
+                  <SessionsSection />
+                </div>
+              )}
 
               <div className="flex items-center justify-between py-3 border-b border-border/50">
                 <div className="flex items-center gap-3">

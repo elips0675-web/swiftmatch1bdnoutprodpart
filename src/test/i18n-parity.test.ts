@@ -35,6 +35,7 @@ const LATIN_ONLY_OK = [
   "profile.pro",
   "safety.contact_email",
   "settings.security.status",
+  "sessions.ip",
   "verification.photo_placeholder",
 ]
 

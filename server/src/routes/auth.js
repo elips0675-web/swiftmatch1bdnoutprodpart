@@ -128,13 +128,26 @@ function makeFingerprint(req) {
 const REFRESH_EXPIRY_DAYS = 30
 
 // familyId: одна «семья» на логин-сессию; refresh ротирует токен внутри семьи,
-// переиспользование ротированного токена отзывает всю семью (этап 34)
-async function createRefreshToken(userId, familyId, fingerprint) {
+// переиспользование ротированного токена отзывает всю семью (этап 34).
+//
+// Этап 27 (P0 #5): вместе с fingerprint пишем ip_address и user_agent. Раньше
+// хранился только SHA256 хэш, поэтому «активные сессии» нечем было показать —
+// хэш не обратим. Пишется на КАЖДЫЙ выпущенный токен, включая ротацию, поэтому
+// значения последнего токена семьи всегда актуальны (миграция 052).
+async function createRefreshToken(userId, familyId, fingerprint, req) {
   const token = crypto.randomBytes(40).toString('hex')
   const family = familyId || crypto.randomUUID()
   await pool.query(
-    'INSERT INTO refresh_tokens (user_id, token, family_id, fingerprint, expires_at) VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))',
-    [userId, token, family, fingerprint || null, REFRESH_EXPIRY_DAYS],
+    'INSERT INTO refresh_tokens (user_id, token, family_id, fingerprint, ip_address, user_agent, expires_at) VALUES (?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))',
+    [
+      userId,
+      token,
+      family,
+      fingerprint || null,
+      (req?.ip || req?.connection?.remoteAddress || '').slice(0, 45) || null,
+      (req?.headers?.['user-agent'] || '').slice(0, 500) || null,
+      REFRESH_EXPIRY_DAYS,
+    ],
   )
   return token
 }
@@ -174,7 +187,7 @@ router.post('/api/auth/register', async (req, res) => {
 
     const token = jwt.sign({ userId, role: 'user' }, JWT_SECRET(), { expiresIn: '24h' })
     const fp = makeFingerprint(req)
-    const refresh_token = await createRefreshToken(userId, undefined, fp)
+    const refresh_token = await createRefreshToken(userId, undefined, fp, req)
     setAuthCookies(res, token, refresh_token)
     if (consent === true) {
       await pool.query(
@@ -331,12 +344,7 @@ router.post('/api/auth/refresh', async (req, res) => {
     }
 
     const token = jwt.sign({ userId: current.user_id, role: 'user' }, JWT_SECRET(), { expiresIn: '24h' })
-    const new_refresh_token = crypto.randomBytes(40).toString('hex')
-    const newFp = makeFingerprint(req)
-    await pool.query(
-      'INSERT INTO refresh_tokens (user_id, token, family_id, fingerprint, expires_at) VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))',
-      [current.user_id, new_refresh_token, current.family_id, newFp, REFRESH_EXPIRY_DAYS],
-    )
+    const new_refresh_token = await createRefreshToken(current.user_id, current.family_id, makeFingerprint(req), req)
     setAuthCookies(res, token, new_refresh_token)
     res.json({ token, refresh_token: new_refresh_token })
   } catch (err) {
@@ -354,6 +362,74 @@ router.post('/api/auth/logout-all', auth, async (req, res) => {
   } catch (err) {
     logger.error('Logout-all error:', err)
     res.status(500).json({ message: 'Failed to revoke sessions' })
+  }
+})
+
+// Этап 27 (P0 #5): список активных сессий + отзыв одной.
+//
+// Сессия = семейство refresh-токенов (family_id), а не строка токена: при ротации
+// внутри семейства токен меняется, поэтому отзыв по id строки оставил бы
+// действующими все её потомки. Отзыв всегда идёт по family_id.
+//
+// Одна строка на семейство — токен с максимальным id (он же самый свежий, его
+// fingerprint/ip/user_agent и показываем). Текущая сессия определяется сравнением
+// fingerprint с fingerprint текущего запроса.
+router.get('/api/auth/sessions', auth, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT t.family_id, t.created_at, t.expires_at, t.fingerprint,
+              t.ip_address, t.user_agent, t.revoked
+       FROM refresh_tokens t
+       JOIN (
+         SELECT family_id, MAX(id) AS latest_id
+         FROM refresh_tokens
+         WHERE user_id = ? AND revoked = 0 AND expires_at > NOW()
+         GROUP BY family_id
+       ) latest ON latest.latest_id = t.id
+       ORDER BY t.created_at DESC`,
+      [req.userId],
+    )
+    const currentFingerprint = makeFingerprint(req)
+    const sessions = rows.map(row => ({
+      familyId: row.family_id,
+      current: row.fingerprint === currentFingerprint,
+      ipAddress: row.ip_address,
+      userAgent: row.user_agent,
+      createdAt: row.created_at,
+      lastUsedAt: row.created_at,
+      expiresAt: row.expires_at,
+    }))
+    res.json({ sessions, current: sessions.find(s => s.current) || null, count: sessions.length })
+  } catch (err) {
+    logger.error('Sessions list error:', err)
+    res.status(500).json({ message: 'Failed to list sessions' })
+  }
+})
+
+router.delete('/api/auth/sessions/:familyId', auth, async (req, res) => {
+  const { familyId } = req.params
+  if (!/^[0-9a-fA-F-]{36}$/.test(familyId)) {
+    return res.status(400).json({ message: 'Invalid session id' })
+  }
+  try {
+    // user_id в WHERE — IDOR-защита: family_id глобально уникален, но чужая
+    // семья не должна отзываться даже если её id угадали.
+    const [rows] = await pool.query(
+      'SELECT family_id, fingerprint FROM refresh_tokens WHERE user_id = ? AND family_id = ? AND revoked = 0 AND expires_at > NOW() LIMIT 1',
+      [req.userId, familyId],
+    )
+    if (rows.length === 0) return res.status(404).json({ message: 'Session not found' })
+
+    const [upd] = await pool.query(
+      'UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ? AND family_id = ? AND revoked = 0',
+      [req.userId, familyId],
+    )
+    const currentRevoked = rows[0].fingerprint === makeFingerprint(req)
+    if (currentRevoked) clearAuthCookies(res)
+    res.json({ message: 'Session revoked', currentRevoked, affected: upd.affectedRows })
+  } catch (err) {
+    logger.error('Session revoke error:', err)
+    res.status(500).json({ message: 'Failed to revoke session' })
   }
 })
 

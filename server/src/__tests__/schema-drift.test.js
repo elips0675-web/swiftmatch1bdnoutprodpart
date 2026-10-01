@@ -120,7 +120,33 @@ describe('миграции против кода (регрессия user_profil
 
     expect(migrations).toMatch(/ALTER TABLE\s+user_profiles\s+ADD COLUMN\s+`?birth_date`?/i)
   })
+})
 
+describe('миграции против кода (регрессия refresh_tokens.ip_address/user_agent, этап 27)', () => {
+  // Регрессия того же класса, что и birth_date: колонки читает и пишет код
+  // (routes/auth.js createRefreshToken + GET/DELETE /api/auth/sessions), поэтому
+  // они обязаны быть и в эталоне, и в миграции — иначе любой вход на живой БД
+  // без применённой миграции падает с ERROR 1054, то есть логин и список сессий
+  // не работают вообще.
+  it('ip_address и user_agent есть в эталоне', () => {
+    const refreshTokens = reference.get('refresh_tokens')
+    expect(refreshTokens.has('ip_address')).toBe(true)
+    expect(refreshTokens.has('user_agent')).toBe(true)
+  })
+
+  it('миграция 052 добавляет обе колонки в refresh_tokens', () => {
+    const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, '052_refresh_session_device.sql'), 'utf8')
+    expect(sql).toMatch(/ALTER TABLE refresh_tokens ADD COLUMN ip_address/i)
+    expect(sql).toMatch(/ALTER TABLE refresh_tokens ADD COLUMN user_agent/i)
+  })
+
+  it('составной индекс активных сессий есть в эталоне', () => {
+    const indexSql = fs.readFileSync(SCHEMA_FILE, 'utf8')
+    expect(indexSql).toMatch(/KEY `idx_refresh_active`\s*\(`user_id`,`revoked`,`expires_at`\)/)
+  })
+})
+
+describe('идемпотентность миграций', () => {
   it('новые миграции (049+) идемпотентны: IF NOT EXISTS или проверка information_schema', () => {
     const files = fs.readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql'))
     for (const file of files) {

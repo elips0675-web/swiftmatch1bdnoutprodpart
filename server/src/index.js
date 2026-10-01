@@ -190,7 +190,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET(), { expiresIn: '24h' })
     const fp = crypto.createHash('sha256').update((req.ip || '') + '|' + (req.headers['user-agent'] || '')).digest('hex').slice(0, 32)
-    const refresh_token = await createRefreshToken(user.id, undefined, fp)
+    const refresh_token = await createRefreshToken(user.id, undefined, fp, req)
     setAuthCookies(res, token, refresh_token)
     res.json({ token, refresh_token, role: user.role })
   } catch (err) {
