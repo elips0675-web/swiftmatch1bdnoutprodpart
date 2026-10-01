@@ -9,8 +9,8 @@
 
 ## 0. Что уже готово в коде (не нужно делать заново)
 
-- `docker-compose.yml` — app + nginx + Prometheus + Grafana (валиден, но НЕ прогонялся end-to-end)
-- `nginx/swiftmatch.conf` — WS timeout `proxy_read_timeout 86400s`, `client_max_body_size 10M`
+- `docker-compose.yml` — db (MySQL 8 на хост-порту 3307) + redis + app + nginx + Prometheus + Grafana, именованные volume'ы `db_data`/`redis_data`/`uploads_data`/`prometheus_data`/`grafana_data` (валиден, но НЕ прогонялся end-to-end)
+- `nginx/swiftmatch.http.conf` — конфиг, который реально едет в образ (`Dockerfile:30`): WS timeout `proxy_read_timeout 86400s`, `client_max_body_size 20M`, `limit_req` 60r/s (`/api`) и 10r/s (`/api/auth`). `nginx/swiftmatch.conf` и корневой `nginx.conf` — конфиги хостового nginx (TLS 443) и в образ не попадают; между собой они расходятся (`swiftmatch.conf` — 30r/s/5r/s, `nginx.conf` — без `limit_req`), см. бэклог
 - `.github/workflows/deploy.yml` — CI: lint → test → build → migrate (на сервере) → restart; нужны только secrets
 - `scripts/backup-mysql.ps1` / `.sh` — бэкап, retention 30 дней; `verify-backup.mjs` — restore smoke
 - `server/.env.example`, `.env.example` — актуальные шаблоны всех ключей
@@ -43,15 +43,15 @@
 
 ## 4. Docker Compose (реальный прогон)
 
-- [ ] `cp server/.env.example server/.env` на VPS → вписать реальные ключи (см. §5)
-- [ ] Склонировать репо на VPS, собрать фронт: `VITE_API_URL=https://<domain> npx vite build` → `dist/`
+- [ ] На VPS: `cp .env.example .env` (корневой, его читает `docker-compose.yml:83`) → вписать `JWT_SECRET` и `CORS_ORIGIN`. Подключение к БД compose перекрывает сам (`DB_HOST=db`, `DB_NAME=swiftmatch1bd`). `server/.env` нужен только для локального запуска без Docker
+- [ ] Склонировать репо на VPS, собрать фронт: `VITE_API_URL=/api npx vite build` → `dist/`
 - [ ] `docker compose up -d`
-- [ ] Проверить по одному: healthcheck app (`/health` 200), nginx проксирует `/api` 200, WS через 60s не обрывается, `client_max_body_size` пропускает фото до 10 MB, volumes (./dist, uploads), сеть между контейнерами
+- [ ] Проверить по одному: app healthy (`docker compose ps`, внутри — `curl -f localhost:3002/health`), nginx проксирует `/api` 200, WS через 60s не обрывается, фото до 10 MB проходят (лимит приложения `server/src/routes/upload.js` = 10 MB; `client_max_body_size 20M` в nginx — запас), volume `uploads_data` смонтирован, сеть между контейнерами
 - [ ] По итогам (если что-то поправили в compose/nginx) — commit
 
 ## 5. Ключи — ввести реальные (по `runbook-keys.md`)
 
-Всё в `server/.env` на VPS. После каждого: рестарт API + смоук.
+Всё в корневом `.env` на VPS (его читает `docker-compose.yml:83`); `server/.env` — только для локального запуска без Docker. После каждого: рестарт API + смоук.
 
 | Сервис | Переменные | Без ключа | Проверка |
 |---|---|---|---|
@@ -133,4 +133,4 @@
 - [ ] Android APK/AAB собирается, App Links работают
 - [ ] Полный E2E против staging зелёный
 
-После выполнения — updeйт `Что доделать.txt` и закоммить (документация).
+После выполнения — обновить `Что доделать.txt` и закоммить (документация).

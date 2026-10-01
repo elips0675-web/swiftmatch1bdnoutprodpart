@@ -7,7 +7,7 @@
 | Создано | Не значит «готово» |
 |---|---|
 | `Dockerfile` | Образ собирается, healthcheck отвечает, `docker-compose up` не падает |
-| `nginx.conf` | `location /api` проксирует, WS не обрывается через 60s, `client_max_body_size` задан |
+| `nginx/swiftmatch.http.conf` | `location /api` проксирует, WS не обрывается (`proxy_read_timeout 86400s`), `client_max_body_size 20M`, `limit_req` настроен. **Именно этот файл попадает в образ** (`Dockerfile:30`); корневой `nginx.conf` — конфиг хостового nginx на VPS (TLS 443, редирект с 80) и в образ не едет |
 | `sentry.ts` | DSN в `.env`, source maps генерируются, `beforeSend` фильтрует JWT/пароли |
 | `swagger.js` | Все новые роуты имеют JSDoc, авторизация через Bearer описана |
 | Тесты Vitest/Playwright | **0 failures** — «pre-existing» не оправдание. Упавший тест = баг или мок сломан |
@@ -19,6 +19,7 @@
 | Счётчики тестов в `.md` | Совпадают с прогоном (`node scripts/test-counter-audit.mjs` — exit 0). Число в документации не доказывает ничего: оно устаревает молча и перепечатывается в оценки проекта (питфолл 47) |
 | Маршрут, отдающий данные другого юзера | Учитывает `user_blocks` **в SQL** (`server/src/user-blocks.js`, `notBlocked`) — не только фид. Возвращает **404**, не 403, чтобы не подтверждать существование. Если ответ зависит от смотрящего — middleware кэша `cacheRoutePerUser`, и **все** `invalidate()` под этот маршрут переписаны под префикс `user:` |
 | Прод-зависимости | `npm run audit:prod` — **exit 0** в корне и в `server/` (джоба `dependency-audit` в `ci.yml`, шаг в `lint-and-typecheck` в `deploy.yml`). High/critical в prod-дереве блокируют деплой; moderate/low — нет (питфолл 49) |
+| Секрет, вписанный в документ | `node scripts/secrets-leak-audit.mjs` — exit 0 **и по именам файлов, и по значениям**. Гейт смотрел только на имена, и настоящий VAPID-приватный ключ в `README.md` уехал на GitHub вместе с историей. Ключи генерируются локально (`npx web-push generate-vapid-keys`) и в репозиторий не пишутся |
 
 ---
 

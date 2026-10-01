@@ -1,47 +1,124 @@
-# SwiftMatch1BD — Тестовая копия с локальной БД
+# SwiftMatch — приложение для знакомств
 
-Клон [основного репозитория](https://github.com/elips0675-web/swiftmatch-vite-react1-production1) для тестирования с **реальной MySQL-БД** через локальный API-сервер.
+React + Express + MySQL, реальный-time (Socket.IO), нативная сборка под Android
+(Capacitor). Репозиторий `elips0675-web/swiftmatch1bdnoutprodpart` — он же
+источник прод-деплоя: `.github/workflows/deploy.yml` по пушу в `main` делает
+rsync на VPS и `docker compose up -d --build`.
 
-Отличается от оригинала:
-- **Бэкенд:** Node.js/Express + MySQL (Laragon), а не Supabase
-- **Данные:** демо-данные (50 пользователей, 30 мэтчей, 200 сообщений)
-- **Порт API:** 3002 (чтобы не конфликтовать с оригиналом на 3001)
-- **Порт фронта:** 8081
+Изначально репозиторий был локальной копией с **реальной** MySQL-БД (а не
+Supabase), с портами 3002/8081, чтобы не мешать основной версии на 3001.
+Сейчас это продакшен-ветка: деплой, миграции, бэкапы и аудиты — в одном месте.
+
+---
+
+## На чём собрано
+
+Версии — из `package.json`, `server/package.json`, `docker-compose.yml`,
+`Dockerfile` и обоих workflow. Числа тестов проверяет гейт
+`scripts/test-counter-audit.mjs` (перезапускает vitest и сверяет с документацией),
+поэтому расхождение с прогоном ловится в CI, а не «глазами».
+
+### Фронтенд — `src/`
+
+| Слой | Технология | Версия |
+|------|-----------|--------|
+| Сборка | Vite | 8.0.16 |
+| UI-библиотека | React / React DOM | 18.3.1 |
+| Язык | TypeScript (strict, без `any`) | 5.9.3 |
+| Стили | Tailwind CSS + shadcn/ui (Radix UI) | 3.4.19 |
+| Серверное состояние | TanStack Query | 5.101.0 |
+| Роутинг | react-router-dom | 6.30.4 |
+| Real-time | socket.io-client | 4.8.4 |
+| Формы | React Hook Form + resolvers | 7.78.0 |
+| Анимации | framer-motion | 12.40.0 |
+| Графики | recharts | 3.8.1 |
+| Мониторинг | @sentry/react | 9.14.0 |
+| Тесты | vitest + @testing-library/react + jsdom | 3.2.6 / 16.3.2 / 20.0.3 |
+| Линт | ESLint 9 + typescript-eslint | 9.39.4 / 8.61.0 |
+
+### Бэкенд — `server/`
+
+| Слой | Технология | Версия |
+|------|-----------|--------|
+| Runtime | Node.js | 22 (образ `node:22-alpine`) |
+| HTTP | Express | 4.21.0 |
+| Real-time | Socket.IO (+ Redis adapter) | 4.8.4 / 8.3.0 |
+| БД | MySQL через mysql2 | 8.x (образ `mysql:8`) / 3.11.0 |
+| Кэш и очереди | ioredis + Bull | 5.11.1 / 4.16.5 |
+| Аутентификация | jsonwebtoken + otplib + bcryptjs | 9.0.2 / 13.5.0 / 2.4.3 |
+| Платежи | Stripe (Checkout + webhooks) | 22.3.0 |
+| Рассылка | Nodemailer + web-push + Twilio | 10.0.13 / 3.6.7 / 6.0.2 |
+| Модерация | OpenAI API + AWS Rekognition | 7.5.0 / 3.1131.0 |
+| Фото | multer + sharp + S3 SDK | 2.4.0 / 0.35.4 / 3.800.0 |
+| Метрики | prom-client | 15.1.3 |
+| API-документация | swagger-jsdoc + swagger-ui-express | 6.3.0 / 5.0.1 |
+| Тесты | vitest + supertest | 4.1.9 / 7.2.2 |
+
+### Инфраструктура
+
+| Слой | Что | Версия / порт |
+|------|-----|---------------|
+| MySQL | локально Laragon на **3306**, в compose образ `mysql:8` на **3307** | 8.x |
+| Redis | `redis:7-alpine` | 6379 |
+| Reverse proxy | nginx (в compose) | 1.27-alpine, хост-порт 8080 |
+| Мониторинг | Prometheus / Grafana | 9090 / 3001 |
+| Пуш в Android | Capacitor 8 + камера/файлы/гео/преferences/push + AdMob + RevenueCat | 8.4.1 |
+| Нагрузочное тестирование | k6 (`k6/load-test.js`) | — |
+
+> `mysql:8` в compose слушает **3307**, чтобы не конфликтовать с локальным MySQL
+> Laragon на 3306. Локально фронт и API ходят на 3306 (Laragon), в контейнерах —
+> на 3307.
 
 ---
 
 ## Быстрый старт
 
-### 1. MySQL (Laragon)
+### Вариант 1 — одним батником (Windows)
 
-Убедитесь, что MySQL запущен. База `swiftmatch` уже создана со схемой и демо-данными.
-
-Импортировать заново:
-```bash
-mysql -u root swiftmatch < database\mysql_schema.sql
-mysql -u root swiftmatch < database\demo_data.sql
+```bat
+запуск-всего.bat
 ```
 
-### 2. API сервер
+Поднимает MySQL (Laragon, 3306) → API (3002) → фронт в **production-режиме**
+(`vite build` + `vite preview`, 8081) и открывает браузер. Пути внутри батника
+относительные (`%~dp0`) — репозиторий можно переносить.
+
+> Фронт намеренно **не** dev-сервер: в dev первый заход в админку тормозил
+> горячей компиляцией модулей (~2.6 с). `vite preview` работает как прод без
+> on-demand компиляции, а `vite.config.ts` описывает `preview.proxy` для `/api`
+> и `/socket.io`. Нужен HMR — запускайте `npx vite` вручную.
+
+### Вариант 2 — вручную
 
 ```bash
-cd server
+# 1. БД
+mysql -u root swiftmatch < database/mysql_schema.sql
+mysql -u root swiftmatch < database/demo_data.sql
+node database/migrations/migrate.js        # применить миграции сверх схемы
+
+# 2. API (строго из server/, иначе dotenv не подхватит .env)
+cd server && npm install && node src/index.js     # → http://localhost:3002
+
+# 3. Фронт
 npm install
-node src/index.js
-# → http://localhost:3002
+npx vite build && npx vite preview --port 8081 --host   # → http://localhost:8081
 ```
 
-### 3. Фронтенд
+### Порты
 
-```bash
-npm install
-npx vite --port 8081 --host
-# → http://localhost:8081
-```
+| Сервис | Порт | Где |
+|--------|------|-----|
+| API (Express) | 3002 | локально и в контейнере |
+| Фронт | 8081 | `vite preview` |
+| MySQL | 3306 (Laragon) / 3307 (compose) | — |
+| Redis | 6379 | — |
+| nginx (compose) | 8080 → 80 | только в Docker |
+| Prometheus / Grafana | 9090 / 3001 | только в Docker |
 
----
+Vite проксирует `/api` и `/socket.io` на `http://localhost:3002` — несоответствие
+портов даёт 502.
 
-## Данные для входа
+### Демо-доступы
 
 | Email | Пароль | Роль |
 |-------|--------|------|
@@ -50,7 +127,93 @@ npx vite --port 8081 --host
 | `user4@mail.ru` … `user50@mail.ru` | `demo123456` | 47 демо-пользователей |
 | `user1@mail.ru` | `demo123456` | Забанен (is_active=0) |
 
-> После `git pull` запустить `node seed-users.cjs` в `server/` если добавились новые demo-пользователи. Пароль всех demo-пользователей: `demo123456`.
+> После `git pull` запустить `node server/src/seed.js`, если добавились новые
+> demo-пользователи.
+
+---
+
+## Команды и гейты
+
+Все гейты блокирующие: каждый из них уже ловил реальный дефект, а не «для
+галочки». Запуск перед коммитом:
+
+```bash
+npx tsc --noEmit                 # типы, strict
+npx eslint src/                  # линт фронта
+npx vite build                   # прод-сборка
+npm test                         # фронт-тесты
+cd server && npm test            # серверные тесты
+```
+
+| Гейт | Команда | Что ловит |
+|------|---------|-----------|
+| Дрейф схемы | `node scripts/schema-drift-audit.mjs --offline` | колонка, которую читает код, есть в `database/mysql_schema.sql`, но её не создаёт ни одна миграция → живой 500 (стоило 500 на `/profile/edit`). В CI — джоба `schema-drift` в `ci.yml` |
+| Дрейф схемы (на БД) | `node scripts/schema-drift-audit.mjs` (нужен `MYSQL_BIN`) | то же + сверка с **живой** MySQL. **В CI не подключён**: `server-test` в `deploy.yml` гоняет `schema-validate`, а не live-дрейф — гейт живёт только локально (в бэклоге, E1) |
+| Секреты | `node scripts/secrets-leak-audit.mjs` | `.dockerignore` пропускает `server/.env`/`.jwt-dev-secret`; rsync без `--exclude .env` стирает прод-`.env`; **значение секрета, вписанное в отслеживаемый файл** (был VAPID-ключ в `README.md`) |
+| Персистентность деплоя | `node scripts/deploy-persistence-audit.mjs` | каталог записи фото не смонтирован volume'ом → `docker compose up --build` удаляет все фото; сверяет путь из кода с compose |
+| Счётчики тестов | `node scripts/test-counter-audit.mjs` (`--fix` переписывает) | числа тестов в `README.md`, `project-context.md`, `test/README.md`, `test/project-context.md`, `test/ИНВЕНТАРЬ-ТЕСТОВ.md` разошлись с прогоном |
+| Уязвимости prod-зависимостей | `npm run audit:prod` (корень и в `server/`) | `npm audit --omit=dev --audit-level=high` по обоим lock-файлам: в образ едет только прод-часть |
+| Порты и ключи | `npm run check:ports` | порты vite/proxy/`.env`/`CORS_ORIGIN` + `console.log` в `server/src` |
+| Конфиг Android | `node scripts/check-native-config.mjs` | cleartext для native-сборок |
+| EXPLAIN всех SQL | `node scripts/sql-explain-audit.mjs` (нужна БД) | запросы без индекса |
+| Мохибейк | `node scripts/scan-mojibake.mjs` | сломанная кодировка в текстах (локально, в CI не подключён) |
+
+Каждый гейт обязан падать на сломанном входе — иначе это декорация
+(см. `docs/AGENTS-pitfalls.md`).
+
+### Тесты
+
+- **Фронтенд (Vitest):** 193 теста, 26 файлов — **0 failures**
+- **Сервер (Vitest):** 715 тестов, 52 файла — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
+- **E2E (Playwright):** 150 тестов, 19 spec-файлов — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
+
+### Зависимости
+
+`npm run audit:prod` = `npm audit --omit=dev --audit-level=high`. Флаги
+обязательны: без `--omit=dev` считается dev-дерево, которого в проде нет, без
+`--audit-level=high` гейт краснеет на moderate/low, которые чинятся только
+мажорными обновлениями. Сейчас: **0 critical, 0 high** (корень — 2 moderate,
+`server/` — 25 moderate; остаток: `@sentry/node`, `firebase-admin`, `bull`/`uuid`,
+`react-router-dom` 6 → 7). Аудить надо **оба** lock-файла: в контейнер едут обе
+половины.
+
+---
+
+## CI/CD
+
+Два workflow. Каждый гейт выше подключён хотя бы в одном из них.
+
+### `.github/workflows/ci.yml` — на **любой** push и PR (Node 20)
+
+| Джоба | Что делает |
+|-------|-----------|
+| `lint` | `tsc --noEmit` → `eslint src/` → `vite build` |
+| `test` | фронт-тесты (vitest) |
+| `test-server` | серверные тесты (vitest, без БД) |
+| `schema-drift` | `schema-drift-audit.mjs --offline` |
+| `secrets-leak` | `secrets-leak-audit.mjs` |
+| `test-counters` | `test-counter-audit.mjs` (нужны оба `node_modules`) |
+| `deploy-persistence` | `deploy-persistence-audit.mjs` |
+| `dependency-audit` | `npm run audit:prod` в корне и в `server/` (без `npm ci` — аудиту нужен только lock-файл) |
+
+### `.github/workflows/deploy.yml` — push в `main`/`develop`, PR в `main` (Node 22)
+
+| Джоба | Что делает |
+|-------|-----------|
+| `lint-and-typecheck` | `check:ports` → `lint` → `tsc` → **`secrets-leak`**, **`deploy-persistence`**, **`audit:prod` ×2** (блокируют деплой) |
+| `frontend-test` | витест + `check-native-config` + `vite build` |
+| `server-test` | MySQL 8.0 сервис: схема → `seed-migrations` → `migrate.js` → `schema-validate` → `sql-explain-audit` → `verify-backup` → витест с живой БД |
+| `test-counters` | сверка чисел с прогоном |
+| `e2e-test` | Playwright на поднятом стеке (needs: lint, frontend, server) + выгрузка отчёта |
+| `docker-config-check` | `docker compose config` + сборка образов `server`/`web` + Trivy (сейчас `exit-code: 0`, режим baseline) |
+| `deploy` | **только push в `main`**: rsync на VPS (с `--exclude .env`, `uploads`, ключи) → `docker compose up -d --build` → `migrate.js` → `schema-validate.mjs` |
+
+`deploy` в `needs`: `lint-and-typecheck`, `frontend-test`, `server-test`,
+`e2e-test`, `test-counters`.
+
+> Расхождение, которое стоит знать: `ci.yml` гоняет тесты на Node **20**,
+> `deploy.yml` и образ — на Node **22**. Продовый рантайм — 22, это же значение
+> стоит перенести в `ci.yml` (в бэклоге, P1).
 
 ---
 
@@ -58,315 +221,278 @@ npx vite --port 8081 --host
 
 ### 👤 Пользовательский опыт
 - Регистрация, анкета, лайки, мэтчи, чаты — полный цикл знакомств
-- Геопоиск по радиусу (MySQL Spatial ST_Distance_Sphere)
+- Геопоиск по радиусу (MySQL Spatial `ST_Distance_Sphere`)
 - Smart Matching: interest overlap + age distance + compatibility + activity
 - Attachment-тест для психологической совместимости
 - Системные и push-уведомления (Service Worker + VAPID)
-- 50 демо-пользователей для тестирования (npm run db:seed)
-- i18n (русский / английский), все данные — translation keys
+- 50 демо-пользователей для тестирования (`npm run db:seed` в `server/`)
+- i18n (русский / английский): в БД и state — translation keys, UI через `t()`
 
 ### 💳 Монетизация
-- **Stripe Checkout** — три тарифа (Plus / Gold / Platinum), длительность 1/6/12 мес.
+- **Stripe Checkout** — тарифы Plus / Gold / Platinum, длительность 1/6/12 мес.
 - **Idempotency-Key middleware** — защита от двойных списаний
-- **STRIPE_LIVE** — при `true` mock отключается; без ключа → 500
+- `STRIPE_LIVE` — при `true` mock отключается; без ключа в prod → 502 «not configured»
 - **Premium-гейтинг:** лимит 10 лайков/день для free, скрытые просмотры
 - **Реклама:** фича-флаг `showAds`, конфиг AdMob/Yandex в БД, динамический импорт с `setTimeout`-fallback
 - **Админка:** управление ценами и рекламными блоками
 
 ### 🛠️ Админ-панель
 - Дашборд со статистикой (пользователи, активность, матчи, выручка, подписки)
-- Аналитика: retention, revenue-mix, регистрации (4 endpoint: `/analytics/overview`, `/retention`, `/revenue-mix`, `/registrations`)
-- Управление пользователями: поиск, фильтры, бан/разбан, массовые операции, имперсонация
-- Фича-флаги: 7 toggle'ов, сохраняются в БД (с валидацией пустого body)
+- Аналитика: retention, revenue-mix, регистрации (`/analytics/overview`, `/retention`, `/revenue-mix`, `/registrations`)
+- Пользователи: поиск, фильтры, бан/разбан, массовые операции, имперсонация
+- Фича-флаги: toggle'и, хранятся в БД (с валидацией пустого body)
 - Модерация: жалобы, запрещённые слова, история действий
-- Контент: управление интересами, целями знакомств
-- Premium-статус в карточке пользователя (из `subscriptions`)
-- **A/B-тесты:** страница `/admin/experiments`, стабильный assign 50/50 по MD5-хэшу, трекинг событий (registration/like/match/premium_purchase)
+- Контент: интересы, цели знакомств
+- **A/B-тесты:** `/admin/experiments`, стабильный assign 50/50 по MD5, трекинг событий
+- **Единый гейт:** все `/api/admin/*` (кроме публичного `GET /api/admin/features`) проходят `adminAuth` и отвечают 401/403
 
 ### 💬 Социальные функции
 - Real-time чаты через **Socket.IO** с typing indicator и read receipts
-- Emoji-реакции на сообщения (happy / love / sad / angry / like)
+- Emoji-реакции (happy / love / sad / angry / like)
 - Онлайн-статус (зелёная точка) через WebSocket
-- Группы по интересам: создание, категории, посты, комментарии, лайки
-- **AI Icebreakers:** чипы первого сообщения в пустом чате (`POST /api/icebreakers/suggest` — OpenAI или fallback из БД, RU/EN, 40 вопросов из сида)
-- Конкурс с голосованием и лидербордом
-- Блокировка пользователей
+- Группы по интересам: категории, посты, комментарии, лайки
+- **AI Icebreakers:** чипы первого сообщения (`POST /api/icebreakers/suggest` — OpenAI или fallback из БД, RU/EN)
+- Блокировка пользователей: применяется и в фиде, и на прямом `GET /api/profile/:id`
 
 ### 🔐 Безопасность и инфраструктура
-- JWT в **httpOnly cookie** (`sm_token` 24h + `sm_refresh` 7d, SameSite=Lax, Secure в prod) — ставятся на login/register/refresh/dev-login; мидлвари читают `Bearer ?? cookie` (`server/src/cookies.js`); нативные сборки работают через Bearer; `POST /api/auth/logout` чистит куку + refresh_tokens в БД; probe `GET /api/auth/me` всегда 200
-- **Refresh rotation + reuse detection**: ротация в пределах `family_id`, replay ротированного токена отзывает всю семью; гонка параллельных refresh закрыта атомарным claim'ом (этап 34)
-- **Revoke all sessions**: `POST /api/auth/logout-all`; смена пароля отзывает все сессии пользователя
-- **Account lockout**: 5 неудачных логинов подряд → 429 на 15 мин (`server/src/lockout.js`)
-- **Санитизация ввода**: свободный текст (bio, имена, посты, сообщения) хранится без HTML-тегов (`server/src/sanitize.js`)
-- **Sentry:** `@sentry/react` + `@sentry/node`, `beforeSend` фильтрует PII (email, токены, пароли)
-- **Helmet:** CSP, X-Frame-Options, X-Content-Type-Options и др. security headers
-- **Request ID:** UUID на каждый запрос, `X-Request-Id` в ответе
-- **Rate limiting:** express-rate-limit (30r/s на лайки, 5r/s на auth)
-- **Модерация чатов:** проверка banned-слов при отправке сообщений
+- JWT в **httpOnly cookie** (`sm_token` 24h + `sm_refresh` 7d, SameSite=Lax, Secure в prod); мидлвари читают `Bearer ?? cookie` (`server/src/cookies.js`); `POST /api/auth/logout` чистит куку и refresh-токены
+- **Refresh rotation + reuse detection:** ротация в пределах `family_id`, replay отзывает всю семью, параллельный refresh защищён атомарным claim'ом
+- **Revoke all sessions:** `POST /api/auth/logout-all`; смена пароля отзывает все сессии
+- **Account lockout:** 5 неудачных логинов → 429 на 15 мин (`server/src/lockout.js`)
+- **Санитизация ввода:** свободный текст (bio, имена, посты, сообщения) хранится без HTML-тегов (`server/src/sanitize.js`)
+- **Sentry:** `@sentry/react` + `@sentry/node`, `beforeSend` фильтрует PII
+- **Helmet:** CSP, X-Frame-Options, X-Content-Type-Options и др.
+- **Request ID:** UUID на запрос, `X-Request-Id` в ответе
+- **Rate limiting:** express-rate-limit (лайки, auth) + лимитер `/api` (600 req/мин на IP) + nginx `limit_req`
+- **Модерация чатов:** banned-слова при отправке сообщений
 - Бан пользователя + WS `user:banned` (мгновенный разлогин)
-- **API Versioning:** `/api/v1/*` → `/api/*` + заголовок `X-API-Version: v1` (обратная совместимость)
-- CORS: строгий `CORS_ORIGIN` (fail-fast без него в production); CSRF — SameSite=Lax куки + Bearer для нативных
+- **Версионирование API:** `/api/v1/*` → `/api/*` + заголовок `X-API-Version: v1`
+- CORS: строгий `CORS_ORIGIN` (fail-fast без него в production)
+- **Прод-`.env` переживает деплой:** rsync исключает `.env`; `middleware.js` в production отвергает плейсхолдеры и секреты короче 32 символов
 
 ### 📁 Загрузка файлов
-- MIME-фильтр: только `image/*` + whitelist расширений (.jpg, .jpeg, .png, .gif, .webp)
-- `fileSize: 10MB`
-- **S3 scaffold:** lazy-init — при наличии AWS_* env → `@aws-sdk/client-s3` + `multer-s3`, иначе локальный диск
+- MIME-фильтр: только `image/*` + whitelist (.jpg, .jpeg, .png, .gif, .webp), лимит 10MB
+- **S3 scaffold:** lazy-init — при `AWS_*` в env → `@aws-sdk/client-s3` + `multer-s3`, иначе локальный диск
+- Каталог фото переживает пересоздание контейнера (именованный volume `uploads_data`)
 
 ### 🗄️ База данных
 - MySQL через mysql2, пул соединений
-- **Миграции:** `database/migrations/` — нумерованные .sql + `migrate.js` (таблица `_migrations`)
-- Schema: users, profiles, photos, interests, matches, chats, messages, reactions, subscriptions, activity_log, feature_flags, reports и др.
+- **Миграции:** `database/migrations/` — 51 пронумерованный `.sql` + `migrate.js` (таблица `_migrations`)
+- Эталон схемы: `database/mysql_schema.sql` (его и сверяет дрейф-аудит)
 
 ### 📧 Коммуникации
-- **SMTP:** Nodemailer с retry-логикой (3 попытки, exponential backoff 1s/2s/3s)
-- Graceful skip при пустых SMTP_USER/PASS
-- Push-уведомления через VAPID + web-push
-- **Email-кампании:** массовая рассылка из админки (`POST /api/admin/campaigns` → `sendCustomEmail` из `mail.js`, Bull queue при реальном SMTP)
+- **SMTP:** Nodemailer с retry (3 попытки, backoff 1s/2s/3s), graceful skip без ключей
+- Push через VAPID + web-push
+- **Email-кампании:** массовая рассылка из админки (`POST /api/admin/campaigns`)
 
 ### 🛡️ Модерация и репорты
-- **AI Moderation:** OpenAI Moderation + AWS Rekognition + эвристика (regex banned-words)
+- **AI-модерация:** OpenAI Moderation + AWS Rekognition + regex banned-words
 - **Auto-escalation:** 1 report → pending, 3+ → temp ban, 5+ → permanent ban
-- Severe categories (nudity, violence) → мгновенный бан
 
 ### 📋 Аудит и soft delete
-- **Soft Deletes:** `deleted_at` на 11 основных таблицах
-- **Audit Log:** `audit_log` таблица со всеми мутациями (кто, что, когда)
+- **Soft delete:** `deleted_at` в 13 таблицах (`006` + `043`), запись только через `softDelete`/`softDeleteWhere` (`server/src/audit.js`), чтение — предикат `activeUser()`
+- **Audit log:** `softDelete` и массовый `softDeleteWhere` пишут `audit_log` (кто, что, когда)
 
 ### 🏥 Health Checks
-- `/health/live` — сервер жив (always 200)
-- `/health/ready` — DB + Redis check (200/503)
-- Graceful shutdown: SIGTERM + SIGINT, timeout 10s
+- `GET /health` (`server/src/index.js:307`) — единственный health-эндпоинт: `SELECT 1` → `200 {status:'ok', db:'connected'}`, при ошибке БД → `503 {status:'error', db:'disconnected'}`. Отдельных `/health/live` и `/health/ready` в проекте **нет**
+- Graceful shutdown по `SIGTERM` (`index.js:337`): `closeQueues()` → `disconnectRedis()` → `pool.end()` → `httpServer.close()`. `SIGINT` и сторожевой таймаут **не** обрабатываются — см. бэклог
+- В контейнере у nginx есть `location = /healthz` (`nginx/swiftmatch.http.conf:24`) — это балансировщик/healthcheck, не API
 
-### 💾 Redis (включён)
-- **REDIS_URL=redis://127.0.0.1:6379** — кэш (profile 60s, matches 30s per-user), Bull Queue (email/push/image), Socket.IO Redis adapter
-- Graceful fallback без Redis — все модули работают
-- Cлужба Redis установлена с автостартом
+### 💾 Redis
+- **Кэш** (профиль 60s, matches 30s per-user), **Bull Queue** (email/push/image), **Socket.IO Redis adapter**
+- Graceful fallback без Redis: in-memory, без 500 на всех роутах
 
 ### 🎁 Реферальная система
-- Уникальный referral_code для каждого пользователя
-- Отслеживание приглашённых друзей и премиум-конверсий
+- Уникальный referral_code, трекинг приглашений и премиум-конверсий
 - `GET /api/referral/code`, `POST /api/referral/apply`, `GET /api/referral/stats`
 
-### 🧪 Тестирование
-- **Фронтенд (Vitest):** 180 тестов, 25 файлов — **0 failures**
-- **Сервер (Vitest):** 715 тестов, 52 файла — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
-- **E2E (Playwright):** 150 тестов, 19 spec-файлов — живой прогон не выполнялся (нужен стек 3002/8081 + чистка БД через `globalTeardown`)
-- **Pre-flight:** `npm run check:ports` — сверка портов (vite/proxy/.env/CORS_ORIGIN) + warn на `console.log` в `server/src`
-- **Дрейф схемы:** `node scripts/schema-drift-audit.mjs --offline` (код ↔ `database/mysql_schema.sql`, без MySQL) и `node scripts/schema-drift-audit.mjs` (+ живая БД, нужен `MYSQL_BIN`). Ловит «код использует колонку, которой нет в БД» — это уже стоило 500 на `/profile/edit`
-- **Зависимости:** `npm run audit:prod` (корень) и `npm run audit:prod` в `server/` = `npm audit --omit=dev --audit-level=high` — **0 critical, 0 high** в prod-зависимостях (корень: 2 moderate, `server/`: 25 moderate — остаток требует мажорных обновлений `@sentry/node`, `firebase-admin`, `react-router-dom`). Гейт блокирующий: джоба `dependency-audit` в `ci.yml` + шаги в `lint-and-typecheck` в `deploy.yml`. Проверять после каждого `npm install`, а не по отчёту об аудите
-- **Swagger:** OpenAPI-документация с JSDoc-аннотациями
-
 ### ⚙️ Фоновые задачи (Bull Queue)
-- **3 очереди:** email (SMTP с retry), push (web-push), image (Sharp resize WebP/AVIF)
-- **Graceful shutdown:** closeQueues() на SIGTERM
+- **3 очереди:** email (retry), push, image (Sharp → WebP/AVIF)
 - **Fallback** без Redis: прямой вызов или лог
 
 ### 🔄 WebSocket
-- Socket.IO с pingInterval 10s / pingTimeout 5s
-- **Redis Adapter:** горизонтальное масштабирование через pub/sub (при REDIS_URL)
+- Socket.IO, pingInterval 10s / pingTimeout 5s
+- **Redis Adapter** — горизонтальное масштабирование
 - WebRTC сигналинг (call-user, ice-candidate, end-call)
 
-### 📍 Geospatial Search
-- **MySQL Spatial:** POINT SRID 4326 + SPATIAL INDEX
-- Поиск через `ST_Distance_Sphere` (все через prepared statements)
+### 📍 Геопоиск
+- **MySQL Spatial:** POINT SRID 4326 + SPATIAL INDEX, `ST_Distance_Sphere` (везде prepared statements)
 - Миграция `005_add_spatial_location.sql`
 
 ### 🐳 DevOps
-- **Docker:** multi-stage (node:22-alpine), healthcheck на `/health`, USER node, `.dockerignore`, `restart: unless-stopped`
-- **Docker Compose:** app + nginx + Prometheus (`:9090`) + Grafana (`:3001`), named volumes
-- **Nginx:** rate limiting (api 30r/s, auth 5r/s), `client_max_body_size 20M`, WebSocket 86400s, SSL, SPA fallback
-- **CI/CD:** GitHub Actions (lint → frontend test → server test с MySQL-сервисом → E2E → deploy)
-- **Monitoring:** Prometheus-метрики (HTTP rps, p50/p95/p99, DB queries, WS events, cache), 7-panel Grafana dashboard
-- **Load Testing:** k6-скрипт (`k6/load-test.js`, ramp-up 10→100 users, 6 endpoints)
-- **Git hooks:** Husky + lint-staged (prettier + eslint на staged файлах)
-- **Логирование:** Winston (JSON, timestamp/level/msg/rid)
-- **Pre-flight:** `npm run check:ports` (порты + JWT_SECRET в server/.env) и `scripts/check-keys.ps1` (какие прод-ключи не заполнены)
-
-### 🚀 Чек-лист запуска продакшена
-1. **Ключи**: заполнить `server/.env` по `server/.env.example`; проверить `powershell -File scripts/check-keys.ps1` (обязательные: `JWT_SECRET`, `DB_PASSWORD`, `CORS_ORIGIN`; для фич: Stripe, SMTP, FCM, RevenueCat, Twilio, OpenAI, S3, Sentry, Redis)
-2. **Миграции**: `node database/migrations/migrate.js` (или через CI)
-3. **Проверка**: `npm run check:ports` → `npm test` (server) → `npx vitest run` → `npx playwright test` → `npx vite build`
-4. **Запуск**: `cd server && node src/index.js` (строго из `server/` — иначе dotenv не подхватит .env и JWT-токены «сгорят»); продакшн-процесс под pm2/systemd
-5. **Без ключей сервис деградирует, но жив**: Stripe → mock (в prod 502 «not configured» — осознанно), OpenAI → fallback из БД, пуши/SMS → mock, письма → лог «would send», S3 → локальный диск, RevenueCat webhook → 503
-6. **CI-deploy**: завести secrets `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DB_HOST/USER/PASSWORD/NAME` — джоба `deploy` в `.github/workflows/deploy.yml`
-
-### 📱 Новые фичи (июль 2026)
-- **Background GPS + Geofence** — 5min polling, PUT/GET /api/location, Capacitor geolocation
-- **Disappearing Messages (TTL)** — таймер самоудаления 5s-24h, WS cleanup каждые 10s, Popover-селектор
-- **Video Date Scheduling** — предложение/принятие/отклонение дат с календарём, WS sync
-- **Profile Score** — рейтинг полноты анкеты (0-100), бейдж на странице профиля + рекомендации
-- **CI/CD** — GitHub Actions: lint → frontend test → server test (MySQL) → E2E → deploy
-- **Load Testing (k6)** — ramp-up до 100 пользователей, 6 endpoints
-- **Monitoring** — Prometheus (`:9090`) + Grafana (`:3001`), HTTP/DB/WS/cache метрики
-
-### 📱 Capacitor Android
-- Нативная камера (`@capacitor/camera`), файлы (`@capacitor/filesystem`), Preferences
-- Адаптер fetch/WS для нативного режима (`src/lib/native.ts`)
-- Live Reload на устройстве через `npx cap run android --livereload`
+- **Docker:** multi-stage (`node:22-alpine` → `nginx:1.27-alpine`), healthcheck, non-root, `.dockerignore`, `restart: unless-stopped`
+- **Docker Compose:** app + nginx + MySQL + Redis + Prometheus + Grafana, именованные volume'ы
+- **Nginx в контейнере** (`nginx/swiftmatch.http.conf` — единственный, что копируется в образ, `Dockerfile:30`): `limit_req` 60r/s на `/api` и 10r/s на `/api/auth`, `client_max_body_size 20M`, WebSocket `proxy_read_timeout 86400s`, `location = /healthz`, SPA fallback
+- **Nginx на VPS** — файла два, и **они расходятся между собой**: `nginx/swiftmatch.conf` (TLS 443, редирект с 80, `limit_req` 30r/s/5r/s, 20M, 86400s) и корневой `nginx.conf` (TLS 443, редирект с 80, `proxy_read_timeout 60s`, **без** `limit_req` и без `client_max_body_size`). Ни один в образ не попадает; какой из двух применять на сервере — в бэклоге (P2)
+- **Мониторинг:** Prometheus-метрики (HTTP rps, p50/p95/p99, DB, WS, cache) + Grafana
+- **Load Testing:** `k6/load-test.js` (ramp-up 10→100 users, 6 endpoints)
+- **Git hooks:** Husky + lint-staged (ESLint + Prettier на staged)
+- **Логирование:** Winston (JSON: timestamp/level/msg/rid)
 
 ---
 
-## Что осталось до продакшена
+## Чек-лист запуска продакшена
 
-### 🔴 Требует реальных ключей (код готов, без env не работает)
+1. **Ключи:** заполнить `server/.env` по `server/.env.example` (в контейнере
+   compose читает **корневой** `.env`, `docker-compose.yml:83`) и проверить
+   `powershell -File scripts/check-keys.ps1` — скрипт читает `server/.env`,
+   проверяет 18 ключей (Stripe, SMTP, FCM, RevenueCat, Twilio, OpenAI, Sentry,
+   AWS/S3, Redis) и отдельно помечает `JWT_SECRET` как `!REQUIRED!`; без
+   `DB_PASSWORD`/`CORS_ORIGIN` в списке он не смотрит — их проверяет
+   `middleware.js` в production
+2. **Миграции:** `node database/migrations/migrate.js` (или через CI)
+3. **Проверка:** `node scripts/secrets-leak-audit.mjs` → `npm test` (server) →
+   `npx vitest run` (фронт) → `npx playwright test` → `npx vite build`
+4. **Запуск:** `cd server && node src/index.js` (строго из `server/`); в проде —
+   pm2/systemd или контейнер
+5. **Без ключей сервис деградирует, но жив:** Stripe → 502 «not configured»,
+   OpenAI → fallback из БД, пуши/SMS → mock, письма → лог, S3 → локальный диск
+6. **CI-deploy:** завести ровно три секрета — `DEPLOY_HOST`, `DEPLOY_USER`,
+   `DEPLOY_SSH_KEY` (`deploy.yml:361-370`, rsync + SSH). Переменные БД в
+   секретах GitHub не нужны: миграции на VPS берут их из `server/.env`
 
-| Переменная | Файл | Назначение |
-|---|---|---|
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | `server/.env` | Реальные платежи (без ключа — mock в dev, 502 в prod) |
-| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` | `server/.env` | Email (регистрация, сброс пароля) |
-| `SENTRY_DSN` | `server/.env` + `.env` | Мониторинг ошибок |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_ENDPOINT` | `server/.env` | Облачное хранение файлов + Rekognition-модерация фото (без — локальный диск, варианты и модерация отрабатывают через temp) |
-| `OPENAI_API_KEY` | `server/.env` | AI Icebreakers + AI-модерация текста (без — fallback БД/эвристика) |
-| `FCM_SERVER_KEY`, `FCM_SERVICE_ACCOUNT` | `server/.env` | Push-уведомления Android (без — mock) |
-| `REVENUECAT_WEBHOOK_SECRET` | `server/.env` | IAP webhook (без — 503, приём событий отключён) |
-| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | `server/.env` | SMS-верификация (без — mock) |
-| `REDIS_URL` | `server/.env` | Кэш + Bull Queue (email/push/image) + Socket.IO adapter (без — всё off, in-memory) |
-| `DB_PASSWORD` | `server/.env` | Непустой пароль для MySQL |
-| `CORS_ORIGIN` | `server/.env` | Домен прода (вместо `localhost:8081`) |
-| `NODE_ENV=production` | `server/.env` | Отключает Stripe mock, Sentry sampling 0.1 |
+Полный чеклист — `docs/AGENTS-production.md` (DoD + Pre-flight, 10 пунктов).
 
-### ✅ Реализовано (без внешних ключей)
+### Требует реальных ключей
 
-| Фича | Файлы | Статус |
-|------|-------|--------|
-| **Ghost Mode** (инкогнито + premium gate) | `profile.js`, `social.js`, `settings-privacy.tsx`, миграция 009 | ✅ |
-| **Passport Mode** (показ в другом городе + premium gate) | Те же файлы, что Ghost Mode | ✅ |
-| **GDPR Compliance** (data export, erase, consent) | `routes/gdpr.js`, миграция 010, UI в settings-privacy | ✅ |
-| **AI Icebreakers** (чипы первого сообщения) | `icebreakers.js`, `chats.tsx`, миграция 018 | ✅ |
-| **A/B Testing + Product Analytics** | `experiments.js`, `useExperiment.ts`, `admin-experiments.tsx`, миграция 019 | ✅ |
-| **API Versioning** (`/api/v1` + X-API-Version) | глобальный middleware в `index.js` | ✅ |
-| **Video Date Scheduling** | `schedule.js`, `schedule.tsx`, WS `schedule:updated`, миграции 013/015, E2E ✅ | ✅ |
-| **Safety Check-in** (экстренные контакты) | `date-checkin.js`, миграция 015, E2E ✅ | ✅ |
-| **Profile Score** | `profile.js` PUT `/api/profile/score`, миграция 014, E2E ✅ | ✅ |
-| **GDPR Consent flow** | чекбокс регистрации + `consent_log` + тумблер настроек (этап 7) | ✅ |
+| Переменная | Назначение |
+|-----------|-----------|
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | реальные платежи (без ключа — 502 в prod) |
+| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` | email (регистрация, сброс пароля) |
+| `SENTRY_DSN` | мониторинг ошибок |
+| `AWS_*`, `S3_BUCKET`, `S3_ENDPOINT` | S3-хранилище фото + Rekognition (без — локальный диск) |
+| `OPENAI_API_KEY` | Icebreakers + AI-модерация (без — fallback) |
+| `FCM_SERVER_KEY`, `FCM_SERVICE_ACCOUNT` | push Android (без — mock) |
+| `REVENUECAT_WEBHOOK_SECRET` | IAP webhook (без — 503) |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | SMS (без — mock) |
+| `REDIS_URL` | кэш + очереди + Socket.IO adapter (без — in-memory) |
+| `JWT_SECRET` | подпись токенов; в prod обязателен и ≥32 символов |
+| `CORS_ORIGIN` | домен прода (вместо `localhost:8081`) |
+| `NODE_ENV=production` | отключает Stripe mock, Sentry sampling 0.1 |
 
-### 🟠 Код готов — ждут ключи API
-
-| Задача | Ключи |
-|--------|-------|
-| Push FCM для Android | `FCM_SERVER_KEY` |
-| Deep Links | Настроить домен + SHA256 |
-| RevenueCat IAP | Webhook secret + проект |
-| SMS-верификация (Twilio) | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` |
-| AI-модерация фото | `OPENAI_API_KEY` или AWS Rekognition |
-| CDN для фото | S3 bucket + AWS keys |
-
-### 🟢 Ещё не начато
-
-- AI Icebreakers (OpenAI в чаты) — ✅ сделано, fallback из БД без ключа OpenAI
-- A/B Testing + Product Analytics — ✅ сделано (таблицы experiments, assign/track API, админка)
-- API Versioning — ✅ сделано (`/api/v1` alias)
-- Design System/Storybook
+> **VAPID-ключи генерируются локально:** `npx web-push generate-vapid-keys` →
+> `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` в `server/.env` и
+> `VITE_VAPID_PUBLIC_KEY` на фронте. Значения ключей **никогда** не пишутся в
+> репозиторий — это проверяет `scripts/secrets-leak-audit.mjs`.
 
 ---
 
-## Структура
+## Структура репозитория
 
 | Папка/Файл | Назначение |
 |------------|-----------|
-| `server/` | API на Express + MySQL (auth, profile, social, chats, premium, reports, referral, admin) |
-| `server/src/routes/admin/` | Админка (dashboard, users, analytics, reports, content, features, messaging, monetization) |
-| `server/src/ws.js` | Socket.IO (чат, уведомления, онлайн-статус) |
-| `server/src/queue.js` | Bull Queue (email/push/image фоновые задачи) |
-| `server/src/jobs/` | Процессоры очередей (email.job.js, push.job.js, image.job.js) |
-| `server/src/redis.js` | ioredis lazy client (3 клиента: main/pub/sub) |
-| `server/src/audit.js` | Soft delete + audit log helpers |
-| `server/src/seed.js` | Генератор тестовых данных (50 users, 30 matches, 200 msgs) |
-| `server/src/routes/report.js` | POST /api/reports + auto-ban escalation |
-| `server/src/routes/referral.js` | Реферальная система (code, apply, stats) |
-| `src/` | Фронтенд на React + Vite + Tailwind |
-| `database/` | `mysql_schema.sql` + `demo_data.sql` + `migrations/` (23 миграции) |
-| `server/src/routes/gdpr.js` | GDPR API (data export, erase, consent logging) |
+| `src/` | Фронтенд: страницы, компоненты, хуки, `lib/api.ts` |
+| `server/src/routes/` | API: auth, profile, social, hangouts, chats, premium, reports, referral, admin |
+| `server/src/routes/admin/` | Админка: dashboard, users, analytics, reports, content, features, messaging, monetization |
+| `server/src/ws.js` | Socket.IO: чат, уведомления, онлайн-статус |
+| `server/src/queue.js`, `server/src/jobs/` | Bull Queue и процессоры (email/push/image) |
+| `server/src/redis.js` | ioredis lazy client (main/pub/sub) |
+| `server/src/audit.js` | soft delete + audit log |
+| `server/src/seed.js` | Генератор демо-данных (50 users, 30 matches, 200 msgs) |
+| `database/` | `mysql_schema.sql` + `demo_data.sql` + `migrations/` (51 SQL) |
+| `scripts/` | Гейты и утилиты (аудит схемы/секретов/счётчиков/персистентности, бэкап, EXPLAIN) |
+| `e2e/` | Playwright-спеки (19) |
+| `android/` | Capacitor/Gradle-проект |
+| `k6/` | Нагрузочный сценарий |
+| `docs/` | Инструкции по модулям (см. ниже) |
+
+---
+
+## Документация: что где правда
+
+| Файл | Что это | Актуальность |
+|------|---------|--------------|
+| `AGENTS.md` | Правила проекта для ИИ-агента: порты, стек, гейты, требования владельца, Git/CI | правило проекта, читается всегда |
+| `docs/AGENTS-*.md` | Модули правил: production-чеклист, pitfalls, workflow, i18n, admin-auth, startup, security, deployment, system-prompt | правила, не «отчёт о прогоне» |
+| `README.md` | Этот файл: стек, запуск, гейты, CI, функционал | числа тестов проверяет `test-counter-audit` |
+| `project-context.md` | Сводный срез по проекту | счётчик проверяет гейт |
+| `docs/architecture.md`, `docs/past-mistakes.md` | Архитектура и разбор прошлых ошибок | справочно |
+| `docs/roadmap.md` | Планы | сверяйтесь с `Что доделать.txt` |
+| `Что сделано.txt` | Журнал этапов: что, зачем, чем проверено | исторический журнал, числа в заголовке — срез на дату |
+| `Что доделать.txt` | Бэклог: открытые P0/P1/P2 с основаниями | рабочий список |
+| `context.txt` | Старый лог этапов (до `Что сделано.txt`) | **исторический**, числа внутри — снимки своих дат |
+| `docs/STATUS.md` | Не существует; ссылки на него помечены «файл не создан» | — |
+
+Правило: числа тестов сначала измеряются гейтом, потом вписываются в документы.
+`test/` — локальное зеркало этих же файлов (в `.gitignore`).
+
+---
+
+## Окружение (`.env`)
+
+Быстрый старт: `powershell -File scripts\setup.ps1` — копирует `.env.example` →
+`.env`, генерирует `JWT_SECRET`, ставит зависимости.
+
+Локальный `server/.env` (без секретов — значения по умолчанию, как в
+`server/.env.example`):
+
+```
+NODE_ENV=development
+PORT=3002
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=root
+DB_NAME=swiftmatch
+CORS_ORIGIN=http://localhost:8081
+REDIS_URL=redis://localhost:6379
+```
+
+> В контейнере подключение к БД подставляет **сам compose**:
+> `DB_HOST=db`, `DB_USER=root`, `DB_PASSWORD=root`, `DB_NAME=swiftmatch1bd`
+> (`docker-compose.yml:85-94`), и эти ключи `environment:` перекрывают
+> `env_file`. Поэтому на VPS от корневого `.env` реально нужны `JWT_SECRET`
+> и `CORS_ORIGIN`, остальное compose достраивает сам.
+
+Полный список переменных с назначением — `server/.env.example` и
+`docs/environment-setup.md`. Значения секретов в репозитории не хранятся:
+`.env` в `.gitignore`, примеры содержат только плейсхолдеры, гейт
+`secrets-leak-audit.mjs` проверяет и имена файлов, и **значения** в текстах.
+
+---
 
 ## Резервное копирование MySQL
 
-Скрипты в `scripts/`:
-
-### Windows (PowerShell)
 ```powershell
-# Единоразово
+# Windows (PowerShell)
 .\scripts\backup-mysql.ps1 -DbName swiftmatch -DbUser root
-
-# Установить задачу в планировщик (ежедневно в 3:00)
-# Запусти install-backup-task.bat от имени Администратора:
+# задача в планировщик (ежедневно 3:00) — из-под администратора:
 .\scripts\install-backup-task.bat
 ```
 
-### Linux / Docker
 ```bash
-# Тестовый запуск
-./scripts/backup-mysql.sh swiftmatch root
-
-# Cron (ежедневно в 3:00)
-crontab -l | { cat; echo "0 3 * * * /path/to/swiftmatch1bd/scripts/backup-mysql.sh swiftmatch root '' localhost 3306 /path/to/backups 7 >> /var/log/swiftmatch-backup.log 2>&1"; } | crontab -
+# Linux / Docker: swiftmatch.sh <db> <user> <pass> [host] [port] [dir] [retention]
+./scripts/backup-mysql.sh swiftmatch root '' localhost 3306 /var/backups/swiftmatch 30
+0 3 * * * /path/to/swiftmatch/scripts/backup-mysql.sh swiftmatch root '' localhost 3306 /var/backups/swiftmatch 30 >> /var/log/swiftmatch-backup.log 2>&1
 ```
 
-Бэкапы сохраняются в `backups/swiftmatch_YYYY-MM-DD_HHmmss.sql`, автоматически удаляются через 7 дней.
+Бэкапы: `swiftmatch_YYYY-MM-DD_HHmmss.sql`, автоудаление по умолчанию через
+**30 дней** (`-RetentionDays` в PowerShell, 7-й позиционный аргумент в shell).
+Проверка восстановления — `scripts/verify-backup.mjs` (создаёт БД
+`swiftmatch_verify_backup`, гоняется в джобе `server-test` на тестовой БД).
+
+---
 
 ## Capacitor Android
 
-Нативное Android-приложение через Capacitor (WebView + нативные плагины).
+Нативная обёртка WebView + нативные плагины.
 
-### Структура
-- `android/` — Gradle-проект (в git)
-- `capacitor.config.ts` — конфиг (appId `com.swiftmatch.app`, webDir, cleartext для LAN-тестов)
-- `src/lib/native.ts` — адаптер fetch/WS для нативного режима
-- `@revenuecat/purchases-capacitor` — IAP-клиент (`src/lib/iap.ts`)
+- `android/` — Gradle-проект (в git), `capacitor.config.ts` — конфиг (appId `com.swiftmatch.app`)
+- `src/lib/native.ts` — адаптер fetch/WS для нативного режима (Bearer вместо cookie)
+- Плагины: камера, файлы, гео, preferences, push, AdMob, RevenueCat IAP
 
-### Требования
-- Android Studio + SDK (platform 35/36, build-tools 35) — ставятся через cmdline-tools
-- **JDK 21** (Temurin): Gradle 8.14.3 не работает на JBR Java 25 из Android Studio
-- AGP 8.13.2, compileSdk 36
+### Сборка APK
 
-### Сборка APK (проверено, APK собирается)
 ```powershell
-npm run build            # или с VITE_API_URL=http://<LAN-IP>:3002 для теста на устройстве
-npx cap sync android     # из корня; подтягивает capacitor-cordova-android-plugins
+npm run build                       # или с VITE_API_URL=http://<LAN-IP>:3002
+npx cap sync android
 # строго из папки android/ (Gradle берёт root от CWD):
 $env:JAVA_HOME="<путь к JDK 21>"; android\gradlew.bat :app:assembleDebug
 # → android\app\build\outputs\apk\debug\app-debug.apk
 ```
-> Грабля: если `compressDebugAssets` падает с «Failed to create MD5 hash ...jar as it does not exist» — прогнать задачу standalone (`gradlew :app:compressDebugAssets`), затем полный `assembleDebug`. Детали в AGENTS.md (#29).
 
-Для релиза: домен вместо LAN-IP, подпись keystore, ключ RevenueCat в .env, App Links.
+Требования: Android Studio + SDK (platform 35/36, build-tools 35), **JDK 21**
+(Temurin) — Gradle 8.14.3 не работает на JBR Java 25.
 
-### Live Reload (отладка на устройстве)
-Запустить на ПК:
-```bash
-npm run dev
-```
-В другом терминале (устройство в той же сети):
-```bash
-npx cap run android --livereload=http://192.168.x.x:8081 --open
-```
-
-### Нативные фичи
-- **Камера**: `@capacitor/camera` — нативный UI фото/видео
-- **Файлы**: `@capacitor/filesystem`
-- **Хранилище**: `@capacitor/preferences` + sessionStorage/localStorage для JWT (Bearer)
-- **IAP**: RevenueCat (`VITE_REVENUECAT_API_KEY`)
-- **Пуши**: VAPID-ключи в `server/.env` готовы
-
-### Как это работает
-На сервере строгий CORS_ORIGIN (для нативных сборок авторизация идёт через Bearer-заголовок, не cookie).
-В нативном режиме `src/lib/native.ts` перехватывает все `fetch('/api/...')` и подставляет `VITE_API_URL`.
-WebSocket в `use-websocket.ts` использует `VITE_WS_URL` или `wss://swiftmatch.app`.
-
----
-
-## Настройка .env
-
-Быстрый старт: `powershell -File scripts\setup.ps1` — скопирует `.env.example` → `.env`, сгенерирует `JWT_SECRET`, установит зависимости.
-
-`server/.env` уже настроен для локальной работы:
-```
-PORT=3002
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=
-DB_NAME=swiftmatch
-CORS_ORIGIN=http://localhost:8081
-REDIS_URL=redis://127.0.0.1:6379
-VAPID_PUBLIC_KEY=BEygaffoNfy9XaaH0QqILW1Kzuf-7WoVL4oAvQpC1ebFkZ8X828d8Fv8TXcqBuykDK4IWJdZMA6TOkQfSBP8N8o
-VAPID_PRIVATE_KEY=b370faewrsuKX2yUXBZ-2-axZiScdesTmpXHPq0yJN4
-```
+Live reload на устройстве: `npm run dev` на ПК, затем
+`npx cap run android --livereload=http://<LAN-IP>:8081 --open`.

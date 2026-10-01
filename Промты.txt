@@ -92,7 +92,7 @@ grep -rE "dev-secret|localhost:300[0-9]|password.*=.*$|JWT_SECRET.*=.*key" ^
 - [ ] Имя файла — uuid + оригинальное расширение
 
 ### 1.8 Admin routes (если touched /api/admin/*)
-- [ ] `adminAuth` middleware остаётся passive (вызывает `next()` на ошибке)
+- [ ] `adminAuth` middleware остаётся **блокирующим** (`server/src/middleware/adminAuth.js`): 401 без валидного токена, 403 если `role !== 'admin'` или `is_active = 0`, `next()` — только для активного админа
 - [ ] Каждый PUT/POST/DELETE проверяет `req.user.role === 'admin'`
 - [ ] Новые админ-роуты возвращают массивы (`[{...}]`), а не `{data: [...]}`
 - [ ] SQL-запросы обёрнуты в try/catch, пустой результат → `[]` или `{}`
@@ -135,7 +135,7 @@ grep -rE "dev-secret|localhost:300[0-9]|password.*=.*$|JWT_SECRET.*=.*key" ^
 2. ADMIN API vs БД — каждый роут (GET/PUT /api/admin/users, stats, features, content, reports, newsletter, impersonate). SQL через prepared statements? try/catch? возвращает массив для DataTable?
 3. ADMIN UI vs ADMIN API — что UI ожидает vs что API реально возвращает
 4. ИЗМЕНЕНИЯ В АДМИНКЕ → ПРИЛОЖЕНИЕ — бан, цены, feature flags применяются?
-5. БЕЗОПАСНОСТЬ — adminAuth passive? req.user.role === 'admin' проверяется внутри? SQL-инъекции? IDOR?
+5. БЕЗОПАСНОСТЬ — adminAuth блокирующий (401/403) и не пропускает не-админа? req.user.role === 'admin' проверяется внутри? SQL-инъекции? IDOR?
 
 Формат: таблицы с проблемами и фиксами.
 
@@ -271,7 +271,7 @@ grep -rE "dev-secret|localhost:300[0-9]|password.*=.*$|JWT_SECRET.*=.*key" \
 - uuid + оригинальное расширение
 
 ### Admin routes
-- adminAuth middleware passive (next() на ошибке)
+- adminAuth middleware блокирующий (401 без токена, 403 на не-админа; `next()` только для админа)
 - req.user.role === 'admin' внутри хендлера
 - Все PUT/POST/DELETE проверяют роль
 - SQL в try/catch, пустой результат → [] или {}
@@ -400,13 +400,13 @@ const stripe = process.env.STRIPE_SECRET_KEY
 2. **Никогда** не оставлять `console.log` в продакшен-логике платежей, писем, авторизации. Использовать `req.log` или winston
 3. **Никогда** не добавлять `cors({ origin: '*' })` в веб-версии продакшена. Только для Capacitor
 4. **Никогда** не использовать `fs.writeFile` для пользовательских загрузок без валидации пути. Только uuid имена, только `/uploads/`
-5. **Никогда** не менять `adminAuth` middleware с passive на blocking. Сломает dev-login и админку
+5. **Никогда** не отключать `adminAuth` middleware (не превращать 401/403 в `next()`). Сломает админку и уберёт единственный гейт на `/api/admin/*`
 6. **Никогда** не хранить `refresh_token` в localStorage/Preferences без httpOnly альтернативы
 
 ---
 
 ## 17. Безопасность (Security Rules)
-- adminAuth middleware — **passive** (вызывает `next()` на ошибке, не блокирует)
+- adminAuth middleware — **блокирующий** (401 без валидного JWT, 403 при `role !== 'admin'`; `next()` только для активного админа)
 - Все SQL-запросы — prepared statements (`??` в mysql2). Никакой конкатенации строк
 - Server-side только uuid для имён файлов, ограничение 5MB, только image/*
 - CORS: `*` для Capacitor (dev), env-переменная для production
@@ -467,7 +467,7 @@ const stripe = process.env.STRIPE_SECRET_KEY
 16. **No WebSocket server** — нет socket.io. **Фикс:** создан `server/src/ws.js`.
 17. **Read receipts & emoji reactions** — нет seenIndicator и реакций. **Фикс:** добавлены.
 18. **Rate-limiter auth 10→30→60** — слишком жёсткий для E2E. **Фикс:** поднят до 60 req/min.
-19. **Admin save 401** — admin routes require JWT. **Фикс:** adminAuth middleware passive.
+19. **Admin save 401** — admin routes требуют валидный JWT и роль админа; 401 = нет/просрочен токен (перезайти), 403 = токен есть, но не админ. «Фикс» через отключение adminAuth недопустим — это снимает гейт со всех `/api/admin/*`
 20. **Stale token redirect loop** — AdminGuard без Supabase не делал dev-login. **Фикс:** всегда пытаться dev-login.
 21. **Education badge styling** — изменял CSS бейджей. **Фикс:** не трогать визуальные классы.
 22. **Translation keys — prefix** — DB хранит slugs без префикса. **Фикс:** префикс на фронте через t().

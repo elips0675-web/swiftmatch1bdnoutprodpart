@@ -1,7 +1,7 @@
 # Чек-лист: VPS → secrets → первый деплой → smoke
 
 > Исполняемый пошаговый план по qwen «4 дня» + приоритеты kimi и дипсик.
-> Согласован с `docs/environment-setup.md` (полный runbook), `docs/runbook-keys.md` (ротация ключей), `test/DEPLOY.md` (ручной деплой), `.github/workflows/deploy.yml`.
+> Согласован с `docs/environment-setup.md` (полный runbook), `docs/runbook-keys.md` (ротация ключей), `DEPLOY.md` (ручной деплой), `.github/workflows/deploy.yml`.
 > Правило: секреты НЕ в git (`git check-ignore server/.env` должен вернуть путь). Секции 1–4 — это ~день 1–2, 5–7 — день 3, 8–10 — день 4.
 
 ---
@@ -66,9 +66,9 @@
   ```
 - [ ] Подготовить окружение (см. §5 — секреты) и собрать фронт:
   ```bash
-  cp server/.env.example server/.env
-  nano server/.env                       # вписать реальные значения (см. §5)
-  VITE_API_URL=/api npm --prefix client run build   # или как в скриптах сборки: npx vite build
+  cp .env.example .env                   # корневой .env — его читает docker-compose.yml:83
+  nano .env                              # JWT_SECRET + CORS_ORIGIN (см. §5)
+  VITE_API_URL=/api npx vite build       # фронт собирается из корня, каталога client/ в проекте нет
   ```
 - [ ] Первый запуск (long-running; держите отдельным ssh-окном или через `nohup`):
   ```bash
@@ -124,7 +124,7 @@
 
 ## 7. Smoke на проде
 
-- [ ] `/health` — 200 через домен.
+- [ ] Health: `curl -i http://127.0.0.1:3002/health` → 200 `{status:ok}` на самом VPS. **Через домен `/health` не проверять**: у nginx такого location нет, запрос уходит в `location /` → SPA и отдаёт `index.html` с кодом 200, то есть «проверка» проходит всегда и ничего не доказывает. Для внешнего балансировщика в контейнере есть `location = /healthz` (`nginx/swiftmatch.http.conf:24`) — он возвращает статический `ok`.
 - [ ] Регистрация нового пользователя → email-верификация приходит.
 - [ ] Логин, редактирование профиля, загрузка фото (S3 или диск), чат.
 - [ ] Premium checkout (Stripe test) → успех → role/премиум-перки.
@@ -148,7 +148,7 @@
   k6 run k6/load-test.js -e API_URL=http://<staging>/api -e USER_EMAIL=user5@mail.ru -e USER_PASSWORD=demo123456
   ```
 - [ ] Держать цель: **errors < 1%**, p95 < 2s. Мониторить `free -m` и `Threads_connected`.
-- [ ] При росте лимитеров (429 у реальных юзеров) — поднять значения в `server/src/limiters.js` и PR.
+- [ ] При росте лимитеров (429 у реальных юзеров) — поднять значения в `server/src/middleware/limiters.js` и PR.
 
 ## 10. Мониторинг + алерты
 

@@ -65,7 +65,7 @@
 
 ### Требования
 
-- Node.js 20+
+- Node.js 22+ (продовый образ `node:22-alpine`, `NODE_VERSION: '22'` в `deploy.yml`; в `ci.yml` часть джоб пока на 20 — расхождение в бэклоге)
 - MySQL 8.0+ (Laragon/XAMPP или локальный инстанс, порт 3306)
 - Git
 - PowerShell (Windows)
@@ -216,6 +216,15 @@ npx eslint src/               # 0 ошибок (warnings допустимы)
 npx vite build                # production-сборка проходит
 npx vitest run                # фронт — все зелёные
 cd server && npm run test     # сервер — все зелёные
+
+# Гейты-аудиты (все блокирующие в CI, полный список — README, раздел «Команды и гейты»)
+npm run check:ports                                  # порты vite/proxy/.env/CORS + console.log в server/src
+node scripts/secrets-leak-audit.mjs                  # .dockerignore, rsync --delete, значения секретов в текстах
+node scripts/deploy-persistence-audit.mjs            # volume для фото + совпадение путей записи/отдачи
+node scripts/schema-drift-audit.mjs --offline        # колонка в эталоне ↔ миграции (с MySQL — без --offline)
+node scripts/test-counter-audit.mjs                  # числа тестов в 5 документах (--fix переписывает)
+npm run audit:prod                                   # уязвимости prod-зависимостей, корень
+cd server && npm run audit:prod                      # … и server/
 ```
 
 ---
@@ -274,6 +283,7 @@ fix(deps): nodemailer 9.0.1 -> 9.1.1 - closes runtime advisory
 - [ ] Код соответствует стандартам (lint: 0 errors)
 - [ ] TypeScript strict — нет `any`
 - [ ] Гейты зелёные: `tsc --noEmit`, `eslint src/`, `vite build`, тесты (front + server)
+- [ ] Аудиты зелёные: `check:ports`, `secrets-leak-audit`, `deploy-persistence-audit`, `schema-drift-audit --offline`, `test-counter-audit`, `audit:prod` (корень + `server/`)
 - [ ] Новый функционал покрыт тестами
 - [ ] Документация обновлена (`Что сделано.txt`, `Что доделать.txt`)
 - [ ] Commit-сообщения соответствуют Conventional Commits

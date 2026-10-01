@@ -1,7 +1,7 @@
 # Деплой SwiftMatch на VPS (Docker)
 
 Проект разворачивается целиком через **Docker Compose** (`.env` + `docker-compose.yml`).
-`github/workflows/deploy.yml` автоматически выкатывает при пушe в `main`; ниже — ручной путь и требования.
+`.github/workflows/deploy.yml` запускается на пуше в `main`/`develop` и на PR в `main`; сама джоба `deploy` срабатывает **только при пуше в `main`** и только после зелёных проверок. Ниже — ручной путь и требования.
 
 ## Предварительные требования (VPS)
 
@@ -13,7 +13,7 @@
   newgrp docker
   docker compose version   # должен вывести версию
   ```
-- Минимум **2 CPU / 2 GB RAM** (при 100 VU лучше 4 GB). Диск ≥ 20 GB.
+- Минимум **2 vCPU / 4 GB RAM** (тот же порог, что в `docs/environment-setup.md:25`; при 100 VU поднимать лимит `/api`, а не память). Диск ≥ 20 GB.
 
 ## 1. Клонировать репозиторий
 
@@ -48,8 +48,9 @@ docker compose up -d --build
 ```
 
 Первый старт:
-- MySQL поднимается, применяет `database/mysql_schema.sql` + миграции из `database/migrations/` (только при **пустом** volume `db_data`);
-- применяет миграции повторно нельзя — они идемпотентны через таблицу `_migrations` (`node database/migrations/migrate.js`).
+- контейнер MySQL при пустом volume `db_data` применяет **только** `docker-entrypoint-initdb.d`: `database/mysql_schema.sql`, `database/demo_data.sql`, `database/03-e2e-seed.sql` (`docker-compose.yml:42-44`). Каталог `database/migrations` смонтирован в `initdb.d/migrations` (строка 45), а entrypoint MySQL выполняет только файлы **непосредственно** в `initdb.d` — вложенные он игнорирует;
+- миграции применяются отдельным шагом `node database/migrations/migrate.js`: в контейнере это часть `CMD` образа server-стадии (`Dockerfile:25`), на VPS — явный шаг после `docker compose up -d --build` (`deploy.yml`). Повторно их применять нельзя — они идемпотентны через таблицу `_migrations`;
+- имя базы в compose — `swiftmatch1bd` (`docker-compose.yml:37`, и строкой ниже в `environment:` сервиса `app`), а не `swiftmatch` из `.env.example`.
 
 Проверить:
 ```bash
