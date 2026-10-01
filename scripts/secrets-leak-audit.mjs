@@ -14,10 +14,19 @@
  *     (`test -f .env || cp .env.example .env`) молча пересоздаёт его из примера —
  *     и прод поднимается с публичным JWT_SECRET, SMTP/Stripe/OpenAI выключены.
  *
+ *  3. Содержимое отслеживаемых текстовых файлов. Первые два канала смотрят на
+ *     ИМЯ файла, поэтому секрет, вписанный значением в обычный `README.md`,
+ *     для них невидим. Именно так в репозиторий попал VAPID-приватный ключ:
+ *     `README.md:371` в блоке «Настройка .env» содержал реальный
+ *     `VAPID_PRIVATE_KEY=b370…`, и он уехал на GitHub вместе с историей —
+ *     гейт был зелёный, потому что `.dockerignore` про `*.md` не говорит.
+ *
  * Гейт не доверяет глазам: он обходит дерево репозитория, применяет правила
  * .dockerignore и требует, чтобы ни один файл с признаками секрета не попал в
  * контекст; отдельно проверяет, что rsync-строка в deploy.yml исключает
- * секреты и uploads.
+ * секреты и uploads; и читает содержимое текстовых файлов, отбрасывая
+ * placeholder'ы (`change-me`, `your-…`, `${…}`), иначе гейт краснеет на
+ * `.env.example` и его отключают.
  */
 
 import fs from 'node:fs'
@@ -207,18 +216,94 @@ export function checkRsyncExcludes(deployYml) {
   return missing
 }
 
+/**
+ * Расширения файлов, содержимое которых имеет смысл читать. Двоичные и
+ * vendor-каталоги отсекаются раньше по ALWAYS_SKIP_DIRS; `.env` и `.env.*`
+ * попадают сюда по имени, а не по расширению (у них его нет).
+ */
+const CONTENT_SCAN_EXTENSIONS = new Set([
+  '.md', '.txt', '.yml', '.yaml', '.json', '.ts', '.tsx', '.js', '.mjs', '.cjs',
+  '.ps1', '.sh', '.bat', '.conf', '.html', '.env', '.example',
+])
+
+/**
+ * Признаки настоящего секрета в строке документа или исходника.
+ *
+ * Провайдерские правила берутся по формату самого токена (префиксы `sk-`,
+ * `AKIA`, `sk_live_`, `ghp_`), общее — по имени переменной. Значение общего
+ * правила отбрасывается двумя фильтрами: PLACEHOLDER (настоящие заглушки,
+ * которые обязаны лежать в репозитории) и CI_VALUE (тестовые константы в
+ * workflow, где секретами не являются).
+ */
+const SECRET_VALUE_RULES = [
+  { name: 'VAPID private key', re: /VAPID_PRIVATE_KEY\s*[=:]\s*["']?([A-Za-z0-9_-]{40,})/ },
+  { name: 'приватный ключ PEM', re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/ },
+  { name: 'ключ OpenAI', re: /\bsk-(?:proj-)?[A-Za-z0-9_-]{32,}/ },
+  { name: 'AWS access key id', re: /\bAKIA[0-9A-Z]{16}\b/ },
+  { name: 'живой ключ Stripe', re: /\b[sr]k_live_[A-Za-z0-9]{16,}/ },
+  { name: 'токен GitHub', re: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}|\bgithub_pat_[A-Za-z0-9_]{20,}/ },
+  { name: 'токен Slack', re: /\bxox[abprs]-[A-Za-z0-9-]{10,}/ },
+  {
+    name: 'присваивание секрета',
+    re: /\b([A-Z][A-Z0-9_]*(?:SECRET|PRIVATE_KEY|ACCESS_TOKEN|API_KEY|PASSWORD|DSN|TOKEN))\s*[=:]\s*["']?([^\s"'#,;)\]}]{24,})/,
+  },
+]
+
+const PLACEHOLDER_PREFIX_RE = /^(?:change[-_]?|example\b|placeholder|your[-_]|dummy|sample|redact|insert|replace)/i
+
+const PLACEHOLDER_ANYWHERE_RE = /\$\{|\$\(|process\.env|import\.meta\.env|example\.(?:invalid|com|org|net|test)|localhost|127\.0\.0\.1|<\w|\.\.\.|\bundefined\b|\bnull\b|\bxxx+\b|\byyy+\b|\bdummy\b|\bsample\b|\bredact/i
+
+const CI_VALUE_RE = /^(?:ci|test|demo|dev|local)[-_]|^(?:swiftmatch|demo|local)_|^(?:test|demo|local)[0-9]/i
+
+/**
+ * Файлы, освобождённые от проверки содержимого: тест самого гейта обязан
+ * содержать правдоподобные токены, иначе проверять правила нечем.
+ */
+const CONTENT_SCAN_ALLOWLIST = new Set(['scripts/secrets-leak-audit.test.mjs'])
+
+/** Секреты, записанные значением в отслеживаемые текстовые файлы. */
+export function findContentSecrets(root) {
+  const hits = []
+  for (const rel of walk(root)) {
+    if (CONTENT_SCAN_ALLOWLIST.has(rel)) continue
+    const base = path.basename(rel)
+    const ext = path.extname(base) || (/^\.env/.test(base) ? '.env' : '')
+    if (!CONTENT_SCAN_EXTENSIONS.has(ext)) continue
+    let text
+    try {
+      text = fs.readFileSync(path.join(root, rel), 'utf8')
+    } catch {
+      continue
+    }
+    const lines = text.split(/\r?\n/)
+    for (const rule of SECRET_VALUE_RULES) {
+      for (let i = 0; i < lines.length; i += 1) {
+        rule.re.lastIndex = 0
+        const match = rule.re.exec(lines[i])
+        if (!match) continue
+        const value = String(match[2] ?? match[1] ?? match[0])
+        if (PLACEHOLDER_PREFIX_RE.test(value) || PLACEHOLDER_ANYWHERE_RE.test(value)) continue
+        if (rule.name === 'присваивание секрета' && CI_VALUE_RE.test(value)) continue
+        hits.push({ file: rel, line: i + 1, rule: rule.name, value })
+      }
+    }
+  }
+  return hits.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)
+}
+
 export function audit(root) {
   const dockerignoreMissing = checkDockerignorePatterns(root)
   const contextSecrets = findContextSecrets(root)
   const includedNoiseDirs = findIncludedNoiseDirs(root)
+  const contentSecrets = findContentSecrets(root)
   const deployYml = fs.readFileSync(path.join(root, '.github/workflows/deploy.yml'), 'utf8')
   const rsyncMissing = checkRsyncExcludes(deployYml)
-  return { dockerignoreMissing, contextSecrets, includedNoiseDirs, rsyncMissing }
+  return { dockerignoreMissing, contextSecrets, includedNoiseDirs, contentSecrets, rsyncMissing }
 }
 
 function main() {
   const root = process.argv[2] || process.cwd()
-  const { dockerignoreMissing, contextSecrets, includedNoiseDirs, rsyncMissing } = audit(root)
+  const { dockerignoreMissing, contextSecrets, includedNoiseDirs, contentSecrets, rsyncMissing } = audit(root)
   let failed = false
 
   if (dockerignoreMissing.length) {
@@ -245,6 +330,17 @@ function main() {
     console.log('OK: в контексте сборки образа нет node_modules/dist (в т.ч. вложенных)')
   }
 
+  if (contentSecrets.length) {
+    failed = true
+    console.log(`FAIL: секреты записаны значением в отслеживаемых файлах (${contentSecrets.length}):`)
+    for (const hit of contentSecrets) {
+      console.log(`  - ${hit.file}:${hit.line} [${hit.rule}] ${hit.value.slice(0, 12)}…`)
+    }
+    console.log('  последствие: значение уезжает в публичный репозиторий вместе с историей коммитов')
+  } else {
+    console.log('OK: в отслеживаемых текстовых файлах нет значений секретов (только placeholder-ы)')
+  }
+
   if (rsyncMissing.length) {
     failed = true
     console.log(`FAIL: rsync-строка в deploy.yml не исключает: ${rsyncMissing.join(', ')}`)
@@ -253,10 +349,10 @@ function main() {
   }
 
   if (failed) {
-    console.log('\nИтог: контекст сборки и rsync-деплой не защищены.')
+    console.log('\nИтог: контекст сборки, rsync-деплой и содержимое документации не защищены.')
     process.exit(1)
   }
-  console.log('\nИтог: секреты и мусор не попадают ни в образ, ни под rsync --delete.')
+  console.log('\nИтог: секреты не попадают ни в образ, ни под rsync --delete, ни в репозиторий значениями.')
 }
 
 if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]))) main()
