@@ -30,6 +30,10 @@ jobs:
       - run: node scripts/secrets-leak-audit.mjs
       # Этап 21 (P0 #37): фото не должны теряться при `docker compose up --build`.
       - run: node scripts/deploy-persistence-audit.mjs
+      # Этап 28: пагинация детерминирована (замыкатель по PK главной таблицы).
+      # Ловит `ORDER BY created_at LIMIT ?` без замыкателя — между страницами
+      # дубли и пропуски. Чистый Node, зависимостей не требует.
+      - run: npm run check:order-by
       # Уязвимости high/critical в prod-зависимостях (этап 23). Блокирует деплой
       # так же, как secrets-leak выше: в образ едет только прод-часть
       # (`npm ci --omit=dev`), и именно её дерево резолвится по lock-файлу.

@@ -112,7 +112,7 @@ router.get('/active', auth, async (req, res) => {
        FROM date_checkins dc
        LEFT JOIN emergency_contacts ec ON dc.contact_id = ec.id
        WHERE dc.user_id = ? AND dc.status IN ('active', 'missed')
-       ORDER BY dc.checkin_at DESC LIMIT 10`,
+       ORDER BY dc.checkin_at DESC, dc.id DESC LIMIT 10`,
       [req.userId]
     );
     res.json(rows || []);

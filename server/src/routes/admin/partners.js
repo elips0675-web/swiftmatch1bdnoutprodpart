@@ -133,7 +133,7 @@ router.get('/conversions', async (req, res) => {
        LEFT JOIN partner_offers o ON o.id = c.offer_id
        LEFT JOIN users u ON u.id = c.user_id
        ${where}
-       ORDER BY c.created_at DESC
+       ORDER BY c.created_at DESC, c.id DESC
        LIMIT 100`,
       params,
     )
@@ -284,7 +284,7 @@ router.get('/payouts', async (req, res) => {
               pp.method, pp.details, pp.status, pp.admin_note, pp.created_at, pp.processed_at
        FROM partner_payouts pp
        JOIN partners p ON p.id = pp.partner_id
-       ORDER BY pp.created_at DESC
+       ORDER BY pp.created_at DESC, pp.id DESC
        LIMIT 200`,
     )
     res.json(rows)

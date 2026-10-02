@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "check:ports": "node scripts/check-ports.mjs",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
+    "check:order-by": "node scripts/order-by-audit.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

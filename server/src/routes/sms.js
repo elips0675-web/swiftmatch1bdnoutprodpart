@@ -82,7 +82,7 @@ router.post('/api/sms/verify', auth, async (req, res) => {
 
     const [rows] = await pool.query(
       `SELECT id, code, expires_at, verified FROM sms_verification
-       WHERE user_id = ? AND phone = ? ORDER BY created_at DESC LIMIT 1`,
+       WHERE user_id = ? AND phone = ? ORDER BY created_at DESC, id DESC LIMIT 1`,
       [req.userId, phone],
     )
 
@@ -122,7 +122,7 @@ router.get('/api/sms/status', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT phone, verified, created_at FROM sms_verification
-       WHERE user_id = ? AND verified = 1 ORDER BY created_at DESC LIMIT 1`,
+       WHERE user_id = ? AND verified = 1 ORDER BY created_at DESC, id DESC LIMIT 1`,
       [req.userId],
     )
 

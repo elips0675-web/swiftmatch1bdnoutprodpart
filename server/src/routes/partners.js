@@ -74,7 +74,7 @@ router.get('/api/partners/offers', auth, async (req, res) => {
                  WHERE ${where.join(' AND ')}
                    AND (o.valid_from IS NULL OR o.valid_from <= CURDATE())
                    AND (o.valid_to IS NULL OR o.valid_to >= CURDATE())${having}
-                 ORDER BY o.created_at DESC
+                 ORDER BY o.created_at DESC, o.id DESC
                  LIMIT 20`
     const [rows] = await pool.query(sql, params)
     res.json(rows)
@@ -265,7 +265,7 @@ router.get('/api/partners/offers/hotel', auth, async (req, res) => {
          AND (o.valid_from IS NULL OR o.valid_from <= CURDATE())
          AND (o.valid_to IS NULL OR o.valid_to >= CURDATE())
          AND (o.city = ? OR o.city IS NULL)
-       ORDER BY o.created_at DESC
+       ORDER BY o.created_at DESC, o.id DESC
        LIMIT 20`,
       [String(city).trim()],
     )
@@ -588,7 +588,7 @@ router.get('/api/partners/orders/my', auth, async (req, res) => {
        JOIN partner_offers o ON o.id = po.offer_id
        JOIN partners p ON p.id = po.partner_id
        WHERE po.user_id = ?
-       ORDER BY po.created_at DESC
+       ORDER BY po.created_at DESC, po.id DESC
        LIMIT 50`,
       [req.userId],
     )

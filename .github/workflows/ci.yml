@@ -51,6 +51,23 @@ jobs:
           node-version: 20
       - run: node scripts/schema-drift-audit.mjs --offline
 
+  # Пагинация обязана быть детерминированной: `ORDER BY created_at LIMIT 20`
+  # без замыкателя по уникальному столбцу даёт между страницами дубли и
+  # пропуски — строка, попавшая в конец первой страницы, может попасть и в
+  # начало второй (живой баг был в ленте, hangouts.js). Гейт разбирает SQL в
+  # строковых литералах server/src, сверяет последний термин ORDER BY с
+  # PRIMARY KEY/UNIQUE главной таблицы и ругается на неоднозначный `id`
+  # (MySQL отдаст ER_NON_UNIQ_ERROR, то есть 500). Запросы без LIMIT не
+  # проверяет: там страниц нет, порядок только «дёргается».
+  order-by:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/order-by-audit.mjs
+
   # Секреты и мусор не должны попадать в артефакты (этап 20, P0-C). Ловит два
   # канала: контекст сборки образа (.dockerignore) и rsync --delete на деплое
   # (deploy.yml) — оба молчаливые, оба срабатывали на каждом пуше в main.

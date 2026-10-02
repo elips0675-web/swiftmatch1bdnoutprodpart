@@ -338,7 +338,7 @@ router.delete('/api/profile/aliases/:aliasId', auth, async (req, res) => {
     await pool.query('DELETE FROM user_aliases WHERE id = ?', [aliasId])
     if (alias.is_primary) {
       const [[first]] = await pool.query(
-        'SELECT id FROM user_aliases WHERE user_id = ? ORDER BY created_at ASC LIMIT 1',
+        'SELECT id FROM user_aliases WHERE user_id = ? ORDER BY created_at ASC, id ASC LIMIT 1',
         [req.userId],
       )
       if (first) {

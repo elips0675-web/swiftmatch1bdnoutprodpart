@@ -11,7 +11,7 @@ router.get('/photos', async (req, res) => {
               up.display_name, up.avatar_url
        FROM user_photos p
        JOIN user_profiles up ON up.id = p.user_id
-       ORDER BY p.created_at DESC
+       ORDER BY p.created_at DESC, p.id DESC
        LIMIT 200`,
     )
     res.json(rows)
@@ -29,7 +29,7 @@ router.get('/photos/pending', async (req, res) => {
        FROM user_photos p
        JOIN user_profiles up ON up.id = p.user_id
        WHERE p.moderation_status = 'pending'
-       ORDER BY p.created_at ASC
+       ORDER BY p.created_at ASC, p.id ASC
        LIMIT 50`,
     )
     res.json(rows)

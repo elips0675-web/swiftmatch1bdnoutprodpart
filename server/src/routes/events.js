@@ -47,7 +47,7 @@ router.get('/api/events', auth, async (req, res) => {
       `SELECT ${EVENT_SELECT}
        FROM partner_offers o JOIN partners p ON p.id = o.partner_id
        WHERE ${where.join(' AND ')}
-       ORDER BY o.event_start ASC
+       ORDER BY o.event_start ASC, o.id ASC
        LIMIT 50`,
       params,
     )

@@ -158,7 +158,7 @@ const HANGOUT_LIST_SELECT = `
               FROM hangout_participants hp3
               JOIN user_profiles up3 ON up3.id = hp3.user_id
               WHERE hp3.hangout_id = h.id AND hp3.status = 'joined' AND ${activeUser('up3')}
-              ORDER BY hp3.joined_at ASC
+              ORDER BY hp3.joined_at ASC, hp3.id ASC
               LIMIT 3
             ) hp2
           ) AS attendees_csv`
@@ -942,7 +942,7 @@ router.get('/api/hangouts/by-chat/:chatId', auth, async (req, res) => {
        FROM hangout_chats hc
        JOIN hangouts h ON h.id = hc.hangout_id
        WHERE hc.chat_id = ?
-       ORDER BY h.created_at DESC
+       ORDER BY h.created_at DESC, h.id DESC, hc.hangout_id ASC, hc.response_id ASC
        LIMIT 1`,
       [chatId],
     )
@@ -1533,7 +1533,7 @@ router.post('/api/hangouts/suggest', auth, suggestLimiter, async (req, res) => {
     const [rows] = await pool.query(
       `SELECT id, category, title, place_name, city FROM hangouts
        WHERE status = 'active' AND event_date > NOW()
-       ORDER BY created_at DESC LIMIT 5`,
+       ORDER BY created_at DESC, id DESC LIMIT 5`,
     )
     const suggestionPool = []
     const used = new Set()

@@ -64,7 +64,7 @@ router.get('/users', async (req, res) => {
        FROM users u
        LEFT JOIN user_profiles up ON u.id = up.id
        WHERE ${where.join(' AND ')}
-       ORDER BY ${sortCol} ${sortDir}
+       ORDER BY ${sortCol} ${sortDir}, u.id ${sortDir}
        LIMIT ? OFFSET ?`,
       [...params, pageSize, offset],
     )

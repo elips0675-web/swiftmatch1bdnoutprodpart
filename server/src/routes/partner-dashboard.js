@@ -76,7 +76,7 @@ router.get('/api/partner/dashboard', auth, requirePartner(async (req, res) => {
     )
 
     const [[sub]] = await pool.query(
-      'SELECT tier, status, expires_at FROM partner_subscriptions WHERE partner_id = ? ORDER BY created_at DESC LIMIT 1',
+      'SELECT tier, status, expires_at FROM partner_subscriptions WHERE partner_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
       [partnerId],
     )
 
@@ -214,7 +214,7 @@ router.get('/api/partner/conversions', auth, requirePartner(async (req, res) => 
        FROM partner_conversions c
        LEFT JOIN partner_offers o ON o.id = c.offer_id
        WHERE c.partner_id = ?
-       ORDER BY c.created_at DESC LIMIT 100`,
+       ORDER BY c.created_at DESC, c.id DESC LIMIT 100`,
       [req.partner.id],
     )
     res.json(rows)
@@ -228,7 +228,7 @@ router.get('/api/partner/conversions', auth, requirePartner(async (req, res) => 
 router.get('/api/partner/subscription', auth, requirePartner(async (req, res) => {
   try {
     const [[sub]] = await pool.query(
-      'SELECT tier, status, starts_at, expires_at FROM partner_subscriptions WHERE partner_id = ? ORDER BY created_at DESC LIMIT 1',
+      'SELECT tier, status, starts_at, expires_at FROM partner_subscriptions WHERE partner_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
       [req.partner.id],
     )
     res.json(sub || { tier: 'basic', status: 'active', expires_at: null })

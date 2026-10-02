@@ -134,7 +134,7 @@ router.post('/api/consent', auth, async (req, res) => {
 router.get('/api/consent/history', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, consent_type, granted, ip_address, created_at FROM consent_log WHERE user_id = ? ORDER BY created_at DESC LIMIT 50',
+      'SELECT id, consent_type, granted, ip_address, created_at FROM consent_log WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 50',
       [req.userId],
     )
     res.json(rows)

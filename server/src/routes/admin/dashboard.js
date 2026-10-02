@@ -95,7 +95,7 @@ router.get('/recent-activity', async (req, res) => {
               DATE_FORMAT(al.created_at, '%H:%i') as time
        FROM activity_log al
        LEFT JOIN user_profiles up ON al.user_id = up.id
-       ORDER BY al.created_at DESC
+       ORDER BY al.created_at DESC, al.id DESC
        LIMIT 20`,
     )
     res.json(rows)

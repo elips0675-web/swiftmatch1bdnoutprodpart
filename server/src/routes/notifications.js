@@ -66,7 +66,7 @@ router.get('/api/notifications', auth, async (req, res) => {
        LEFT JOIN hangouts h
               ON h.id = CAST(JSON_UNQUOTE(JSON_EXTRACT(n.payload, '$.hangout_id')) AS UNSIGNED)
        WHERE n.user_id = ? AND n.deleted_at IS NULL
-       ORDER BY n.created_at DESC
+       ORDER BY n.created_at DESC, n.id DESC
        LIMIT 30`,
       [req.userId],
     )

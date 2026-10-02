@@ -84,7 +84,7 @@ router.get('/api/iap/status', auth, async (req, res) => {
     const userId = req.userId
 
     const [rows] = await pool.query(
-      "SELECT tier, status, current_period_end FROM subscriptions WHERE user_id = ? AND provider = 'revenuecat' ORDER BY created_at DESC LIMIT 1",
+      "SELECT tier, status, current_period_end FROM subscriptions WHERE user_id = ? AND provider = 'revenuecat' ORDER BY created_at DESC, id DESC LIMIT 1",
       [userId],
     )
     if (rows.length === 0) {

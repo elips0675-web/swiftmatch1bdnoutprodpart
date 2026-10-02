@@ -77,7 +77,7 @@ router.get('/api/premium/tiers', (req, res) => {
 router.get('/api/premium/my', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
-      "SELECT tier, duration_months, price, started_at, expires_at, is_active FROM subscriptions WHERE user_id = ? AND is_active = 1 AND expires_at > NOW() ORDER BY started_at DESC LIMIT 1",
+      "SELECT tier, duration_months, price, started_at, expires_at, is_active FROM subscriptions WHERE user_id = ? AND is_active = 1 AND expires_at > NOW() ORDER BY started_at DESC, id DESC LIMIT 1",
       [req.userId],
     )
     if (rows.length === 0) return res.json(null)

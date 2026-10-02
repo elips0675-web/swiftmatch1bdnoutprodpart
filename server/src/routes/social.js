@@ -174,7 +174,7 @@ router.get('/api/users/search', auth, async (req, res) => {
                  ${blockJoin}
                  WHERE ${whereClauses.join(' AND ')}${blockWhere}
                  ${having}
-                 ORDER BY ${orderBy} LIMIT 50`
+                 ORDER BY ${orderBy}, up.id DESC LIMIT 50`
 
     const [rows] = await pool.query(sql, params)
     res.json(rows)
@@ -415,7 +415,7 @@ router.get('/api/groups/:groupId/posts', auth, async (req, res) => {
        FROM group_posts gp
        JOIN user_profiles up ON up.id = gp.user_id
        WHERE gp.group_id = ? AND ${activeUser('up')}
-       ORDER BY gp.created_at DESC
+       ORDER BY gp.created_at DESC, gp.id DESC
        LIMIT 50`,
       [req.userId, req.params.groupId],
     )
@@ -647,7 +647,7 @@ router.get('/api/chats/:chatId/messages', auth, async (req, res) => {
        WHERE m.chat_id = ?
          AND (m.ttl_seconds IS NULL OR m.created_at > DATE_SUB(NOW(), INTERVAL m.ttl_seconds SECOND))
          AND ${activeUser('up')}
-       ORDER BY m.created_at ASC
+       ORDER BY m.created_at ASC, m.id ASC
        LIMIT 100`,
       [req.params.chatId],
     )
@@ -822,7 +822,7 @@ router.get('/api/activity', auth, async (req, res) => {
        FROM activity_log al
        JOIN user_profiles up ON al.user_id = up.id
        WHERE al.target_id = ? AND (up.incognito = 0 OR up.incognito IS NULL) AND ${activeUser('up')}
-       ORDER BY al.created_at DESC
+       ORDER BY al.created_at DESC, al.id DESC
        LIMIT 50`,
       [req.userId],
     )

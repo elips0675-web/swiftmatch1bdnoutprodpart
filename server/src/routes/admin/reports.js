@@ -59,7 +59,7 @@ router.get('/moderation-log', async (req, res) => {
        FROM moderation_log ml
        LEFT JOIN user_profiles admin ON ml.admin_id = admin.id
        LEFT JOIN user_profiles target ON ml.target_user_id = target.id
-       ORDER BY ml.created_at DESC
+       ORDER BY ml.created_at DESC, ml.id DESC
        LIMIT 100`,
     )
     res.json(rows)
@@ -79,7 +79,7 @@ router.get('/verifications', async (req, res) => {
        LEFT JOIN users u ON u.id = v.user_id
        LEFT JOIN user_profiles up ON up.id = v.user_id
        WHERE v.status = 'pending'
-       ORDER BY v.created_at ASC LIMIT 50`,
+       ORDER BY v.created_at ASC, v.id ASC LIMIT 50`,
     )
     res.json(rows)
   } catch (err) {
