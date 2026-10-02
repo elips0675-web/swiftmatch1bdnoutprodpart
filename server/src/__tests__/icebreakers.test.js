@@ -8,9 +8,8 @@ vi.hoisted(() => {
   process.env.OPENAI_API_KEY = 'sk-test-dummy'
 })
 
-const { dbQuery, authNext, openaiCreate, rootLog } = vi.hoisted(() => ({
+const { dbQuery, openaiCreate, rootLog } = vi.hoisted(() => ({
   dbQuery: vi.fn(),
-  authNext: vi.fn(),
   openaiCreate: vi.fn(),
   rootLog: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }))

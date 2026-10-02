@@ -248,7 +248,7 @@ router.post('/api/likes', auth, likeLimiter, async (req, res) => {
       const [[liker]] = await pool.query('SELECT display_name FROM user_profiles WHERE id = ?', [req.userId])
       if (isAllowedIn(prefsMap, liked_user_id, 'like', 'push')) {
         sendPushToUser(liked_user_id, 'SwiftMatch', matched
-          ? `It\'s a match with ${liker?.display_name || 'someone'}!`
+          ? `It's a match with ${liker?.display_name || 'someone'}!`
           : `${liker?.display_name || 'Someone'} liked you!`)
       }
     }

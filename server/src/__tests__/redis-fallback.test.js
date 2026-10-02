@@ -22,7 +22,9 @@ class FakeRedisClient {
     this.get = vi.fn().mockRejectedValue(Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:6379'), { code: 'ECONNREFUSED' }))
     this.setex = vi.fn().mockRejectedValue(Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:6379'), { code: 'ECONNREFUSED' }))
     this.scanStream = vi.fn().mockReturnValue({
-      [Symbol.asyncIterator]: async function* () { throw Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }) },
+      [Symbol.asyncIterator]: () => ({
+        next: () => Promise.reject(Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' })),
+      }),
     })
     this.ping = vi.fn().mockRejectedValue(Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:6379'), { code: 'ECONNREFUSED' }))
     this.connect = vi.fn().mockRejectedValue(Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:6379'), { code: 'ECONNREFUSED' }))

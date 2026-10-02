@@ -1,10 +1,8 @@
 import { rootLogger } from './logger.js'
 import { readFile } from 'fs/promises'
-import path from 'path'
 
 // ─── Config ───────────────────────────────────────────────────
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
-const PERSPECTIVE_API_KEY = process.env.PERSPECTIVE_API_KEY
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1'
 
 let openaiClient = null

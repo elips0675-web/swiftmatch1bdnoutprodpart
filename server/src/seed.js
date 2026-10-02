@@ -208,8 +208,6 @@ async function main() {
     )
     const userId = result.insertId
 
-    const genderId = u.gender === 'male' ? 3 : (u.gender === 'female' ? 4 : 1)
-
     await conn.execute(
       `INSERT INTO user_profiles
        (id, display_name, age, bio, avatar_url, gender, looking_for, dating_goal, height, city, lat, lng, location, zodiac, circadian, super_likes, online, last_seen)

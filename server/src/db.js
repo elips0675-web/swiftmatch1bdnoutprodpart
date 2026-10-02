@@ -16,17 +16,13 @@ const pool = mysql.createPool({
 const originalQuery = pool.query.bind(pool)
 pool.query = async (sql, params) => {
   const start = Date.now()
+  const result = await originalQuery(sql, params)
+  const duration = (Date.now() - start) / 1000
   try {
-    const result = await originalQuery(sql, params)
-    const duration = (Date.now() - start) / 1000
-    try {
-      const { trackDbQuery } = await import('./metrics.js')
-      trackDbQuery(typeof sql === 'string' ? sql : sql.sql, duration)
-    } catch {}
-    return result
-  } catch (err) {
-    throw err
-  }
+    const { trackDbQuery } = await import('./metrics.js')
+    trackDbQuery(typeof sql === 'string' ? sql : sql.sql, duration)
+  } catch {}
+  return result
 }
 
 export default pool

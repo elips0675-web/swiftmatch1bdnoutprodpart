@@ -1,6 +1,5 @@
 import sharp from 'sharp'
 import path from 'path'
-import fs from 'fs'
 import { rootLogger } from './logger.js'
 
 const SIZES = [

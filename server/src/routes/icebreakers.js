@@ -38,11 +38,6 @@ const openaiBreaker = createBreaker(
   { timeout: 9000, volumeThreshold: 3 },
 )
 
-function randomQuestions(rows, n) {
-  const shuffled = [...rows].sort(() => Math.random() - 0.5)
-  return shuffled.slice(0, n)
-}
-
 // POST /api/icebreakers/suggest — personalized conversation starters
 // body: { chat_user_id, language?: 'ru'|'en' }
 router.post('/api/icebreakers/suggest', auth, async (req, res) => {

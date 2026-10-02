@@ -4,7 +4,7 @@ import pool from '../db.js'
 import { auth } from '../middleware.js'
 import logger from '../logger.js'
 import { pushQueue } from '../queue.js'
-import { isFCMConfigured, sendFcmToUser, sendFcmToAll } from '../fcm.js'
+import { isFCMConfigured, sendFcmToAll } from '../fcm.js'
 
 const router = Router()
 

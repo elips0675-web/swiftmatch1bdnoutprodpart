@@ -6,6 +6,11 @@ import { getIO } from '../../ws.js'
 
 const router = Router()
 
+// План выводится и фильтруется одним и тем же выражением: разъезд между
+// колонкой `premium` в SELECT и условием фильтра означал бы, что админ выбирает
+// «Plus», а список не меняется (фильтр был в query, но не попадал в WHERE).
+const TIER_SQL = `COALESCE((SELECT s.tier FROM subscriptions s WHERE s.user_id = u.id AND s.is_active = 1 AND s.expires_at > NOW() LIMIT 1), 'free')`
+
 // Мгновенный разлогин забаненного юзера: шлём WS-событие user:banned и, как
 // страховку, обрываем его сокеты (клиент, который не обрабатывает событие,
 // всё равно теряет соединение и поднимется заново — но auth вернёт USER_BANNED).
@@ -42,6 +47,10 @@ router.get('/users', async (req, res) => {
       where.push('up.city = ?')
       params.push(city)
     }
+    if (premium && premium !== 'all') {
+      where.push(`${TIER_SQL} = ?`)
+      params.push(premium)
+    }
 
     const allowedSort = { name: 'up.display_name', joined: 'u.created_at', age: 'up.age' }
     const sortCol = allowedSort[sort] || 'u.created_at'
@@ -57,7 +66,7 @@ router.get('/users', async (req, res) => {
     const [rows] = await pool.query(
       `SELECT u.id, up.display_name as name, up.age, u.email, up.city,
               CASE WHEN u.is_active = 1 THEN 'active' ELSE 'banned' END as status,
-               COALESCE((SELECT s.tier FROM subscriptions s WHERE s.user_id = u.id AND s.is_active = 1 AND s.expires_at > NOW() LIMIT 1), 'free') as premium, false as online,
+              ${TIER_SQL} as premium, false as online,
               DATE_FORMAT(u.created_at, '%Y-%m-%d') as joined,
               DATE_FORMAT(u.last_login, '%Y-%m-%d %H:%i') as lastActive,
               COALESCE(up.bio, '') as bio

@@ -15,9 +15,6 @@ function wrap(fn) {
 
 router.get('/analytics/overview', wrap(async (req, res) => {
   const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM users')
-  const [[{ lastMonth }]] = await pool.query(
-    'SELECT COUNT(*) as lastMonth FROM users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH)',
-  )
   const [[{ premium }]] = await pool.query(
     "SELECT COUNT(*) as premium FROM subscriptions WHERE is_active = 1 AND expires_at > NOW()",
   )

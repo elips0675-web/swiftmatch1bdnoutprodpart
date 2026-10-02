@@ -19,8 +19,6 @@ function createApp() {
   return app
 }
 
-const JWT_SECRET = 'change-me-in-production'
-
 beforeEach(() => {
   vi.clearAllMocks()
 })

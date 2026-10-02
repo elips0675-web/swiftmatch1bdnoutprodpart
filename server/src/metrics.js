@@ -1,5 +1,4 @@
 import client from 'prom-client'
-import { rootLogger } from './logger.js'
 
 const register = new client.Registry()
 

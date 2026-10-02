@@ -28,8 +28,7 @@ vi.mock('../ai-moderation.js', () => ({
   isAIModerationConfigured: vi.fn(),
 }))
 
-import pool from '../db.js'
-import { moderateText, moderateImage, reviewProfile, isAIModerationConfigured } from '../ai-moderation.js'
+import { moderateText, moderateImage, isAIModerationConfigured } from '../ai-moderation.js'
 import moderationRoutes from '../routes/moderation.js'
 
 function createApp() {

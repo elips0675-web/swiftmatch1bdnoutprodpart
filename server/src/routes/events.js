@@ -5,8 +5,6 @@ import logger from '../logger.js'
 
 const router = Router()
 
-const EVENT_CATEGORIES = ['event', 'experience']
-
 const EVENT_SELECT = `o.id, o.partner_id, o.category, o.title, COALESCE(o.poster_url, o.image_url) AS poster_url,
     o.description, o.price, o.city, o.location, o.event_start, o.event_end, o.event_url, o.deeplink,
     o.capacity, o.tickets_sold,
@@ -249,7 +247,7 @@ router.post('/api/events/order/webhook', async (req, res) => {
     const session = event.data.object
     if (!session.metadata || session.metadata.kind !== 'event') return res.json({ received: true })
     if (session.payment_status !== 'paid') return res.json({ received: true })
-    const { userId, offer_id: offerId } = session.metadata
+    const { offer_id: offerId } = session.metadata
     try {
       const conn = await pool.getConnection()
       try {

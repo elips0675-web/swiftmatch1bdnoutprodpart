@@ -88,8 +88,6 @@ router.get('/api/premium/my', auth, async (req, res) => {
   }
 })
 
-const PRICE_IDS = { plus: 'price_plus', gold: 'price_gold', platinum: 'price_platinum' }
-
 router.post('/api/premium/create-checkout', auth, async (req, res) => {
   const { tier, duration_months } = req.body
   if (!tier || !duration_months) return res.status(400).json({ message: 'tier and duration_months are required' })
@@ -99,7 +97,6 @@ router.post('/api/premium/create-checkout', auth, async (req, res) => {
 
   const stripeKey = process.env.STRIPE_SECRET_KEY
   const isLive = process.env.STRIPE_LIVE === 'true'
-  const isProd = process.env.NODE_ENV === 'production'
   if (stripeKey || isLive) {
     if (isLive && !stripeKey) {
       return res.status(500).json({ message: 'STRIPE_LIVE=true but STRIPE_SECRET_KEY is not set' })

@@ -2,7 +2,6 @@ import { Router } from 'express'
 import pool from '../db.js'
 import { auth } from '../middleware.js'
 import { getIO } from '../ws.js'
-import logger from '../logger.js'
 import { activeUser } from '../active-user.js'
 
 const router = Router()

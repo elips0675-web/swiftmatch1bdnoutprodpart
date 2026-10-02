@@ -19,7 +19,7 @@ router.post('/api/iap/webhook', async (req, res) => {
 
   try {
     const event = req.body.event || req.body
-    const { type, app_user_id, product_id, expiration_at_ms, period_type } = event
+    const { type, app_user_id, product_id, expiration_at_ms } = event
 
     logger.info(`IAP webhook: ${type} for user ${app_user_id}, product ${product_id}`)
 

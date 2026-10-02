@@ -15,6 +15,26 @@ jobs:
       - run: npx eslint src/
       - run: npx vite build
 
+  # Линтинг бэкенда (этап 29, B1). До этого конфиг ESLint покрывал только
+  # `**/*.{ts,tsx}` — 131 файл server/src не проверялся линтером вообще.
+  # Отдельная джоба, а не шаг в `lint`: та джоба делает `npx eslint src/`
+  # (только фронт), и расширение её до бэкенда тихо смешало бы два разных
+  # по смыслу гейта — фронтовый (tsc + eslint + build) и серверный.
+  # Зависимости сервера не нужны: eslint и конфиг живут в корневом
+  # node_modules, линтер работает по исходникам и ничего не импортирует.
+  # Что находит: неиспользуемые импорты/переменные (в т.ч. параметр
+  # query-фильтра, который разбирается, но не применяется), no-undef,
+  # require-yield, no-useless-catch, no-useless-escape.
+  lint-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run lint:server
+
   test:
     runs-on: ubuntu-latest
     steps:

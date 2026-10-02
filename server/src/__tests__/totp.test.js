@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import request from 'supertest'
 import express from 'express'
-import jwt from 'jsonwebtoken'
 
 vi.mock('../db.js', () => ({
   default: { query: vi.fn() },
@@ -26,8 +25,6 @@ import pool from '../db.js'
 import twoFaRoutes from '../routes/totp-2fa.js'
 import { generateTotpSecret, verifyTotpToken } from '../totp.js'
 import { generateSync } from 'otplib'
-
-const JWT_SECRET = 'change-me-in-production'
 
 function createApp() {
   const app = express()

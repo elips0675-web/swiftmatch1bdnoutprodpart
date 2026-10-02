@@ -242,7 +242,7 @@ function createFakeDb() {
   return { query, state }
 }
 
-function createApp(db) {
+function createApp(_db) {
   const app = express()
   app.use(express.json())
   app.use(authRoutes)

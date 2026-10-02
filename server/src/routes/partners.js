@@ -4,7 +4,7 @@ import pool from '../db.js'
 import { auth } from '../middleware.js'
 import logger from '../logger.js'
 import { getIO } from '../ws.js'
-import { getCached, setCached, invalidate } from '../cache.js'
+import { getCached, setCached } from '../cache.js'
 import { parseRadiusKm } from '../geo.js'
 
 const router = Router()
@@ -532,7 +532,6 @@ router.post('/api/partners/order/webhook', async (req, res) => {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object
-    const { userId, offer_id: offerId, partner_id: partnerId, recipient_name, recipient_address, gift_message } = session.metadata || {}
     if (session.payment_status !== 'paid') return res.json({ received: true })
     try {
       const conn = await pool.getConnection()

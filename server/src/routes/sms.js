@@ -1,5 +1,4 @@
 import { Router } from 'express'
-import crypto from 'crypto'
 import pool from '../db.js'
 import { auth } from '../middleware.js'
 import { rootLogger } from '../logger.js'

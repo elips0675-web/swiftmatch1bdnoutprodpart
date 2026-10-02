@@ -13,7 +13,7 @@ import pool from './db.js'
 import { initIO, startMessageCleanup, startCheckinCleanup, stopWsTimers } from './ws.js'
 import { createLogger, rootLogger } from './logger.js'
 import { idempotency } from './middleware/idempotency.js'
-import { csrf, csrfGuard, csrfRouter } from './middleware/csrf.js'
+import { csrf, csrfRouter } from './middleware/csrf.js'
 import { startRefreshTokenCleanup } from './cleanup.js'
 import { isLocked, recordFailure, recordSuccess } from './lockout.js'
 import twoFaRoutes from './routes/totp-2fa.js'
@@ -87,7 +87,8 @@ app.use(helmet())
 app.use(cookieParser())
 // CSRF double-submit: раздача токена (безопасно на любой точке).
 // Активация guard (блокировка мутирующих запросов без x-csrf-token) — после
-// выноса API на поддомен: раскомментировать app.use(csrfGuard) ниже.
+// выноса API на поддомен: вернуть в импорт `csrfGuard` и раскомментировать
+// app.use(csrfGuard) ниже.
 app.use(csrf)
 // app.use(csrfGuard)
 
@@ -317,7 +318,7 @@ app.get('/health', async (req, res) => {
 // before the generic 500 handler above to catch route errors.
 registerSentryErrorHandler(app)
 
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   const log = req.log || rootLogger
   log.error('Unhandled error', err)
   res.status(500).json({ message: 'Internal server error' })

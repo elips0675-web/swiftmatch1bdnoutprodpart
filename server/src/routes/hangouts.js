@@ -963,7 +963,6 @@ const checkinLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000,
 const reviewLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: 500, message: { message: 'Too many reviews' } })
 
 const CHECKIN_RADIUS_M = 500
-const CHECKIN_WINDOW_HOURS = 2
 
 function haversineDistance(lat1, lng1, lat2, lng2) {
   const R = 6371000

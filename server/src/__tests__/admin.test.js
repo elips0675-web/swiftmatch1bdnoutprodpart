@@ -98,6 +98,36 @@ describe('GET /api/admin/users (admin users route)', () => {
     expect(res.body).toHaveProperty('total')
   })
 
+  it('filters the list by plan (premium=plus)', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ total: 0 }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ cities: '[]' }], []])
+    const res = await request(app)
+      .get('/api/admin/users?premium=plus')
+      .set('Authorization', `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    const [countSql, countParams] = pool.query.mock.calls[0]
+    expect(countSql).toContain("FROM subscriptions s WHERE s.user_id = u.id AND s.is_active = 1 AND s.expires_at > NOW() LIMIT 1), 'free') = ?")
+    expect(countParams).toEqual(['plus'])
+    const [listSql, listParams] = pool.query.mock.calls[1]
+    expect(listSql).toContain("), 'free') = ?")
+    expect(listParams.slice(-3)).toEqual(['plus', 15, 0])
+  })
+
+  it('ignores the plan filter when premium=all', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ total: 1 }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ cities: '[]' }], []])
+    const res = await request(app)
+      .get('/api/admin/users?premium=all')
+      .set('Authorization', `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    expect(pool.query.mock.calls[0][0]).toContain('WHERE 1=1')
+    expect(pool.query.mock.calls[0][1]).toEqual([])
+  })
+
   it('handles database error', async () => {
     pool.query.mockRejectedValue(new Error('DB error'))
     const res = await request(app)
@@ -167,7 +197,6 @@ describe('GET /api/admin/analytics/overview', () => {
   it('returns analytics overview', async () => {
     pool.query
       .mockResolvedValueOnce([[{ total: 100 }], []])
-      .mockResolvedValueOnce([[{ lastMonth: 10 }], []])
       .mockResolvedValueOnce([[{ premium: 5 }], []])
 
     const res = await request(app)
