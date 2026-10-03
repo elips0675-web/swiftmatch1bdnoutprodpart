@@ -157,13 +157,14 @@ cd server && npm test            # серверные тесты
 | Конфиг Android | `node scripts/check-native-config.mjs` | cleartext для native-сборок |
 | EXPLAIN всех SQL | `node scripts/sql-explain-audit.mjs` (нужна БД) | запросы без индекса |
 | Мохибейк | `node scripts/scan-mojibake.mjs` | сломанная кодировка в текстах (локально, в CI не подключён) |
+| Обязательность E2E | `npm run check:e2e` | джобы `e2e` в `ci.yml` нет / у неё `continue-on-error` или `if:` / триггер ограничен ветками / `deploy` не зависит от `e2e-test`; рецепт без сида демо-данных, без миграций, без `vite preview --strictPort`, с `sleep` вместо `wait-for-url.mjs`, без `upload-artifact`; команды Playwright в двух workflow разошлись |
 
 Каждый гейт обязан падать на сломанном входе — иначе это декорация
 (см. `docs/AGENTS-pitfalls.md`).
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 225 тестов, 28 файлов — **0 failures**
+- **Фронтенд (Vitest):** 256 тестов, 29 файлов — **0 failures**
 - **Сервер (Vitest):** 784 теста, 55 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 150 тестов, 19 spec-файлов — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
@@ -188,6 +189,9 @@ cd server && npm test            # серверные тесты
 | Джоба | Что делает |
 |-------|-----------|
 | `lint` | `tsc --noEmit` → `eslint src/` → `vite build` |
+| `lint-server` | `eslint` по `server/src` (этап 29) |
+| `e2e` | **обязательный E2E на любом push/PR** (этап 30): MySQL 8.0 сервис → схема → `seed-migrations` → `migrate.js` → **`server/src/seed.js`** → API 3002 + `vite preview --strictPort` 8081 → `wait-for-url` → `npm run test:e2e` → `upload-artifact` при `always()` |
+| `e2e-gate` | `npm run check:e2e` — E2E-джоба обязательна, рецепт способен стать зелёным, команды Playwright в двух workflow совпадают |
 | `test` | фронт-тесты (vitest) |
 | `test-server` | серверные тесты (vitest, без БД) |
 | `schema-drift` | `schema-drift-audit.mjs --offline` |
@@ -200,11 +204,11 @@ cd server && npm test            # серверные тесты
 
 | Джоба | Что делает |
 |-------|-----------|
-| `lint-and-typecheck` | `check:ports` → `lint` → `tsc` → **`secrets-leak`**, **`deploy-persistence`**, **`audit:prod` ×2** (блокируют деплой) |
+| `lint-and-typecheck` | `check:ports` → `lint` → `lint:server` → `tsc` → **`secrets-leak`**, **`deploy-persistence`**, **`audit:prod` ×2**, **`check:e2e`** (блокируют деплой) |
 | `frontend-test` | витест + `check-native-config` + `vite build` |
 | `server-test` | MySQL 8.0 сервис: схема → `seed-migrations` → `migrate.js` → `schema-validate` → `sql-explain-audit` → `verify-backup` → витест с живой БД |
 | `test-counters` | сверка чисел с прогоном |
-| `e2e-test` | Playwright на поднятом стеке (needs: lint, frontend, server) + выгрузка отчёта |
+| `e2e-test` | Playwright на поднятом стеке (needs: lint, frontend, server) + выгрузка отчёта; с этапа 30 рецепт идентичен `e2e` в `ci.yml` (сид демо-данных, `wait-for-url` вместо `sleep`, `vite preview --strictPort`) |
 | `docker-config-check` | `docker compose config` + сборка образов `server`/`web` + Trivy (сейчас `exit-code: 0`, режим baseline) |
 | `deploy` | **только push в `main`**: rsync на VPS (с `--exclude .env`, `uploads`, ключи) → `docker compose up -d --build` → `migrate.js` → `schema-validate.mjs` |
 

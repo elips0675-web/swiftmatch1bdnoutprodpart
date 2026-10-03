@@ -180,6 +180,9 @@ async function main() {
     'user_sessions', 'activity_log', 'analytics_events', 'posts', 'post_images',
     'post_comments', 'post_likes', 'group_members', 'group_posts', 'group_post_likes',
     'group_post_comments', 'users', 'refresh_tokens', 'sms_verification',
+    'partner_payouts', 'partner_orders', 'partner_subscriptions',
+    'partner_conversions', 'event_tickets', 'partner_offers', 'partners',
+    'experiment_assignments', 'experiments',
   ]
   for (const t of tables) {
     await conn.execute(`DELETE FROM \`${t}\``).catch(() => {})
@@ -230,6 +233,63 @@ async function main() {
     '["secondary","vocational","incomplete_higher","higher","bachelor","master","candidate","doctor"]',
     '["спам","мошенничество","фейк","скам","развод","обман","реклама","казино","ставки","заработок","крипта","инвестиции","наркотики","закладки","продажа","куплю","порно","секс"]'
   )`)
+
+  console.log('Inserting experiments and partner offers...')
+  await conn.execute(
+    `INSERT IGNORE INTO experiments (name, experiment_key, description, enabled)
+     VALUES ('CTA на карточке', 'card_cta', 'Variant B — доп. кнопка «Открыть профиль» на карточке свайпа', 1)`,
+  )
+
+  const partners = [
+    ['Yandex Go', 'deeplink', 8.00, 'yg_hmac_e5a2d8f1c3b7'],
+    ['KinoPoisk Afisha', 'deeplink', 10.00, 'kp_hmac_b4c9a1e7f3d2'],
+    ['Restoclub', 'deeplink', 12.00, 'rc_hmac_f2a8d5c1e9b3'],
+    ['Ostrovok', 'deeplink', 4.00, 'os_hmac_a1b2c3d4e5f6'],
+    ['Flowwow', 'api', 15.00, 'fw_hmac_a3f8c2e1b7d4'],
+    ['Bouquet.ru', 'deeplink', 12.00, 'bq_hmac_d9e2f1a8c3b5'],
+    ['Yandex Lavka', 'deeplink', 10.00, 'yl_hmac_c7b1e4d9f2a8'],
+    ['LoveSpa', 'deeplink', 12.00, null],
+    ['FitBro', 'deeplink', 10.00, null],
+    ['Wild Events', 'deeplink', 20.00, null],
+  ]
+  for (const [name, type, rate, secret] of partners) {
+    await conn.execute(
+      'INSERT IGNORE INTO partners (name, type, commission_rate, hmac_secret, status) VALUES (?, ?, ?, ?, \'active\')',
+      [name, type, rate, secret],
+    )
+  }
+
+  const partnerOffers = [
+    ['KinoPoisk Afisha', 'cinema', 'Выбрать фильм в кино', 'Афиша кинотеатров рядом: расписание и билеты', 'https://www.afisha.ru/movie/?utm_source=swiftmatch&city={city}', null, null, 'chat,hangout'],
+    ['Yandex Go', 'taxi', 'Вызвать такси к месту встречи', 'Deeplink в Яндекс Go с маршрутом до места', 'yandextaxi://route?startlat={lat}&startlon={lng}&endlat={to_lat}&endlon={to_lng}', null, null, 'chat,hangout'],
+    ['Restoclub', 'restaurant', 'Забронировать столик', 'Рестораны для свидания с онлайн-бронью', 'https://restoclub.ru/msk/search?text=svidanie&utm_source=swiftmatch', 'Москва', null, 'chat,hangout'],
+    ['Restoclub', 'event', 'Идеи для встречи: мастер-классы и события', 'Подборка событий Restoclub для совместного досуга', 'https://restoclub.ru/msk/events/?utm_source=swiftmatch', 'Москва', null, 'hangout'],
+    ['Ostrovok', 'hotel', 'Где остановиться в поездке', 'Отели города по партнёрской цене Ostrovok', 'https://ostrovok.ru/?utm_source=swiftmatch&city={city}', null, null, 'passport'],
+    ['Restoclub', 'restaurant', 'Ужин на двоих — подборка романтических ресторанов', 'Рестораны с романтической атмосферой для свидания', 'https://restoclub.ru/msk/romantic?utm_source=swiftmatch&city={city}', 'Москва', null, 'chat'],
+    ['Flowwow', 'flowers', 'Букет роз — классика для свидания', 'Свежие розы с доставкой на адрес получателя', 'https://flowwow.com/roses?ref=swiftmatch&city={city}', null, 2490, 'chat'],
+    ['Flowwow', 'flowers', 'Авторский букет на выбор', 'Букет от флориста — для особенного свидания', 'https://flowwow.com/author?ref=swiftmatch&city={city}', null, 3490, 'chat'],
+    ['Bouquet.ru', 'flowers', 'Букет тюльпанов — весеннее настроение', 'Яркие тюльпаны с доставкой за 2 часа', 'https://bouquet.ru/tulips?ref=swiftmatch&city={city}', null, 1890, 'chat'],
+    ['Bouquet.ru', 'flowers', 'Композиция из пионов', 'Пионы — элегантный подарок для свидания', 'https://bouquet.ru/peonies?ref=swiftmatch&city={city}', null, 3990, 'chat'],
+    ['Yandex Lavka', 'flowers', 'Букет из полевых цветов', 'Лёгкий букет — доставка за 30 минут', 'https://lavka.yandex.ru/flowers?ref=swiftmatch&city={city}', null, 1290, 'chat'],
+    ['Restoclub', 'restaurant', 'Ресторан для первого свидания', 'Уютные рестораны с атмосферой для свидания: подборка по городу, бронь столика в пару кликов.', 'https://swiftmatch.app/go/restoclub-first-date', 'Москва', 2500, 'hangout'],
+    ['Ostrovok', 'hotel', 'Отель на романтический уикенд', 'Подборка отелей для двоих: завтрак включён, поздний чекаут.', 'https://swiftmatch.app/go/ostrovok-weekend', 'Санкт-Петербург', 6000, 'hangout'],
+    ['Flowwow', 'flowers', 'Цветы к свиданию', 'Доставка букетов за 2 часа.', 'https://swiftmatch.app/go/flowwow-flowers', 'Москва', 1500, 'hangout'],
+    ['Yandex Go', 'taxi', 'Такси до места встречи', 'Комфортный трансфер до свидания.', 'https://swiftmatch.app/go/yandexgo-ride', 'Москва', 400, 'hangout'],
+    ['Bouquet.ru', 'gift', 'Подарок для второй половинки', 'Идеи подарков: от сладких боксов до сувениров.', 'https://swiftmatch.app/go/bouquet-gift', 'Москва', 2000, 'hangout'],
+    ['LoveSpa', 'spa', 'Массаж для двоих', 'Расслабляющий массаж в уютной атмосфере для пар', 'https://lovespa.ru/booking?utm_source=swiftmatch&city={city}', null, 4500, 'chat,profile'],
+    ['LoveSpa', 'spa', 'СПА-процедуры и релакс', 'Полный спектр СПА-услуг', 'https://lovespa.ru/spa?utm_source=swiftmatch&city={city}', null, 3200, 'chat,hangout'],
+    ['FitBro', 'experience', 'Абонемент в фитнес-клуб', 'Пробный абонемент на неделю в фитнес-клубе рядом с вами', 'https://fitbro.ru/pass?utm_source=swiftmatch&city={city}', null, 1500, 'chat,profile'],
+    ['FitBro', 'experience', 'Групповые занятия: йога, пилатес, функциональная', 'Запись на групповое занятие', 'https://fitbro.ru/group?utm_source=swiftmatch&city={city}', null, 800, 'chat,hangout'],
+  ]
+  for (const [pname, category, title, description, deeplink, city, price, placement] of partnerOffers) {
+    await conn.execute(
+      `INSERT INTO partner_offers (partner_id, category, title, description, deeplink, price, city, placement, status, valid_to)
+       SELECT p.id, ?, ?, ?, ?, ?, ?, ?, 'active', DATE_ADD(CURDATE(), INTERVAL 1 YEAR)
+       FROM partners p WHERE p.name = ?
+         AND NOT EXISTS (SELECT 1 FROM partner_offers o WHERE o.title = ?)`,
+      [category, title, description, deeplink, price, city, placement, pname, title],
+    )
+  }
 
   console.log(`Creating ${TARGET_MATCHES} matches and ${TARGET_MESSAGES} messages...`)
   let matchCount = 0

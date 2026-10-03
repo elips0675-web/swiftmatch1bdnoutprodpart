@@ -2,7 +2,7 @@ import { APIRequestContext } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
 
-const API_BASE = process.env.TEST_API_URL || 'http://localhost:3002'
+export const API_BASE = process.env.TEST_API_URL || 'http://localhost:3002'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 

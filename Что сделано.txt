@@ -460,6 +460,92 @@ searchTimer.current = setTimeout(() => {
 
 `eslint.config.js` (блок `server/src/**/*.js`, `eslint.config.js:10-25`) · `scripts/eslint-server-lint.test.mjs` (новый, 8 тестов) · `package.json` (`lint:server`) · `.github/workflows/ci.yml` (джоба `lint-server`) · `.github/workflows/deploy.yml` (шаг в `lint-and-typecheck`) · 20 файлов `server/src` (уборка 69 нарушений) · `server/src/__tests__/admin.test.js` (+2 теста на фильтр «План», −1 мок удалённого запроса) · 9 тест-файлов `server/src/__tests__` (уборка) · `server/src/routes/admin/users.js` (фильтр «План» + `TIER_SQL`) · `docs/AGENTS-pitfalls.md` (питфоллы 55–58) · `AGENTS.md` (счётчик 58) · `test/ИНВЕНТАРЬ-ТЕСТОВ.md` (+ строка нового тест-файла, локально) · `README.md`, `project-context.md`, `test/README.md`, `test/project-context.md` (счётчики).
 
+## Этап 30 (03.10.2026): P1 (B2) — E2E был гейтом на бумаге: не обязателен, ни разу не зелёный, 7 красных тестов → 150/150
+
+### Что было на самом деле
+
+Бэклог говорил «E2E не обязательный гейт» и был прав, но неполон: E2E был не только необязательным, он **ни разу не проходил**. Две молчаливые причины, каждая выглядит как «тесты флакают».
+
+**Первая — триггер.** E2E жил только в `deploy.yml`, а тот триггерится на `push` в `[main, develop]` и PR в `main` (`deploy.yml:3-7`). На фиче-ветке E2E не шёл вообще, джоба `e2e-test` была зелёной вакансией, а `deploy`, зависящий от неё, не запускался, пока она красная.
+
+**Вторая — рецепт не был зелёным и на `main`.** `database/mysql_schema.sql` содержит **только структуру** (ни одного `INSERT INTO users`), а `scripts/seed-migrations.mjs` помечает миграции как применённые (`database/migrations/migrate.js:38-50`, BASELINE) — поэтому **`INSERT`-сиды из миграций теряются на свежей БД**: эксперимент `card_cta` (`019_experiments.sql:26`) и офферы категории `cinema` (`030`) существовали только на машине, где БД накатывалась с нуля. Про порядок «сначала измерить, потом включать гейт» — питфолл 49.
+
+### Измерение (стенд пользователя на 3002/8081 не трогали)
+
+Одноразовая БД `swiftmatch_e2e`, API 3003, фронт 8091 через `VITE_PROXY_TARGET` (новое в `vite.config.ts`: `API_TARGET` применяется к `server.proxy` и `preview.proxy` — иначе E2E нельзя гонять, не останавливая стенд). Подъём: `mysql_schema.sql` → `seed-migrations` → `migrate.js` → `seed.js`, `/health` = `{"status":"ok","db":"connected"}`.
+
+**Первый полный прогон: 143 passed / 7 failed.** Все семь оказались реальными дефектами, а не артефактами измерения:
+
+1. `e2e/ban-realtime.spec.ts` — токен сажался `page.evaluate` после `goto('/chats')`; за время `networkidle` неавторизованный посетитель уходил на `/login`, `reload` оставался на `/login`, а `useWebSocket` смонтирован только в `/chats` → **0 сокетов**. Заменено на `page.addInitScript` до первой навигации + `expect(page.url()).not.toContain('/login')`. Прогон файла: 1 passed (8.5s) — питфолл 61.
+2–4. Хардкод `http://localhost:3002` в трёх местах (`e2e/helpers/api.ts`, `e2e/features.spec.ts:129`, `e2e/partner-b2b.spec.ts:97`) — `API_BASE` теперь экспортируется из `e2e/helpers/api.ts`.
+5. `e2e/features.spec.ts:113` — allowlist источника был `['db', 'openai']`, а `static` — легитимный фолбэк (`server/src/routes/icebreakers.js:76`).
+6. **Потеря миграционных сидов** (см. выше) — демо-данные перенесены в `server/src/seed.js`: эксперимент `card_cta`, 10 партнёров, 20 офферов (`INSERT ... SELECT ... FROM partners p WHERE p.name = ? AND NOT EXISTS (...)`). Не «чинились» в CI: правильное место сида — один.
+7. `database/migrations/052_refresh_session_device.sql` — миграция написана ещё на этапе 27 (`9f25f13`), но на рабочей БД `swiftmatch` колонок `refresh_tokens.ip_address/user_agent` не было, и **каждый логин давал 500**. После применения `LOGIN_3002=200`.
+
+Прогон 4 затронутых файлов — **22 passed (31.4s)**, exit 0.
+
+### Что включено
+
+- **`.github/workflows/ci.yml`, джоба `e2e`**: сервис `mysql:8.0` с `health-cmd`, `env: DB_*/JWT_SECRET`, `npm ci` + `npm ci --prefix server`, Init DB schema → `seed-migrations` → `migrate.js` → **`node server/src/seed.js`**, `npx playwright install --with-deps chromium`, старт API + `wait-for-url /health --status 200 --timeout 120000`, `npx vite build`, `vite preview --port 8081 --strictPort` + `wait-for-url http://127.0.0.1:8081`, `npm run test:e2e`, `upload-artifact` (`playwright-report/`, `test-results/`) и остановка сервисов — всё с `if: always()`.
+- **`.github/workflows/ci.yml`, джоба `e2e-gate`** = `npm run check:e2e`.
+- **`.github/workflows/deploy.yml`**: `e2e-test` приведён к тому же рецепту (сид, ожидание вместо `sleep 5`, `vite preview --strictPort` вместо dev-сервера, `npm run test:e2e`, артефакт с 7-дневным хранением), плюс шаг `npm run check:e2e` в `lint-and-typecheck` — иначе гейт, который проверяет сам деплой, отключался бы вместе с ним.
+- **`scripts/e2e-gate-audit.mjs`** (`npm run check:e2e`, 31 тест в `scripts/e2e-gate-audit.test.mjs`) и **`scripts/wait-for-url.mjs`** вместо `sleep`.
+
+Гейт проверяет две разные вещи: **(1) обязательность** — `on: [push, pull_request]` без фильтра по веткам, джоба `e2e` без `continue-on-error` и без `if:` на уровне джобы, `deploy needs` содержит `e2e-test`; **(2) исполнимость рецепта** — MySQL-сервис, схема, `seed-migrations`, `migrate.js`, сид **до** запуска тестов, `wait-for-url.mjs` для API и фронта, отсутствие `sleep`, `vite preview` с `--strictPort`, `upload-artifact`, и **совпадение команды Playwright в обоих workflow** (иначе «рецепт работает» на одной машине и молча не работает на другой).
+
+### Честность гейта: 15 ломок, 15/15 пойманы + конфигурация «до этапа 30»
+
+Ломки прогнались на **реальных файлах** репозитория (копии workflow в temp + мутация, гейт запускается как в CI). Ни одна не «применилась вхолостую» — скрипт печатает `мутация применилась: true` и требует `exit=1` с непустым списком `FAIL`:
+
+| # | Ломка | Что поймано |
+|---|-------|-------------|
+| L1 | джоба `e2e` удалена из `ci.yml` | нет джобы e2e |
+| L2 | `continue-on-error: true` | гейт, который ничего не блокирует |
+| L3 | `if:` на уровне джобы | то же |
+| L4 | триггер ограничен `branches: [main]` | E2E не идёт на фиче-ветке |
+| L5 | шаг `node server/src/seed.js` удалён | нет сида демо-данных |
+| L6 | сид перенесён после `npm run test:e2e` | тесты стартуют без данных |
+| L7 | `wait-for-url` заменён на `sleep 5` | 4 замечания (готовность, API, фронт, sleep) |
+| L8 | убран `--strictPort` | занятый порт = падение не по делу |
+| L9 | `vite preview` → dev-сервер | не production-режим |
+| L10 | шаг создания схемы убран | схема не создаётся |
+| L11 | убран `upload-artifact` | отчёт при падении |
+| L12 | команда Playwright в `ci.yml` изменена | команды разошлись между workflow |
+| L13 | `e2e-test` убран из `deploy needs` | деплой не ждёт E2E |
+| L14 | удалён сервис MySQL | нет БД |
+| L15 | удалён `migrate.js` | нет миграций |
+
+**Ломку поймал только живой прогон по файлам, а не юнит-тест:** L10 (шаг `mysql ... < database/mysql_schema.sql` удалён, но **упоминание файла осталось в комментарии** рядом с шагом) проходила на зелёном гейте, пока проверки шли по сырому тексту джобы. Вылечено `jobCode()` — комментарии вырезаются до всех проверок; на это теперь два юнит-теста (питфолл 62).
+
+**На прежней конфигурации** (workflow из `HEAD`, до этого этапа) гейт даёт **exit 1 и 8 замечаний**: нет джобы `e2e` в `ci.yml`; в `deploy.yml` — нет сида, нет `wait-for-url` для API и фронта, `sleep N`, нет `--strictPort`, нет `vite preview`. Плюс отдельно гейт зелёный на неизломанной копии — иначе «15/15 пойманы» ничего не значило бы.
+
+### Первый полный зелёный прогон и две находки на нём
+
+**`150 passed (3.9m)`, exit 0, ни одного ретрая** (было 143/7).
+
+Прогон до этого дал «149 passed, **1 flaky**»: `full partner lifecycle via API` падал на `commission_pending ≥ 200` с received `0` и проходил на ретрае. Причина оказалась не гонкой: `commission_pending` = `SUM(conversions.commission) − SUM(completed payouts)` (`server/src/routes/partner-dashboard.js:66-74`), а `server/src/seed.js` чистил `partners` со сбросом `AUTO_INCREMENT`, **но не чистил `partner_payouts` / `partner_orders` / `partner_subscriptions`** — новый партнёр получал `id`, под которым уже лежала завершённая выплата прошлого прогона, и `pending` обнулялся. Диагноз дал только `SELECT * FROM partner_payouts`: две выплаты по 200 с разницей в 13 минут, у первой `partner_id` совпал с id свежего партнёра. Список таблиц с FK на партнёра снят запросом по `information_schema.COLUMNS` (`partner_id` → `conversions/orders/payouts/subscriptions/offers`), все пять теперь чистятся (питфолл 63).
+
+Вторая находка — по требованию «после E2E ничего не остаётся»: `ban-realtime.spec.ts` регистрировал юзера с префиксом `ban_rt_`, а `globalTeardown` удаляет только `e2e_*` и `layout_*` — после зелёного прогона в БД остался `ban_rt_1791014183410@mail.ru`. Префикс переименован в `e2e_ban_rt_`; повторный прогон файла: **1 passed (8.9s)**, teardown «deleted 1 test users», после него в БД не осталось ни одного тестового юзера.
+
+### Как воспроизвести локально
+
+```powershell
+mysql -uroot -e "CREATE DATABASE IF NOT EXISTS swiftmatch_e2e"
+mysql -uroot swiftmatch_e2e < database/mysql_schema.sql
+$env:DB_HOST='127.0.0.1'; $env:DB_USER='root'; $env:DB_PASSWORD=''; $env:DB_NAME='swiftmatch_e2e'
+node scripts/seed-migrations.mjs; node database/migrations/migrate.js; node server/src/seed.js
+# API: PORT=3003 · фронт: VITE_PROXY_TARGET=http://localhost:3003 npx vite preview --port 8091 --strictPort
+$env:TEST_BASE_URL='http://localhost:8091'; $env:TEST_API_URL='http://localhost:3003'
+npx playwright test
+```
+
+**Состояние гейтов после этапа:** `npx vite build` exit 0 · `npx tsc --noEmit` exit 0 · `eslint` 0 errors (21 warning, все `no-explicit-any` в существующих файлах) · фронт **256/256** (29 файлов) · сервер **784/784** (55 файлов) · гейт-тесты **31/31** · `npm run check:e2e` exit 0 · счётчики `node scripts/test-counter-audit.mjs` exit 0 (фронт 256/29, сервер 784/55, E2E 150/19, итого **1040**).
+
+### Файлы
+
+`.github/workflows/ci.yml` (джобы `e2e`, `e2e-gate`) · `.github/workflows/deploy.yml` (рецепт `e2e-test` + шаг `check:e2e`) · `scripts/e2e-gate-audit.mjs` (новый) · `scripts/e2e-gate-audit.test.mjs` (новый, 31 тест) · `scripts/wait-for-url.mjs` (новый) · `package.json` (`check:e2e`) · `server/src/seed.js` (эксперименты + 10 партнёров + 20 офферов; в очистку добавлены `partner_payouts`, `partner_orders`, `partner_subscriptions`) · `e2e/ban-realtime.spec.ts` (`addInitScript`, префикс `e2e_ban_rt_`) · `e2e/helpers/api.ts` (экспорт `API_BASE`) · `e2e/features.spec.ts` (`API_BASE`, allowlist источника) · `e2e/partner-b2b.spec.ts` (`API_BASE`) · `vite.config.ts` (`VITE_PROXY_TARGET` для `server.proxy`/`preview.proxy`) · `docs/AGENTS-pitfalls.md` (питфоллы 60–63) · `AGENTS.md` (счётчик 63) · `test/ИНВЕНТАРЬ-ТЕСТОВ.md` (+ строка нового тест-файла, локально) · `README.md` (гейт, таблицы джоб обоих workflow) · `project-context.md` (живой прогон E2E, этап 30).
+
+
 ## Факт-чек «Финальной оценки проекта SwiftMatch1.txt» (01.10.2026): восемь расхождений с кодом из 64 строк
 
 Вторая оценка проекта (первая разобрана в питфолле 47). Разбор построчный: каждое утверждение сверено с кодом, а не с предыдущей оценкой. Файл переписан на факты; ниже — что именно не сошлось и чем это доказано.

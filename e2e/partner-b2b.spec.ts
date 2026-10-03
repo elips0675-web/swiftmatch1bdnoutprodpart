@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import crypto from 'crypto'
-import { apiCall, loginViaApi } from './helpers/api'
+import { apiCall, loginViaApi, API_BASE } from './helpers/api'
 
 // Этап 74 (аудит qwen, пробел #3): B2B partner dashboard —
 // регистрация партнёра → оффер → конверсия (S2S postback с HMAC) → статистика → выплата.
@@ -94,7 +94,7 @@ test.describe('B2B partner dashboard: register -> offer -> conversion -> payout'
     expect(postback.status).toBe(401) // без подписи — 401
 
     const raw = JSON.stringify(postbackBody)
-    const signedRes = await request.post(`http://localhost:3002/api/partners/postback/${partnerId}`, {
+    const signedRes = await request.post(`${API_BASE}/api/partners/postback/${partnerId}`, {
       headers: {
         'Content-Type': 'application/json',
         'X-Partner-Signature': sig,

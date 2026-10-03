@@ -20,6 +20,8 @@ function utf8Plugin(): import('vite').Plugin {
   };
 }
 
+const API_TARGET = process.env.VITE_PROXY_TARGET || 'http://localhost:3002';
+
 export default defineConfig(({ mode }) => ({
   server: {
     host: "127.0.0.1",
@@ -29,11 +31,11 @@ export default defineConfig(({ mode }) => ({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:3002',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '/socket.io': {
-        target: 'http://localhost:3002',
+        target: API_TARGET,
         changeOrigin: true,
         ws: true,
       },
@@ -44,11 +46,11 @@ export default defineConfig(({ mode }) => ({
     port: 8081,
     proxy: {
       '/api': {
-        target: 'http://localhost:3002',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '/socket.io': {
-        target: 'http://localhost:3002',
+        target: API_TARGET,
         changeOrigin: true,
         ws: true,
       },

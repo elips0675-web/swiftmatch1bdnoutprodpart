@@ -10,7 +10,8 @@ test.describe('Realtime ban chain → user:banned → logout', () => {
   let adminToken: string = ''
 
   test('banned user is logged out via WS user:banned event', async ({ request, page }) => {
-    const email = `ban_rt_${Date.now()}@mail.ru`
+    // Префикс `e2e_` обязателен: global-teardown чистит только `e2e_*` и `layout_*`.
+    const email = `e2e_ban_rt_${Date.now()}@mail.ru`
     const password = 'demo123456'
     const name = 'BanNotify'
 
@@ -44,17 +45,17 @@ test.describe('Realtime ban chain → user:banned → logout', () => {
       if (ws.url().includes('/socket.io/')) wsToApi.push(ws.url())
     })
 
-    // 3. Open the app, seed the token exactly like global-setup (storageState),
-    //    then reload so AuthProvider restores the session and useWebSocket connects.
-    await page.goto(`${BASE_URL}/chats`)
-    await page.waitForLoadState('networkidle')
-    await page.evaluate((t) => {
+    // 3. Токен сажается ДО первой навигации: addInitScript выполняется раньше кода
+    //    приложения на каждом документе. После goto('/chats') + page.evaluate визитёр
+    //    успевал уйти на /login, а useWebSocket живёт только в /chats — 0 сокетов.
+    await page.addInitScript((t) => {
       sessionStorage.setItem('swiftmatch_auth_token', t)
       localStorage.setItem('token', t)
       document.cookie = `sm_token=${t}; path=/`
     }, userToken)
-    await page.reload()
+    await page.goto(`${BASE_URL}/chats`)
     await page.waitForLoadState('networkidle')
+    expect(page.url()).not.toContain('/login')
 
     // Give the WS handshake a moment to reach the user:ID room
     await page.waitForTimeout(2500)

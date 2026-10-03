@@ -35,6 +35,78 @@ jobs:
       - run: npm ci
       - run: npm run lint:server
 
+  # E2E обязателен на любом push/PR (этап 30, B2). До этого он жил только в
+  # deploy.yml, а тот триггерится на push в main/develop и PR в main — на
+  # фиче-ветке E2E не шёл вообще, и джоба e2e-test была зелёной вакансией.
+  # Рецепт ниже повторяет deploy.yml шаг в шаг; расхождение между ними ловит
+  # `npm run check:e2e`.
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: swiftmatch_test
+          MYSQL_DATABASE: swiftmatch_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASSWORD: swiftmatch_test
+      DB_NAME: swiftmatch_test
+      JWT_SECRET: ci-e2e-secret-not-for-production-0123456789
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm ci --prefix server
+      - name: Init DB schema
+        run: mysql -h 127.0.0.1 -uroot -pswiftmatch_test < database/mysql_schema.sql
+      - run: node scripts/seed-migrations.mjs
+      - run: node database/migrations/migrate.js
+      # Без сида демо-данных global-setup не сможет залогиниться за
+      # user2@mail.ru/admin@mail.ru: в mysql_schema.sql нет ни одного
+      # INSERT INTO users, поэтому все четыре storageState остаются пустыми.
+      - run: node server/src/seed.js
+      - run: npx playwright install --with-deps chromium
+      - name: Start API
+        run: |
+          node server/src/index.js > /tmp/api.log 2>&1 &
+          echo $! > /tmp/api.pid
+      - name: Wait for API
+        run: node scripts/wait-for-url.mjs http://127.0.0.1:3002/health --status 200 --timeout 120000
+      - name: Build frontend
+        run: npx vite build
+      - name: Start frontend
+        run: |
+          npx vite preview --port 8081 --strictPort > /tmp/front.log 2>&1 &
+          echo $! > /tmp/front.pid
+      - name: Wait for frontend
+        run: node scripts/wait-for-url.mjs http://127.0.0.1:8081 --timeout 120000
+      - run: npm run test:e2e
+      - name: Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+      - name: Stop services
+        if: always()
+        run: |
+          kill $(cat /tmp/front.pid) 2>/dev/null || true
+          kill $(cat /tmp/api.pid) 2>/dev/null || true
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -130,6 +202,18 @@ jobs:
         with:
           node-version: 20
       - run: node scripts/deploy-persistence-audit.mjs
+
+  # E2E объявлен обязательным гейтом (этап 30, B2) — проверяем, что он и правда
+  # обязательный, а рецепт в ci.yml и deploy.yml не разошёлся. Сам E2E здесь не
+  # запускается (нужна MySQL и два сервиса — это джоба `e2e`).
+  e2e-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm run check:e2e
 
   # Уязвимости в prod-зависимостях — гейт без `npm ci`: аудиту нужен только
   # lock-файл, поэтому джоба делает ровно две команды (корень и server) и

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { createAudit } from './helpers/audit'
-import { apiCall, getTokenFromStorage } from './helpers/api'
+import { apiCall, getTokenFromStorage, API_BASE } from './helpers/api'
 
 const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:8081'
 
@@ -110,7 +110,8 @@ test.describe('14. Icebreakers', () => {
       expect(typeof s).toBe('string')
       expect(s.length).toBeGreaterThan(0)
     }
-    expect(['db', 'openai']).toContain(res.body?.source)
+    // source: 'static' — легитимный фолбэк icebreakers.js:76, а не ошибка.
+    expect(['db', 'openai', 'static']).toContain(res.body?.source)
   })
 
   test.describe('Icebreakers UI', () => {
@@ -126,7 +127,7 @@ test.describe('14. Icebreakers', () => {
       // в jar'е несёт sm_token не-админа (от предыдущих регистраций) → PUT /features дал бы 403.
       // Обходим через чистый fetch (без cookie jar'а), чтобы Bearer-админ прошёл.
       const adminPut = async (flagsBody: Record<string, unknown>) => {
-        const r = await fetch('http://localhost:3002/api/admin/features', {
+        const r = await fetch(`${API_BASE}/api/admin/features`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + adminToken },
           body: JSON.stringify(flagsBody),
