@@ -404,7 +404,7 @@ jobs:
       - name: Push raw files to VPS via rsync
         uses: burnett01/rsync-deployments@7.0.1
         with:
-          switches: -avz --delete --exclude node_modules --exclude .git --exclude test-results --exclude playwright-report --exclude e2e/.auth --exclude .env --exclude '*.secret' --exclude '*.pem' --exclude '*.key' --exclude '*.p12' --exclude uploads
+          switches: -avz --delete --exclude node_modules --exclude .git --exclude test-results --exclude playwright-report --exclude e2e/.auth --exclude .env --exclude '.env.*' --exclude '*.secret' --exclude '*-secret' --exclude '*.pem' --exclude '*.key' --exclude '*.p12' --exclude '*.pfx' --exclude 'id_*' --exclude uploads
           path: ./
           remote_path: /app/swiftmatch
           remote_host: ${{ secrets.DEPLOY_HOST }}

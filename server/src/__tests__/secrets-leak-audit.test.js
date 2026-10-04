@@ -10,8 +10,10 @@ import {
   checkRsyncExcludes,
   findContextSecrets,
   findIncludedNoiseDirs,
+  findRsyncSecretGaps,
   isExcluded,
   parseDockerignore,
+  SECRET_FILE_SAMPLES,
 } from '../../../scripts/secrets-leak-audit.mjs'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -48,7 +50,11 @@ const FIXED_DOCKERIGNORE = `${OLD_DOCKERIGNORE}
 
 const OLD_RSYNC = '  switches: -avz --delete --exclude node_modules --exclude .git --exclude test-results --exclude playwright-report --exclude e2e/.auth'
 
-const NEW_RSYNC = "  switches: -avz --delete --exclude node_modules --exclude .git --exclude .env --exclude '*.secret' --exclude '*.pem' --exclude '*.key' --exclude '*.p12' --exclude uploads"
+// Строка после этапа 20: исключает пять шаблонов, но не дев-секрет и не
+// варианты `.env.*` — дыра N8, закрытая этапом 35.
+const RSYNC_AFTER_STAGE_20 = "  switches: -avz --delete --exclude node_modules --exclude .git --exclude .env --exclude '*.secret' --exclude '*.pem' --exclude '*.key' --exclude '*.p12' --exclude uploads"
+
+const NEW_RSYNC = "  switches: -avz --delete --exclude node_modules --exclude .git --exclude test-results --exclude playwright-report --exclude e2e/.auth --exclude .env --exclude '.env.*' --exclude '*.secret' --exclude '*-secret' --exclude '*.pem' --exclude '*.key' --exclude '*.p12' --exclude '*.pfx' --exclude 'id_*' --exclude uploads"
 
 function makeFixture(dockerignore, rsync) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'secrets-audit-'))
@@ -118,21 +124,49 @@ describe('secrets-leak-audit: обязательные правила .dockerign
   })
 })
 
-describe('secrets-leak-audit: rsync не должен стирать прод-.env', () => {
-  it('прежняя строка rsync не исключает секреты (прод-.env удаляется --delete)', () => {
+describe('secrets-leak-audit: rsync не должен стирать прод-.env и везти секреты', () => {
+  it('прежняя строка rsync не исключает ни .env, ни uploads (прод-.env удаляется --delete)', () => {
     const missing = checkRsyncExcludes(OLD_RSYNC)
     expect(missing).toContain('.env')
-    expect(missing).toContain('*.secret')
     expect(missing).toContain('uploads')
   })
 
-  it('исправленная строка rsync проходит', () => {
+  it('строка после этапа 20 держала 5 шаблонов и пропускала 7 классов секретов', () => {
+    expect(findRsyncSecretGaps(RSYNC_AFTER_STAGE_20)).toEqual([
+      '.env.local',
+      '.env.production',
+      '.env.development',
+      '.jwt-dev-secret',
+      'tls.pfx',
+      'id_rsa',
+      'id_ed25519',
+    ])
+  })
+
+  it('строка без единого секретного исключения пропускает все образцы', () => {
+    expect(findRsyncSecretGaps(OLD_RSYNC).length).toBe(SECRET_FILE_SAMPLES.length)
+  })
+
+  it('исправленная строка rsync проходит по обоим каналам', () => {
     expect(checkRsyncExcludes(NEW_RSYNC)).toEqual([])
+    expect(findRsyncSecretGaps(NEW_RSYNC)).toEqual([])
   })
 
   it('актуальный deploy.yml репозитория проходит', () => {
     const deployYml = fs.readFileSync(path.join(REPO_ROOT, '.github/workflows/deploy.yml'), 'utf8')
     expect(checkRsyncExcludes(deployYml)).toEqual([])
+    expect(findRsyncSecretGaps(deployYml)).toEqual([])
+  })
+
+  it('audit() отдаёт находки нового канала, а не молчит на старой строке', () => {
+    const dir = makeFixture(FIXED_DOCKERIGNORE, OLD_RSYNC)
+    try {
+      const result = audit(dir)
+      expect(result.rsyncSecretGaps).toContain('.jwt-dev-secret')
+      expect(result.rsyncSecretGaps).toContain('.env')
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

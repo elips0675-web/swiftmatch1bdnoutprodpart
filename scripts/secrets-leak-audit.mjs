@@ -43,7 +43,39 @@ const REQUIRED_DOCKERIGNORE_PATTERNS = [
   '**/dist',
 ]
 
-const REQUIRED_RSYNC_EXCLUDES = ['.env', '*.secret', '*.pem', '*.key', 'uploads']
+// Обязательные rsync-исключения — только то, что не выводится из правил
+// секретов: `.env` (прод-конфиг, который переживает --delete) и `uploads`
+// (каталог фото на volume, не секрет). Классы файлов-секретов проверяются
+// отдельно и вычисляются, а не перечисляются здесь: список-константа была
+// ровно тем дефектом, который закрывает этап 35 (см. SECRET_FILE_SAMPLES).
+const REQUIRED_RSYNC_EXCLUDES = ['.env', 'uploads']
+
+/**
+ * Образцы имён файлов-секретов: по одному на каждую ветку `SECRET_FILE_RE`.
+ *
+ * Это НЕ список «что сейчас лежит в репозитории»: в CI после checkout таких
+ * файлов нет вообще (`.env` и `.jwt-dev-secret` в `.gitignore`), и проверка по
+ * наличию файлов была бы честно зелёной на настоящей дыре. Именно так и вышло:
+ * `server/.jwt-dev-secret` исключён `.dockerignore` (паттерн для файлов, имя
+ * которых заканчивается на дефис и `secret`) и потому не попадал в образ, но
+ * не матчился НИ ОДНИМ rsync-исключением — и ехал на VPS, пока гейт
+ * оставался зелёным. Тест гейта требует, чтобы каждый образец сам
+ * признавался секретом в `isSecretPath`, иначе эти два списка разъедутся.
+ */
+export const SECRET_FILE_SAMPLES = [
+  '.env',
+  '.env.local',
+  '.env.production',
+  '.env.development',
+  '.jwt-dev-secret',
+  'app.secret',
+  'tls.pem',
+  'tls.key',
+  'tls.p12',
+  'tls.pfx',
+  'id_rsa',
+  'id_ed25519',
+]
 
 const ALWAYS_SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', 'coverage', '.vite'])
 
@@ -53,7 +85,7 @@ const ALWAYS_SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', 'coverage', '.
 // суффикс через дефис, поэтому в список попал явно, а не общим `\.(secret|…)$`.
 const SECRET_FILE_RE = /(^|\/)\.env$|(^|\/)\.env\.(local|production|development)$|(^|\/)\.jwt-dev-secret$|\.(secret|pem|key|p12|pfx)$|(^|\/)id_(rsa|ed25519)$/
 
-function isSecretPath(relPath) {
+export function isSecretPath(relPath) {
   if (/(^|\/)\.env\.example$/.test(relPath)) return false
   return SECRET_FILE_RE.test(relPath)
 }
@@ -216,6 +248,52 @@ export function checkRsyncExcludes(deployYml) {
   return missing
 }
 
+/** Значения `--exclude` из строки switches (кавычки у rsync — часть синтаксиса). */
+export function parseRsyncExcludes(switches) {
+  return [...switches.matchAll(/--exclude(?:=|\s+)['"]?([^'"\s]+)['"]?/g)].map((m) => m[1])
+}
+
+/**
+ * Мини-матчер шаблона rsync, семантика ровно rsync-овая и в одном пункте
+ * противоположна .dockerignore: шаблон БЕЗ слеша матчит basename на любой
+ * глубине (`.env` — это и `.env`, и `server/.env`), а `*` не проходит через
+ * `/`. Шаблон со слешем (или ведущим `/`) сверяется с полным относительным
+ * путём. Если бы матчер повторял docker-семантику, гейт зеленил бы сломанную
+ * rsync-строку и пропустил бы ровно ту утечку, ради которой он написан.
+ */
+export function compileRsyncPattern(pattern) {
+  const body = pattern.replace(/^\//, '')
+  const byPath = body.includes('/')
+  let re = ''
+  for (let i = 0; i < body.length; i += 1) {
+    const ch = body[i]
+    if (ch === '*') {
+      if (body[i + 1] === '*') {
+        re += '.*'
+        i += 1
+      } else {
+        re += '[^/]*'
+      }
+    } else if (ch === '?') {
+      re += '[^/]'
+    } else {
+      re += ch.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    }
+  }
+  return { byPath, re: new RegExp(`^${re}$`) }
+}
+
+/**
+ * Классы файлов-секретов, не покрытые ни одним rsync-исключением: именно они
+ * уедут на VPS, оставаясь в `.gitignore` (в образ их закрывает `.dockerignore`).
+ */
+export function findRsyncSecretGaps(deployYml, samples = SECRET_FILE_SAMPLES) {
+  const rules = parseRsyncExcludes(findRsyncSwitches(deployYml)).map(compileRsyncPattern)
+  return samples.filter(
+    (sample) => !rules.some((rule) => rule.re.test(rule.byPath ? sample : path.posix.basename(sample))),
+  )
+}
+
 /**
  * Расширения файлов, содержимое которых имеет смысл читать. Двоичные и
  * vendor-каталоги отсекаются раньше по ALWAYS_SKIP_DIRS; `.env` и `.env.*`
@@ -298,12 +376,13 @@ export function audit(root) {
   const contentSecrets = findContentSecrets(root)
   const deployYml = fs.readFileSync(path.join(root, '.github/workflows/deploy.yml'), 'utf8')
   const rsyncMissing = checkRsyncExcludes(deployYml)
-  return { dockerignoreMissing, contextSecrets, includedNoiseDirs, contentSecrets, rsyncMissing }
+  const rsyncSecretGaps = findRsyncSecretGaps(deployYml)
+  return { dockerignoreMissing, contextSecrets, includedNoiseDirs, contentSecrets, rsyncMissing, rsyncSecretGaps }
 }
 
 function main() {
   const root = process.argv[2] || process.cwd()
-  const { dockerignoreMissing, contextSecrets, includedNoiseDirs, contentSecrets, rsyncMissing } = audit(root)
+  const { dockerignoreMissing, contextSecrets, includedNoiseDirs, contentSecrets, rsyncMissing, rsyncSecretGaps } = audit(root)
   let failed = false
 
   if (dockerignoreMissing.length) {
@@ -346,6 +425,14 @@ function main() {
     console.log(`FAIL: rsync-строка в deploy.yml не исключает: ${rsyncMissing.join(', ')}`)
   } else {
     console.log(`OK: rsync исключает ${REQUIRED_RSYNC_EXCLUDES.join(', ')} (прод-.env переживает --delete)`)
+  }
+
+  if (rsyncSecretGaps.length) {
+    failed = true
+    console.log(`FAIL: rsync на деплое не исключает файлы-секреты (${rsyncSecretGaps.length}): ${rsyncSecretGaps.join(', ')}`)
+    console.log('  последствие: эти файлы закрыты .dockerignore и .gitignore, поэтому в образ не попадают, но едут на VPS')
+  } else {
+    console.log(`OK: rsync исключает все ${SECRET_FILE_SAMPLES.length} классов файлов-секретов, а не только перечисленные в гейте`)
   }
 
   if (failed) {

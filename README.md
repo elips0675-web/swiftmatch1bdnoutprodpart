@@ -149,7 +149,7 @@ cd server && npm test            # серверные тесты
 |------|---------|-----------|
 | Дрейф схемы | `node scripts/schema-drift-audit.mjs --offline` | колонка, которую читает код, есть в `database/mysql_schema.sql`, но её не создаёт ни одна миграция → живой 500 (стоило 500 на `/profile/edit`). В CI — джоба `schema-drift` в `ci.yml` |
 | Дрейф схемы (на БД) | `node scripts/schema-drift-audit.mjs` (нужен `MYSQL_BIN`) | то же + сверка с **живой** MySQL. **В CI не подключён**: `server-test` в `deploy.yml` гоняет `schema-validate`, а не live-дрейф — гейт живёт только локально (в бэклоге, E1) |
-| Секреты | `node scripts/secrets-leak-audit.mjs` | `.dockerignore` пропускает `server/.env`/`.jwt-dev-secret`; rsync без `--exclude .env` стирает прод-`.env`; **значение секрета, вписанное в отслеживаемый файл** (был VAPID-ключ в `README.md`) |
+| Секреты | `node scripts/secrets-leak-audit.mjs` | четыре независимых канала: `.dockerignore` пропускает `server/.env`/`.jwt-dev-secret`; rsync без `--exclude .env` стирает прод-`.env`; **rsync исключает не все классы файлов-секретов, которые гейт сам признаёт секретами** (`server/.jwt-dev-secret`, `.env.*`, `*.pfx`, `id_rsa` ехали на VPS при зелёном гейте — этап 35); **значение секрета, вписанное в отслеживаемый файл** (был VAPID-ключ в `README.md`) |
 | Персистентность деплоя | `node scripts/deploy-persistence-audit.mjs` | каталог записи фото не смонтирован volume'ом → `docker compose up --build` удаляет все фото; сверяет путь из кода с compose |
 | Счётчики тестов | `node scripts/test-counter-audit.mjs` (`--fix` переписывает) | числа тестов в `README.md`, `project-context.md`, `test/README.md`, `test/project-context.md`, `test/ИНВЕНТАРЬ-ТЕСТОВ.md` разошлись с прогоном |
 | Уязвимости prod-зависимостей | `npm run audit:prod` (корень и в `server/`) | `npm audit --omit=dev --audit-level=high` по обоим lock-файлам: в образ едет только прод-часть |
@@ -167,8 +167,8 @@ cd server && npm test            # серверные тесты
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 365 тестов, 33 файла — **0 failures**
-- **Сервер (Vitest):** 792 теста, 55 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
+- **Фронтенд (Vitest):** 374 теста, 33 файла — **0 failures**
+- **Сервер (Vitest):** 795 тестов, 55 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 152 теста, 19 spec-файлов — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
 ### Зависимости

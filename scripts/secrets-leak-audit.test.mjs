@@ -15,7 +15,16 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { findContentSecrets, isExcluded, parseDockerignore } from "./secrets-leak-audit.mjs";
+import {
+  compileRsyncPattern,
+  findContentSecrets,
+  findRsyncSecretGaps,
+  isExcluded,
+  isSecretPath,
+  parseDockerignore,
+  parseRsyncExcludes,
+  SECRET_FILE_SAMPLES,
+} from "./secrets-leak-audit.mjs";
 
 let root;
 
@@ -142,5 +151,102 @@ describe("parseDockerignore: семантика полного пути", () => 
     expect(isExcluded("server/.env", false, rules)).toBe(true);
     expect(isExcluded(".env", false, parseDockerignore(".env\n"))).toBe(true);
     expect(isExcluded("server/.env", false, parseDockerignore(".env\n"))).toBe(false);
+  });
+});
+
+// rsync-канал. Дыра этапа 35: `server/.jwt-dev-secret` закрыт .gitignore и
+// .dockerignore, но не матчился НИ ОДНИМ `--exclude` в deploy.yml — и ехал на
+// VPS, пока гейт был зелёный: список обязательных исключений был константой
+// гейта, а не тем, что гейт сам считает секретом.
+const RSYNC_SWITCHES_BEFORE_STAGE_35 =
+  "-avz --delete --exclude node_modules --exclude .git --exclude test-results --exclude playwright-report " +
+  "--exclude e2e/.auth --exclude .env --exclude '*.secret' --exclude '*.pem' --exclude '*.key' --exclude '*.p12' --exclude uploads";
+
+const rsyncYml = (switches) =>
+  `  deploy:\n    steps:\n      - uses: actions/checkout@v4\n      - name: rsync\n        with:\n          switches: ${switches}\n`;
+
+const gapsOf = (switches) => findRsyncSecretGaps(rsyncYml(switches));
+
+describe("parseRsyncExcludes: разбор строки switches", () => {
+  it("берёт значения --exclude с кавычками и без, пробелом и равенством", () => {
+    expect(parseRsyncExcludes("-avz --exclude node_modules --exclude '*.secret' --exclude=\"*.pem\"")).toEqual([
+      "node_modules",
+      "*.secret",
+      "*.pem",
+    ]);
+  });
+
+  it("пустая строка switches не превращается в тысячу исключений", () => {
+    expect(parseRsyncExcludes("")).toEqual([]);
+  });
+});
+
+describe("compileRsyncPattern: семантика rsync, а не docker", () => {
+  const matches = (pattern, sample) => {
+    const rule = compileRsyncPattern(pattern);
+    return rule.re.test(rule.byPath ? sample : sample.split("/").pop());
+  };
+
+  it("шаблон без слеша матчит basename на любой глубине", () => {
+    expect(matches(".env", ".env")).toBe(true);
+    expect(matches(".env", "server/.env")).toBe(true);
+    expect(matches("*.secret", "server/.jwt-dev-secret")).toBe(false);
+    expect(matches("*-secret", "server/.jwt-dev-secret")).toBe(true);
+  });
+
+  it("звёздочка не проходит через слеш, шаблон со слешем сверяет путь от корня", () => {
+    expect(matches("uploads", "server/uploads")).toBe(true);
+    expect(matches("config/*.pem", "config/tls.pem")).toBe(true);
+    expect(matches("config/*.pem", "server/config/tls.pem")).toBe(false);
+    expect(matches("*.key", "nested/dir/tls.key")).toBe(true);
+    expect(matches("*.key", "nested/dir/tls.key/внутри")).toBe(false);
+  });
+});
+
+describe("findRsyncSecretGaps: дыра rsync, которую не видели два канала", () => {
+  it("на рабочем deploy.yml находок нет (контрольный зелёный)", () => {
+    const deployYml = fs.readFileSync(
+      path.join(process.cwd(), ".github/workflows/deploy.yml"),
+      "utf8",
+    );
+    expect(findRsyncSecretGaps(deployYml)).toEqual([]);
+  });
+
+  it("на строке rsync до этапа 35 без исключений не находятся (старый гейт был зелёный)", () => {
+    const legacy = parseRsyncExcludes(RSYNC_SWITCHES_BEFORE_STAGE_35);
+    expect(legacy).toEqual([
+      "node_modules", ".git", "test-results", "playwright-report",
+      "e2e/.auth", ".env", "*.secret", "*.pem", "*.key", "*.p12", "uploads",
+    ]);
+    const gaps = gapsOf(RSYNC_SWITCHES_BEFORE_STAGE_35);
+    expect(gaps).toContain(".jwt-dev-secret");
+    expect(gaps).toContain(".env.local");
+    expect(gaps).toContain("tls.pfx");
+    expect(gaps).toContain("id_rsa");
+    expect(gaps).toContain("id_ed25519");
+    expect(gaps.length).toBe(7);
+  });
+
+  it("без исключения для дев-секрета дыра ровно в .jwt-dev-secret", () => {
+    const fixed = fs.readFileSync(path.join(process.cwd(), ".github/workflows/deploy.yml"), "utf8");
+    const switches = fixed.match(/^\s*switches:\s*(.+)$/m)[1].trim();
+    expect(gapsOf(switches.replace(/ --exclude '\*-secret'/, ""))).toEqual([".jwt-dev-secret"]);
+  });
+
+  it("без `.env.*` теряются все варианты окружения, а `.env` остаётся", () => {
+    const fixed = fs.readFileSync(path.join(process.cwd(), ".github/workflows/deploy.yml"), "utf8");
+    const switches = fixed.match(/^\s*switches:\s*(.+)$/m)[1].trim();
+    expect(gapsOf(switches.replace(/ --exclude '\.env\.\*'/, "")).sort()).toEqual([
+      ".env.development", ".env.local", ".env.production",
+    ]);
+  });
+
+  it("каждый образец признан секретом самим isSecretPath (списки не разъедутся)", () => {
+    for (const sample of SECRET_FILE_SAMPLES) {
+      expect(isSecretPath(sample)).toBe(true);
+      expect(isSecretPath(`server/${sample}`)).toBe(true);
+    }
+    expect(isSecretPath(".env.example")).toBe(false);
+    expect(isSecretPath("server/.env.example")).toBe(false);
   });
 });
