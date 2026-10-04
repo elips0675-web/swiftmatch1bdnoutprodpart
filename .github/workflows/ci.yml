@@ -231,6 +231,20 @@ jobs:
       - run: npm ci
       - run: npm run check:deps
 
+  # Раскладка документации (этап 32). Проверяет, что `Промты.txt` остался
+  # указателем на канон (а не второй копией правил), идеи 21–34 на месте в
+  # `docs/product-roadmap.md`, архив `context.txt` помечен как срез, а в
+  # отслеживаемых .md/.txt нет запрещённых формулировок («adminAuth … passive»
+  # и «Zod 4»). Ни MySQL, ни npm ci не нужны — только git ls-files.
+  docs-canon:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm run check:docs
+
   # Уязвимости в prod-зависимостях — гейт без `npm ci`: аудиту нужен только
   # lock-файл, поэтому джоба делает ровно две команды (корень и server) и
   # проверяет обе половины: в контейнер едут обе, а не только фронт.

@@ -17,6 +17,7 @@
     "check:order-by": "node scripts/order-by-audit.mjs",
     "check:e2e": "node scripts/e2e-gate-audit.mjs",
     "check:deps": "node scripts/dependency-audit.mjs",
+    "check:docs": "node scripts/docs-canon-audit.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -158,13 +158,15 @@ cd server && npm test            # серверные тесты
 | EXPLAIN всех SQL | `node scripts/sql-explain-audit.mjs` (нужна БД) | запросы без индекса |
 | Мохибейк | `node scripts/scan-mojibake.mjs` | сломанная кодировка в текстах (локально, в CI не подключён) |
 | Обязательность E2E | `npm run check:e2e` | джобы `e2e` в `ci.yml` нет / у неё `continue-on-error` или `if:` / триггер ограничен ветками / `deploy` не зависит от `e2e-test`; рецепт без сида демо-данных, без миграций, без `vite preview --strictPort`, с `sleep` вместо `wait-for-url.mjs`, без `upload-artifact`; команды Playwright в двух workflow разошлись |
+| Целостность зависимостей | `npm run check:deps` | необъявленный импорт (в т.ч. `import()`) или мёртвая runtime-зависимость в `package.json` |
+| Раскладка документации | `npm run check:docs` | `Промты.txt` снова стал источником правил (шапка пропала, вернулись разделы 0–20 или 21–34); битая ссылка в таблице канона; `docs/product-roadmap.md` потерял один из 14 разделов идей, похудел или набрал чужих правил; запрещённые формулировки (правила `admin-auth-passive` и `zod-version-claim`, буквальные примеры — в `hint` гейта) в отслеживаемых `.md`/`.txt`; архив `context.txt` без пометки «ИСТОРИЧЕСКИЙ СРЕЗ», без даты среза и без ссылки на канон; гейт не вызывается из `ci.yml`/`deploy.yml`, джоба переименована или помечена `continue-on-error`/`if: false` |
 
 Каждый гейт обязан падать на сломанном входе — иначе это декорация
 (см. `docs/AGENTS-pitfalls.md`).
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 282 теста, 30 файлов — **0 failures**
+- **Фронтенд (Vitest):** 327 тестов, 31 файл — **0 failures**
 - **Сервер (Vitest):** 784 теста, 55 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 150 тестов, 19 spec-файлов — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
@@ -199,12 +201,13 @@ cd server && npm test            # серверные тесты
 | `test-counters` | `test-counter-audit.mjs` (нужны оба `node_modules`) |
 | `deploy-persistence` | `deploy-persistence-audit.mjs` |
 | `dependency-audit` | `npm run audit:prod` в корне и в `server/` (без `npm ci` — аудиту нужен только lock-файл) |
+| `docs-canon` | `npm run check:docs` — раскладка документации: правила только в `docs/AGENTS-*.md`, идеи 21–34 в `docs/product-roadmap.md`, архив помечен, запрещённых формулировок в отслеживаемых `.md`/`.txt` нет (этап 32) |
 
 ### `.github/workflows/deploy.yml` — push в `main`/`develop`, PR в `main` (Node 22)
 
 | Джоба | Что делает |
 |-------|-----------|
-| `lint-and-typecheck` | `check:ports` → `lint` → `lint:server` → `tsc` → **`secrets-leak`**, **`deploy-persistence`**, **`audit:prod` ×2**, **`check:e2e`** (блокируют деплой) |
+| `lint-and-typecheck` | `check:ports` → `lint` → `lint:server` → `tsc` → **`secrets-leak`**, **`deploy-persistence`**, **`audit:prod` ×2**, **`check:e2e`**, **`check:docs`** (блокируют деплой) |
 | `frontend-test` | витест + `check-native-config` + `vite build` |
 | `server-test` | MySQL 8.0 сервис: схема → `seed-migrations` → `migrate.js` → `schema-validate` → `sql-explain-audit` → `verify-backup` → витест с живой БД |
 | `test-counters` | сверка чисел с прогоном |
@@ -411,14 +414,25 @@ cd server && npm test            # серверные тесты
 | `README.md` | Этот файл: стек, запуск, гейты, CI, функционал | числа тестов проверяет `test-counter-audit` |
 | `project-context.md` | Сводный срез по проекту | счётчик проверяет гейт |
 | `docs/architecture.md`, `docs/past-mistakes.md` | Архитектура и разбор прошлых ошибок | справочно |
-| `docs/roadmap.md` | Планы | сверяйтесь с `Что доделать.txt` |
+| `docs/roadmap.md` | Журнал этапов до 06.09.2026 (чистая UTF-8 сводка, отслеживается в git) | исторический журнал, сверяйтесь с `Что сделано.txt` |
+| `docs/product-roadmap.md` | Продуктовые идеи: разделы 21–34 из бывшего `Промты.txt`, перенесены дословно (14 разделов, 645 непустых строк) | идеи, не «сделано»; правил не содержит — это проверяет `npm run check:docs` |
+| `Промты.txt` | Указатель канона: таблица «тема → где правило» + что убрано и почему | **не источник правил**; разделы 0–20 живут в `docs/AGENTS-*.md`, идеи 21–34 — в `docs/product-roadmap.md` |
 | `Что сделано.txt` | Журнал этапов: что, зачем, чем проверено | исторический журнал, числа в заголовке — срез на дату |
 | `Что доделать.txt` | Бэклог: открытые P0/P1/P2 с основаниями | рабочий список |
-| `context.txt` | Старый лог этапов (до `Что сделано.txt`) | **исторический**, числа внутри — снимки своих дат |
+| `context.txt` | Старый лог этапов (до `Что сделано.txt`), 992 строки | **исторический срез 26.09.2026** — в шапке баннер и отсылка к `project-context.md`; числа внутри — снимки своих дат |
 | `docs/STATUS.md` | Не существует; ссылки на него помечены «файл не создан» | — |
 
 Правило: числа тестов сначала измеряются гейтом, потом вписываются в документы.
 `test/` — локальное зеркало этих же файлов (в `.gitignore`).
+
+Раскладка (этап 32, проверяется `npm run check:docs`): **правила** — только
+`AGENTS.md` и `docs/AGENTS-*.md`; **продуктовые идеи** — `docs/product-roadmap.md`;
+**история** — `Что сделано.txt` и `Что доделать.txt`; **архивы** (`context.txt`,
+`docs/roadmap.md`) обязаны нести в шапке дату среза и ссылку на канон.
+`Промты.txt` — указатель с таблицей «тема → где правило», а не копия правил:
+дублирование правил опаснее их отсутствия, потому что протухающая копия
+читается как истина (этот файл и предлагал сделать `adminAuth` пассивным —
+снятие защиты `/api/admin`, закрыто этапом 24).
 
 ---
 

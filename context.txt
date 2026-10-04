@@ -1,10 +1,17 @@
+> **ИСТОРИЧЕСКИЙ СРЕЗ. Снято 26.09.2026 — не обновляется.** Файл описывает состояние
+> проекта на ту дату; числа внутри — снимки, а не измерение. Канон: `project-context.md`
+> (стек, порты, карта), `README.md` (гейты и числа, проверяется `test-counter-audit`),
+> `docs/AGENTS-*.md` (правила), `Что сделано.txt` (история этапов), `Что доделать.txt`
+> (бэклог). Все номера этапов, упомянутые ниже, есть в `Что сделано.txt` или
+> `Что доделать.txt`. Правки правил сюда не вносятся: этот файл — архив, а не источник
+> истины (04.10.2026, этап 32).
 # SwiftMatch — Production Context
 
 ## Stack
 - **Frontend:** React 18 + Vite 8 + TypeScript 5 strict + Tailwind CSS 3 + shadcn/ui
 - **Backend:** Express.js 4 + MySQL (mysql2) + Socket.IO 4
 - **State:** TanStack Query 5 + React Context
-- **Forms:** React Hook Form + Zod 4
+- **Forms:** React Hook Form — импортируется только в `src/components/ui/form.tsx`; `zod` и `@hookform/resolvers` удалены 04.10.2026 (этап 31) как мёртвые зависимости
 - **Auth:** JWT (Bearer) + refresh tokens, dev-login для админки
 - **Payments:** Stripe (mock-fallback без ключа) + RevenueCat IAP scaffold
 - **Realtime:** Socket.IO (chats, online status, typing indicator)
