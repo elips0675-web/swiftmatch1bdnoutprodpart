@@ -36,6 +36,33 @@ function deleteConversation(chatId: number) {
   fetch(`/api/chats/${chatId}`, { method: 'DELETE' }).catch(() => {});
 }
 
+const MESSAGES_PAGE_SIZE = 50;
+
+type MessagesPage = { messages: any[]; has_more: boolean; next_before: number | null };
+
+// Страница истории чата: без курсора — новые сообщения, с курсором — строго
+// старше него. Ответ — объект `{ messages, has_more, next_before }`, а не
+// массив: по массиву нельзя понять, есть ли ещё более старые сообщения, и
+// чат длиннее одной страницы выглядит как «история кончилась».
+function fetchMessagePage(chatId: number, token: string, before?: number | null): Promise<MessagesPage | null> {
+  const cursor = before ? `&before=${before}` : '';
+  return fetch(`/api/chats/${chatId}/messages?limit=${MESSAGES_PAGE_SIZE}${cursor}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+    .then(res => (res.ok ? res.json() : null) as Promise<MessagesPage | null>)
+    .catch(() => null);
+}
+
+function toChatMessage(m: any, myId?: number) {
+  return {
+    id: m.id,
+    text: m.text,
+    sender: m.sender_id === myId ? 'me' : 'other',
+    time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    reactions: m.reactions || [],
+  };
+}
+
 const Upload = ({ size }: { size: number }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
 
 const GroupFeed = dynamic(() => import('@/components/feeds/category-feed').then(m => ({ default: m.CategoryFeed })), { ssr: false });
@@ -217,7 +244,54 @@ function ChatsContent() {
   const [isChatsLoading, setIsChatsLoading] = useState(true);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [icebreakerSuggestions, setIcebreakerSuggestions] = useState<string[]>([]);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [historyCursor, setHistoryCursor] = useState<number | null>(null);
+  const loadingHistoryRef = useRef(false);
+  const restoreScrollRef = useRef<number | null>(null);
   const msgContainerRef = useAntiScreenshot<HTMLDivElement>();
+
+  // Страница новых сообщений: сброс истории чата и установка курсора.
+  const applyFirstPage = (rows: any[], myId?: number) => {
+    setMessages(rows.map(m => toChatMessage(m, myId)));
+    const rMap: Record<number, any[]> = {};
+    rows.forEach((m: any) => { if (m.reactions?.length) rMap[m.id] = m.reactions; });
+    setReactions(rMap);
+  };
+
+  // Подгрузка более ранних сообщений при прокрутке вверх. Позиция скролла
+  // восстанавливается на прежнюю высоту: без этого список прыгает вниз на
+  // целую страницу и старые сообщения невозможно прочитать.
+  const loadOlderMessages = async () => {
+    if (!selectedChat || !authToken || !hasMoreHistory || historyCursor === null) return;
+    if (loadingHistoryRef.current) return;
+    loadingHistoryRef.current = true;
+    try {
+      const el = msgContainerRef.current;
+      const beforeHeight = el?.scrollHeight ?? 0;
+      const beforeTop = el?.scrollTop ?? 0;
+      const page = await fetchMessagePage(selectedChat.id, authToken, historyCursor);
+      if (page && page.messages.length > 0) {
+        restoreScrollRef.current = beforeHeight;
+        setMessages(prev => [...page.messages.map(m => toChatMessage(m, user?.id)).reverse(), ...prev]);
+        setHistoryCursor(page.next_before);
+        setHasMoreHistory(page.has_more);
+        if (el) el.scrollTop = beforeTop;
+      } else {
+        setHasMoreHistory(false);
+      }
+    } finally {
+      loadingHistoryRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    const el = msgContainerRef.current;
+    const target = restoreScrollRef.current;
+    if (el && target !== null) {
+      el.scrollTop = el.scrollHeight - target;
+      restoreScrollRef.current = null;
+    }
+  }, [messages]);
 
   const allDirectChats = useMemo(() => {
     const seen = new Set<number>();
@@ -275,22 +349,12 @@ function ChatsContent() {
         img: existing.avatar_url || '',
         online: existing.online,
       });
-      fetch(`/api/chats/${existing.id}/messages`, { headers: { Authorization: `Bearer ${authToken}` } })
-        .then(res => res.ok ? res.json() : [])
-        .then(data => {
-          if (Array.isArray(data)) {
-            setMessages(data.map((m: any) => ({
-              id: m.id, text: m.text,
-              sender: m.sender_id === user?.id ? 'me' : 'other',
-              time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              reactions: m.reactions || [],
-            })));
-            const rMap: Record<number, any[]> = {};
-            data.forEach((m: any) => { if (m.reactions?.length) rMap[m.id] = m.reactions; });
-            setReactions(rMap);
-          }
-        })
-        .catch(() => {});
+      fetchMessagePage(existing.id, authToken).then(page => {
+        if (!page) return;
+        applyFirstPage(page.messages, user?.id);
+        setHasMoreHistory(page.has_more);
+        setHistoryCursor(page.next_before);
+      });
       openingChatRef.current = targetUserId;
       return;
     }
@@ -306,21 +370,16 @@ function ChatsContent() {
           if (!data) return;
           setSelectedChat({ id: data.id, name: '', img: '', online: false });
           if (data.existing) {
-            fetch(`/api/chats/${data.id}/messages`, { headers: { Authorization: `Bearer ${authToken}` } })
-              .then(res => res.ok ? res.json() : [])
-              .then(msgs => {
-                if (Array.isArray(msgs)) {
-                  setMessages(msgs.map((m: any) => ({
-                    id: m.id, text: m.text,
-                    sender: m.sender_id === user?.id ? 'me' : 'other',
-                    time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    reactions: m.reactions || [],
-                  })));
-                }
-              })
-              .catch(() => {});
+            fetchMessagePage(data.id, authToken).then(page => {
+                if (!page) return;
+                applyFirstPage(page.messages, user?.id);
+                setHasMoreHistory(page.has_more);
+                setHistoryCursor(page.next_before);
+              });
           } else {
             setMessages([]);
+            setHasMoreHistory(false);
+            setHistoryCursor(null);
           }
           fetch('/api/chats', { headers: { Authorization: `Bearer ${authToken}` } })
             .then(res => res.ok ? res.json() : [])
@@ -479,24 +538,12 @@ function ChatsContent() {
     setSelectedChat(chat);
     setReactions({});
     const authH = { Authorization: `Bearer ${authToken}` };
-    fetch(`/api/chats/${chat.id}/messages`, { headers: authH })
-      .then(res => res.ok ? res.json() : [])
-      .then(data => {
-        if (Array.isArray(data)) {
-          const msgs = data.map((m: any) => ({
-            id: m.id,
-            text: m.text,
-            sender: m.sender_id === user?.id ? 'me' : 'other',
-            time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            reactions: m.reactions || [],
-          }));
-          setMessages(msgs);
-          const rMap: Record<number, any[]> = {};
-          data.forEach((m: any) => { if (m.reactions?.length) rMap[m.id] = m.reactions; });
-          setReactions(rMap);
-        }
-      })
-      .catch(() => {});
+    fetchMessagePage(chat.id, authToken).then(page => {
+      if (!page) return;
+      applyFirstPage(page.messages, user?.id);
+      setHasMoreHistory(page.has_more);
+      setHistoryCursor(page.next_before);
+    });
     fetch(`/api/chats/${chat.id}/read`, { method: 'PUT', headers: authH }).catch(() => {});
   };
 
@@ -602,7 +649,14 @@ function ChatsContent() {
             </DropdownMenu>
           </div>
         </header>
-        <main ref={msgContainerRef} className="flex-1 overflow-y-auto anti-screenshot [overflow-anchor:auto]">
+        <main
+          ref={msgContainerRef}
+          className="flex-1 overflow-y-auto anti-screenshot [overflow-anchor:auto]"
+          data-testid="messages-scroll"
+          onScroll={e => {
+            if (e.currentTarget.scrollTop <= 80) loadOlderMessages();
+          }}
+        >
           <div className="flex flex-col min-h-full px-4 pt-4 pb-2 space-y-2">
             <div className="flex-1" />
             <div className="text-center my-2"><Badge variant="secondary" className="bg-white/50 text-[9px] text-muted-foreground border-0 font-black uppercase tracking-widest px-2.5 py-0.5">{t('chats.today')}</Badge></div>

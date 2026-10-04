@@ -44,6 +44,13 @@ const likeLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, ma
  *   get:
  *     tags: [Chats]
  *     summary: Get messages with reactions
+ *     description: >
+ *       Отдаёт страницу новых сообщений (курсорная пагинация, а не OFFSET).
+ *       По умолчанию — последние `limit` сообщений в хронологическом порядке;
+ *       `before=<id>` отдаёт страницу строго старше указанного сообщения.
+ *       Ответ — объект `{ messages, has_more, next_before }`, где `next_before`
+ *       равен id самого старого сообщения страницы: его передают обратно как
+ *       `before`, чтобы подгрузить следующую порцию истории вверх.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -51,6 +58,41 @@ const likeLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, ma
  *         name: chatId
  *         required: true
  *         schema: { type: integer }
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         description: Размер страницы, кламп 1..100, по умолчанию 50.
+ *         schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+ *       - in: query
+ *         name: before
+ *         required: false
+ *         description: id сообщения-курсора; отдаёт сообщения строго старше него.
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Страница истории чата
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 messages:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer }
+ *                       sender_id: { type: integer }
+ *                       text: { type: string }
+ *                       image_url: { type: string, nullable: true }
+ *                       reply_to: { type: integer, nullable: true }
+ *                       ttl_seconds: { type: integer, nullable: true }
+ *                       created_at: { type: string }
+ *                       sender_name: { type: string }
+ *                       seen: { type: boolean }
+ *                       reactions: { type: array, items: { type: object } }
+ *                 has_more: { type: boolean, description: Есть ли ещё более старые сообщения }
+ *                 next_before: { type: integer, nullable: true, description: id самого старого сообщения страницы }
  *
  * /api/chats/{chatId}/messages/{msgId}/reactions:
  *   post:
@@ -631,6 +673,15 @@ router.post('/api/chats', auth, async (req, res) => {
   }
 })
 
+const MESSAGES_PAGE_DEFAULT = 50
+const MESSAGES_PAGE_MAX = 100
+
+function clampMessagesLimit(value) {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n <= 0) return MESSAGES_PAGE_DEFAULT
+  return Math.min(Math.floor(n), MESSAGES_PAGE_MAX)
+}
+
 router.get('/api/chats/:chatId/messages', auth, async (req, res) => {
   try {
     const [participant] = await pool.query(
@@ -639,7 +690,24 @@ router.get('/api/chats/:chatId/messages', auth, async (req, res) => {
     )
     if (participant.length === 0) return res.status(403).json({ message: 'Not a participant' })
 
-    const [rows] = await pool.query(
+    const limit = clampMessagesLimit(req.query.limit)
+    const beforeRaw = String(req.query.before ?? '')
+    const before = /^\d{1,12}$/.test(beforeRaw) ? Number(beforeRaw) : null
+
+    // Курсор по `m.id`, а не по `created_at` с подзапросом: сообщения с TTL
+    // удаляются фоновой уборкой каждые 10 секунд, и курсор по времени вёл бы
+    // себя по-разному в зависимости от того, дожила ли до запроса строка, на
+    // которую он ссылается (пустой ответ при удалённом курсоре выглядит как
+    // «история кончилась»). `id` — автоинкремент, порядок вставки совпадает с
+    // порядком времени, а удалённый курсор просто отсекает ещё меньше строк.
+    const params = [req.params.chatId]
+    let cursor = ''
+    if (before !== null) {
+      cursor = 'AND m.id < ?'
+      params.push(before)
+    }
+
+    const [fetched] = await pool.query(
       `SELECT m.id, m.sender_id, m.text, m.image_url, m.reply_to, m.ttl_seconds, m.created_at,
               up.display_name as sender_name
        FROM messages m
@@ -647,17 +715,24 @@ router.get('/api/chats/:chatId/messages', auth, async (req, res) => {
        WHERE m.chat_id = ?
          AND (m.ttl_seconds IS NULL OR m.created_at > DATE_SUB(NOW(), INTERVAL m.ttl_seconds SECOND))
          AND ${activeUser('up')}
-       ORDER BY m.created_at ASC, m.id ASC
-       LIMIT 100`,
-      [req.params.chatId],
+         ${cursor}
+       ORDER BY m.id DESC
+       LIMIT ?`,
+      [...params, limit + 1],
     )
+
+    // Страница берётся с конца (новые), разворачивается в хронологический
+    // порядок для клиента. `limit + 1` — признак «есть ещё старые».
+    const hasMore = fetched.length > limit
+    const page = fetched.slice(0, limit).reverse()
+    const nextBefore = page.length ? page[0].id : null
 
     const [[otherParticipant]] = await pool.query(
       'SELECT user_id, last_read_at FROM chat_participants WHERE chat_id = ? AND user_id != ?',
       [req.params.chatId, req.userId],
     )
 
-    const msgIds = rows.map(r => r.id)
+    const msgIds = page.map(r => r.id)
     const reactionsMap = {}
     if (msgIds.length > 0) {
       const [reactions] = await pool.query(
@@ -673,12 +748,12 @@ router.get('/api/chats/:chatId/messages', auth, async (req, res) => {
         reactionsMap[r.message_id].push(r)
       }
     }
-    const result = rows.map(msg => ({
+    const result = page.map(msg => ({
       ...msg,
       reactions: reactionsMap[msg.id] || [],
       seen: otherParticipant?.last_read_at ? new Date(msg.created_at) <= new Date(otherParticipant.last_read_at) : false,
     }))
-    res.json(result)
+    res.json({ messages: result, has_more: hasMore, next_before: nextBefore })
   } catch (err) {
     logger.error('Messages error:', err)
     res.status(500).json({ message: 'Failed to fetch messages' })

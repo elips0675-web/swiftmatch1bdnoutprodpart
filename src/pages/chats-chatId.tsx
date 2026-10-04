@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { ChevronLeft, Send, MoreVertical, Smile, Heart, Laugh, Zap, Star, Flame, Eye, CheckCheck, Phone, Video, Timer, Clock } from "lucide-react";
 import Image from "@/shims/next-image";
 import { useRouter } from "@/shims/next-navigation";
@@ -28,6 +28,21 @@ import { CalendarHeart } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useFeatureFlags } from "@/context/feature-flags-context";
 import { ChatPartnerActions } from "@/components/chat/chat-partner-actions";
+
+const MESSAGES_PAGE_SIZE = 50;
+
+type MessagesPage = { messages: any[]; has_more: boolean; next_before: number | null };
+
+// Страница истории: без курсора — новые сообщения, с курсором — строго старше.
+// Ответ — объект `{ messages, has_more, next_before }`: по массиву нельзя
+// отличить «чат пуст» от «это только новые сообщения, старая история выше».
+function fetchOlderPage(chatId: string, token: string | null, before: number) {
+  return fetch(`/api/chats/${chatId}/messages?limit=${MESSAGES_PAGE_SIZE}&before=${before}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+    .then(res => (res.ok ? res.json() : null) as Promise<MessagesPage | null>)
+    .catch(() => null);
+}
 
 const QUICK_REACTIONS = [
   { id: 'heart', icon: Heart, color: 'text-red-500', label: '❤️' },
@@ -109,9 +124,26 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
   const msgContainerRef = useAntiScreenshot<HTMLDivElement>();
 
-  const { data: messages, loading: messagesLoading, error: messagesError, refetch: refetchMessages } = useApi<any[]>(
-    `/api/chats/${params.chatId}/messages`
+  const { data: messagePage, loading: messagesLoading, error: messagesError, refetch: refetchMessages } = useApi<MessagesPage>(
+    `/api/chats/${params.chatId}/messages?limit=${MESSAGES_PAGE_SIZE}`
   );
+  const messages = useMemo(() => messagePage?.messages ?? [], [messagePage]);
+  const [olderMessages, setOlderMessages] = useState<any[]>([]);
+  const [historyExhausted, setHistoryExhausted] = useState(false);
+  const loadingHistoryRef = useRef(false);
+  const restoreScrollRef = useRef<number | null>(null);
+  // «Есть ли история выше» — это признак первой страницы И «всё ещё не
+  // выбрано до конца». Держать их одним состоянием нельзя: подгрузка
+  // обновляет второй признак, а первый остаётся от первой страницы, и при
+  // обоих в одном объекте обновление второй страницы затирало бы первый.
+  const hasMoreHistory = (messagePage?.has_more ?? false) && !historyExhausted;
+  // Курсор выводится из того, что уже показано, и держится в состоянии
+  // отдельно только для красоты: пока история не подгружена, это `next_before`
+  // первой страницы, а после подгрузки — id самого старого из подгруженных
+  // сообщений (он и есть `next_before` последней принятой страницы). Отдельное
+  // состояние курсора расходилось бы с картинкой: второй скролл повторил бы
+  // первый запрос (`before` первой страницы) и сообщения добавились бы дважды.
+  const historyCursor = olderMessages.length > 0 ? olderMessages[0].id : messagePage?.next_before ?? null;
   const { data: chatPartner, loading: partnerLoading, error: partnerError } = useApi<any>(
     `/api/chats/${params.chatId}`
   );
@@ -134,6 +166,47 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   useEffect(() => {
     scrollToBottom();
   }, [messages, optimisticMessages, viewportHeight]);
+
+  // Подгруженная история принадлежит конкретному чату: при переходе в другой
+  // чат она обязана исчезнуть, иначе сообщения прошлого чата остались бы в
+  // списке (id совпадают — выглядит как «история этого чата»).
+  useEffect(() => {
+    setOlderMessages([]);
+    setHistoryExhausted(false);
+  }, [params.chatId]);
+
+  const loadOlderMessages = async () => {
+    const cursor = historyCursor;
+    if (cursor === null || !hasMoreHistory || loadingHistoryRef.current) return;
+    loadingHistoryRef.current = true;
+    try {
+      const el = msgContainerRef.current;
+      const beforeHeight = el?.scrollHeight ?? 0;
+      const beforeTop = el?.scrollTop ?? 0;
+      const page = await fetchOlderPage(params.chatId, getToken(), cursor);
+      if (page && page.messages.length > 0) {
+        restoreScrollRef.current = beforeHeight;
+        setOlderMessages(prev => [...page.messages, ...prev]);
+        if (!page.has_more) setHistoryExhausted(true);
+        if (el) el.scrollTop = beforeTop;
+      } else {
+        setHistoryExhausted(true);
+      }
+    } finally {
+      loadingHistoryRef.current = false;
+    }
+  };
+
+  // Позиция скролла возвращается на прежнюю высоту: без этого список прыгает
+  // вниз на целую страницу и только что подгруженные сообщения не видны.
+  useEffect(() => {
+    const el = msgContainerRef.current;
+    const target = restoreScrollRef.current;
+    if (el && target !== null) {
+      el.scrollTop = el.scrollHeight - target;
+      restoreScrollRef.current = null;
+    }
+  }, [olderMessages]);
 
   useEffect(() => {
     if (params.chatId) {
@@ -226,7 +299,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     )
   }
 
-  const allMessages = [...(messages || []), ...optimisticMessages];
+  const allMessages = [...olderMessages, ...(messages || []), ...optimisticMessages];
 
   return (
     <div className="flex flex-col bg-[#f8f9fb]" style={{ height: viewportHeight }}>
@@ -244,7 +317,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         </DropdownMenu>
       </header>
 
-      <main data-testid="message-list" ref={msgContainerRef} className="flex-1 overflow-y-auto anti-screenshot">
+      <main
+        data-testid="message-list"
+        ref={msgContainerRef}
+        className="flex-1 overflow-y-auto anti-screenshot [overflow-anchor:auto]"
+        onScroll={e => {
+          if (e.currentTarget.scrollTop <= 80) loadOlderMessages();
+        }}
+      >
         {hangoutCtx && (
           <Link to={`/hangouts/${hangoutCtx.id}`} className="block px-4 pt-3">
             <div data-testid="chat-hangout-banner" className="flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-900 transition-colors hover:bg-violet-100">

@@ -29,7 +29,7 @@ test.describe('Chats — messaging and groups', () => {
       expect(Array.isArray(res.body)).toBe(true)
     })
 
-    test('2. API: GET /api/chats/:chatId/messages returns messages', async ({ request }) => {
+    test('2. API: GET /api/chats/:chatId/messages returns a page with a cursor', async ({ request }) => {
       const token = await loginViaApi(request, USER2_EMAIL, USER2_PASS)
       const chatsRes = await apiCall(request, 'GET', '/api/chats', undefined, token)
       if (chatsRes.body.length === 0) return
@@ -37,7 +37,50 @@ test.describe('Chats — messaging and groups', () => {
       const chatId = chatsRes.body[0].id || chatsRes.body[0].chatId
       const res = await apiCall(request, 'GET', `/api/chats/${chatId}/messages`, undefined, token)
       expect(res.ok).toBe(true)
-      expect(Array.isArray(res.body)).toBe(true)
+      expect(Array.isArray(res.body.messages)).toBe(true)
+      expect(typeof res.body.has_more).toBe('boolean')
+      // Курсор обязан совпадать с самым старым сообщением страницы: по нему
+      // клиент подгружает предыдущую порцию. Пустая страница — курсор null.
+      if (res.body.messages.length > 0) {
+        expect(res.body.next_before).toBe(res.body.messages[0].id)
+      } else {
+        expect(res.body.next_before).toBeNull()
+      }
+    })
+
+    test('2b. API: ?before= отдаёт только сообщения строго старше курсора', async ({ request }) => {
+      const token = await loginViaApi(request, USER2_EMAIL, USER2_PASS)
+      const chatsRes = await apiCall(request, 'GET', '/api/chats', undefined, token)
+      if (chatsRes.body.length === 0) return
+
+      const chatId = chatsRes.body[0].id || chatsRes.body[0].chatId
+      const first = await apiCall(request, 'GET', `/api/chats/${chatId}/messages?limit=2`, undefined, token)
+      expect(first.ok).toBe(true)
+      expect(first.body.messages.length).toBeLessThanOrEqual(2)
+      if (first.body.messages.length === 0) return
+
+      const older = await apiCall(
+        request, 'GET', `/api/chats/${chatId}/messages?limit=2&before=${first.body.next_before}`, undefined, token,
+      )
+      expect(older.ok).toBe(true)
+      expect(Array.isArray(older.body.messages)).toBe(true)
+      for (const m of older.body.messages) {
+        expect(m.id).toBeLessThan(first.body.next_before)
+      }
+      // Хронологический порядок внутри страницы обязан сохраняться
+      const ids = older.body.messages.map((m: any) => m.id)
+      expect(ids).toEqual([...ids].sort((a: number, b: number) => a - b))
+    })
+
+    test('2c. API: limit клампится (limit=9999 не отдаёт больше 100)', async ({ request }) => {
+      const token = await loginViaApi(request, USER2_EMAIL, USER2_PASS)
+      const chatsRes = await apiCall(request, 'GET', '/api/chats', undefined, token)
+      if (chatsRes.body.length === 0) return
+
+      const chatId = chatsRes.body[0].id || chatsRes.body[0].chatId
+      const res = await apiCall(request, 'GET', `/api/chats/${chatId}/messages?limit=9999`, undefined, token)
+      expect(res.ok).toBe(true)
+      expect(res.body.messages.length).toBeLessThanOrEqual(100)
     })
 
     test('3. API: POST /api/chats/:chatId/messages sends message', async ({ request }) => {
@@ -50,8 +93,8 @@ test.describe('Chats — messaging and groups', () => {
       const res = await apiCall(request, 'POST', `/api/chats/${chatId}/messages`, { text }, token)
       expect(res.ok).toBe(true)
 
-      const msgs = await apiCall(request, 'GET', `/api/chats/${chatId}/messages`, undefined, token)
-      const found = msgs.body.some((m: any) => m.text === text)
+      const msgs = await apiCall(request, 'GET', `/api/chats/${chatId}/messages?limit=100`, undefined, token)
+      const found = msgs.body.messages.some((m: any) => m.text === text)
       expect(found).toBe(true)
     })
 

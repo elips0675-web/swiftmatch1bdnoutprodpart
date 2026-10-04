@@ -167,9 +167,9 @@ cd server && npm test            # серверные тесты
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 358 тестов, 32 файла — **0 failures**
-- **Сервер (Vitest):** 785 тестов, 55 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
-- **E2E (Playwright):** 150 тестов, 19 spec-файлов — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
+- **Фронтенд (Vitest):** 365 тестов, 33 файла — **0 failures**
+- **Сервер (Vitest):** 792 теста, 55 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
+- **E2E (Playwright):** 152 теста, 19 spec-файлов — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
 ### Зависимости
 
@@ -262,6 +262,7 @@ cd server && npm test            # серверные тесты
 - Группы по интересам: категории, посты, комментарии, лайки
 - **AI Icebreakers:** чипы первого сообщения (`POST /api/icebreakers/suggest` — OpenAI или fallback из БД, RU/EN)
 - Блокировка пользователей: применяется и в фиде, и на прямом `GET /api/profile/:id`
+- **История чата постранично:** `GET /api/chats/:chatId/messages` отдаёт объект `{ messages, has_more, next_before }`, а не массив. Параметры: `limit` (1..100, дефолт 50, сверху берётся `limit + 1` строк — по нему честно считается `has_more`) и `before` (id сообщения; строки строго старше него). Курсор — **по `m.id`**, не по времени: сообщения с TTL удаляются каждые 10 с, и курсор по `created_at` после удаления своей строки вернул бы пустую страницу вместо «есть ещё старше». Клиент (`chats.tsx`, `chats-chatId.tsx`) грузит новую порцию и подтягивает старую при прокрутке вверх, восстанавливая позицию скролла
 
 ### 🔐 Безопасность и инфраструктура
 - JWT в **httpOnly cookie** (`sm_token` 24h + `sm_refresh` 7d, SameSite=Lax, Secure в prod); мидлвари читают `Bearer ?? cookie` (`server/src/cookies.js`); `POST /api/auth/logout` чистит куку и refresh-токены
