@@ -1,0 +1,34 @@
+{
+  "_about": "scripts/dependency-audit.mjs — что обязано быть в package.json без единого импорта в коде. Каждая запись обязана нести причину; протухшая запись (пакет уже импортируется или вычеркнут из манифеста) — самостоятельное замечание гейта. Пустая причина тоже замечание.",
+  "entries": [
+    {
+      "package": "@capacitor/android",
+      "reason": "Платформа Android для `npx cap add/sync/run android`: JS-код её не импортирует, её подключает Gradle. Убрать можно только вместе с пересборкой APK."
+    },
+    {
+      "package": "@capacitor/camera",
+      "reason": "Нативный плагин, присутствует в android/app/capacitor.build.gradle. JS-API в проекте не вызывается — кандидат на удаление, но требует `npx cap sync` и сборки APK, см. бэклог."
+    },
+    {
+      "package": "@capacitor/core",
+      "reason": "Обязательный peer каждого @capacitor-плагина; в коде используется глобал window.Capacitor, прямого импорта нет."
+    },
+    {
+      "package": "@capacitor/filesystem",
+      "reason": "Нативный плагин, присутствует в android/app/capacitor.build.gradle. JS-API в проекте не вызывается — кандидат на удаление, но требует `npx cap sync` и сборки APK, см. бэклог."
+    },
+    {
+      "package": "@capacitor/preferences",
+      "reason": "Нативный плагин, присутствует в android/app/capacitor.build.gradle. JS-API в проекте не вызывается — кандидат на удаление, но требует `npx cap sync` и сборки APK, см. бэклог."
+    },
+    {
+      "package": "@sentry/vite-plugin",
+      "reason": "Плагин загрузки source maps в Sentry не подключён в vite.config.ts — незакрытая функция, запись в бэклоге. Пока не подключён, удалять нельзя: вместе с ним исчезнет и намерение."
+    },
+    {
+      "package": "k6",
+      "externalRuntime": true,
+      "reason": "Модуль рантайма бинаря k6, а не npm-пакет: scripts/k6/load-staging.js исполняется через `k6 run`, в npm такого пакета нет и объявлять его нельзя."
+    }
+  ]
+}

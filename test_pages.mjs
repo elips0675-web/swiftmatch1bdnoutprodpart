@@ -1,4 +1,4 @@
-import { chromium } from 'playwright';
+import { chromium } from '@playwright/test';
 
 const URL = 'http://localhost:8081';
 const API  = 'http://localhost:3002';

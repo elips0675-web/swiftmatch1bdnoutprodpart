@@ -1189,7 +1189,7 @@ UX-улучшение ленты (следующий кандидат из сп�
 | B4 | Док-дрейф счётчиков (пункт 7) | `README.md:151-153` — фронт **58** / сервер **149** / E2E **44** при фактических **141 / 579 / 208**; `context.txt:442` — «173/179», `:518` — «284/284», `:300` — «E2E 44/44». Расхождение в **4 файлах** |
 | B5 | `zod` — мёртвая зависимость | `zod: ^4.4.3` в `dependencies` корня; `git grep -w zod -- src server/src scripts e2e` → **0 совпадений** |
 | B6 | Плоские ошибки `{ message }` | Так задумано и зафиксировано тестом `api-contract.test.js:318`, но ни в `docs/`, ни в README не описано |
-| B7 | `adminAuth` ACTIVE vs Промты.txt | Верно, и это единственное место, где аудит прав, а не пересказывает старую заметку. `Промты.txt:95` («остаётся passive»), `:403` (Absolute Bans #5 — «никогда не менять с passive на blocking»), `:409` («adminAuth middleware - **passive**») — **все три против кода**: `middleware/adminAuth.js` отдаёт `401 ADMIN_REQUIRED` / `403`. `AGENTS.md` и `docs/past-mistakes.md:115` уже зафиксировали правильное правило — **устарел именно `Промты.txt`** |
+| B7 | `adminAuth` ACTIVE vs `Промты.txt` | ~~устарел именно `Промты.txt`~~ ✅ **закрыт этапом 24 (04.10.2026 перепроверено)**: тогда аудит был прав — `Промты.txt:95/403/409` называли `adminAuth` «passive»/неблокирующим вопреки коду (`middleware/adminAuth.js` отдаёт `401 ADMIN_REQUIRED` / `403`). Файл исправлен в коммите `9b4e156` («6 мест в `Промты.txt`», `Что сделано.txt:232`). Сегодня: **вхождений `passive` в файле 0**, все три строки читаются «`adminAuth` middleware остаётся **блокирующим** … 401 без валидного токена, 403 если `role !== 'admin'`» — совпадает с кодом |
 
 ### C. Частично верно / неточно
 
@@ -1218,9 +1218,9 @@ UX-улучшение ленты (следующий кандидат из сп�
 | **P1** *(новое, 30.09)* | **Полный режим дрейф-аудита в `deploy.yml`** (MySQL там уже поднят в `server-test`) — ловит «колонка есть в эталоне, но не создана миграцией» — E1; `--offline` без БД его не видит | E1, E4 |
 | **P0-A** | ~~Soft-delete: фильтровать `users.deleted_at`/`is_active` в пользовательских выборках~~ ✅ **этап 16 (30.09)**: 25 выборок в 5 роутах закрыты предикатом `activeUser()`, мёртвые `up.deleted_at IS NULL` убраны, `softDeleteWhere` пишет `audit_log`, 31 тест (в т.ч. статический канон). ~~Осталось: `icebreakers.js` / `hangouts.js:1505` отдают `bio` без проверки связи (IDOR)~~ ✅ **остаток снят этапом 22** — эти две точки уязвимыми **не были** (`activeUser` стоял, `bio` публична по замыслу, `profile.js:391`); настоящая дыра была в другом маршруте, она закрыта как P0-D | A1 — дыра закрыта; ложный «остаток IDOR» снят 30.09 |
 | **P0-B** | ~~WS: re-verify/таймер на стороне сервера + `connect_error` → refresh → reconnect на клиенте; слушатель `auth:unauthorized` → `logout()`~~ ✅ **этап 25 (01.10)**: запись описывала симптом, а в коде было **три** независимых дефекта — токен проверялся только в handshake (24-часовой access-токен не рвал живую сессию), обработчика `connect_error` не было вовсе при `reconnectionAttempts: Infinity` (после обновления токена HTTP-слоем сокет переподключался со старым и realtime умирал молча до конца сессии), а `auth:unauthorized` никто не слушал. Сервер: `reverifySockets()` раз в минуту → `auth:unauthorized` + `disconnect(true)`, таймер гасится в SIGTERM; клиент: одна попытка refresh → сокет с новым токеном, неудачный refresh → `logout()`, **сетевая ошибка не разлогинивает**; refresh вынесен в `src/lib/auth-refresh.ts`. 25 тестов, честность гейта проверена на сломанном входе (первая версия фикстурой маскировала production-код — питфолл 51) | A2, A3 — дыра закрыта |
-| **P0-C** | `.dockerignore`: `server/.jwt-dev-secret` (+ `server/.env`), и exclude в rsync `deploy.yml` | A4 — одна строка |
+| **P0-C** | Осталась одна половина: `--exclude` в rsync `deploy.yml:397` не покрывает `server/.jwt-dev-secret` (перечислены только `'*.secret'`, `'*.pem'`, `'*.key'`, `'*.p12'`). Половина с `.dockerignore` ✅ закрыта: `.dockerignore:31-32` содержит `**/*.secret` и `**/*-secret`, файл в образ не попадает; прод-`.env` тоже переживает `--delete` | A4 — одна строка (`--exclude '.jwt*'`); проверено 04.10, см. N8 |
 | **P0-D** *(новое, 30.09)* | ✅ **этап 22 (30.09): запись в бэклоге была неверна — исправлено на факты.** Обе названные точки (`icebreakers.js:57`, `hangouts.js:1505`) уже применяли `activeUser('up')`, а `bio` **публична по замыслу**: `GET /api/profile/:id` (`profile.js:391`) отдаёт её любому авторизованному, и `social.js:118` (`baseSelect`) не тянет `bio` только в **фид** выдачи — это не «приватное поле», а разница двух форм выдачи. Настоящая дыра оказалась в другом месте: `user_blocks` учитывался **только** в `social.js:141/841/853/865` (фид), а **прямой `GET /api/profile/:id` блокировок не учитывал** — заблокированный продолжал читать полную карточку (bio, фото, город, зодиак, образование). Закрыто предикатом `notBlocked()` в SQL на 3 маршрутах, кэш профиля переведён на `cacheRoutePerUser`, инвалидация переписана под новый ключ, 16 тестов (`blocks.test.js`), 10 из них падают на прежнем коде | Найдено при разборе этапа 16; в аудите `Оценка qwen1.txt` не значилось |
-| **P1** | ~~ESLint для `server/src` + гейт в CI~~ — **этап 29**; ~~E2E-гейт в `ci.yml`~~ — **этап 30** (заодно сделан первый полный зелёный прогон E2E 150/150); выкинуть `zod`; поправить `Промты.txt` (3 места про passive). ~~Последний ключ `id` в `ORDER BY` пагинируемых выборок~~ — **сделано этапом 28** (30 мест + гейт `order-by-audit` в CI) | B1 ✅ (29), B2 ✅ (30), B3 ✅ (28); осталось **B5** (`zod` — мёртвая зависимость) и **B7** (3 места про `passive` в `Промты.txt`, все три против кода) |
+| **P1** | ~~ESLint для `server/src` + гейт в CI~~ — **этап 29**; ~~E2E-гейт в `ci.yml`~~ — **этап 30** (заодно сделан первый полный зелёный прогон E2E 150/150); ~~выкинуть `zod`~~ — **этап 31** (заодно `next-themes`, `react-is`, `@hookform/resolvers`); ~~поправить `Промты.txt` (3 места про passive)~~ — **этап 24**, перепроверено 04.10: вхождений `passive` 0. ~~Последний ключ `id` в `ORDER BY` пагинируемых выборок~~ — **сделано этапом 28** (30 мест + гейт `order-by-audit` в CI) | B1 ✅ (29), B2 ✅ (30), B3 ✅ (28), B5 ✅ (31), B7 ✅ (24); **открытых пунктов в этой строке нет** |
 
 ---
 
@@ -1569,3 +1569,113 @@ P0 #37 родился как побочная находка этапа 20: та
 **6. Стенд пользователя не нужен, чтобы честно измерить E2E.** `VITE_PROXY_TARGET` (новое в `vite.config.ts`, применяется к `server.proxy` и `preview.proxy`) + порты 3003/8091 + одноразовая БД `swiftmatch_e2e` дают полный прогон, не останавливая 3002/8081. Документация по воспроизведению — в `Что сделано.txt`, этап 30.
 
 **Открыто после этапа 30:** K4 (структурный гейт «E2E-спеки существуют и коллекционируются»), B5 (`zod` — мёртвая зависимость), B7 (3 места про `passive` в `Промты.txt`), P0-E (очередь модерации фото — ждёт продуктового решения), L1–L7, P2 #33/#34 (зеркало и `E:` — диск недоступен), и новое: **схема-сиды в миграциях** — `INSERT` в `database/migrations/*.sql` не отыгрываются на свежей БД, их стоит перенести в `server/src/seed.js` (в этом этапе перенесены только эксперименты и партнёры, потому что без них падали E2E).
+
+## Находки этапа 31 (04.10.2026, гейт целостности зависимостей): B5 закрыт, а попутно исправлены две вещи, которых не искали
+
+Гейт `scripts/dependency-audit.mjs` (`npm run check:deps`, джоба `dependency-integrity` в `ci.yml`, шаг в `deploy.yml:lint-and-typecheck`) проверяет две стороны: необъявленный импорт и мёртвую runtime-зависимость. Свой набор тестов — `scripts/dependency-audit.test.mjs`, 26/26. Гейт проверен на 15 ломающих правках (каждая дала ожидаемый exit-код) и на 5 ломах `npm audit --omit=dev`.
+
+Что нашёл и что исправлено: объявлен `@capacitor/app`; `test_pages.mjs` переведён с несуществующего пакета `playwright` на объявленный `@playwright/test`; удалены `zod`, `next-themes`, `react-is`, `@hookform/resolvers` (**B5 закрыт**); `tailwindcss-animate` перенесён в `devDependencies` (он тянул `tailwindcss → chokidar → braces` в прод-дерево, из-за чего `audit:prod` на корне был красным); обновлён `@fastify/busboy` 3.2.0 → 3.2.2 (high-адвайзори из `firebase-admin`). Теперь оба `audit:prod` exit 0 (корень — 2 moderate, `server/` — 25 moderate, известны).
+
+Два дефекта нашлись не гейтом, а тем, что гейт потребовал прогнать остальные проверки: `scripts/check-ports.mjs` перестал видеть порт за константой `API_TARGET` после ввода `VITE_PROXY_TARGET` (добавлена `resolveTargetAliases()`), и `@tailwindcss/typography` был объявлен, но не подключён — в собранном CSS не было `.prose`.
+
+### Открыто после этапа 31
+
+- **Ограничение гейта: «build-инструмент в `dependencies`» он не ловит.** Такой пакет импортируется конфигом сборки, а не исходниками, поэтому для гейта он выглядит живым. На этот случай сработал `audit:prod` — защита есть, но другим инструментом. Правило: «пакет в `dependencies`, который тянет в образ дерево dev-инструментов» диагностировать двумя гейтами.
+- **`lovable-tagger ^1.3.0` в `devDependencies` не используется нигде** — гейтом не покрыт: направление «мёртвые» смотрит только в `dependencies`, потому что devDep легитимно зовётся как CLI или конфиг. Кандидат на удаление, отдельная проверка.
+- **`bun.lockb` (285 КБ) лежит рядом с `package-lock.json`.** Два lock-файла — источник расхождений; Dockerfile и CI используют `npm ci`, то есть `package-lock.json`.
+- **Единичный прогон серверных тестов дал 783/784.** Не воспроизвелось: 3 прогона `npm test` в `server` → 784/784, 3 прогона ровно тем способом, которым считает гейт счётчиков → 784/784. Мой неверный запуск (корневой бинарник с `--root server`) давал 718/716 — это артефакт рабочей директории, не флак. Если повторится — искать таймаут, а не списывать на флак.
+- **`check:ports` резолвит один ход констант** (`const X = process.env.Y || 'url'`). Появление двух ходов или значения из функции снова сделает гейт слепым, и это будет молча.
+
+## Разбор аудитов «Тесты и функционал qwen1.txt» + «Тесты и функционал дипсик1.txt» (04.10.2026)
+
+Оба файла — план пробелов, написанный по снимку `test/` и `Промты.txt`. Ниже сверка **по живому коду**, а не по описаниям аудитов. Числа пересчитаны 04.10: **282 фронт-теста / 30 файлов, 784 серверных / 55 файлов, 150 E2E / 19 спек — итого 1066**; `router.<verb>(` — **212** в 37 файлах `server/src/routes` (53 в `routes/admin/`); `CREATE TABLE` в `database/mysql_schema.sql` — **76**. Оба аудита считают 807–929 юнит-тестов и 208–210 роутов: счётчик тестов устарел, число роутов почти верно (в коде оно зафиксировано комментарием `server/src/__tests__/api-contract.test.js:225` «47 операций против 208 роутов», порог `:228`).
+
+### N1. «Живой БД-слой» в CI не выполняется ни разу: единственный живой тест молча пропускается (дипсик #1, qwen «живой смоук»)
+
+`server/src/__tests__/race.mysql.test.js:43` — `describe.skipIf(!admin)`: если MySQL недоступен, файл не падает, а **пропускается**. В `ci.yml` сервис `mysql` объявлен только у джобы `e2e` (строки 45–62); у `test-server` (строки 120–131) его нет — значит «гонки на живом MySQL» в CI не выполняются, а джоба зелёная. Плюс сам файл строит собственную мини-схему из трёх таблиц (`users`, `likes`, `matches`), а не `mysql_schema.sql`, то есть CHECK/ENUM/длины колонок не проверяет в принципе. **Направление аудитов верное, но недооценено: дело не «нет интеграционных тестов», а «живой тест есть и не запускается».** **P1**: сервис `mysql` в джобу `test-server` + условие, из-за которого гейт падает, а не зеленеет, если живой тест был пропущен.
+
+### N2. Чат отдаёт 100 самых старых сообщений и не умеет отдавать новые (qwen «пагинация второго порядка»)
+
+`server/src/routes/social.js:642-651` — `ORDER BY m.created_at ASC, m.id ASC LIMIT 100`, без параметров `before`/`after`/`offset`. Фронт `src/pages/chats-chatId.tsx:112-114` запрашивает `/api/chats/:chatId/messages` без пагинации. В чате длиннее 100 сообщений пользователь видит **первые** 100 и после перезагрузки уже не увидит новых. OFFSET-пагинация в проекте есть ровно в трёх местах: `hangouts.js:256`, `admin/users.js:77`, `admin/hangouts.js:74` — лента объявлений и админские списки защищены (`hangouts.js:186-188`: `page >= 1`, `limit` через `parseLimit`), а история сообщений, уведомления и матчи — нет. Теста на `LIMIT 100` не существует (проверено поиском), то есть поведение не закреплено ничем. **P0**: это не «неудобно», это потеря истории чата.
+
+### N3. Очередь модерации фото мертва, а тест на неё зелёный (дипсик #5, qwen «модерация фото»)
+
+Цепочка разорвана в трёх местах, каждое проверено:
+
+- `database/mysql_schema.sql:1249` — `moderation_status varchar(20) DEFAULT 'approved'`;
+- `server/src/routes/upload.js:123` — `INSERT INTO user_photos (user_id, url, sort_order)`, статус не задаётся → **каждое загруженное фото попадает в `approved`**;
+- `server/src/routes/admin-moderation.js:31` — очередь фильтрует `WHERE p.moderation_status = 'pending'`, то есть всегда пуста;
+- `admin-moderation.js:45` — approve: `UPDATE ... WHERE id = ? AND moderation_status = 'pending'`, **`affectedRows` не проверяется**, поэтому 200 возвращается даже при нуле обновлённых строк.
+
+Тест `server/src/__tests__/admin-moderation.test.js:98-104` подтверждает ровно этот вакуум: `pool.query.mockResolvedValueOnce([[], []])`, проверяется только `expect(res.status).toBe(200)`. Это тот же класс, что фикстура, которая воспроизводит то, что создаёт тестируемый код. **P0-E, продуктовое решение**: fail-closed `pending` для всех или только для free.
+
+### N4. Гейта «CHECK/ENUM/UNSIGNED ↔ валидаторы кода» нет (дипсик #2, `check-enum-constraints.mjs`)
+
+Проверено, что класс не перекрыт: `scripts/schema-drift-audit.mjs:18` пропускает строки `CHECK` и `FOREIGN KEY`; `scripts/schema-validate.mjs:23` относит `CHECK` к списку constraint-строк и сверяет эталон с **живой БД**, а не с кодом. Про сам инцидент: `mysql_schema.sql:1305` — `CHECK (height >= 100 AND height <= 250)`, код `server/src/routes/profile.js:457` — `intField(rawHeight, 'height', { min: 100, max: 250 })`, регресс-тест есть (`profile.test.js:284`). То есть **конкретный случай починен, а гейта, который поймал бы следующий класс** (ENUM `compatibility_scores.style_a`, UNSIGNED-диапазоны), нет. **P1**: `check-enum-constraints.mjs` — CHECK/ENUM из `mysql_schema.sql` против констант валидаторов в `server/src`. Как и `check:deps`, он требует разбора кода, а не регулярки.
+
+### N5. N+1-аудит написан, но в CI не подключён (дипсик #26)
+
+`scripts/n-plus-one-audit.mjs` возвращает exit 1 при находке, но не встречается ни в `ci.yml`, ни в `deploy.yml` (проверено поиском по обоим файлам). Соседние гейты подключены: `schema-validate.mjs` — `deploy.yml:121`, `sql-explain-audit.mjs` — `deploy.yml:128`, `verify-backup.mjs` — `deploy.yml:135`. Скрипт, который никто не запускает, не защищает ничего: 70 файлов `server/src`, которые он обходит, с момента последнего прогона никто не перепроверял. **P1** — отдельная джоба или шаг.
+
+### N6. У очереди Bull нет ни DLQ, ни наблюдаемости (qwen, дипсик #8)
+
+`server/src/queue.js:20-23` — `attempts: 3`, `backoff: exponential`, `removeOnComplete: 100`, **`removeOnFail: 50`**; `queue.js:36-38` пишет ошибку в лог. Что не так по факту: после трёх попыток джоба попадает в сет `failed`, где хранятся **только 50 последних** — всё, что старше, вытесняется без следа; повторного прогона (re-drive) нет, admin-поверхности нет (поиск `queue|getJobCounts|Queue` в `server/src/routes/admin/*.js` — 0 совпадений), метрик и алертов нет. «Нет DLQ» — это терминология аудитов; реальная дыра в том, что **упавшее письмо или пуш не оставляют следа, и никто об этом не узнаёт**. **P1** для очереди писем, **P2** для полноценного DLQ с re-drive.
+
+### N7. Скрипты-гейты, которых действительно нет
+
+Отсутствуют в `scripts/` (проверено листингом каталога): `swagger-coverage-audit.mjs`, `env-consistency-audit.mjs`, `i18n-orphan-keys-audit.mjs`, `route-auth-audit.mjs`, `sql-concat-audit.mjs`, `migration-order-audit.mjs`, `admin-route-paths-audit.mjs`, `check-enum-constraints.mjs`, `smoke-write.mjs`, `bundle-size-check.mjs`, `lighthouse-ci.mjs`, `webhook-replay.mjs`, `migration-status.mjs`, `log-shipper.mjs`, `chaos-runner.mjs`, `generate-api-docs.mjs`, `seed-fixtures.mjs`, `rollback-runbook.mjs`, `rotate-key.mjs`, `restore-drill.mjs`, `health-dashboard.mjs`, `check-doc-sync.mjs`.
+
+Что уже перекрыто и учитывать не надо:
+
+- `sql-concat-audit.mjs` → `order-by-audit.mjs` + `deploy-persistence-audit.mjs` + правило AGENTS; дыра `HAVING` в `partners.js` закрыта тестом-сканером;
+- `admin-route-paths-audit.mjs` → **совпадений нет ни одного**: в `server/src/routes/admin/*.js` нет `'/api/admin` (проверено) — двойного префикса нет, гейт нужен только как сторож;
+- `lint-server.mjs` → `npm run lint:server`, этап 29, `ci.yml:36` и `deploy.yml:28`;
+- `check-doc-sync.mjs` → для счётчиков тестов есть `test-counter-audit.mjs` (этап 30), для остальных доков — нет;
+- `generate-api-docs.mjs` → Swagger есть (47 операций), долить 165 роутов — это долг `api-contract.test.js`, а не скрипт;
+- `restore-drill.mjs` → `verify-backup.mjs` плюс `.ps1`/`.sh`.
+
+Приоритет: `check-enum-constraints` (N4) → `env-consistency-audit` (дёшево, ловит «работает у меня») → `swagger-coverage-audit` → `migration-order-audit`. Остальное — либо P2/P3, либо требует внешнего окружения.
+
+### N8. `.jwt-dev-secret`: в образ не попадает, на VPS попадает (дипсик #5, A4)
+
+Заявление аудита про `.dockerignore` **не подтверждается**: `.dockerignore:31-32` содержит `**/*.secret` и `**/*-secret`, что покрывает `server/.jwt-dev-secret` (файл есть на диске и не отслеживается git — `.gitignore:32`). Но `deploy.yml:397` (rsync) исключает только `'*.secret'`, `'*.pem'`, `'*.key'`, `'*.p12'` — **ни один шаблон не матчит `.jwt-dev-secret`**, то есть дев-секрет едет на VPS. Это остаток **P0-C** (открыт с этапа 18); формулировку в бэклоге стоит уточнить — проблема в rsync, а не в docker-контексте.
+
+### ✅ Закрыто до этого разбора — аудиты предлагают сделанное
+
+| Пункт аудитов | Факт |
+|---|---|
+| «E2E только в `deploy.yml`, на фиче-ветке не идёт» (qwen P2) | джоба `e2e` в `ci.yml:43-108`: полный рецепт с MySQL-сервисом, сидами и выкладкой артефактов |
+| «ESLint покрывает только фронт» (дипсик #14, qwen P2) | блок `server/src/**/*.js` в `eslint.config.js`, `npm run lint:server`, `ci.yml:36`, `deploy.yml:28` — этап 29 |
+| «Rate-limit шарится между инстансами — сейчас in-memory» (qwen P1) | `server/src/middleware/limiters.js:6` — `RedisStore` из `rate-limit-redis`, in-memory только как fallback |
+| «WS re-verify нет ни кода, ни теста» (дипсик #1, A2) | `src/hooks/use-websocket.ts:55` (`auth:unauthorized`) и `:58` (`connect_error` → refresh → reconnect); серверная часть — `server/src/__tests__/ws-auth-reverify.test.js`, клиентская — `src/test/use-websocket.test.tsx` |
+| «Слушателя `auth:unauthorized` нет ни одного» (дипсик #4, A3) | `src/context/auth-context.tsx:218`, тест `src/test/auth-context.test.tsx:128` |
+| «Нет теста на откат транзакции premium» (дипсик #10) | `premium-webhook.test.js:125` и `partner-webhook.test.js:133` проверяют `conn.rollback()`; replay-тесты есть в обоих файлах |
+| «UI редактирования объявления нет, нет фильтров дат, нет лимита 1/день» (qwen, хвосты фич) | `src/pages/hangout-edit.tsx` + ссылка `hangout-detail.tsx:435`; фильтры `date_from`/`date_to` в `src/pages/hangouts.tsx:871-872`; дневной лимит — `server/src/routes/hangouts.js:470` |
+| «В `mysql_schema.sql` 62 таблицы против 73 в живой БД» (qwen) | в эталоне **76** `CREATE TABLE` вместе с `_migrations`; `schema-drift-audit --offline` зелёный |
+| «Активные сессии + revoke» (дипсик P1 #7) | сделано (этап 27) |
+
+### ❌ Не подтвердилось или опровергнуто ранее
+
+- **«`icebreakers.js:57` и `hangouts.js:1505` отдают bio чужого юзера без проверки чата»** (дипсик P0 #4) — это **в третий раз** то же самое утверждение, уже опровергнутое в этом же документе: `bio` публична по замыслу, в `hangouts.js:1510-1514` стоят `activeUser()` и `notBlocked()` (этапы 16 и 22). Повторять в следующем аудите не нужно.
+- **«Радиус и координаты не защищены»** — закрыто `server/src/geo.js` `parseRadiusKm()` (кламп 1..500 км) в трёх роутах.
+- **«Пагинация: `page=99999` → 500»** (дипсик #11) — `hangouts.js:186-188` клампит `page >= 1` и `limit`, `offset` остаётся числом, 500 не получается. Реальная проблема в этой области другая и серьёзнее — **N2**.
+- **«Разделы `Промты.txt` 21–34 — продуктовые roadmap'ы, вынести в `ROADMAP.md`»** (qwen) — **подтверждается**: 1257 строк, 34 раздела, хвост `33.11 Priority Timeline`, `34.1 Deep Links` … `34.12 APM` действительно про продукты и инфраструктуру, а не про генерацию кода. Дёшево и полезно: агент перестаёт пытаться реализовать всё сразу. Уже закрытая часть этого файла (**B7** — три места про `passive` в `:95/403/409`) вынесена не в этот раздел, а закрыта этапом 24; при переносе разделов важно не потерять правки `9b4e156`.
+
+### Что из функционала в бэклоге уже есть (дубли не плодить)
+
+TOTP-2FA и backup-codes, сессии и revoke, webhooks journal, health-dashboard и queue monitor, edit сообщений и reply-to, имперсонация, GDPR export ZIP, feature-flag rollout %, field-level permissions, merge дублей, Stories/Moments, Smart matching score, IAP/RevenueCat, Crashlytics, CDN для фото, multi-env, `/api/v2`, IaC, blue-green, Loki/ELK, Prometheus→Telegram, UptimeRobot, DWH, runbooks, post-mortem — всё это уже записано в P1/P2/P3 предыдущих разделов. Новыми можно считать только Stories/Moments, Smart matching score, Crashlytics, CDN, IaC, DWH, UptimeRobot, Prometheus-алерты и Loki — и они присутствуют в бэклоге как P2/P3 из более ранних аудитов.
+
+### «Что не нужно» — без изменений
+
+Список из восьми антипаттернов (SLA и business hours, custom roles, Kanban/Calendar/Wiki/Polls, ticket relations, OpenTelemetry/SLO/SLI/Snowflake, org chart, approval chains для фото) совпадает с уже зафиксированным в этом документе консенсусом. Новых антипаттернов два аудита не предложили.
+
+### Порядок (только подтверждённое кодом и не ждущее внешнего окружения)
+
+1. **N2** — пагинация истории чата (P0, пользователь теряет сообщения).
+2. **N3** — fail-closed модерация фото, проверка `affectedRows` и тест, который краснеет на мёртвом пути (P0-E, нужен продуктовый выбор).
+3. **N8** — уточнить формулировку P0-C и закрыть rsync-дыру в `deploy.yml:397`.
+4. **N1** — MySQL-сервис в `test-server` + падение гейта при пропуске живого теста (P1).
+5. **N4** — `check-enum-constraints.mjs` (P1).
+6. **N5** — подключить `n-plus-one-audit.mjs` в CI (P1).
+7. **N6** — наблюдаемость очереди писем, начинать с сигнала «джоба упала три раза» (P1).
+8. **N7** — `env-consistency-audit.mjs`, затем `swagger-coverage-audit.mjs` (P1/P2).

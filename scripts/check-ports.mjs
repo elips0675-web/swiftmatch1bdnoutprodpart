@@ -27,8 +27,34 @@ function extractPort(text, pattern, label, optional = false) {
   return Number(m[1])
 }
 
+/**
+ * Подставляет значение за константой, чтобы гейт видел порт, а не имя.
+ *
+ * После появления `VITE_PROXY_TARGET` в vite.config.ts появилась строка
+ * `const API_TARGET = process.env.VITE_PROXY_TARGET || 'http://localhost:3002'`,
+ * а `target: API_TARGET` перестал содержать литерал. Гейт на этом молча краснел
+ * («Не найден порт для vite.config.ts proxy target») — то есть блокирующий шаг
+ * деплоя был мёртвым и проверял уже не то. Раскрывается ровно один ход: если
+ * константа определена в этом же файле через `||`/`??` с URL-литералом,
+ * `target: ИМЯ` считается равным этому литералу. Неизвестная константа по-прежнему
+ * даёт «порт не найден», то есть гейт не подменяет проверку догадкой.
+ */
+export function resolveTargetAliases(cfg) {
+  const aliases = new Map()
+  for (const m of cfg.matchAll(
+    /const\s+([A-Za-z_$][\w$]*)\s*=\s*[^;'"]*?(?:\|\||\?\?)\s*['"](https?:\/\/[^'"]+)['"]/g,
+  )) {
+    aliases.set(m[1], m[2])
+  }
+  let out = cfg
+  for (const [name, url] of aliases) {
+    out = out.replace(new RegExp(`target:\\s*${name}\\b`, 'g'), `target: '${url}'`)
+  }
+  return out
+}
+
 const vitePort = extractPort(viteCfg, /server:\s*\{[\s\S]*?port:\s*(\d+)/, 'vite.config.ts server.port')
-const proxyPort = extractPort(viteCfg, /proxy:\s*\{[\s\S]*?target:\s*['"]http:\/\/[^'"]*:(\d+)/, 'vite.config.ts proxy target')
+const proxyPort = extractPort(resolveTargetAliases(viteCfg), /proxy:\s*\{[\s\S]*?target:\s*['"]http:\/\/[^'"]*:(\d+)/, 'vite.config.ts proxy target')
 const envPort = extractPort(serverEnv, /^PORT=(\d+)/m, 'server/.env PORT', true)
 const examplePort = extractPort(envExample, /^PORT=(\d+)/m, 'server/.env.example PORT')
 const corsOrigin = serverEnv.match(/^CORS_ORIGIN=(.+)$/m)?.[1] ?? null

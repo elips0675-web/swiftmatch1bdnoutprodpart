@@ -52,6 +52,12 @@ jobs:
       # ожидание готовности вместо sleep, vite preview --strictPort. Проверка
       # не запускает сам Playwright — это джоба e2e-test ниже.
       - run: npm run check:e2e
+      # Этап 31 (P1-B5): целостность package.json в обе стороны — импортируемое
+      # объявлено, объявленное в dependencies используется. Блокирует деплой так
+      # же, как secrets-leak: мёртвая runtime-зависимость едет в образ, а
+      # необъявленная ломает сборку на любой машине, где нет случайной
+      # транзитивной установки.
+      - run: npm run check:deps
 
   frontend-test:
     name: Frontend Tests (Vitest)
