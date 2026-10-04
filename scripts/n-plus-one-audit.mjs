@@ -9,8 +9,9 @@
 // Выход: код 0 — находок нет, код 1 — есть находки (для CI).
 import fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
 
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1')), '..')
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const SRC = path.join(root, 'server', 'src')
 
 const DB_CALL = /\b(pool|conn|connection|client|db)\s*\.\s*(query|execute)\s*\(/
@@ -18,15 +19,29 @@ const LOOP_HEADER = /\b(for|while)\s*\(|\.\s*(forEach|map|flatMap)\s*\(/
 
 // Места, где N+1 остаётся намеренно. Причина обязательна: при добавлении нового
 // случая сюда нужно писать, почему батчинг не подходит.
-const JUSTIFIED = [
+//
+// `expect` — якорь: текст, который ОБЯЗАН остаться на указанной строке. Без него
+// оправдание молча протухает: код сдвинулся на 12 строк, номер в списке остался
+// прежним, и гейт начинает ругаться на «новый N+1» в месте, которое оправдано
+// уже год (замер 04.10.2026: так отвалились profile.js:463 и hangouts.js:633,638).
+// С якорем протухание — самостоятельная находка `justification-drift`.
+export const JUSTIFIED = [
   { file: 'seed.js', reason: 'сидинг, не рантайм' },
-  { file: 'jobs/push.job.js', lines: [46], reason: 'удаление мёртвой push-подписки по коду 410/404 — сам delete идёт только для отваливших, их единицы' },
-  { file: 'routes/push.js', lines: [148, 174], reason: 'то же: чистка подписок по 410/404, а не по каждой подписке' },
-  { file: 'routes/profile.js', lines: [463], reason: 'user_interests — фиксированный каталог из 28 interest_id, потолок известен и мал' },
-  { file: 'routes/hangouts.js', lines: [633, 638], reason: 'рассылка уведомлений об отмене встречи: цикл даёт изоляцию ошибок на пользователя (один сбойный INSERT не срывает остальных)' },
+  {
+    file: 'jobs/push.job.js',
+    lines: [46],
+    expect: 'DELETE',
+    reason: 'удаление мёртвой push-подписки по коду 410/404 — сам delete идёт только для отваливших, их единицы',
+  },
+  {
+    file: 'routes/push.js',
+    lines: [148, 174],
+    expect: 'DELETE',
+    reason: 'то же: чистка подписок по 410/404, а не по каждой подписке',
+  },
 ]
 
-function collectFiles(dir) {
+export function collectFiles(dir) {
   const out = []
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name)
@@ -40,7 +55,7 @@ function collectFiles(dir) {
   return out
 }
 
-function stripNonCode(line) {
+export function stripNonCode(line) {
   let out = ''
   let quote = null
   for (let i = 0; i < line.length; i++) {
@@ -58,7 +73,7 @@ function stripNonCode(line) {
   return out
 }
 
-function analyze(file) {
+export function analyze(file) {
   const raw = fs.readFileSync(file, 'utf8').split(/\r?\n/)
   const code = raw.map(stripNonCode)
 
@@ -98,16 +113,42 @@ function analyze(file) {
   return { totalLoops: loops.length, findings }
 }
 
-function justifiedFor(rel, line) {
-  return JUSTIFIED.find((j) => {
+export function justifiedFor(rel, line, list = JUSTIFIED) {
+  return list.find((j) => {
     if (!rel.includes(j.file)) return false
     if (!j.lines) return true
     return j.lines.includes(line)
   })
 }
 
-function main() {
-  const files = collectFiles(SRC)
+/**
+ * Оправдание протухло: строка сдвинулась и на ней больше нет того SQL,
+ * ради которого её вносили. Молча оставить такое нельзя — список оправданий
+ * тогда превращается в мусор, который выглядит как «всё проверили».
+ */
+export function collectJustificationDrift(srcDir = SRC, list = JUSTIFIED) {
+  const files = collectFiles(srcDir)
+  const drift = []
+  for (const j of list) {
+    if (!j.lines || !j.expect) continue
+    const full = files.find((f) => f.replace(/\\/g, '/').includes(j.file))
+    if (!full) {
+      drift.push({ file: j.file, line: j.lines[0], reason: `файл не найден под ${srcDir}` })
+      continue
+    }
+    const lines = fs.readFileSync(full, 'utf8').split(/\r?\n/)
+    for (const line of j.lines) {
+      const text = lines[line - 1] ?? ''
+      if (!text.includes(j.expect)) {
+        drift.push({ file: j.file, line, reason: `на строке нет «${j.expect}»: ${text.trim().slice(0, 60) || '(строка вне файла)'}` })
+      }
+    }
+  }
+  return drift
+}
+
+export function audit(srcDir = SRC, list = JUSTIFIED) {
+  const files = collectFiles(srcDir)
   const unexpected = []
   let accepted = 0
 
@@ -115,30 +156,44 @@ function main() {
     const rel = path.relative(root, file).replace(/\\/g, '/')
     const { findings } = analyze(file)
     for (const f of findings) {
-      const rule = justifiedFor(rel, f.line)
+      const rule = justifiedFor(rel, f.line, list)
       if (rule) accepted++
       else unexpected.push({ rel, ...f })
     }
   }
 
-  console.log(`N+1 audit: просмотрено ${files.length} файлов в server/src`)
-  console.log(`Новых мест с SQL внутри цикла: ${unexpected.length} (допустимых по JUSTIFIED: ${accepted})\n`)
-
-  if (!unexpected.length) {
-    console.log('Новых N+1 не найдено — все оставшиеся места внесены в JUSTIFIED с причиной.')
-    process.exit(0)
-  }
-
-  for (const f of unexpected) {
-    console.log(`  ${f.rel}:${f.line}  внутри цикла с :${f.loopStart}  ${f.header}`)
-  }
-  console.log('')
-  console.log('Как править:')
-  console.log('  1) SELECT для всех id одним запросом — mysql2 расплющивает массив в IN (?, ?, ?);')
-  console.log('  2) или INSERT ... SELECT / LEFT JOIN + GROUP BY, если пишем по каждой строке;')
-  console.log('  3) если запрос внутри цикла намеренный — внеси его в JUSTIFIED этого')
-  console.log('     скрипта с указанием строки и причины, иначе новый N+1 пройдёт мимо.')
-  process.exit(1)
+  const drift = collectJustificationDrift(srcDir, list)
+  return { filesCount: files.length, unexpected, accepted, drift }
 }
 
-main()
+export function report({ filesCount, unexpected, accepted, drift }, log = console.log) {
+  log(`N+1 audit: просмотрено ${filesCount} файлов в server/src`)
+  log(`Новых мест с SQL внутри цикла: ${unexpected.length} (допустимых по JUSTIFIED: ${accepted})\n`)
+
+  for (const f of unexpected) {
+    log(`  ${f.rel}:${f.line}  внутри цикла с :${f.loopStart}  ${f.header}`)
+  }
+  for (const d of drift) {
+    log(`  ОПРАВДАНИЕ ПРОТУХЛО ${d.file}:${d.line} — ${d.reason}`)
+  }
+  if (!unexpected.length && !drift.length) {
+    log('Новых N+1 не найдено — все оставшиеся места внесены в JUSTIFIED с причиной и якорем.')
+    return 0
+  }
+
+  log('')
+  log('Как править:')
+  log('  1) SELECT для всех id одним запросом — mysql2 расплющивает массив в IN (?, ?, ?);')
+  log('  2) или INSERT ... VALUES (?,?),(?,?) одним запросом / INSERT ... SELECT, если пишем по каждой строке;')
+  log('  3) если запрос внутри цикла намеренный — внеси его в JUSTIFIED этого')
+  log('     скрипта с указанием строки, причины и якоря `expect`, иначе новый N+1 пройдёт мимо;')
+  log('  4) протухшее оправдание (строка сдвинулась) — обнови номер строки и якорь,')
+  log('     либо почини место, если оно больше не намеренное.')
+  return 1
+}
+
+function main() {
+  process.exit(report(audit(SRC)))
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main()

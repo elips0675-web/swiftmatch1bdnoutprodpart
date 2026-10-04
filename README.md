@@ -160,14 +160,15 @@ cd server && npm test            # серверные тесты
 | Обязательность E2E | `npm run check:e2e` | джобы `e2e` в `ci.yml` нет / у неё `continue-on-error` или `if:` / триггер ограничен ветками / `deploy` не зависит от `e2e-test`; рецепт без сида демо-данных, без миграций, без `vite preview --strictPort`, с `sleep` вместо `wait-for-url.mjs`, без `upload-artifact`; команды Playwright в двух workflow разошлись |
 | Целостность зависимостей | `npm run check:deps` | необъявленный импорт (в т.ч. `import()`) или мёртвая runtime-зависимость в `package.json` |
 | Раскладка документации | `npm run check:docs` | `Промты.txt` снова стал источником правил (шапка пропала, вернулись разделы 0–20 или 21–34); битая ссылка в таблице канона; `docs/product-roadmap.md` потерял один из 14 разделов идей, похудел или набрал чужих правил; запрещённые формулировки (правила `admin-auth-passive` и `zod-version-claim`, буквальные примеры — в `hint` гейта) в отслеживаемых `.md`/`.txt`; архив `context.txt` без пометки «ИСТОРИЧЕСКИЙ СРЕЗ», без даты среза и без ссылки на канон; гейт не вызывается из `ci.yml`/`deploy.yml`, джоба переименована или помечена `continue-on-error`/`if: false` |
+| SQL внутри цикла | `npm run check:n-plus-one` | `pool.query`/`conn.execute` в теле цикла по коллекции → 51 запрос вместо 2 (рассылка уведомлений об отмене встречи делала по два запроса на участника, профиль — по INSERT на интерес); **протухшее оправдание** из `JUSTIFIED` (номер строки разошёлся с кодом, якорь `expect` не найден); оправдание без якоря; гейт не вызван из `ci.yml`/`deploy.yml` (этап 33) |
 
 Каждый гейт обязан падать на сломанном входе — иначе это декорация
 (см. `docs/AGENTS-pitfalls.md`).
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 327 тестов, 31 файл — **0 failures**
-- **Сервер (Vitest):** 784 теста, 55 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
+- **Фронтенд (Vitest):** 358 тестов, 32 файла — **0 failures**
+- **Сервер (Vitest):** 785 тестов, 55 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 150 тестов, 19 spec-файлов — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
 ### Зависимости
@@ -202,12 +203,13 @@ cd server && npm test            # серверные тесты
 | `deploy-persistence` | `deploy-persistence-audit.mjs` |
 | `dependency-audit` | `npm run audit:prod` в корне и в `server/` (без `npm ci` — аудиту нужен только lock-файл) |
 | `docs-canon` | `npm run check:docs` — раскладка документации: правила только в `docs/AGENTS-*.md`, идеи 21–34 в `docs/product-roadmap.md`, архив помечен, запрещённых формулировок в отслеживаемых `.md`/`.txt` нет (этап 32) |
+| `n-plus-one` | `npm run check:n-plus-one` — SQL внутри цикла по коллекции (2N запросов вместо 2) + протухшие оправдания `JUSTIFIED` (этап 33, N5) |
 
 ### `.github/workflows/deploy.yml` — push в `main`/`develop`, PR в `main` (Node 22)
 
 | Джоба | Что делает |
 |-------|-----------|
-| `lint-and-typecheck` | `check:ports` → `lint` → `lint:server` → `tsc` → **`secrets-leak`**, **`deploy-persistence`**, **`audit:prod` ×2**, **`check:e2e`**, **`check:docs`** (блокируют деплой) |
+| `lint-and-typecheck` | `check:ports` → `lint` → `lint:server` → `tsc` → **`secrets-leak`**, **`deploy-persistence`**, **`audit:prod` ×2**, **`check:e2e`**, **`check:docs`**, **`check:n-plus-one`** (блокируют деплой) |
 | `frontend-test` | витест + `check-native-config` + `vite build` |
 | `server-test` | MySQL 8.0 сервис: схема → `seed-migrations` → `migrate.js` → `schema-validate` → `sql-explain-audit` → `verify-backup` → витест с живой БД |
 | `test-counters` | сверка чисел с прогоном |

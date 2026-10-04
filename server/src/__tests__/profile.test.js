@@ -123,7 +123,7 @@ describe('PUT /api/profile/:id', () => {
     expect(res.body.display_name).toBe('Updated')
   })
 
-  it('updates interests if provided', async () => {
+  it('updates interests if provided: один INSERT на весь список, а не по интересу', async () => {
     pool.query
       .mockResolvedValueOnce([[], []])
       .mockResolvedValueOnce([[{ interests: '["sport","music"]' }], []])
@@ -138,7 +138,9 @@ describe('PUT /api/profile/:id', () => {
     const insertCalls = pool.query.mock.calls.filter(
       (c) => typeof c[0] === 'string' && c[0].startsWith('INSERT IGNORE INTO user_interests'),
     )
-    expect(insertCalls).toHaveLength(2)
+    expect(insertCalls).toHaveLength(1)
+    expect(insertCalls[0][0]).toContain('(?, ?), (?, ?)')
+    expect(insertCalls[0][1]).toEqual(['1', 1, '1', 2])
   })
 
   it('filters out non-canonical interest ids on save (e.g. Animals/Politics)', async () => {
@@ -156,7 +158,8 @@ describe('PUT /api/profile/:id', () => {
     const insertCalls = pool.query.mock.calls.filter(
       (c) => typeof c[0] === 'string' && c[0].startsWith('INSERT IGNORE INTO user_interests'),
     )
-    expect(insertCalls.map((c) => c[1][1])).toEqual([1])
+    expect(insertCalls).toHaveLength(1)
+    expect(insertCalls.map((c) => c[1].slice(1))).toEqual([[1]])
   })
 
   it('keeps canonical interests added later (Coffee=26, Design=37) and drops Animals(13)', async () => {
@@ -181,7 +184,8 @@ describe('PUT /api/profile/:id', () => {
     const insertCalls = pool.query.mock.calls.filter(
       (c) => typeof c[0] === 'string' && c[0].startsWith('INSERT IGNORE INTO user_interests'),
     )
-    expect(insertCalls.map((c) => c[1][1])).toEqual([26, 37])
+    expect(insertCalls).toHaveLength(1)
+    expect(insertCalls[0][1]).toEqual(['1', 26, '1', 37])
   })
 
   it('recomputes age from birth_date on save and stores birth_date', async () => {

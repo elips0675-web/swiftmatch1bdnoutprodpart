@@ -639,25 +639,40 @@ router.delete('/api/hangouts/:id', auth, async (req, res) => {
     )
     const io = getIO()
     const cancelPrefs = await getPrefsMap(respondents.map((r) => r.user_id))
-    for (const r of respondents) {
-      if (isAllowedIn(cancelPrefs, r.user_id, 'hangout_cancelled', 'inApp')) {
-        try {
-          const [nr] = await pool.query(
-            'INSERT INTO notifications (user_id, type, payload) VALUES (?, ?, ?)',
-            [r.user_id, 'hangout_cancelled', JSON.stringify({ hangout_id: Number(id) })],
-          )
-          if (io) {
-            const [[row]] = await pool.query('SELECT id, type, payload, is_read, created_at FROM notifications WHERE id = ?', [nr.insertId])
-            io.to(`user:${r.user_id}`).emit('notification:new', row)
-          }
-        } catch {}
+    const payload = JSON.stringify({ hangout_id: Number(id) })
+    const toNotify = respondents.filter((r) => isAllowedIn(cancelPrefs, r.user_id, 'hangout_cancelled', 'inApp'))
+    if (toNotify.length) {
+      try {
+        const [inserted] = await pool.query(
+          `INSERT INTO notifications (user_id, type, payload) VALUES ${toNotify.map(() => '(?, ?, ?)').join(', ')}`,
+          toNotify.flatMap((r) => [r.user_id, 'hangout_cancelled', payload]),
+        )
+        const firstId = Number(inserted.insertId)
+        const [created] = await pool.query(
+          'SELECT id, user_id, type, payload, is_read, created_at FROM notifications WHERE id IN (?)',
+          [toNotify.map((_, i) => firstId + i)],
+        )
+        if (io) {
+          for (const row of created) io.to(`user:${row.user_id}`).emit('notification:new', row)
+        }
+        if (created.length !== toNotify.length) {
+          logger.error(`Hangout cancel: ${toNotify.length - created.length} notifications inserted but not returned for WS`)
+        }
+      } catch (err) {
+        logger.error('Hangout cancel notification insert failed:', err)
       }
+    }
+    for (const r of respondents) {
       if (isAllowedIn(cancelPrefs, r.user_id, 'hangout_cancelled', 'push')) {
-        sendPushToUser(r.user_id, 'SwiftMatch', 'The hangout was cancelled by its author').catch(() => {})
+        sendPushToUser(r.user_id, 'SwiftMatch', 'The hangout was cancelled by its author').catch((err) => {
+          logger.error('Hangout cancel push failed:', err)
+        })
       }
       try {
         if (io) io.to(`user:${r.user_id}`).emit('hangout:cancelled', { hangoutId: Number(id) })
-      } catch {}
+      } catch (err) {
+        logger.error('Hangout cancel realtime emit failed:', err)
+      }
     }
 
     res.json({ message: 'Hangout cancelled' })

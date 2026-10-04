@@ -513,8 +513,11 @@ router.put('/api/profile/:id', auth, async (req, res) => {
       const canonical = await getCanonicalInterestIds()
       const safeInterests = [...new Set(interests)].filter((id) => canonical.has(Number(id)))
       await pool.query('DELETE FROM user_interests WHERE user_id = ?', [req.params.id])
-      for (const interestId of safeInterests) {
-        await pool.query('INSERT IGNORE INTO user_interests (user_id, interest_id) VALUES (?, ?)', [req.params.id, interestId])
+      if (safeInterests.length) {
+        await pool.query(
+          `INSERT IGNORE INTO user_interests (user_id, interest_id) VALUES ${safeInterests.map(() => '(?, ?)').join(', ')}`,
+          safeInterests.flatMap((id) => [req.params.id, id]),
+        )
       }
     }
 

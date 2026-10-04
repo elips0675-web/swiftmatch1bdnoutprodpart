@@ -446,23 +446,54 @@ describe('DELETE /api/hangouts/:id', () => {
     expect(pool.query.mock.calls[1][0]).toContain("status = 'cancelled'")
   })
 
-  it('cancel inserts hangout_cancelled notification for respondents', async () => {
+  it('cancel inserts hangout_cancelled notification for ALL respondents in ONE insert', async () => {
     pool.query
       .mockResolvedValueOnce([[{ user_id: 2, status: 'active' }], []])
       .mockResolvedValueOnce([{ affectedRows: 1 }, []])
-      .mockResolvedValueOnce([[{ user_id: 3 }], []])
-      .mockResolvedValueOnce([{ insertId: 91 }, []])
-      .mockResolvedValueOnce([[{ id: 91, type: 'hangout_cancelled', payload: '{}', is_read: 0, created_at: new Date() }], []])
+      .mockResolvedValueOnce([[{ user_id: 3 }, { user_id: 4 }, { user_id: 5 }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([{ insertId: 91, affectedRows: 3 }, []])
+      .mockResolvedValueOnce([
+        [
+          { id: 91, user_id: 3, type: 'hangout_cancelled', payload: { hangout_id: 5 }, is_read: 0, created_at: new Date() },
+          { id: 92, user_id: 4, type: 'hangout_cancelled', payload: { hangout_id: 5 }, is_read: 0, created_at: new Date() },
+          { id: 93, user_id: 5, type: 'hangout_cancelled', payload: { hangout_id: 5 }, is_read: 0, created_at: new Date() },
+        ],
+        [],
+      ])
 
     const res = await request(createApp(hangoutsRoutes))
       .delete('/api/hangouts/5')
       .set('Authorization', `Bearer ${authToken(2)}`)
 
     expect(res.status).toBe(200)
-    const notifInsert = pool.query.mock.calls.find(([sql]) => sql.includes('INSERT INTO notifications'))
-    expect(notifInsert).toBeTruthy()
-    expect(notifInsert[1][0]).toBe(3)
-    expect(notifInsert[1][1]).toBe('hangout_cancelled')
+    const inserts = pool.query.mock.calls.filter(([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO notifications'))
+    const selects = pool.query.mock.calls.filter(([sql]) => typeof sql === 'string' && sql.includes('FROM notifications WHERE id IN'))
+    expect(inserts).toHaveLength(1)
+    expect(selects).toHaveLength(1)
+    expect(inserts[0][0]).toContain('(?, ?, ?), (?, ?, ?), (?, ?, ?)')
+    expect(inserts[0][1]).toEqual([
+      3, 'hangout_cancelled', JSON.stringify({ hangout_id: 5 }),
+      4, 'hangout_cancelled', JSON.stringify({ hangout_id: 5 }),
+      5, 'hangout_cancelled', JSON.stringify({ hangout_id: 5 }),
+    ])
+    expect(selects[0][1][0]).toEqual([91, 92, 93])
+  })
+
+  it('cancel survives a failing notification insert: лог вместо тишины', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ user_id: 2, status: 'active' }], []])
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []])
+      .mockResolvedValueOnce([[{ user_id: 3 }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockRejectedValueOnce(new Error('notifications table is locked'))
+
+    const res = await request(createApp(hangoutsRoutes))
+      .delete('/api/hangouts/5')
+      .set('Authorization', `Bearer ${authToken(2)}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.message).toBe('Hangout cancelled')
   })
 })
 
