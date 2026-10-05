@@ -117,8 +117,32 @@ jobs:
       - run: npm ci
       - run: npm test
 
+  # Живой MySQL обязателен, иначе «гонки на настоящем движке» (P0 #2,
+  # race.mysql.test.js) не выполняются никогда. Прежде у джобы не было сервиса
+  # БД, а тест был написан как `describe.skipIf(!admin)`: джоба честно зеленела
+  # при полном пропуске единственного живого теста репозитория. Теперь сервис
+  # объявлен, а REQUIRE_MYSQL=1 превращает отсутствие БД в падение; локально без
+  # БД файл по-прежнему пропускается, чтобы `npm test` у разработчика не краснел.
+  # Структуру джобы проверяет гейт scripts/mysql-race-gate.mjs.
   test-server:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: swiftmatch_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASSWORD: swiftmatch_test
+      REQUIRE_MYSQL: '1'
     defaults:
       run:
         working-directory: server
@@ -129,6 +153,20 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npm test
+
+  # Гейт «живой тест на MySQL действительно выполняется» (этап 36, N1).
+  # Проверяет три вещи, которые вместе дают зелёную джобу при полном пропуске
+  # теста: сервис mysql в test-server, REQUIRE_MYSQL=1 и «пропуск превращается в
+  # падение» в самом race.mysql.test.js. Локально гейт зелёный на честном
+  # окружении без БД — он проверяет структуру, а не наличие соединения.
+  mysql-race:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/mysql-race-gate.mjs
 
   # Дрейф схемы: каждая колонка, которую читает код в server/src, должна
   # существовать в эталоне database/mysql_schema.sql. Без MySQL — только эта

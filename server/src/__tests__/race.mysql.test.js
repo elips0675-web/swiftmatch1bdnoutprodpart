@@ -10,8 +10,17 @@
 //   3) два параллельных INSERT IGNORE INTO matches → обе в норме, строка одна.
 //
 // Работает в отдельной базе `swiftmatch_race_test` и удаляет её в afterAll;
-// продовую `swiftmatch` не трогает. Если MySQL недоступен (в CI у джобы
-// test-server сервиса БД нет) — файл пропускается, а не падает.
+// продовую `swiftmatch` не трогает.
+//
+// Если MySQL недоступен, поведение зависит от REQUIRE_MYSQL:
+//   - флаг не задан (локальная машина без БД) — файл пропускается, чтобы
+//     `npm test` у разработчика оставался зелёным;
+//   - REQUIRE_MYSQL=1 (CI, джоба test-server) — пропуск становится ПАДЕНИЕМ.
+// Именно этим был плох прежний вариант (этап 35, N1): `describe.skipIf(!admin)`
+// зеленил джобу CI, в которой сервиса БД нет вообще, то есть «гонки на живом
+// MySQL» в CI не выполнялись никогда, а джоба была зелёная. Сейчас структуру
+// джобы проверяет гейт `scripts/mysql-race-gate.mjs`, а сам факт падения при
+// отсутствии БД доказан прогоном с `REQUIRE_MYSQL=1 DB_PORT=1`.
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import mysql from 'mysql2/promise'
@@ -39,11 +48,29 @@ async function probe() {
 }
 
 const admin = await probe()
+const requireMysql = process.env.REQUIRE_MYSQL === '1'
 
-describe.skipIf(!admin)('гонки на живом MySQL (P0 #2)', () => {
+// Локально (REQUIRE_MYSQL не задан) — пропуск; в CI — файл выполняется, и
+// первый тест падает, если БД всё-таки недоступна. Без него `beforeAll` упал бы
+// на `admin.query` с невнятным «Cannot read properties of null».
+describe.skipIf(!admin && !requireMysql)('гонки на живом MySQL (P0 #2)', () => {
   let pool
 
+  it('живой MySQL доступен там, где он обязателен (REQUIRE_MYSQL=1)', () => {
+    expect(admin).not.toBeNull()
+  })
+
   beforeAll(async () => {
+    // Без этого падение выглядит как «Cannot read properties of null (reading
+    // 'query')» в beforeAll, и вывод не говорит ни про БД, ни про REQUIRE_MYSQL:
+    // догадаться, что джоба CI осталась зелёной без единого живого теста, по
+    // такому сообщению нельзя.
+    if (!admin) {
+      throw new Error(
+        `MySQL недоступен по ${config.host}:${config.port}` +
+          (requireMysql ? ' (REQUIRE_MYSQL=1 — в CI это падение, а не пропуск)' : ''),
+      )
+    }
     await admin.query(`DROP DATABASE IF EXISTS \`${DB_NAME}\``)
     await admin.query(`CREATE DATABASE \`${DB_NAME}\``)
     pool = mysql.createPool({ ...config, database: DB_NAME, connectionLimit: 4 })
@@ -80,6 +107,10 @@ describe.skipIf(!admin)('гонки на живом MySQL (P0 #2)', () => {
 
   afterAll(async () => {
     if (pool) await pool.end().catch(() => {})
+    // admin бывает null, когда БД недоступна: vitest выполняет afterAll даже после
+    // падения beforeAll, и без этой проверки поверх внятной ошибки «MySQL
+    // недоступен» наезжает вторая, уже невнятная — TypeError на null.query.
+    if (!admin) return
     await admin.query(`DROP DATABASE IF EXISTS \`${DB_NAME}\``).catch(() => {})
     await admin.end().catch(() => {})
   })
