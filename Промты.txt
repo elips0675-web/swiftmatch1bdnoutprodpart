@@ -36,11 +36,11 @@
 | 11 | Документация | `README.md` — карта документации; `AGENTS.md` — навигация по модулям |
 | 12 | Git | `AGENTS.md` — Conventional Commits, `git commit --no-verify`, что нельзя коммитить (`.env`) |
 | 13 | Стек технологий | `project-context.md` |
-| 14 | Код-стайл и архитектура | `docs/AGENTS-system-prompt.md` + `docs/AGENTS-pitfalls.md` (63 грабли) |
+| 14 | Код-стайл и архитектура | `docs/AGENTS-system-prompt.md` + `docs/AGENTS-pitfalls.md` (89 грабли) |
 | 15 | Golden Rules | `AGENTS.md` (гипер-краткое резюме) + `docs/AGENTS-system-prompt.md` |
 | 16 | Absolute Bans | `docs/AGENTS-security.md` |
 | 17 | Безопасность (Security Rules) | `docs/AGENTS-security.md` |
-| 18 | Миграции БД | `AGENTS.md` («Дрейф схемы = живой 500») + `node scripts/schema-drift-audit.mjs` |
+| 18 | Миграции БД | `AGENTS.md` («Дрейф схемы = живой 500», «Ограничение в схеме = проверка в коде») + `node scripts/schema-drift-audit.mjs` + `npm run check:enum-constraints` |
 | 19 | Capacitor / нативные правила | `capacitor.config.ts`, гейт `node scripts/check-native-config.mjs`, сборка `npm run build:native` |
 | 20 | Past Mistakes | `docs/past-mistakes.md` + `docs/AGENTS-pitfalls.md` |
 | 21–34 | Продуктовые roadmap’и (roadmap, DevEx, a11y, observability, IaC, IAP, GDPR, Chaos Engineering) | `docs/product-roadmap.md` — перенесено дословно, 775 строк |

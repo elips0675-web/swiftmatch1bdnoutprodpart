@@ -301,6 +301,20 @@ jobs:
           node-version: 20
       - run: npm run check:n-plus-one
 
+  # CHECK/ENUM в схеме против валидаторов кода (этап 37, N4). MySQL отвечает на
+  # нарушение ограничения не 400, а 500: ограничение живёт в
+  # `database/mysql_schema.sql`, а проверяет его код. Схему и код читать
+  # достаточно, живая БД не нужна — гейт зелёный локально и в CI одинаково.
+  # Зависимости не нужны: гейт читает исходники, импортов не делает.
+  enum-constraints:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm run check:enum-constraints
+
   # Уязвимости в prod-зависимостях — гейт без `npm ci`: аудиту нужен только
   # lock-файл, поэтому джоба делает ровно две команды (корень и server) и
   # проверяет обе половины: в контейнер едут обе, а не только фронт.

@@ -19,6 +19,7 @@
     "check:deps": "node scripts/dependency-audit.mjs",
     "check:docs": "node scripts/docs-canon-audit.mjs",
     "check:n-plus-one": "node scripts/n-plus-one-audit.mjs",
+    "check:enum-constraints": "node scripts/check-enum-constraints.mjs",
     "check:mysql-race": "node scripts/mysql-race-gate.mjs",
     "preview": "vite preview",
     "test": "vitest run",

@@ -74,6 +74,12 @@ jobs:
       # был написан как describe.skipIf(!admin). Гейт проверяет, что сервис
       # объявлен, REQUIRE_MYSQL=1 задан и отсутствие БД — падение, а не пропуск.
       - run: npm run check:mysql-race
+      # Этап 37 (N4): CHECK/ENUM схемы против валидаторов кода. MySQL отвечает
+      # на нарушение ограничения 500, а не 400 — ограничение живёт в схеме, а
+      # проверяет его код. Гейт ловит четыре класса: код-валидатор шире CHECK,
+      # диапазонный CHECK без проверки в пишущем файле, белый список кода с
+      # значением вне ENUM и литерал в INSERT/UPDATE, которого нет в ENUM.
+      - run: npm run check:enum-constraints
 
   frontend-test:
     name: Frontend Tests (Vitest)
