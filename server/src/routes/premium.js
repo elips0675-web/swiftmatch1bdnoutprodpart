@@ -4,6 +4,7 @@ import { auth } from '../middleware.js'
 import logger from '../logger.js'
 import { trackEvent } from './experiments.js'
 import { createBreaker } from '../circuit-breaker.js'
+import { refuseMockPayment } from '../runtime.js'
 
 const router = Router()
 
@@ -98,9 +99,7 @@ router.post('/api/premium/create-checkout', auth, async (req, res) => {
   const stripeKey = process.env.STRIPE_SECRET_KEY
   const isLive = process.env.STRIPE_LIVE === 'true'
   if (stripeKey || isLive) {
-    if (isLive && !stripeKey) {
-      return res.status(500).json({ message: 'STRIPE_LIVE=true but STRIPE_SECRET_KEY is not set' })
-    }
+    if (isLive && !stripeKey && refuseMockPayment(res)) return
     try {
       const { default: Stripe } = await import('stripe')
       const stripe = new Stripe(stripeKey)
@@ -135,9 +134,7 @@ router.post('/api/premium/create-checkout', auth, async (req, res) => {
     }
   }
 
-  if (isLive) {
-    return res.status(502).json({ message: 'Stripe not configured in live mode' })
-  }
+  if (refuseMockPayment(res)) return
 
   const price = tierConfig.price * duration_months
   const conn = await pool.getConnection()

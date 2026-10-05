@@ -22,6 +22,7 @@ import { adminAuth } from './middleware/adminAuth.js'
 import { initSentry, registerSentryErrorHandler } from './sentry.js'
 import { getRedis, disconnectRedis } from './redis.js'
 import { initQueues, closeQueues } from './queue.js'
+import { healthHandler } from './health.js'
 
 import adminDashboard from './routes/admin/dashboard.js'
 import adminUsers from './routes/admin/users.js'
@@ -305,14 +306,7 @@ app.use(eventsRoutes)
 app.use(affiliateRoutes)
 app.use(notificationsRoutes)
 
-app.get('/health', async (req, res) => {
-  try {
-    await pool.query('SELECT 1')
-    res.json({ status: 'ok', db: 'connected' })
-  } catch {
-    res.status(503).json({ status: 'error', db: 'disconnected' })
-  }
-})
+app.get('/health', healthHandler)
 
 // Error middleware order matters: Sentry errorHandler must be registered
 // before the generic 500 handler above to catch route errors.

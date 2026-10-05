@@ -2,6 +2,7 @@ import { Router } from 'express'
 import pool from '../db.js'
 import { auth } from '../middleware.js'
 import logger from '../logger.js'
+import { refuseMockPayment } from '../runtime.js'
 
 const router = Router()
 
@@ -137,12 +138,9 @@ router.post('/api/events/:id/purchase', auth, async (req, res) => {
 
     const stripeKey = process.env.STRIPE_SECRET_KEY
     const isLive = process.env.STRIPE_LIVE === 'true'
-    const isProd = process.env.NODE_ENV === 'production'
 
     if (stripeKey || isLive) {
-      if (isLive && !stripeKey) {
-        return res.status(500).json({ message: 'STRIPE_LIVE=true but STRIPE_SECRET_KEY is not set' })
-      }
+      if (isLive && !stripeKey && refuseMockPayment(res)) return
       try {
         const { default: Stripe } = await import('stripe')
         const stripe = new Stripe(stripeKey)
@@ -186,9 +184,7 @@ router.post('/api/events/:id/purchase', auth, async (req, res) => {
       }
     }
 
-    if (isLive || isProd) {
-      return res.status(502).json({ message: isProd ? 'Stripe not configured for production' : 'Stripe not configured in live mode' })
-    }
+    if (refuseMockPayment(res)) return
 
     const orderId = `event_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
     await pool.query(

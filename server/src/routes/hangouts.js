@@ -14,6 +14,7 @@ import { notBlocked } from '../user-blocks.js'
 import { trackEvent } from './experiments.js'
 import { createBreaker } from '../circuit-breaker.js'
 import { getPrefs, getPrefsMap, isAllowed, isAllowedIn } from '../notification-prefs.js'
+import { refuseMockPayment } from '../runtime.js'
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 
@@ -1359,6 +1360,7 @@ router.post('/api/hangouts/:id/purchase', auth, hangoutTicketLimiter, async (req
 
     const stripeKey = process.env.STRIPE_SECRET_KEY
     if (!stripeKey) {
+      if (refuseMockPayment(res)) return
       await pool.query(
         `INSERT INTO hangout_tickets (hangout_id, user_id, amount, status, paid_at)
          VALUES (?, ?, ?, 'paid', NOW())

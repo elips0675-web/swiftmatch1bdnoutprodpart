@@ -4,6 +4,7 @@ import pool from '../db.js'
 import { auth } from '../middleware.js'
 import logger from '../logger.js'
 import { invalidate } from '../cache.js'
+import { refuseMockPayment } from '../runtime.js'
 
 const router = Router()
 
@@ -272,6 +273,7 @@ router.post('/api/partner/subscribe', auth, requirePartner(async (req, res) => {
   }
 
   // Mock mode
+  if (refuseMockPayment(res)) return
   await pool.query(
     `INSERT INTO partner_subscriptions (partner_id, tier, status, stripe_session_id, expires_at)
      VALUES (?, 'pro', 'active', ?, DATE_ADD(NOW(), INTERVAL 30 DAY))`,
