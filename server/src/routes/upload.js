@@ -9,6 +9,7 @@ import { auth } from '../middleware.js'
 import logger from '../logger.js'
 import { processImage } from '../image-pipeline.js'
 import { moderateImage } from '../ai-moderation.js'
+import { requirePhotoModerationOrRefuse } from '../runtime.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(__dirname, '../../uploads')
@@ -113,6 +114,8 @@ router.post('/api/upload', auth, async (req, res) => {
     })
 
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' })
+
+    if (requirePhotoModerationOrRefuse(res)) return
 
     const userId = req.userId
     const sortOrder = req.body.sort_order || 0

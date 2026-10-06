@@ -262,7 +262,7 @@ describe('режим интеграций виден в /health', () => {
     process.env.TWILIO_ACCOUNT_SID = 'AC1'
     process.env.TWILIO_AUTH_TOKEN = 'token'
     process.env.REDIS_URL = 'redis://localhost:6379'
-    expect(integrationModes()).toEqual({ stripe: 'mock', smtp: 'live', sms: 'live', fcm: 'mock', redis: 'live' })
+    expect(integrationModes()).toEqual({ stripe: 'mock', smtp: 'live', sms: 'live', fcm: 'mock', redis: 'live', moderation: 'mock' })
   })
 
   it('sms считается live только с парой ключей', () => {

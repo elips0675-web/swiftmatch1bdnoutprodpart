@@ -1,265 +1,68 @@
-D:\Tickets Cursor nout\repo
+Оценка проекта SwiftMatch по предоставленным документам
+Общий вердикт: инженерно — 9/10, продуктово — 4/10, «попадание в прод» — 2/10
+Это редкий случай, когда документация честнее, чем большинство внешних оценок самого проекта. И именно поэтому по ней видно то, что обычно скрыто: проект уже год полируется, но не выпускается.
 
-Что можно доделать по аналогии с Service Desk для SwiftMatch
-Service Desk (1572 теста) ушёл далеко вперёд по инженерной культуре. SwiftMatch (521 тест) сильно отстаёт по глубине тестов и resilience. Вот готовый план переноса — по категориям, с конкретными аналогами.
+Что по-настоящему сильно
+1. Культура гейтов. 19 проверок в CI, и каждая с доказательством «падает на сломанном входе» (ломки B1–B6 с побайтовым откатом). Это уровень выше среднего продакшена, не то что пет-проектов. То, что гейты находят реальные баги, а не только зелёные галочки — подтверждается конкретикой: nginx:1.27-alpine EOL, rsync вез .jwt-dev-secret, partner_payouts без очистки давал E2E-флак, окно времени чек-ина мертво. Это не «для галочки».
 
-1. Race-тесты (у Service Desk — 4 файла / 14 тестов, у SwiftMatch — 0)
-SwiftMatch имеет критичные гонки в ядре (лайки, матчи, подписки), но ни одного race-теста.
+2. Питфоллы. 84 записи с корневой причиной, а не симптомом. Записи вида «фикстура воспроизводит то, что создаёт тестируемый код» (№51), «курсор по времени умирает на TTL-уборке» (№73), «пустое хранилище выглядит как рабочее» (№53) — это то, что обычно нигде не записывается, а потом повторяется. Список работает как внешняя память.
 
-Аналог в Service Desk	Что сделать в SwiftMatch
-ticket-lock.race.test.js — 2 параллельных POST /:id/lock, только один 200	like.race.test.js — 2 параллельных POST /api/likes одним юзером на одну цель → ровно одна запись, второй 409
-ticket-status.race.test.js — нет двойного resolved_at	match.race.test.js — mutual like (A→B, B→A одновременно) → ровно один matches, второй INSERT отклонён UNIQUE
-time-timer.race.test.js — только один активный таймер	subscription.race.test.js — параллельные checkout/webhook → одна активная подписка (аудит qwen #8 уже флагил)
-outbox.delivery.test.js — идемпотентность воркера	webhook.race.test.js — параллельная доставка Stripe/RevenueCat → дедуп через webhook_events (частично есть, тестов на race нет)
-refresh-family.test.js — reuse-detection отзывает семью	refresh.race.test.js — 2 параллельных refresh одним токеном → один 200, второй 401 + семья отозвана (уже есть в E2E, но нет unit)
-Оценка: 2–3 дня, ~12 тестов. Ловят реальные баги на проде.
+3. Безопасность. httpOnly cookie + refresh rotation с reuse detection + lockout + IDOR-аудит, нашедший 6 живых дыр (анонимная перезапись профиля, утечка email+координат, пуш-подписки на user 1) — это не косметика. Fail-closed на Stripe в проде (N9) — правильное решение, а не «оставим как есть, потом».
 
-2. IDOR-аудит + canAccess* хелперы (Service Desk — Этап 56)
-В Service Desk нашли дыру: GET /:id/messages не проверял доступ. В SwiftMatch есть аналог — проверить:
+4. Саморефлексия. Раздел про то, как «Финальная оценка» предсказывала 908/908 при фактических 929, а Промты.txt 6 раз требовал сделать adminAuth пассивным — это редкая честность. Большинство проектов такое просто замалчивают.
 
-Service Desk	SwiftMatch — что проверить
-canAccessTicket(ticket, user) — единое правило	canAccessChat(chatId, userId), canAccessProfile(profileId, viewerId), canAccessHangout(hangoutId, userId)
-GET /:id/messages — 403 чужому	GET /api/chats/:chatId — может ли user A читать чат B/C? (частично закрыто, тестов нет)
-POST /:id/lock — 403 requester'у	POST /api/hangouts/:id/checkin — может ли не-участник чек-иниться?
-11 тестов в idor.test.js	idor.test.js — 10–15 тестов: чужой профиль, чужой чат, чужие сообщения, чужой hangout, чужой partner offer
-Оценка: 1–2 дня, ~15 тестов. Одна из самых частых уязвимостей в dating apps.
+Что настораживает
+1. Проект застрял. Последние 30+ этапов — это гейты, аудиты, рефакторинг, но не «продукт у пользователя». В Что доделать.txt сами авторы пишут: «новый продуктовый код не нужен — разблокировать прод». Но «разблокировать прод» висит в том же файле с мая–июня 2026. Каждый этап добавляет 20–40 тестов и ещё один гейт. Это классическая продуктивная прокрастинация: безопаснее написать ещё один аудит схемы, чем зарегистрировать домен и выложить приложение.
 
-3. Contract-тесты (zod-схемы ответов) — Service Desk Этап 60
-Service Desk	SwiftMatch
-contract.api.test.js — 5 list-эндпоинтов (tickets, employees, chats, wiki, news)	contract.api.test.js — /api/users/search, /api/matches, /api/chats, /api/hangouts, /api/partners/offers, /api/events
-Проверка: success: true + элементы с id: number	То же + age, gender, photo_url обязательны в search-ответах
-Зачем: мобильное приложение на Capacitor не обновляется мгновенно. Breaking change в API = краш в APK. Контракт-тесты ловят за 30 секунд.
+2. Цифры уже разъехались — в тех самых доках, которые гейт должен защищать. В ИНВЕНТАРЬ-ТЕСТОВ.md — 1306/1306, в СВОДКА.md и шапке Что сделано.txt — 1258/1258. Гейт test-counter-audit проверяет 5 файлов, но не шапку Что сделано.txt (там только частично), и уж точно не ловит расхождение между инвентарём и сводкой. Авторы это знают — сами пишут про «числа стареют молча» — и всё равно допускают. Ирония в том, что это тот самый класс бага, который проект объявил побеждённым.
 
-Оценка: 1 день, ~10 тестов.
+3. Документов больше, чем продукта. Что доделать.txt — 364 КБ, Что сделано.txt — 458 КБ, AGENTS-pitfalls.md — 120 КБ, product-roadmap.md — 38 КБ. Это не «документация», это архив целого процесса. Для одного продукта знакомств, у которого 50 демо-юзеров и нет ни одной реальной транзакции, объём документации выглядит как компенсация чего-то другого. Из документации уже видно, что она сама становится источником проблем — правки правил в 3 копиях, расхождения между README, project-context и СВОДКА.
 
-4. Query guards + N+1 spy (Service Desk Этап 61)
-Service Desk	SwiftMatch
-Клампинг limit: 9999→500, 0→50, -5→1, abc→50	GET /api/users/search, /api/hangouts, /api/partners/offers — сейчас limit без клампинга?
-N+1 spy на prisma — ровно 1 findMany	N+1 spy на mysql2 — 1 pool.query на список, а не цикл
-query-guards.test.js — 5 тестов	То же + проверка offset (отрицательный, огромный)
-Зачем: в геопоиске (ST_Distance_Sphere + HAVING) на 10k юзеров лимит без клампинга = OOM.
+4. Windows-центричность. Laragon, .bat, PowerShell, Task Scheduler. Прод — Docker + Linux. Это среда, в которой гейты зелёные на одной машине. Проверки вроде seed-migrations.mjs и BASELINE в migrate.js — это обход специфики локального окружения, а не системное решение.
 
-Оценка: 1 день, ~8 тестов.
+5. Scope creep. Дейтинг + Hangouts + партнёрская экосистема (10 типов партнёров, Wave 1–4) + события + алиасы + верификация + B2B-маркетплейс + аффилиаты + стриминг + психологи… Это уже не дейтинг-приложение, а попытка построить «супер-апп» до того, как выпущен MVP. Roadmap-файл честно перечисляет ~50 фич «сделано» — и ни одной с реальным пользователем.
 
-5. Notify-failure regression (Service Desk Этап 61)
-Service Desk	SwiftMatch
-SMTP/webhook упал → POST /tickets всё равно 201	SMTP упал → POST /register всё равно 201 (регистрация не падает из-за письма)
-Тест мокает notifyTicketCreated → reject	Мок sendCustomEmail → reject, проверка users INSERT
-Зачем: в SwiftMatch mail.js с retry — но что если retry исчерпан? Проверить, что флоу не ломается.
+6. E2E стал обязательным только в этапе 30. До этого «150/150 зелёных» было утверждением без подтверждения прогоном. Полный прогон E2E, судя по журналу, случаен — то Docker на WSL, то локальный стенд, то не проводился. Это значит, что предыдущие 150 тестов могли не собираться годами.
 
-Оценка: 4 часа, 2 теста.
+Отдельно про последние этапы (33–39)
+N+1 (33): починены 3 места, гейт включён, ломка доказана. Правильная работа.
 
-6. Migration idempotency + process-guards (Service Desk Этапы 35/60)
-Service Desk	SwiftMatch
-migrate:latest дважды = no-op	node database/migrations/migrate.js дважды = 0 errors (в Service Desk нашли реальный баг миграции 018)
-CSP без unsafe-inline/unsafe-eval	CSP SwiftMatch — проверить script-src, connect-src для Stripe/Socket.IO
-413 при теле >100kb	413 при >10MB upload (сейчас 500 на всё?)
-Оценка: 1 день, ~6 тестов. У SwiftMatch миграции 018–023 уже поломались один раз — превентив.
+N2 пагинация чата (34): честно, с ключевой находкой про created_at vs id в курсоре. Правильно.
 
-7. 2FA/TOTP для админа (Service Desk Этап 63.1)
-У SwiftMatch админка (/admin/*) защищена одним паролем demo123456. Это критично.
+N8 rsync (35): гейт переписан с константы на вычисляемое покрытие. Это правильный фикс.
 
-Service Desk	SwiftMatch
-auth/totp.js (otplib) + verifySync	То же — server/src/totp.js
-user_totp таблица + флаг two_fa (off)	Миграция + флаг
-require2FA middleware на /api/admin/*	То же
-TwoFactorSection.tsx в Profile + QR	То же
-14 тестов в auth-2fa.test.js	~12 тестов: setup/enable/disable/verify + require2FA 403
-🐞 Нашли баг: requireRole('admin','super_admin') требовал super_admin (Math.max)	Проверить свой adminAuth
-Оценка: 2–3 дня, ~12 тестов. P0 перед любым публичным запуском.
+N1 MySQL в CI (36): REQUIRE_MYSQL=1, ломка, гейт. Правильно.
 
-8. Активные сессии (Service Desk Этап 63.2)
-Service Desk	SwiftMatch
-Колонки device_name/ip_address/user_agent/last_seen_at в refresh_tokens	То же
-parseUserAgent() — «Chrome · Windows»	То же (переиспользовать код)
-GET /auth/sessions (token не утекает)	То же
-POST /auth/sessions/:id/revoke (своя 200, чужая 404, текущая 400)	То же
-SessionsSection.tsx в Profile	То же
-10 + 6 тестов	~12 тестов
-Зачем: dating app = паранойя про взлом. «Разлогинить везде» — базовая фича Tinder/Bumble.
+N4 CHECK/ENUM (37): 47 тестов, 6 ломок, из них одна не доказала то, что должна была. Авторы это сами честно зафиксировали.
 
-Оценка: 1–2 дня, ~12 тестов.
+N9 fail-closed Stripe (39): найдена третья незащищённая точка (premium.js), которую не назвал никто из аудиторов. Это уровень.
 
-9. Notification preferences per user (Service Desk Этап 63.3)
-Service Desk	SwiftMatch
-Таблица notification_preferences (user_id + JSON)	То же
-8 событий × 3 канала (email/push/in_app)	7 событий × 3: like, match, message, hangout_response, event_reminder, partner_offer, subscription
-GET/PUT /notifications/preferences	То же
-Все 7 notify-функций фильтруют через allowedUserIds	То же — сейчас все шлют всем
-UI: таблица 8×3, мастер-чекбоксы	То же
-11 + 6 тестов	~15 тестов
-Зачем: без этого пользователи отключают пуши целиком и уходят. Retention.
+Все семь — качественная работа. Но за эти же 7 этапов не выпущено ни одной новой фичи и не сделан шаг к проду.
 
-Оценка: 2 дня, ~15 тестов.
+Что бы я сказал по существу
+Если это портфолио — инженерная часть выше всяких похвал, и её надо показывать. Если это бизнес — проект в плену собственного качества. Ему нужен не следующий этап, а решение владельца: либо в течение 2 недель поднять VPS + домен + Stripe test + один живой сценарий от регистрации до оплаты, либо признать, что это хобби-артефакт и остановить рост документации.
 
-10. Timeline / история активности (Service Desk Этап 62)
-Service Desk	SwiftMatch
-GET /tickets/:id/history из audit_log	GET /api/profile/activity — история: лайки, мэтчи, сообщения, встречи, покупки
-Вкладка «История» в TicketDetail	Вкладка в Profile
-TicketHistoryCard.tsx + PDF	То же + PDF
-5 + 5 тестов	~10 тестов
-Зачем: в SwiftMatch уже есть /api/activity — но это лента визитов, не timeline своих действий. Для пользователя «где я был, что делал» — важно.
+Конкретно:
 
-Оценка: 1–2 дня, ~10 тестов.
+Срочно — остановить расхождение счётчиков (обновить шапку Что сделано.txt после этапа 39, завести гейт на test/ИНВЕНТАРЬ ↔ СВОДКА).
 
-11. Feature flags: percentage rollout (Service Desk Этап 51)
-Service Desk	SwiftMatch
-rollout_percent (0–100) на флаге	То же — сейчас все флаги boolean (on/off)
-getRolloutBucket(userId) — hash % 100	То же
-isFeatureEnabledForUser() — детерминированный гейт	То же
-UI в админке (инпут %)	То же
-+13 клиент / +4 сервер тестов	~15 тестов
-Зачем: A/B экспериментам SwiftMatch (card_cta, aiIcebreakers) нужен процентный rollout. Сейчас — только 50/50 по MD5 или 100%.
+Срочно — внешний дедлайн на VPS + ключи. Без этого следующие 10 этапов ничего не изменят.
 
-Оценка: 1–2 дня, ~15 тестов.
+Потом — заморозить фичи на 4 недели. Не «заморозить гейты», а именно фичи и рефакторинг. Всё время — на «первый рубль».
 
-12. Backup verification (Service Desk Этап 53)
-Service Desk	SwiftMatch
-scripts/verify-backup.mjs — restore в scratch-БД + sanity	То же
-CI job backup-verify (schedule 03:17 UTC daily)	То же
-1 скрипт + CI	1 день
-Зачем: у SwiftMatch бэкапы есть (backup-mysql.ps1), но нет проверки, что они восстанавливаются. Классика: «бэкапы были, но битые».
+Долгосрочно — сократить объём документации в 3–5 раз. Она уже сама стала риском (расхождения, противоречия, объём, который ИИ-агент не удержит в контексте).
 
-Оценка: 4 часа.
+Итоговая оценка по шкалам:
 
-13. Health dashboard в админке (Service Desk Этап 58)
-Service Desk	SwiftMatch
-/admin/health — БД/Redis/Meili/SMTP/IMAP/очередь	/admin/health — MySQL/Redis/SMTP/Stripe/OpenAI/FCM
-AdminHealth.tsx	То же
-8 тестов	~10 тестов
-Зачем: сейчас /health/live + /health/ready есть, но админ не видит, что «SMTP отвалился 2 часа назад».
+Инженерное качество кода и тестов: 9.5/10
 
-Оценка: 1–2 дня, ~10 тестов.
+Честность процесса: 10/10
 
-14. Queue monitor (Service Desk Этап 58)
-Service Desk	SwiftMatch
-/admin/queues — BullMQ dashboard	У SwiftMatch 3 очереди (email/push/image) — нет UI
-AdminQueues.tsx	То же
-6 тестов	~8 тестов
-Зачем: если email queue забилась — сейчас никто не видит. Забитая → письма не уходят → юзеры не подтверждают email.
+Готовность к продакшену технически: 8/10
 
-Оценка: 1 день, ~8 тестов.
+Готовность к продакшену операционно: 2/10
 
-15. Impersonation + аудит (Service Desk Этап 67)
-Service Desk	SwiftMatch
-POST /admin/impersonate/:userId + audit_log	У SwiftMatch есть «имперсонация» в админке, но без аудита
-«Войти как пользователь» в AdminUsers	То же + запись в audit_log
-4 теста	~5 тестов
-Зачем: GDPR/безопасность — админ не должен иметь возможность «незаметно» зайти под юзером. Аудит обязателен.
+Продуктовая ценность на рынке: не измерена (0 реальных пользователей)
 
-Оценка: 1 день.
+Риск «проект не дойдёт до пользователя»: высокий
 
-16. Watchers / Relations / Merge (Service Desk Этап 64)
-Для Hangouts / Events SwiftMatch:
-
-Service Desk	SwiftMatch
-ticket_watchers + UI	hangout_watchers — подписка на встречу без участия
-parent/child, blocked-by, duplicates	hangout_relations — «похожие встречи», «та же серия»
-Merge tickets (перенос сообщений)	Merge hangouts (объединение дублей, перенос участников)
-Оценка: 3–4 дня, ~20 тестов.
-
-17. Field-level permissions (Service Desk Этап 67)
-Service Desk	SwiftMatch
-field_permissions (role × field × entity)	То же — какие поля профиля видит кто
-GET/PUT /admin/field-permissions	То же
-Скрытие полей в UI + серверная проверка	То же
-Зачем: в dating app приватность полей (phone, email, instagram, last_seen) — критично. Сейчас — хардкод.
-
-Оценка: 2–3 дня.
-
-18. Процессные правила (Service Desk Этап 60)
-Скопировать в AGENTS.md SwiftMatch:
-
-Правило Service Desk	Аналог для SwiftMatch
-№11 — читать «Что-доделать.txt» в начале задачи	То же (уже есть)
-№12 — «фича = флаг»	То же
-№13 — DoD на фичу (флаг+тест+i18n+check-console+инвентарь)	То же
-№14 — AI-пункт без цитаты кода не идёт в план	То же
-№15 — «сначала фикс, потом тест»	То же
-№16 — coverage thresholds = факт − 2 п.п.	То же
-check-doc-sync.mjs — MD5-сверка копий	То же (root ↔ part)
-Оценка: 4 часа (только документы).
-
-19. E2E-глубина (Service Desk — 61 тест / 19 спеков, SwiftMatch — 134 / много)
-Парадокс: у SwiftMatch больше E2E-тестов (134 vs 61), но Service Desk глубже:
-
-Service Desk	SwiftMatch — что добавить
-tickets-lifecycle — create→assign→status→resolved→reopen + API-check на каждом шаге	user-lifecycle — register→profile→search→like→match→chat→hangout (полная воронка)
-rbac-matrix — 5 ролей × 5 действий	То же для SwiftMatch: guest/user/premium/partner/admin
-websocket-chat — 2 браузера, реальный WS	У SwiftMatch есть, но не покрыт hangout:new_response / notification:new / user:banned
-search-real — реальный результат из БД + навигация	search-real — реальный профиль из seed → открыть → лайкнуть
-admin-chains — клик по каждой Primary-кнопке → assert request	То же для admin-content, admin-features, admin-users, admin-partners
-file-upload-real — setInputFiles + toast	То же — загрузить реальное фото → в профиле → скачать
-sla-escalation	premium-expiry — подписка истекла → премиум-фича 403
-Оценка: 4–5 дней, ~15 новых E2E.
-
-20. Покрытие ядра (Service Desk — большая работа в Этапах 57/61)
-Текущее покрытие ядра SwiftMatch (по context.txt — устарело):
-
-Файл Service Desk	SwiftMatch аналог
-ticket-context.tsx 35% → 60%+ (optimistic)	auth-context.tsx, use-premium.ts, use-websocket.ts — покрыть optimistic-сценарии
-TicketDetail.tsx 51% → 75%+	chats-chatId.tsx, hangout-detail.tsx — 50–60% сейчас
-ChatDetail.tsx 51% → 75%+	chats.tsx — виртуализация, TTL, icebreaker chips
-Kanban.tsx 47% → 70%+	search.tsx — swipe-логика, фильтры, A/B
-Оценка: 4–5 дней, +80–100 тестов.
-
-Итоговая таблица приоритетов
-#	Что	Дней	Тестов	Приоритет
-7	Admin TOTP 2FA	2–3	+12	🔴 P0
-2	IDOR-аудит всех :id + canAccess*	1–2	+15	🔴 P0
-3	Contract-тесты (zod)	1	+10	🔴 P0 (мобильное приложение)
-1	Race-тесты ядра	2–3	+12	🟠 P1
-8	Активные сессии	1–2	+12	🟠 P1
-9	Notification preferences	2	+15	🟠 P1
-6	Migration idempotency + process-guards	1	+6	🟠 P1
-4	Query guards + N+1 spy	1	+8	🟠 P1
-12	Backup verification	0.5	—	🟠 P1
-18	Процессные правила в AGENTS.md	0.5	—	🟠 P1
-11	Feature flag rollout %	1–2	+15	🟡 P2
-13	Health dashboard	1–2	+10	🟡 P2
-10	Timeline активности	1–2	+10	🟡 P2
-14	Queue monitor	1	+8	🟡 P2
-5	Notify-failure regression	0.5	+2	🟡 P2
-15	Impersonation + аудит	1	+5	🟡 P2
-16	Watchers / Relations / Merge	3–4	+20	🟢 P3
-17	Field-level permissions	2–3	+10	🟢 P3
-19	E2E-глубина	4–5	+15	🟢 P3
-20	Покрытие ядра	4–5	+80	🟢 P3
-Итого P0+P1: ~14–18 дней → 521 → ~700 тестов.
-Полный план: ~35–40 дней → 521 → ~900+ тестов.
-
-Что не надо копировать из Service Desk
-SLA / business hours / эскалации — нет аналога в dating
-
-Kanban, Calendar, Wiki, Polls, News — уже не нужно
-
-Ticket relations / merge — только для hangouts, не для ядра
-
-Custom roles — 5 ролей хватит, dating ≠ enterprise
-
-OpenTelemetry / Trivy / SLO — перебор для dating-стартапа
-
-Snowflake/ClickHouse data warehouse — 50k юзеров не нужен
-
-Storybook — на 15 компонентов не окупается
-
-Что скопировать первым делом (первые 5 дней)
-Правило 12–16 в AGENTS.md (0.5 дня) — процессы
-
-check-doc-sync.mjs (0.5 дня) — синхронизация Что-сделано/Что-доделать
-
-Admin TOTP 2FA (2.5 дня) — критично
-
-IDOR-аудит (1.5 дня) — критично
-
-Contract-тесты (1 день) — для мобилки
-
-За эту неделю вы:
-
-приведёте процессы к уровню Service Desk
-
-закроете 2 критические дыры безопасности
-
-получите защиту от breaking change в API для APK
-
-Это даст максимальный ROI. Остальное — по таблице приоритетов.
