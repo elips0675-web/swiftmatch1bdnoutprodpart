@@ -102,7 +102,12 @@ export const FORBIDDEN_PHRASES = [
 ]
 
 /** Журналы обязаны цитировать неверное правило, чтобы зафиксировать его закрытие. */
-export const FORBIDDEN_EXEMPT_FILES = ['Что сделано.txt', 'Что доделать.txt']
+export const FORBIDDEN_EXEMPT_FILES = [
+  'Что сделано.txt',
+  'Что доделать.txt',
+  'test/Что сделано.txt',
+  'test/Что доделать.txt',
+]
 
 /**
  * Ссылка на файл в обратных кавычках. `\p{L}` обязателен: `Промты.txt` и
@@ -238,6 +243,7 @@ export function collectArchiveFindings(text) {
 
 /** Блок джобы по отступу: от `  <имя>:` до следующей строки с тем же или меньшим отступом. */
 export function getJobBlock(yaml, jobName) {
+  if (!yaml) return null
   const lines = yaml.split(/\r?\n/)
   const start = lines.findIndex(l => new RegExp(`^ {2}${jobName}:\\s*$`).test(l))
   if (start < 0) return null
@@ -260,6 +266,7 @@ export function getJobBlock(yaml, jobName) {
  * шаге, который ничего не блокирует (питфолл 56).
  */
 export function getStepBlock(yaml, needle) {
+  if (!yaml) return null
   const lines = yaml.split(/\r?\n/)
   const at = lines.findIndex(l => l.includes(needle))
   if (at < 0) return null

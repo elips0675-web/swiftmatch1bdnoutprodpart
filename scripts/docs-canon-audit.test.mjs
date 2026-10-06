@@ -23,7 +23,9 @@
 
 import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 import {
@@ -194,6 +196,14 @@ describe('запрещённые формулировки в отслежива�
     }
   })
 
+  it('исключение журналов неполное без их зеркал: копия того же журнала обязана цитировать то же правило', () => {
+    const roots = FORBIDDEN_EXEMPT_FILES.filter((f) => !f.startsWith('test/'))
+    expect(roots.length).toBeGreaterThan(0)
+    for (const file of roots) {
+      expect(FORBIDDEN_EXEMPT_FILES, `нет зеркала ${file}`).toContain(`test/${file}`)
+    }
+  })
+
   it('«Zod 4» в любом регистре и с дефисом — находка', () => {
     for (const text of ['| React Hook Form | 7 | + Zod 4 валидация |', 'zod 4 стоит', 'Zod-4 обязателен']) {
       expect(ids(collectForbiddenFindings([{ path: 'project-context.md', text }])), text).toContain('zod-version-claim')
@@ -206,8 +216,26 @@ describe('запрещённые формулировки в отслежива�
   })
 
   it('файлы, отсутствующие в дереве, дают skip, а не исключение (чужие удаления в рабочем дереве)', () => {
-    const { docs, missing } = collectTrackedDocs(ROOT)
-    expect(missing.length).toBeGreaterThan(0)
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'docs-canon-missing-'))
+    try {
+      execFileSync('git', ['init', '-q'], { cwd: tmp })
+      fs.writeFileSync(path.join(tmp, 'probe.md'), 'probe\n')
+      execFileSync('git', ['-c', 'core.quotepath=false', 'add', 'probe.md'], { cwd: tmp })
+      fs.unlinkSync(path.join(tmp, 'probe.md'))
+
+      const { docs, missing, source } = collectTrackedDocs(tmp)
+      expect(source).toBe('git')
+      expect(missing).toEqual(['probe.md'])
+      expect(docs).toEqual([])
+      expect(() => audit(tmp)).not.toThrow()
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+
+  it('список документации репозитория не содержит отсутствующих файлов', () => {
+    const { docs } = collectTrackedDocs(ROOT)
+    expect(docs.length).toBeGreaterThan(0)
     expect(docs.every(d => fs.existsSync(path.join(ROOT, d.path)))).toBe(true)
   })
 })
