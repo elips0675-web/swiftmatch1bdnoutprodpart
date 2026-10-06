@@ -308,7 +308,7 @@
 
 Счётчики после этапа 48 (remote): server 250/250, front 74/74, E2E 55/55 = **379/379**
 
-### Этап 48б (25.08.2026): postback, плейсхолдеры координат, конверсии в админке — ЗАКРЫТО
+### Этап б (25.08.2026): postback, плейсхолдеры координат, конверсии в админке — ЗАКРЫТО
 
 | Что | Чем закрыто |
 |---|---|
@@ -358,7 +358,7 @@
 - [x] Wave 3 (часть 2): спа/фитнес-офферы — аналогичная структура (offers с типом spa, размещение в профиле/чате, spa-запись через партнёров) — **ЗАКРЫТО этапом 56**
 - [x] Wave 4: B2B-маркетплейс услуг (роль partner, ЛК, подписка через Stripe) — **ЗАКРЫТО этапом 58**
 
-### Этап 49 (25.08.2026): HMAC-подпись postback + сиды цветочных партнёров — ЗАКРЫТО
+### Этап  (25.08.2026): HMAC-подпись postback + сиды цветочных партнёров — ЗАКРЫТО
 - HMAC-SHA256 подпись postback: X-Partner-Signature header, timingSafeEqual, fallback на token если hmac_secret=null
 - Миграция 034: hmac_secret в partners
 - Сиды 7 партнёров: Yandex Go (5%), KinoPoisk (8%), Restoclub (10%), Ostrovok (7%), **Flowwow (15%)**, **Bouquet.ru (12%)**, **Yandex Lavka (10%)**
@@ -366,28 +366,28 @@
 - hmac_secret в админке (таблица + генерация при создании)
 - 4 HMAC-теста
 
-### Этап 50 (25.08.2026): Stripe Checkout для цветов — ЗАКРЫТО
+### Этап  (25.08.2026): Stripe Checkout для цветов — ЗАКРЫТО
 - Миграция 035: partner_orders + stripe_session_id в conversions
 - POST /api/partners/order (Stripe Checkout или mock), POST /api/partners/order/webhook (идемпотентность через webhook_events)
 - GET /api/partners/offers/:id, GET /api/partners/orders/my
 - flower-order-dialog.tsx (2-step: details→confirm→Stripe redirect)
 - partner-order-success.tsx + partner-order-cancel.tsx
 
-### Этап 51 (25.08.2026): Бронирование ресторанов в чате — ЗАКРЫТО
+### Этап  (25.08.2026): Бронирование ресторанов в чате — ЗАКРЫТО
 - POST /api/partners/booking (создание брони + deeplink с date/time/guests)
 - POST /api/partners/booking/share (WS `partner:restaurant_shared` через getIO())
 - restaurant-booking-dialog.tsx (дата/время/гости/сообщение, share in chat)
 - Интеграция в chat-partner-actions.tsx для restaurant
 - 6 новых тестов
 
-### Этап 52 (25.08.2026): Админка выплат партнёрам — ЗАКРЫТО
+### Этап  (25.08.2026): Админка выплат партнёрам — ЗАКРЫТО
 - Миграция 036: partner_payouts (amount, currency, method, status, admin_note, processed_at)
 - API: GET/POST /payouts, PUT /payouts/:id, GET /stats/daily (30-дневная агрегация)
 - UI: 5 вкладок (Partners/Offers/Conversions/Payouts/Stats), таблица выплат с approve/reject, диалог создания, дневная статистика
 - 7 новых тестов (57 total partners.test.js)
 - **Итого: 299/299 сервер, 81/81 фронт = 380/380**
 
-### Этап 53 (25.08.2026): Отели в passport-mode + Redis-кэш — ЗАКРЫТО
+### Этап  (25.08.2026): Отели в passport-mode + Redis-кэш — ЗАКРЫТО
 
 | Что | Чем закрыто |
 |---|---|
@@ -865,14 +865,14 @@ UX-улучшение ленты (следующий кандидат из сп�
 - **Результат e2e (всё через nginx :8080):** `healthz` 200, `/health` 200, index.html отдаётся, register через `/api` → 201+JWT, login → JWT, Socket.IO handshake → 200 (sid+websocket upgrade). Prometheus :9090 200, Grafana :3001 200 (admin/swiftmatch). app healthy, db healthy, nginx healthy. Stack: app, db(mysql:8, 3307), redis, nginx(8080), prometheus, grafana — все up.
 - Playwright E2E против staging — не прогонялся (осталось, требует запуск Playwright на VPS/staging; dev уже 150 green).
 
-### Этап 118 — Реальные ключи API (критично для первого платежа/писем)
+### Этап  — Реальные ключи API (критично для первого платежа/писем)
 - Ввести в `server/.env`: Stripe test (платёжный флоу полностью), SMTP/Mailtrap, Sentry DSN, OpenAI, FCM, Twilio, RevenueCat (все сервисы сейчас в mock/fallback).
 - GitHub secrets для `deploy.yml`. Живые ключи НЕ коммитить.
 - Частично ЗАКРЫТО (06.09): **SMTP — Ethereal** (preview-инбокс генерируется на лету `nodemailer.createTestAccount()`); криды вписаны в `server/.env`, отправка письма проверена вживую (email job 148 completed, preview URL открывается; + прямой тест sendMail OK). **Stripe-флоу в mock** прогнан вживую против запущенного API: premium create-checkout → "Subscription activated (mock)"; event ticket `/api/events/25/purchase` → ticket_id 4, status `paid`, amount 1500; partner order `offer_id=10` → "Order created (mock)" + deeplink. Для теста события сдвинуты `event_start/event_end` оффера 25 в будущее (dev-БД).
 - Вывод по данным: платные события/офферы в БД есть (10–25), но большинство с `event_end` в прошлом → не показываются фидом (правило `event_end > NOW()`, events.js L17-20). Для продакшн-сида обновлять event_end.
 - Осталось внешнее (требует аккаунтов): Stripe test-ключи (`.env` `STRIPE_LIVE`), Sentry DSN, OpenAI, FCM, Twilio, RevenueCat, S3 (этап 121).
 
-### Этап 119 — Домен + SSL + мониторинг
+### Этап  — Домен + SSL + мониторинг
 - Домен, Caddy/Let's Encrypt (авто-SSL), wss:// для /socket.io.
 - UptimeRobot + Grafana alerts (Telegram/Slack); бэкапы/restore smoke на реальном VPS (RTO уже замерен: 3.6s dev).
 
@@ -884,7 +884,7 @@ UX-улучшение ленты (следующий кандидат из сп�
 - Локально (06.09): Redis запущен в Laragon (порт 6379, `redis-cli PONG`). Создан `server/.env` (из .env.example). Замечание: `.env.example` содержит VAPID-placeholder'ы `change-me-generate-with-web-push`, которые валидируются web-push и роняют сервер — сгенерированы реальные ключи (`npx web-push generate-vapid-keys`) и вписаны в `.env` (в git не коммитятся). `REDIS_URL=redis://localhost:6379` раскомментирован.
 - Верификация вживую: API поднят (`node src/index.js`), в логах `[redis] client/pub/sub connected` + `[ws] Redis adapter attached — horizontal scaling enabled`; после GET /api/hangouts в Redis появился ключ `rl:::/56` (rate-limit, 5 запросов, TTL остаток 53s) — счётчик живёт в Redis. Process API PID 6032 оставлен запущенным.
 
-### Этап 121 — S3/CDN для файлов (код готов, нужны ключи — см. этап 118)
+### Этап  — S3/CDN для файлов (код готов, нужны ключи — см. этап 118)
 - `server/src/routes/upload.js` полностью готов: `USE_S3 = S3_BUCKET && AWS_ACCESS_KEY_ID` → multer-S3 (S3Client, AUTO_CONTENT_TYPE, ключ uploads/...); иначе diskStorage локально. `ai-moderation.js`: Rekognition при `AWS_ACCESS_KEY_ID` (иначе auto-approve), OpenAI fallback. Удаление файла: DeleteObjectCommand. Public URL отдаётся из s3 Location.
 - Осталось только внешнее: ввести ключи S3 (Selectel/DO/Yandex, `S3_ENDPOINT` поддерживается) + настроить CDN. Это подпункт этапа 118, код-работы нет.
 
@@ -915,10 +915,10 @@ UX-улучшение ленты (следующий кандидат из сп�
 
 Проверки: front vitest **116/116** (было 113, +3: бейдж-счётчики/эмбед-кадр/отсутствие эмбеда без deeplink), server 415/415, eslint 0 errors (попутно починен пустой `catch {}` в `hangouts.tsx` — единственный известный error), `tsc --noEmit` чист, `vite build` OK.
 
-### Этап 122 — Android-релиз
+### Этап  — Android-релиз
 - AAB + keystore, assetlinks.json + SHA256 (App Links), Google Play (17+, Privacy Policy, скриншоты), RevenueCat sandbox→prod, FCM на устройство.
 
-### Этап 123 — Мелочи (не блокируют бету)
+### Этап  — Мелочи (не блокируют бету)
 - Закрыто (06.09): чистка дубля `<Route path="/schedule">` в project-context.md (L119/121 — дублировался, плюс фиктивная строка `/profile/:userId/score`, которой нет в App.tsx; приведено к реальному App.tsx: `/schedule`, `/safety`).
 - Осталось: CSRF double-submit при выносе API на поддомен; Loki/ELK log aggregation; Design System / Storybook.
 
