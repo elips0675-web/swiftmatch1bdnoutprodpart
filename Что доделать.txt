@@ -32,10 +32,10 @@
 
 | Пункт аудита | Кто флагил | Чем закрыт |
 |---|---|---|
-| RevenueCat IAP (клиент) | kimi #3 | **Этап 22**: `src/lib/iap.ts` + интеграция в premium.tsx (нативная ветка); **Этап 36**: `npm i @revenuecat/purchases-capacitor@13.4.1` + динамический `import()` вместо `require` (работает в ESM-бандле на нативе); осталось только `VITE_REVENUECAT_API_KEY` при сборке APK |
+| RevenueCat IAP (клиент) | kimi #3 | ## Этап 22**: `src/lib/iap.ts` + интеграция в premium.tsx (нативная ветка); ## Этап 36**: `npm i @revenuecat/purchases-capacitor@13.4.1` + динамический `import()` вместо `require` (работает в ESM-бандле на нативе); осталось только `VITE_REVENUECAT_API_KEY` при сборке APK |
 | Privacy Policy + Terms of Service | kimi, дипсик | Страницы существовали с марта 2024 (`/legal/privacy`, `/legal/terms`, `/legal/data-processing`, RU/EN, ссылки в настройках) — аудиты смотрели старый срез; **этап 19**: добавлена ссылка на ToS в чекбокс регистрации |
-| Age verification 18+ | kimi чеклист | **Этап 20**: обязательный чекбокс «Мне есть 18 лет» при регистрации + тост-блокировка |
-| Backup restore verification | kimi #23 | **Этап 21**: `scripts/verify-backup.ps1` (restore в скретч-БД + sanity-проверки), weekly-задача в `install-backup-task.bat` |
+| Age verification 18+ | kimi чеклист | ## Этап 20**: обязательный чекбокс «Мне есть 18 лет» при регистрации + тост-блокировка |
+| Backup restore verification | kimi #23 | ## Этап 21**: `scripts/verify-backup.ps1` (restore в скретч-БД + sanity-проверки), weekly-задача в `install-backup-task.bat` |
 | GDPR: consent, export, erasure | kimi #7 | Этап 8 — E2E-тесты (consent_log, /api/data/export, erase) |
 | Background GPS + Geofence | kimi #8 | Июльские фичи: 5-min polling, /api/location |
 | Ghost Mode (premium) | kimi #9 | Этап 8, E2E #16 + 403 PREMIUM_REQUIRED |
@@ -46,18 +46,18 @@
 | Profile Score | kimi #14 | Этап 8 E2E #17 |
 | Date Check-in (Safety) | kimi #15 | Этап 10 E2E #18 |
 | A/B + feature flags | kimi #16 | Этап 8 E2E #15 |
-| Product analytics | kimi #17, qwen 🟡 | **Этап 24**: внутренняя аналитика полная (track + retention + revenue-mix в админке); воронка расширена: login_completed, register_completed, message_sent, purchase_completed (плюс swipe_like/super_like) |
+| Product analytics | kimi #17, qwen 🟡 | ## Этап 24**: внутренняя аналитика полная (track + retention + revenue-mix в админке); воронка расширена: login_completed, register_completed, message_sent, purchase_completed (плюс swipe_like/super_like) |
 | CI/CD | kimi #18 | deploy.yml (lint→test→E2E→deploy), нужны только secrets |
 | Docker Compose | kimi #19 | app + nginx + Prometheus + Grafana |
 | Redis Adapter Socket.IO | kimi #20 | ws.js adapter |
-| Load Testing k6 | kimi #21 | **Этап 23**: скрипт починен под актуальный API (`/api/users/search`, `liked_user_id`, динамический chatId, дефолт user5@mail.ru) + лайт-прогон 10 VU: p95 < 250ms, одиночный запрос 5–8ms. Полный ramp 100 VU — на staging: rate-limit'ы (600/мин глобальный, 30/мин лайки) режут тест с одного IP |
+| Load Testing k6 | kimi #21 | ## Этап 23**: скрипт починен под актуальный API (`/api/users/search`, `liked_user_id`, динамический chatId, дефолт user5@mail.ru) + лайт-прогон 10 VU: p95 < 250ms, одиночный запрос 5–8ms. Полный ramp 100 VU — на staging: rate-limit'ы (600/мин глобальный, 30/мин лайки) режут тест с одного IP |
 | Monitoring | kimi #22 | Prometheus :9090, Grafana :3001 |
 | matches дубликаты | qwen 🔴1 | social.js сортирует Math.min/max + UNIQUE (user1,user2) + проверка обоих направлений |
 | posts is_liked/is_bookmarked | qwen 🔴2 | Сервер никогда не читал колонки (liked_by_me через EXISTS) — колонки удалены миграцией 024 |
-| Sentry errorHandler мёртв | qwen 🔴3 | **Этап 18**: initSentry → requestHandler до роутов; errorHandler зарегистрирован перед 500-хендлером (sentry.js: registerSentryErrorHandler) |
-| dev-login без guard | qwen 🔴4 | **Этап 18**: 404 при NODE_ENV=production |
-| CORS '*' в проде | qwen 🔴5 | **Этап 18**: fail-fast при старте — без CORS_ORIGIN сервер не поднимется в production |
-| Дубли активных подписок | qwen #8 | **Этап 18**: транзакция с деактивацией старых перед INSERT (mock + Stripe webhook) |
+| Sentry errorHandler мёртв | qwen 🔴3 | ## Этап 18**: initSentry → requestHandler до роутов; errorHandler зарегистрирован перед 500-хендлером (sentry.js: registerSentryErrorHandler) |
+| dev-login без guard | qwen 🔴4 | ## Этап 18**: 404 при NODE_ENV=production |
+| CORS '*' в проде | qwen 🔴5 | ## Этап 18**: fail-fast при старте — без CORS_ORIGIN сервер не поднимется в production |
+| Дубли активных подписок | qwen #8 | ## Этап 18**: транзакция с деактивацией старых перед INSERT (mock + Stripe webhook) |
 | password_hash в SELECT login | qwen #7 | Не баг: используется в bcrypt.compare (index.js:131) |
 | user_profiles.id без AUTO_INCREMENT | qwen #10 | By design — 1-to-1 с users.id, FK |
 
@@ -91,22 +91,22 @@
 
 | Пункт | Кто флагил | Чем закрыт |
 |---|---|---|
-| AGENTS.md противоречия по adminAuth | qwen #1 | **Этап 25**: переписаны все 7 секций AGENTS.md + persona.md — adminAuth ACTIVE (401/403), единый гейт `/api/admin` в index.js, публичен только GET /api/admin/features, dev-login → 404 в production; **Этап 37**: закреплено ПРАВИЛО adminAuth в Security Rules |
-| rules-of-hooks / баг useApi.ts | qwen 🟡 | **Этап 25**: проверено — react-hooks rules-of-hooks включён в eslint.config.js, eslint: 0 errors (153 warnings), баг этапа 17 линтером ловился бы |
-| Секреты в логах | дипсик | **Этап 25**: Winston логирует только msg + err.message/stack (logger.js), req.body/headers не логируются; Sentry beforeSend фильтрует authorization/cookie/email |
-| План отката | дипсик | **Этап 26**: `docs/rollback-plan.md` — категории инцидентов (платежи/БД/полный отказ), диагностика ≤5 мин, откат коммита, бэкап-восстановление, чек-лист после отката |
-| mysql2 пул / RADAR_PRE_LEAK_64 | qwen #4 | **Этап 26**: пул проверен — connectionLimit 20 (env DB_POOL_MAX), enableKeepAlive; getConnection только в premium.js, оба с finally/release (утечек нет); полный k6 100 VU — на staging |
-| Windows-центричность | qwen #3 | **Этап 26**: docker-compose починен — добавлен nginx-сервис (nginx/swiftmatch.conf + dist), CORS_ORIGIN в app (иначе fail-fast ронял контейнер), prometheus target app:3002, grafana dashboards provisioning; YAML валиден, 6 сервисов |
-| Миграции в CI | qwen 🟡 | **Этап 27**: deploy.yml — миграции перенесены с CI-раннера на сервер (ssh: `set -a; . ./server/.env; node database/migrations/migrate.js`) перед pm2 restart; secrets DB_* больше не нужны |
-| JWT в localStorage | qwen #7 | **Этап 28**: ADR в AGENTS.md — переход на httpOnly cookie отложен (CSRF, credentials:include, 80+ fetch, E2E); Bearer в sessionStorage остаётся стандартом; refresh_token в storage не добавлять |
-| Redis доступность | дипсик | **Этап 29**: поднят локальный Redis 5.0.14 (portable, Temp), REDIS_URL=redis://127.0.0.1:6379 в server/.env, сервер держит пул (connected_clients 11); в compose redis уже есть; для постоянной работы — docker или install |
+| AGENTS.md противоречия по adminAuth | qwen #1 | ## Этап 25**: переписаны все 7 секций AGENTS.md + persona.md — adminAuth ACTIVE (401/403), единый гейт `/api/admin` в index.js, публичен только GET /api/admin/features, dev-login → 404 в production; ## Этап 37**: закреплено ПРАВИЛО adminAuth в Security Rules |
+| rules-of-hooks / баг useApi.ts | qwen 🟡 | ## Этап 25**: проверено — react-hooks rules-of-hooks включён в eslint.config.js, eslint: 0 errors (153 warnings), баг этапа 17 линтером ловился бы |
+| Секреты в логах | дипсик | ## Этап 25**: Winston логирует только msg + err.message/stack (logger.js), req.body/headers не логируются; Sentry beforeSend фильтрует authorization/cookie/email |
+| План отката | дипсик | ## Этап 26**: `docs/rollback-plan.md` — категории инцидентов (платежи/БД/полный отказ), диагностика ≤5 мин, откат коммита, бэкап-восстановление, чек-лист после отката |
+| mysql2 пул / RADAR_PRE_LEAK_64 | qwen #4 | ## Этап 26**: пул проверен — connectionLimit 20 (env DB_POOL_MAX), enableKeepAlive; getConnection только в premium.js, оба с finally/release (утечек нет); полный k6 100 VU — на staging |
+| Windows-центричность | qwen #3 | ## Этап 26**: docker-compose починен — добавлен nginx-сервис (nginx/swiftmatch.conf + dist), CORS_ORIGIN в app (иначе fail-fast ронял контейнер), prometheus target app:3002, grafana dashboards provisioning; YAML валиден, 6 сервисов |
+| Миграции в CI | qwen 🟡 | ## Этап 27**: deploy.yml — миграции перенесены с CI-раннера на сервер (ssh: `set -a; . ./server/.env; node database/migrations/migrate.js`) перед pm2 restart; secrets DB_* больше не нужны |
+| JWT в localStorage | qwen #7 | ## Этап 28**: ADR в AGENTS.md — переход на httpOnly cookie отложен (CSRF, credentials:include, 80+ fetch, E2E); Bearer в sessionStorage остаётся стандартом; refresh_token в storage не добавлять |
+| Redis доступность | дипсик | ## Этап 29**: поднят локальный Redis 5.0.14 (portable, Temp), REDIS_URL=redis://127.0.0.1:6379 в server/.env, сервер держит пул (connected_clients 11); в compose redis уже есть; для постоянной работы — docker или install |
 
 ## 🗺 Этапы 30+ (после ключей / внешних действий, см. «Ждёт действий пользователя»)
 
-- ✅ **Этап 30 (19.08.2026)** — проверка работоспособности всего: `/api/invites` давал 500 (дрейф колонок `sender_id/receiver_id/type` → `from_user_id/to_user_id/invite_type/message` в social.js) — починен (GET/POST/PUT, валидация enum, message). Прочие смоук-точки 200/201. Сервер 126/126 ✅, E2E 44/44 ✅
-- ✅ **Этап 31 (19.08.2026)** — EXPLAIN-аудит всех SQL из server/src против схемы: найдены и починены дрейфы — `iap.js` webhook ссылался на несуществующую `subscriptions.updated_at` (500 на каждом событии RevenueCat), `location.js` использовал `user_profiles.user_id` вместо `id` (500 на PUT/GET /api/location). Проверено: PUT/GET location 200, EXPLAIN 55/56 (1 — ложное срабатывание audit.js). Сервер 126/126 ✅, фронт 57/57 ✅
-- ✅ **Этап 32 (19.08.2026)** — Android-сборка: установлены Android Studio (JBR 25), cmdline-tools, SDK (platform 35/36, build-tools 35.0.0), JDK 21 (Gradle 8.14.3 не работает на Java 25); `@revenuecat/purchases-capacitor` 13.4.0; AGP 8.13.0→8.13.2; каприз `compressDebugAssets` (MD5 jar) вылечен standalone-прогоном. **APK собран: `android/app/build/outputs/apk/debug/app-debug.apk` (27,8 MB), копия на Рабочем столе**; пока с VITE_API_URL = LAN IP для теста на устройстве, для прода — домен + ключ RevenueCat в .env
-- ✅ **Этап 33 (19.08.2026)** — JWT → httpOnly cookie: сервер ставит `sm_token`/`sm_refresh` (SameSite=Lax, Secure в prod) на login/register/refresh/dev-login, все auth-мидлвари читают Bearer ?? cookie (`server/src/cookies.js`); новый GET `/api/auth/me` (probe, всегда 200) и POST `/api/auth/logout` (кука + refresh_tokens). Фронт: на web токен не пишется в storage (только память + чтение легаси), refresh через куку без body, логаут дергает сервер. Грабли обойдены: E2E storageState требует чтения старого storage, `/me` отдаёт 200 без токена (иначе console-error валит audit). Сервер 129/129 ✅ (+3 cookie-теста), фронт 58/58 ✅, E2E 44/44 ✅, lint 0 errors ✅, build ✅
+- ✅ ## Этап 30 (19.08.2026)** — проверка работоспособности всего: `/api/invites` давал 500 (дрейф колонок `sender_id/receiver_id/type` → `from_user_id/to_user_id/invite_type/message` в social.js) — починен (GET/POST/PUT, валидация enum, message). Прочие смоук-точки 200/201. Сервер 126/126 ✅, E2E 44/44 ✅
+- ✅ ## Этап 31 (19.08.2026)** — EXPLAIN-аудит всех SQL из server/src против схемы: найдены и починены дрейфы — `iap.js` webhook ссылался на несуществующую `subscriptions.updated_at` (500 на каждом событии RevenueCat), `location.js` использовал `user_profiles.user_id` вместо `id` (500 на PUT/GET /api/location). Проверено: PUT/GET location 200, EXPLAIN 55/56 (1 — ложное срабатывание audit.js). Сервер 126/126 ✅, фронт 57/57 ✅
+- ✅ ## Этап 32 (19.08.2026)** — Android-сборка: установлены Android Studio (JBR 25), cmdline-tools, SDK (platform 35/36, build-tools 35.0.0), JDK 21 (Gradle 8.14.3 не работает на Java 25); `@revenuecat/purchases-capacitor` 13.4.0; AGP 8.13.0→8.13.2; каприз `compressDebugAssets` (MD5 jar) вылечен standalone-прогоном. **APK собран: `android/app/build/outputs/apk/debug/app-debug.apk` (27,8 MB), копия на Рабочем столе**; пока с VITE_API_URL = LAN IP для теста на устройстве, для прода — домен + ключ RevenueCat в .env
+- ✅ ## Этап 33 (19.08.2026)** — JWT → httpOnly cookie: сервер ставит `sm_token`/`sm_refresh` (SameSite=Lax, Secure в prod) на login/register/refresh/dev-login, все auth-мидлвари читают Bearer ?? cookie (`server/src/cookies.js`); новый GET `/api/auth/me` (probe, всегда 200) и POST `/api/auth/logout` (кука + refresh_tokens). Фронт: на web токен не пишется в storage (только память + чтение легаси), refresh через куку без body, логаут дергает сервер. Грабли обойдены: E2E storageState требует чтения старого storage, `/me` отдаёт 200 без токена (иначе console-error валит audit). Сервер 129/129 ✅ (+3 cookie-теста), фронт 58/58 ✅, E2E 44/44 ✅, lint 0 errors ✅, build ✅
 - SMS-верификация (Twilio), AI-модерация фото (Rekognition), CDN/S3, push (FCM), staging-E2E с реальными ключами, публикация в Google Play (AAB, App Links, политика 17+, сторы)
 - GitHub secrets для deploy.yml: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY (DB_* больше не нужны — миграции читают server/.env на сервере)
 - Полный k6 ramp 100 VU на staging (проверка RADAR_PRE_LEAK_64 под реальной нагрузкой)
@@ -116,7 +116,7 @@
 
 Оценки: **kimi 7.5/10** («готов к staging и закрытой бете; не готов к открытому проду без блокеров безопасности»), **qwen 8/10** pet / 6.5/10 prod-SaaS (~70% готовности: код и тесты — отлично, окружение и релиз — нет), **дипсик ~95%** технически («держат релиз только внешние ключи, домен и сторы»). Консенсус всех трёх: **новый продуктовый код не нужен — разблокировать прод** (staging → ключи → домен → релиз Android).
 
-### ✅ Этап 34 (22.08.2026) — безопасность: сделано из таблицы выше
+### Этап 34 (22.08.2026) — безопасность: сделано из таблицы выше
 
 | # | Пункт | Статус |
 |---|---|---|
@@ -132,19 +132,19 @@
 
 Проверки этапа: сервер **149/149** (+14 rotation/lockout, +6 sanitize), фронт 58/58 ✅, E2E 44/44 ✅ (WS-тесты подтверждают отказ от query-token), lint 0 errors ✅. Живая проверка: login → refresh 200 → replay старого refresh 401 «reuse» → новый токен тоже отозван (семья) ✅. **XSS в «О себе»**: `<script>` больше не хранится — `stripHtml` на входе (profile PUT/register/посты/сообщения), см. AGENTS #32; полная верификация 22.08: check:ports ✅, build ✅, 251/251 ✅, смоук API 200 ✅.
 
-### ✅ Этапы 35–37 (23.08.2026) — schema-validation в CI, слепые зоны тестов, IAP SDK
+### Этапы 35–37 (23.08.2026) — schema-validation в CI, слепые зоны тестов, IAP SDK
 
 | Что | Чем закрыто |
 |---|---|
-| Schema validation в CI (kimi, инфра #1) | **Этап 35**: `scripts/schema-validate.mjs` — mysql_schema.sql ↔ information_schema живой БД (53 таблицы, exit 1 при расхождении); шаг в CI server-test после Init DB и на deploy ДО `migrate.js`; попутно убраны 4 мёртвые колонки схемы (users.email_verified_at, user_photos.moderated_by/at, messages.read_by) |
-| Migration idempotency (слепая зона) | **Этап 35**: найден реальный баг — migrate.js падал на 018 (`Duplicate entry 'romantic'`), т.к. seed/ALTER-миграции 018–023 не идемпотентны; исправлено (INSERT IGNORE, уникальный ключ uq_icebreaker_q, ALTER через information_schema+PREPARE); двойной прогон → 0 errors |
-| Security headers supertest (слепая зона) | **Этап 35**: `server/src/__tests__/security.headers.test.js` — 7 тестов против живого сервера (CSP, XFO/frame-ancestors, nosniff, HSTS, Referrer-Policy, /health без auth, кеш auth-эндпоинтов); skipIf сервер не поднят |
+| Schema validation в CI (kimi, инфра #1) | ## Этап 35**: `scripts/schema-validate.mjs` — mysql_schema.sql ↔ information_schema живой БД (53 таблицы, exit 1 при расхождении); шаг в CI server-test после Init DB и на deploy ДО `migrate.js`; попутно убраны 4 мёртвые колонки схемы (users.email_verified_at, user_photos.moderated_by/at, messages.read_by) |
+| Migration idempotency (слепая зона) | ## Этап 35**: найден реальный баг — migrate.js падал на 018 (`Duplicate entry 'romantic'`), т.к. seed/ALTER-миграции 018–023 не идемпотентны; исправлено (INSERT IGNORE, уникальный ключ uq_icebreaker_q, ALTER через information_schema+PREPARE); двойной прогон → 0 errors |
+| Security headers supertest (слепая зона) | ## Этап 35**: `server/src/__tests__/security.headers.test.js` — 7 тестов против живого сервера (CSP, XFO/frame-ancestors, nosniff, HSTS, Referrer-Policy, /health без auth, кеш auth-эндпоинтов); skipIf сервер не поднят |
 | Impersonation guard (слепая зона) | N/A — фичи имперсонации в коде нет |
-| CI guard для Android cleartext (инфра #5) | **Этап 35**: `usesCleartextTraffic="true"` убран из main-манифеста (MITM-риск), добавлен debug-only манифест; guard `scripts/check-native-config.mjs` встроен в build:native и CI frontend job |
-| Backup retention 7 дней мало (инфра #7) | **Этап 35**: 7 → 30 дней (backup-mysql.ps1 + .sh) |
-| Down-миграций нет (инфра #8) | **Этап 35**: отмечено в docs/rollback-plan.md («откат только через бэкап») |
-| RevenueCat SDK (kimi #3) | **Этап 36**: `@revenuecat/purchases-capacitor@13.4.1`, `require()` → динамический `import()` (ESM-бандл); graceful no-op сохранён; остался только VITE_REVENUECAT_API_KEY перед APK |
-| AGENTS.md adminAuth (qwen #1) | **Этап 37**: ПРАВИЛО adminAuth в Security Rules — только active-check middleware, запрет пассивных `next()`, ручных проверок роли и обхода единого гейта |
+| CI guard для Android cleartext (инфра #5) | ## Этап 35**: `usesCleartextTraffic="true"` убран из main-манифеста (MITM-риск), добавлен debug-only манифест; guard `scripts/check-native-config.mjs` встроен в build:native и CI frontend job |
+| Backup retention 7 дней мало (инфра #7) | ## Этап 35**: 7 → 30 дней (backup-mysql.ps1 + .sh) |
+| Down-миграций нет (инфра #8) | ## Этап 35**: отмечено в docs/rollback-plan.md («откат только через бэкап») |
+| RevenueCat SDK (kimi #3) | ## Этап 36**: `@revenuecat/purchases-capacitor@13.4.1`, `require()` → динамический `import()` (ESM-бандл); graceful no-op сохранён; остался только VITE_REVENUECAT_API_KEY перед APK |
+| AGENTS.md adminAuth (qwen #1) | ## Этап 37**: ПРАВИЛО adminAuth в Security Rules — только active-check middleware, запрет пассивных `next()`, ручных проверок роли и обхода единого гейта |
 
 Проверки этапов: сервер **156/156** (+7 headers), фронт 58/58 ✅, E2E 44/44 ✅ = **258/258**; lint 0 errors ✅; build ✅; migrate.js ×2 → exit 0 ✅; schema-validate 53 таблицы OK ✅; cleartext guard OK ✅.
 
@@ -212,10 +212,10 @@
 
 | Этап | Что сделано |
 |---|---|
-| **Этап 38** | Admin TOTP 2FA: миграция 026 (users.totp_secret/totp_enabled), server/src/totp.js (otplib v13), routes/totp-2fa.js (setup/enable/disable через adminAuth), login требует totp_code при включённой 2FA (401 TOTP_REQUIRED/TOTP_INVALID + lockout), UI two-fa-settings.tsx, i18n two_fa_*; живой смоук 8/8 |
-| **Этап 39** | Webhook replay/idempotency: миграция 027 webhook_events (UNIQUE provider+event_id), INSERT IGNORE дедуп в checkout.session.completed, premium-webhook.test.js 5/5; upload security +5 тестов (non-image/no-file/auth/traversal/double-ext) |
-| **Этап 40** | Лимитеры вынесены в middleware/limiters.js (фабрики для тестов); ratelimit.test.js 3/3 (60 ок -> 61-й 429, api 600, изоляция экземпляров); i18n.test.ts RU<->EN синхронность; E2E icebreakers починен (эрозия данных - диапазон кандидатов расширен до 199) |
-| **Этап 41** | docs/runbook-keys.md: ротация всех ключей (.env vs VITE_*), порядок для каждого провайдера, чеклист полной ротации при утечке |
+| ## Этап 38** | Admin TOTP 2FA: миграция 026 (users.totp_secret/totp_enabled), server/src/totp.js (otplib v13), routes/totp-2fa.js (setup/enable/disable через adminAuth), login требует totp_code при включённой 2FA (401 TOTP_REQUIRED/TOTP_INVALID + lockout), UI two-fa-settings.tsx, i18n two_fa_*; живой смоук 8/8 |
+| ## Этап 39** | Webhook replay/idempotency: миграция 027 webhook_events (UNIQUE provider+event_id), INSERT IGNORE дедуп в checkout.session.completed, premium-webhook.test.js 5/5; upload security +5 тестов (non-image/no-file/auth/traversal/double-ext) |
+| ## Этап 40** | Лимитеры вынесены в middleware/limiters.js (фабрики для тестов); ratelimit.test.js 3/3 (60 ок -> 61-й 429, api 600, изоляция экземпляров); i18n.test.ts RU<->EN синхронность; E2E icebreakers починен (эрозия данных - диапазон кандидатов расширен до 199) |
+| ## Этап 41** | docs/runbook-keys.md: ротация всех ключей (.env vs VITE_*), порядок для каждого провайдера, чеклист полной ротации при утечке |
 
 Счётчики после этапа 41: server 179/179 (18 файлов), front 61/61 (13 файлов), E2E 44/44 = **284/284**
 
@@ -572,7 +572,7 @@
 
 Счётчики после этапа 68: server **311/311**, front **81/81**, E2E **134/134** = **526/526**
 
-## ✅ Этапы 80–83 (30.08.2026): /hangouts — поиск, UX, доделки, связь с профилями — ЗАКРЫТО
+## Этапы 80–83 (30.08.2026): /hangouts — поиск, UX, доделки, связь с профилями — ЗАКРЫТО
 
 | Что | Чем закрыто |
 |---|---|
@@ -600,7 +600,7 @@
 
 **Консенсус интернет-ресёрча (2026):** события/ивенты — самый естественный и высокомаржинальный канал для дейтинга (+10–30% маржа на билетах; Thursday закрыл app ради платных ивентов; Hinge — $1M фонд на Gen Z-ивенты). Гибрид «подписка + IAP + партнёрка + ивенты» даёт +30–40% LTV vs single-model. **Первый шаг рекомендован — 🔴 P0.**
 
-## ✅ Этап 84 (30.08.2026): /hangouts P0 — джойн partner_offer + блок «Билет» — ЗАКРЫТО
+## Этап 84 (30.08.2026): /hangouts P0 — джойн partner_offer + блок «Билет» — ЗАКРЫТО
 
 Первый 🔴 P0 из плана монетизации выполнен: лента встреч теперь показывает и продаёт партнёрские офферы (цена + кнопка покупки).
 
@@ -611,7 +611,7 @@
 
 **Что дальше (P0 #2 → P1):** платные встречи (price+capacity в hangouts + ticket-flow через тот же чёкаут), затем закреплённые/спонсированные карточки Sponsored.
 
-## ✅ Этап 85 (30.08.2026): /hangouts P0 #2 — платные встречи с билетами — ЗАКРЫТО
+## Этап 85 (30.08.2026): /hangouts P0 #2 — платные встречи с билетами — ЗАКРЫТО
 
 Второй 🔴 P0 из плана монетизации выполнен: авторы могут продавать билеты на свои встречи.
 
@@ -628,7 +628,7 @@
 
 **Что дальше (P1):** закреплённые/спонсорские карточки «Sponsored» (placement=hangout + pinned → верх ленты), затем событийная интеграция с ивент-организаторами.
 
-## ✅ Этап 86 (30.08.2026): /hangouts P1 #1 — закреплённые/спонсорские карточки «Sponsored» — ЗАКРЫТО
+## Этап 86 (30.08.2026): /hangouts P1 #1 — закреплённые/спонсорские карточки «Sponsored» — ЗАКРЫТО
 
 Первый 🟠 P1 из плана монетизации выполнен: админ может продавать «закрепление» оффера локальным кафе/барам/ивент-организаторам — закреплённые офферы поднимаются в начало ленты /hangouts с бейджем «Sponsored».
 
@@ -645,7 +645,7 @@
 
 **Что дальше (P1):** событийная интеграция с ивент-организаторами (speed-dating, миксеры, мастер-классы → комиссия за билет 10–30%), затем P2 (премиум-перки на встречи).
 
-## ✅ Этап 87 (30.08.2026): /hangouts P2 — Премиум-перки на встречи (boost + companions cap)
+## Этап 87 (30.08.2026): /hangouts P2 — Премиум-перки на встречи (boost + companions cap)
 
 🟠 P2 из плана монетизации закрыт: premium получает увеличенный лимит компаньонов (10→20) и «продвижение» своих встреч в начало ленты.
 
@@ -660,11 +660,11 @@
 
 **Что дальше (P1):** событийная интеграция с ивент-организаторами (speed-dating, миксеры, мастер-классы → комиссия за билет 10–30%), затем P3 (AI-подбор мест, affiliate-офферы).
 
-## ✅ Этапы 94–97 (31.08.2026): Улучшение ленты /hangouts — quick actions, сортировка, infinite scroll, aggregates — ЗАКРЫТО
+## Этапы 94–97 (31.08.2026): Улучшение ленты /hangouts — quick actions, сортировка, infinite scroll, aggregates — ЗАКРЫТО
 
 Комплексное улучшение UX ленты встреч по плану из «Улучшение страницы hangouts Встречи.txt» (этапы 94–97 из 94–98, этап 98 отложен).
 
-- **Этап 94 — Quick actions на карточке** (`src/pages/hangouts.tsx`, HangoutCard):
+- ## Этап 94 — Quick actions на карточке** (`src/pages/hangouts.tsx`, HangoutCard):
   - Кнопки «Откликнуться»/«Присоединиться» + «Нравится» — вызывают `POST /api/hangouts/:id/{respond,join,like}`; тосты на 200/401/402/409/ошибка. Кнопки disabled при `actionLoading` или `isFull`.
   - Кнопка «Поделиться» — Web Share API (мобильные) или clipboard.writeText + toast `hangout.action.link_copied`.
   - Бейдж рейтинга (★ + `Number(rating).toFixed(1)`) — `showRating = Number(hangout.rating) > 0` (mysql2 DECIMAL → строка, Number() конвертирует).
@@ -672,14 +672,14 @@
   - Аватарки участников (`hangout.attendees`) — первые 3, `object-cover`, `-space-x-2` overlap.
   - Компонент `hangout-skeleton-card.tsx` — скелетон для загрузки (3 штуки).
   - `loading="lazy" decoding="async"` на аватаре автора.
-- **Этап 95 — Сортировка + URL sync** (`hangouts.tsx`):
+- ## Этап 95 — Сортировка + URL sync** (`hangouts.tsx`):
   - Селектор `hangout-sort-select` с тремя вариантами: date / popularity / price. Параметр `sort` в URL через `useSearchParams`.
   - Эффект чтения фильтров из URL при монтировании + эффект записи. `sortBy` в deps загрузки. Сортировка popularity/price — client-side (после загрузки items).
-- **Этап 96 — Backend aggregates** (`server/src/routes/hangouts.js`):
+- ## Этап 96 — Backend aggregates** (`server/src/routes/hangouts.js`):
   - `HANGOUT_LIST_SELECT` добавлены: `rating` (ROUND AVG hangout_reviews), `review_count`, `attendees_csv` (GROUP_CONCAT первых 3 участников `user_id|display_name|avatar_url` через LIMIT 3 подзапрос).
   - Функция `parseAttendees(row)` конвертирует `attendees_csv` → `attendees: Array<{user_id, display_name, avatar_url}>`, удаляет CSV-ключ. Применяется к feed, my, detail.
   - Тип `Hangout` расширен: `rating?: number | null`, `review_count?: number | null`, `attendees?: Array<{user_id; display_name?; avatar_url?}>`.
-- **Этап 97 — Infinite scroll + скелетоны + группировка** (`hangouts.tsx`):
+- ## Этап 97 — Infinite scroll + скелетоны + группировка** (`hangouts.tsx`):
   - Бесконечный скролл через `IntersectionObserver` (sentinel `hangout-sentinel`, rootMargin 250px). `hasMore` = `items.length >= PAGE_LIMIT`. Кнопка «Показать ещё» удалена.
   - Скелетоны `HangoutSkeletonCard` (3 шт) вместо спиннера при первой загрузке.
   - Группировка `groupHangoutsByDate` — сегодня/завтра/неделя/дата → sticky-заголовки `top-[64px]` с `bg-background/95 backdrop-blur-sm`.
@@ -691,7 +691,7 @@
   - **server 366/366**, **front 86/86**, lint 0 errors, `vite build` OK.
 - **DOM (Playwright 390px):** селектор сортировки присутствует, все 4 карточки в bounds 390px (overflow=0), action buttons на каждой (respond + like + share), rating badge на карточке id=4 (rating=4.5), scarcity/remaining badge, attendees avatars, group headings sticky («среда, 2 сентября»/«пятница, 4 сентября»), sentinel absent при <20 записей, sort=popularity в URL.
 
-## ✅ Этап 98 (31.08.2026): WS real-time — тост + бейдж новой встречи в ленте — ЗАКРЫТО
+## Этап 98 (31.08.2026): WS real-time — тост + бейдж новой встречи в ленте — ЗАКРЫТО
 
 Реал-тайм уведомление о только что созданных встречах в открытой ленте /hangouts:
 
@@ -708,7 +708,7 @@
   - `src/test/hangouts.test.tsx`: мок useWebSocket переведён на управляемый `mockWs` (vi.hoisted: `socket.on/off/emit` vi.fn, `handlers` map). Новый тест: триггер `mockWs.handlers['hangout:new']` → бейдж появляется → клик → бейдж исчезает + вызывается рефетч.
   - **server 360/360**, **front 87/87**, lint 0 errors, `vite build` OK.
 
-## ✅ Этап 99 (31.08.2026): Фильтр по цене — бесплатные/платные/диапазон — ЗАКРЫТО
+## Этап 99 (31.08.2026): Фильтр по цене — бесплатные/платные/диапазон — ЗАКРЫТО
 
 Пункт 🔴 #2 плана (фильтр по цене) с сохранением в URL.
 
@@ -742,7 +742,7 @@
   - Итог (390px): первая карточка top≈988→887 (блок фильтров компактнее ~на 100px).
 - **Проверки**: tsc 0, lint 0 errors, tests 14/14, `vite build` OK. DOM (Playwright 390/768/1440px): go-out карточки в bounds, snap работает; страничного overflow нет.
 
-## ✅ Этап 100 (31.08.2026): мини-карта + «Проложить маршрут» — ЗАКРЫТО
+## Этап 100 (31.08.2026): мини-карта + «Проложить маршрут» — ЗАКРЫТО
 
 Пункт 🔴 #4 плана (навигация к месту встречи) без API-ключей и доп. зависимостей:
 
@@ -753,7 +753,7 @@
 - **i18n (RU+EN):** 2 ключа hangout.map.route («Маршрут»/«Route»), hangout.map.view («На карте»/«Map»).
 - **Тест:** фронт +1 (рендер кнопок hangout-map-1/hangout-route-1, клик → модалка hangout-route-modal-1, iframe src openstreetmap.org/export/embed.html + marker=55.751244). **front 88→89/89, server 363/363, tsc/lint 0 errors, ite build OK.** Live (390px): у demo lat/lng=null → OSM фолбэк на q=название («Aurora Cinema, Moscow»), обе кнопки и модалка работают.
 
-## ✅ Этап 101 (31.08.2026): лёгкая виртуализация длинного списка — ЗАКРЫТО
+## Этап 101 (31.08.2026): лёгкая виртуализация длинного списка — ЗАКРЫТО
 
 Пункт 🛠 #13 плана. Выбран безопасный «лёгкий оконный рендер» (react-window отклонён: конфликтует с группировкой по датам + sticky-заголовками — List требует собственный scroll-контейнер).
 
@@ -762,7 +762,7 @@
 - **Выигрыш:** при сотнях карточек в DOM (infinite scroll) меньше layout/paint вне вьюпорта — меньше jank при скролле.
 - **Проверки:** front 89/89, server 363/363, tsc/lint 0 errors, ite build OK. Live (390px): у карточек hangout-virt, height>0, H-overflow нет.
 
-## ✅ Этап 102 (31.08.2026): мастер создания встречи + предзаполнение из профиля — ЗАКРЫТО
+## Этап 102 (31.08.2026): мастер создания встречи + предзаполнение из профиля — ЗАКРЫТО
 
 Пункт 🟠 #6 плана — пошаговый мастер вместо длинной формы + автоподстановка города из профиля.
 
@@ -776,7 +776,7 @@
 - **i18n (RU+EN):** +7 ключей hangout.form.step_what/step_where/step_when/step_tickets, hangout.form.back/next, hangout.form.date_invalid.
 - **Тесты (новый hangout-create.test.tsx, +3):** prefill города из профиля + скрытие полей др. шагов; блокировка «Далее» при пустом заголовке; проход 0→3, на последнем — «Создать». **front 89→92/92, server 363/363, tsc/lint 0 errors, ite build OK.** Live (390px): подставился «Екатеринбург», навигация/валидация работают.
 
-## ✅ Этап 103 (31.08.2026): уведомления о новых встречах в радиусе (веб-часть) — ЗАКРЫТО
+## Этап 103 (31.08.2026): уведомления о новых встречах в радиусе (веб-часть) — ЗАКРЫТО
 
 Пункт 🟠 #7 плана. Полные нативные push (FCM) — во внешних блокерах; закрыта веб-часть без API-ключей.
 
@@ -788,7 +788,7 @@
 - **Тесты:** server emit-тест дополнен lat/lng; front unit `haversineKm`. **server 363→370/370, front 92→93/93, tsc/lint 0, `vite build` OK.** Live-WS перепроверка ограничена средой (free daily-лимит + WS-прокси 8081/3002); механика бейджа live-подтверждена в 98.
 - **Хвосты:** нативный FCM (Capacitor) — staging VPS + google-services/APNs + SSL.
 
-## ✅ Этап 104 (31.08.2026): улучшение блока «Куда пойти» (аффилиаты) — ЗАКРЫТО
+## Этап 104 (31.08.2026): улучшение блока «Куда пойти» (аффилиаты) — ЗАКРЫТО
 
 Пункт 🟠 #8 плана. 4 направления + бэкенд.
 
@@ -801,7 +801,7 @@
 - **Тесты:** server 370→**372/372** (+2 category), front 93→**96/96** (+3: фильтр/бронь/карта), tsc/lint 0, `vite build` OK. Live: бэкенд перезапущен `node --watch` (был стейл — не подхватывал изменения), category-фильтр и lat/lng подтверждены на 3002.
 - **Хвосты:** координаты у офферов пока null (карта по городу); бейдж-кол-во на чипах — в долгосрочных.
 
-## ✅ Этап 105 (31.08.2026): pull-to-refresh + stagger-анимация карточек — ЗАКРЫТО
+## Этап 105 (31.08.2026): pull-to-refresh + stagger-анимация карточек — ЗАКРЫТО
 
 UX-улучшение ленты (следующий кандидат из списка).
 
@@ -812,7 +812,7 @@ UX-улучшение ленты (следующий кандидат из сп�
 
 Следующие кандидаты (не блокируют): оптимистичный UI respond/join, чип «все» в категориях, бейдж-счётчики на чипах «Куда пойти», эмбед-кадры с мероприятиями в карточках.
 
-## ✅ Этап 106 (31.08.2026): оптимистичный UI respond/join/like на карточке — ЗАКРЫТО
+## Этап 106 (31.08.2026): оптимистичный UI respond/join/like на карточке — ЗАКРЫТО
 Пункт из «следующих кандидатов»: состояние карточки меняется сразу, до ответа сервера, при ошибке откатывается.
 - **`HangoutCard` (`src/pages/hangouts.tsx`), `doAction(kind: "respond"|"join"|"like")`:** перед сетевой `POST /api/hangouts/:id/{respond,join,like}` применяется оптимистичный патч через `onOptimistic(hangout.id, patch)`: respond → `my_response_status:"pending"`; join → `my_participant_status:"joined"` + `participant_count+1`; like → `my_like_status:"like"` + `like_count+1`. Инверс (`prev`) сохраняется для отката.
 - **Откат:** при `!ok && status!==201` (409/402/401/прочее) или сетевом catch — повторно применяется `prev`, показывается тост (`already`/`payment_required`/`auth_required`/`error`).
@@ -831,7 +831,7 @@ UX-улучшение ленты (следующий кандидат из сп�
 - **Открыто (для staging):** честный «k6 100 VU с <1% errors» с одного IP невозможен без pacing/think-time под потолок 600/мин (или k6 Cloud / multi-IP / замер raw по `/health`). Пункт «Полный k6 ramp 100 VU на staging» из бэклога остаётся открытым — локальный базлайн есть, нужен VPS.
 - Код не менялся; счётчики server/front/e2e прежние.
 
-## ✅ Этап 115 (06.09.2026): интересы id 26–37 + фикс дублей «Фильмы»/«Танцы» — ЗАКРЫТО
+## Этап 115 (06.09.2026): интересы id 26–37 + фикс дублей «Фильмы»/«Танцы» — ЗАКРЫТО
 
 - **БД (`interests`):** добавлены строки id 26–37: Coffee, DIY, Extreme, Films, Food, Hiking, «Martial Arts», Podcasts, Astronomy, «Board Games», Nature, Design — `name_en`-слаг точно совпадает с ключом канона `content_config.interests` (маппинг `getCanonicalInterestIds()` строково по слагу). Канон в БД: 36 ключей (удалены `films`, `dancing`).
 - **Фронт:** `'interest.design': 37` в `INTEREST_KEY_TO_ID`; добавлены RU/EN имена в `NAME_TO_KEY`/`nameToKey` («Своими руками», «Астрономия», «Настольные игры», Astronomy, Board Games) в profile-edit.tsx/profile.tsx; защитная дедупликация чипов по выводимой метке `Map(label→key)`.
@@ -841,21 +841,21 @@ UX-улучшение ленты (следующий кандидат из сп�
 - **Live:** на `/profile/edit` все 36 чипов по одному разу, выбор «Кофе»+«Дизайн» сохраняется и отображается; демо-профиль Анна восстановлен (interests [9,5,2,1]).
 - **Коммит:** `c70dc61` → `origin/main`.
 
-## ✅ Этап 114 (06.09.2026): Production-запуск фронта + фикс сейва профиля — ЗАКРЫТО (сводно в context.txt)
+## Этап 114 (06.09.2026): Production-запуск фронта + фикс сейва профиля — ЗАКРЫТО (сводно в context.txt)
 
 - dev-vite заменён на `npx vite build && npx vite preview --port 8081 --host` (запуск-всего.bat/запуск.bat); `vite.config.ts` + `preview.proxy` для `/api`/`/socket.io`.
 - `profile.js`: `:id`-роуты → конец файла (statics `aliases`/`verification`/`me` не перехватывались как `:id`); `profile-edit.tsx handleSave`: `Content-Type: application/json` + `res.ok` + тост ошибки + `getDefaultProfile(t).photos` при пустой БД.
 - Server-тесты `profile.test.js` 12/12 (добавлены 4 регрессионных static-vs-`:id`).
 ## 📋 Доделать: план по этапам (приоритет сверху вниз; источник — оценки ИИ Дипсик 8.6/10, Qwen 8.5/10 от 06.09)
 
-### ✅ Этап 116 — Schema drift устранён — ЗАКРЫТО (06.09)
+### Этап 116 — Schema drift устранён — ЗАКРЫТО (06.09)
 - Проверка с живой БД: раньше `.env` не было — подключился `mysql -u root` к локальной `swiftmatch` (75 таблиц live).
 - Найдено: `event_tickets` (из миграции 047) отсутствовала в `mysql_schema.sql` (74 vs 75); кроме того, при сравнительном дампе обнаружились расхождения структуры (индексы/ключи groups, reactions, refresh_tokens и др.) — старая schema отставала.
 - Регенерация: `mysqldump --no-data swiftmatch` → новый `database/mysql_schema.sql` (75 таблиц, заголовок обновлён 73→75, FK-обёртка сохранена по этапу 79).
 - Верификация: импорт в чистую scratch-БД 0 ошибок → 75/75 таблиц; построчная сверка структур live vs scratch (нормируя AUTO_INCREMENT и COLLATE-формат) — 0 расхождений; `schema-validate.mjs` → «OK: 75 tables validated against live DB (0 extra tables)». Scratch-БД удалена.
 - Оценки Дипсик/Qwen (schema 62/73 таблиц) устарели — пункт закрыт.
 
-### ✅ Этап 117 — VPS + Docker Compose end-to-end — ЗАКРЫТО (06.09, имитация на компе)
+### Этап 117 — VPS + Docker Compose end-to-end — ЗАКРЫТО (06.09, имитация на компе)
 - VPS имитирован в WSL2 Ubuntu-24.04 (уже стоит как сервер: CyberPanel, LiteSpeed, MariaDB, 12 vCPU/7.7G/1T). Ноутбук: установлен Docker Engine 29.8 + compose v5.5 (офиц. репо docker.com, systemd). Проект скопирован в `/opt/swiftmatch` (rsync, минус node_modules/.git).
 - **Найдены и исправлены 3 реальных деплой-бага** (никогда не всплывали, т.к. до этого compose end-to-end не прогонялся):
   1. **Dockerfile**: `migrate.js` (ESM в `/app/database/`) резолвил `mysql2` вверх от корня `/app`, но `npm ci` шёл в `server/` → `ERR_MODULE_NOT_FOUND` на старте. Фикс: `RUN npm install --no-save --omit=dev mysql2@^3.11.0` в `/app`.
@@ -876,7 +876,7 @@ UX-улучшение ленты (следующий кандидат из сп�
 - Домен, Caddy/Let's Encrypt (авто-SSL), wss:// для /socket.io.
 - UptimeRobot + Grafana alerts (Telegram/Slack); бэкапы/restore smoke на реальном VPS (RTO уже замерен: 3.6s dev).
 
-### ✅ Этап 120 — Rate-limit на Redis — ЗАКРЫТО (06.09)
+### Этап 120 — Rate-limit на Redis — ЗАКРЫТО (06.09)
 - `lockout` уже был Redis-backed (этап 48). Переведены на `rate-limit-redis` v6: `middleware/limiters.js` (auth/api/like), `routes/hangouts.js` (9 лимитеров: respond/create/like/join/checkin/review/ticket/boost/suggest), `routes/social.js` (like). Общий `getRateLimitStore()` в limiters.js: Redis при заданном `REDIS_URL`, иначе in-memory fallback (паттерн lockout.js).
 - `store: getRateLimitStore()` на `sendCommand: (...args) => r.call(...args)`; RedisStore v6 экспортируется именованно.
 - Тесты: ratelimit 3/3 + redis-fallback 7/7 = 10/10 (в тестах REDIS_URL нет → memory); eslint 0; полный server-прогон 395 passed + 10 fail в hangouts.test.js (предсуществующие, падали и на чистом HEAD). Redis есть в docker-compose (сервис `redis:7-alpine` + `REDIS_URL: redis://redis:6379` для API).
@@ -922,7 +922,7 @@ UX-улучшение ленты (следующий кандидат из сп�
 - Закрыто (06.09): чистка дубля `<Route path="/schedule">` в project-context.md (L119/121 — дублировался, плюс фиктивная строка `/profile/:userId/score`, которой нет в App.tsx; приведено к реальному App.tsx: `/schedule`, `/safety`).
 - Осталось: CSRF double-submit при выносе API на поддомен; Loki/ELK log aggregation; Design System / Storybook.
 
-## ✅ Этап 124 (08.09.2026): E2E 150/150 на полном Docker-стеке (WSL2) — ЗАКРЫТО
+## Этап 124 (08.09.2026): E2E 150/150 на полном Docker-стеке (WSL2) — ЗАКРЫТО
 
 Полный Playwright-прогон против прод-сборки (nginx :8080 + app :3002 + mysql + redis) — **150 passed / 0 failed (3.0m)**.
 
@@ -938,7 +938,7 @@ UX-улучшение ленты (следующий кандидат из сп�
 - Заодно закрыт флейк `hangouts2:197` (429 review на первых попытках — счётчик в Redis-стор сохранялся между прогонами; поднятый лимит + окно 60s снимают).
 - Коммит: `8e3282b`. Требования к прогонам: стабильное окно стека (внешний `docker compose up -d` на VPS/WSL пересоздаёт контейнеры и даёт кратковременные 502), свежие `.auth/*.json`, `redis-cli FLUSHALL` опционально перед серией.
 
-## ✅ Этап 125 (08.09.2026): self-contained развёртывание в новой папке (initdb 01+02+03) — ЗАКРЫТО
+## Этап 125 (08.09.2026): self-contained развёртывание в новой папке (initdb 01+02+03) — ЗАКРЫТО
 
 Проблема: развёртывание из репо в чистую папку (новый volume БД) падало или давало **незелёные e2e** — было ВЫЯВЛЕНО 3 дыры:
 
@@ -953,7 +953,7 @@ UX-улучшение ленты (следующий кандидат из сп�
 - Верификация на scratch-БД внутри контейнера: `01+02+03` применены без ошибок; users=63 (включая admin/user2/user4/user5), themes=8, questions=40, profiles=59, RU-тексты читабельны (`Что для тебя идеальное первое свидание?`).
 - Коммит: см. git log после `push` (код: `03-e2e-seed.sql` + `demo_data.sql` + `docker-compose.yml`).
 
-## ✅ Этап 126 (08.09.2026): unit-тесты 405/405 — закрыты 12 предсуществующих фейлов — ЗАКРЫТО
+## Этап 126 (08.09.2026): unit-тесты 405/405 — закрыты 12 предсуществующих фейлов — ЗАКРЫТО
 
 | Файл | Фейлы | Причина → Фикс |
 |---|---|---|
@@ -1063,13 +1063,13 @@ UX-улучшение ленты (следующий кандидат из сп�
 
 | Пункт аудита | Где закрыто | Примечание |
 |---|---|---|
-| Admin TOTP 2FA (дипсик #7 🔴, qwen #10) | **Этап 38**: `server/src/totp.js` + `routes/totp-2fa.js` + `users.totp_secret/totp_enabled` + login требует код с TOTP_REQUIRED/TOTP_INVALID + `two-fa-settings.tsx` | Осталось только расширение: обязательный для super_admin, backup-коды — qwen #10 (1 день, P2) |
-| Migration idempotency (дипсик #6, qwen #22) | **Этап 35**: `migrate.js` дважды → 0 errors; найден и исправлен баг миграции 018; 51 миграция идемпотентна | Проверка была ручной, **автотеста в CI нет** (см. P1 #14) |
-| Backup verification (дипсик #12) | **Этапы 21 + 67**: `scripts/verify-backup.ps1` (restore в скретч-БД) + `verify-backup.mjs` + `install-backup-task.bat`; подключён в `deploy.yml:99-100` («Backup restore smoke test») | ✅ |
+| Admin TOTP 2FA (дипсик #7 🔴, qwen #10) | ## Этап 38**: `server/src/totp.js` + `routes/totp-2fa.js` + `users.totp_secret/totp_enabled` + login требует код с TOTP_REQUIRED/TOTP_INVALID + `two-fa-settings.tsx` | Осталось только расширение: обязательный для super_admin, backup-коды — qwen #10 (1 день, P2) |
+| Migration idempotency (дипсик #6, qwen #22) | ## Этап 35**: `migrate.js` дважды → 0 errors; найден и исправлен баг миграции 018; 51 миграция идемпотентна | Проверка была ручной, **автотеста в CI нет** (см. P1 #14) |
+| Backup verification (дипсик #12) | ## Этапы 21 + 67**: `scripts/verify-backup.ps1` (restore в скретч-БД) + `verify-backup.mjs` + `install-backup-task.bat`; подключён в `deploy.yml:99-100` («Backup restore smoke test») | ✅ |
 | ~~i18n parity-тест (qwen #6)~~ → **ОТКРЫТ ЗАНОВО** | ~~Этап 40: `src/test/i18n.test.ts`~~ — **файла нет** | `git log --diff-filter=ADR -- src/test/i18n.test.ts` пуст: тест **никогда не был в репозитории** (потерян при переносе проекта). RU/EN-паритет сейчас не проверяется ничем, хотя `docs/AGENTS-i18n.md` и `Что сделано.txt:560` описывают его как готовый → P1 #15 |
-| XSS-инвариант regression (qwen #5) | **Этап 45**: `sanitize.test.js` (img onerror/script/onmouseover/javascript:) + `profile.test.js` чтение legacy-XSS | ✅ |
-| CSP process-guard (дипсик #6, qwen #23) | **Этап 35**: `security.headers.test.js` — 7 тестов (CSP/XFO/HSTS…) | ✅ |
-| 413 при >10MB upload (дипсик #6, qwen #23) | **Этапы 39**: `upload.js` limits fileSize 10MB + `upload.test.js` (+5: non-image/no-file/auth/traversal/double-ext) | ✅ |
+| XSS-инвариант regression (qwen #5) | ## Этап 45**: `sanitize.test.js` (img onerror/script/onmouseover/javascript:) + `profile.test.js` чтение legacy-XSS | ✅ |
+| CSP process-guard (дипсик #6, qwen #23) | ## Этап 35**: `security.headers.test.js` — 7 тестов (CSP/XFO/HSTS…) | ✅ |
+| 413 при >10MB upload (дипсик #6, qwen #23) | ## Этапы 39**: `upload.js` limits fileSize 10MB + `upload.test.js` (+5: non-image/no-file/auth/traversal/double-ext) | ✅ |
 
 ### 🔴 P0 — критично, брать первыми (консенсус обоих, qwen #1–3 / дипсик #2–3,8–9)
 
@@ -1149,7 +1149,7 @@ UX-улучшение ленты (следующий кандидат из сп�
 
 **Перенос регламентов Service Desk (26–27.09) — СДЕЛАНО:** ~~N+1 Query Audit~~ ✅ → скрипт `scripts/n-plus-one-audit.mjs` (70 файлов, 0 новых, exit 1 при находке; заведомый N+1 в `hangouts.js:907/1063` из плана **не подтвердился** — это одиночные проверки вне цикла) → ~~JWT graceful rotation~~ ✅ → `verifyToken()` в `middleware.js` + `JWT_SECRET_PREV`, переведены все 5 точек `jwt.verify`, `server/.env.example` + `docs/runbook-keys.md`, 12 тестов → ~~`CONTRIBUTING.md`~~ ✅ → ~~рубрика «Оценка и улучшение промтов»~~ ✅ в `docs/AGENTS-workflow.md`. **Не переносилось** (чужой стек, причинения ноль): `repo/AGENTS.md`, `repo/TECHNICAL.md`, `test-analysis/AGENTS.md` (дубль корневого), Index Audit (у нас уже `scripts/sql-explain-audit.mjs`), Soft Deletes / Feature Flags / API Versioning / backup smoke / Observability — всё это в SwiftMatch уже есть (P1 #13 soft-delete хвост, P2 #17 флаги, P2 #18 health, «Этапы 21 + 67» backup verify, `security.headers.test.js` + Sentry). `D:\Tickets Cursor nout\repo` не изменялся — только чтение.
 
-**Этап 6 (следующий):** P0 #1 закрыт (этап 11), P0 #2 закрыт (этап 12) — дальше по Спринту 1 идёт **P0 #3 contract-тесты ответов API** (сверять фактическую форму `{ success/items }` + `{ message }`; заодно `swagger.js` не декларирует `security:` ни для одного роута), затем P0 #4 notification preferences, P0 #5 активные сессии + revoke. Ветка (б) — P2 #33 (модернизация образов) — ждёт машины с Docker, она не пересекается с кодом. Итог P0+P1: ~14–18 дней; тесты **636** (507 server + 129 front) → ~700.
+## Этап 6 (следующий):** P0 #1 закрыт (этап 11), P0 #2 закрыт (этап 12) — дальше по Спринту 1 идёт **P0 #3 contract-тесты ответов API** (сверять фактическую форму `{ success/items }` + `{ message }`; заодно `swagger.js` не декларирует `security:` ни для одного роута), затем P0 #4 notification preferences, P0 #5 активные сессии + revoke. Ветка (б) — P2 #33 (модернизация образов) — ждёт машины с Docker, она не пересекается с кодом. Итог P0+P1: ~14–18 дней; тесты **636** (507 server + 129 front) → ~700.
 
 **Отдельно про E2E:** прогнать не удалось (в `D:\swiftmatch1bdnoutprodpart1` не было `node_modules`, зависимости установлены 26.09 для этой сверки; E2E требует живого стек 3002/8081 и чистки БД). Актуальный срез по E2E — только статический: **19 спеков / 208 тестов**.
 
@@ -1320,7 +1320,7 @@ UX-улучшение ленты (следующий кандидат из сп�
 
 ### F5. Что оценка **пропустила** (и это важнее её ошибок)
 
-- **Этап 17 (сегодня): `PUT /api/profile/:id` отдавал 500 на любое сохранение профиля** — колонка `birth_date` была в эталоне, но не создавалась миграцией. Оценка написана по коду **без запуска на живой БД**, поэтому такой класс дефекта в принципе не виден.
+- ## Этап 17 (сегодня): `PUT /api/profile/:id` отдавал 500 на любое сохранение профиля** — колонка `birth_date` была в эталоне, но не создавалась миграцией. Оценка написана по коду **без запуска на живой БД**, поэтому такой класс дефекта в принципе не виден.
 - **Очередь модерации фото мертва** (E2): approve/reject обновляют 0 строк и отвечают 200. Оценка хвалит «IDOR-дыры закрыты, безопасность 10/10» — но не проверяет, что кнопка админки вообще что-то делает.
 - **2 IDOR-дыры открыты** (P0-D: `icebreakers.js:57`, `hangouts.js:1505` отдают `bio` чужого юзера). «IDOR-дыр закрыто: 6 ✅» — цифра верна, но «закрыто» ≠ «все закрыты». → **поправка этапа 22: сами эти две точки уязвимыми не были** (`activeUser` в них стоял, `bio` публична по замислу), а блокер был в другом маршруте. Число «2 открытые IDOR-дыры» было неверным; неверным было и описание, по которому их искали.
 - **Оценка основана на документации, а не на прогонах.** Все три её ошибки — числа, взятые из текстов. Правило: метрику считать командой (`vitest --reporter=json`, `npm audit`), а не пересказывать.
@@ -1331,8 +1331,7 @@ UX-улучшение ленты (следующий кандидат из сп�
 
 
 азбор этапа 19 (30.09.2026): «/profile/edit не сохраняется» — миграция `birth_date` закрыла один слой, 500 остался
-
-Этап 17 закрыл колонку `birth_date` и был объявлен исправлением. Проверка в **реальном браузере на живой БД** показала: страница по-прежнему отдаёт **HTTP 500 «Failed to update profile»** на обычном сохранении. Ни один мок-тест этого не видел, и гейт дрейфа схемы — тоже.
+## Этап  закрыл колонку `birth_date` и был объявлен исправлением. Проверка в **реальном браузере на живой БД** показала: страница по-прежнему отдаёт **HTTP 500 «Failed to update profile»** на обычном сохранении. Ни один мок-тест этого не видел, и гейт дрейфа схемы — тоже.
 
 ### G1. Почему это не нашлось раньше (метод, а не только баг)
 
@@ -1477,7 +1476,7 @@ P0 #37 родился как побочная находка этапа 20: та
 
 ### K4. Что осталось
 
-- **E2E-гейт счётчиков считает статически.** `--list` даёт число тестов, но не результат прогона: зелёные/красные E2E он по-прежнему не видит. **Этап 30 закрыл другую половину** — теперь E2E реально исполняется в CI (джоба `e2e` в `ci.yml` на любом push/PR, рецепт идентичен `deploy.yml`, первый полный зелёный прогон 150/150 доказан локально). Остаётся **K4: P1 «E2E-спеки существуют и коллекционируются»** — дешёвый структурный гейт без стека (каждый спек в `e2e/` попал в коллекцию, файл в инвентаре, `test.describe` без пустых): он ловит «спека лежит, но не запускается» за секунду, без MySQL и без 4 минут прогона.
+- **E2E-гейт счётчиков считает статически.** `--list` даёт число тестов, но не результат прогона: зелёные/красные E2E он по-прежнему не видит. ## Этап 30 закрыл другую половину** — теперь E2E реально исполняется в CI (джоба `e2e` в `ci.yml` на любом push/PR, рецепт идентичен `deploy.yml`, первый полный зелёный прогон 150/150 доказан локально). Остаётся **K4: P1 «E2E-спеки существуют и коллекционируются»** — дешёвый структурный гейт без стека (каждый спек в `e2e/` попал в коллекцию, файл в инвентаре, `test.describe` без пустых): он ловит «спека лежит, но не запускается» за секунду, без MySQL и без 4 минут прогона.
 - **Гейт проверяет числа, а не смысл.** Формулировку «715/715» он не оспорит — сверит только. Утверждение «0 failures» покрыто отдельно (`counts.front.failed` → ошибка), но «тесты проходят» текстом в произвольном файле — нет.
 - **Снимок `test/` под `.gitignore`** — существует только локально, в репозиторий не попадает, `git checkout` его не восстанавливает. Гейт проверяет копии, если они есть, но на чистой машине сверяются только пять файлов. Решение (включать снимок в репозиторий или генерировать на лету) не принято.
 - **Транскрипт чужой сессии — переименован пользователем в `Промты тесты для ИИ агента.txt`, оставлен в дереве как есть** (решение пользователя 30.09). Разобран построчно (5 пар USER/ASSISTANT, 2310 строк). Каждая его диагностическая находка **уже была в бэклоге до него** — перепроверено по коду: очередь модерации фото (`upload.js:123` → дефолт `'approved'`, `admin-moderation.js:31/46/60` → 0 строк и 200) = пункт E2/P0-E; `audit_log` только на DELETE (`audit.js:26/32`) = строки 1048 и 1084; ESLint без `server/src` (`eslint.config.js:11`) = B1; «47 из 208 роутов документированы» = наше собс
@@ -1774,21 +1773,21 @@ TOTP-2FA и backup-codes, сессии и revoke, webhooks journal, health-dashb
 
 **Новых открытых пунктов этап не создал.** Внешне не тронуто: `deploy.yml:397` (`--exclude` для `server/.jwt-dev-secret`) — N8/P0-C — **закрыто этапом 35 (04.10.2026)**, см. N8; решения владельца по L2 (nginx-эталон), `/test/` в `.gitignore`, блокирующему `audit:prod` в `deploy.yml`, и N3 (fail-closed модерация, P0-E) — по-прежнему не приняты.
 
-**Этап 33 (04.10.2026): N+1 — закрыто.** Починены три места в `server/src` (рассылка уведомлений об отмене встречи, профиль), гейт `npm run check:n-plus-one` подключён джобой в `ci.yml` и шагом в `deploy.yml`, ломка доказана. Из приведённого выше порядка N5 выбыл.
+## Этап 33 (04.10.2026): N+1 — закрыто.** Починены три места в `server/src` (рассылка уведомлений об отмене встречи, профиль), гейт `npm run check:n-plus-one` подключён джобой в `ci.yml` и шагом в `deploy.yml`, ломка доказана. Из приведённого выше порядка N5 выбыл.
 
 **Порядок дальше:** N2 (P0, пагинация истории чата) — следующий по приоритету и последний P0 без продуктового решения.
 
-**Этап 34 (04.10.2026): N2 — закрыто.** История чата постранична: сервер отдаёт `{ messages, has_more, next_before }` курсором по `m.id`, фронт подтягивает старые порции при прокрутке вверх и восстанавливает позицию скролла; 16 новых тестов (7 серверных, 7 фронтовых в новом файле, 2 E2E), ломка доказана пятью прогонами, откат побайтовый. Из приведённого выше порядка N2 выбыл — остался единственный P0, требующий продуктового решения (N3, fail-closed модерация фото). P0 без продуктового решения больше нет; дальше по списку — P1: N8 (rsync-дыра), N1 (живой тест в CI), N4 (`check-enum-constraints.mjs`), N6, N7.
+## Этап 34 (04.10.2026): N2 — закрыто.** История чата постранична: сервер отдаёт `{ messages, has_more, next_before }` курсором по `m.id`, фронт подтягивает старые порции при прокрутке вверх и восстанавливает позицию скролла; 16 новых тестов (7 серверных, 7 фронтовых в новом файле, 2 E2E), ломка доказана пятью прогонами, откат побайтовый. Из приведённого выше порядка N2 выбыл — остался единственный P0, требующий продуктового решения (N3, fail-closed модерация фото). P0 без продуктового решения больше нет; дальше по списку — P1: N8 (rsync-дыра), N1 (живой тест в CI), N4 (`check-enum-constraints.mjs`), N6, N7.
 
-**Этап 35 (04.10.2026): N8 — закрыто.** Вторая половина P0-C закрыта: rsync исключает все 12 классов файлов-секретов, гейт считает покрытие вычисляемо (было — сверка с собственным списком из пяти шаблонов), ломка доказана: B1 → 7 находок, B2 → 1 находка `.jwt-dev-secret`, B3 → сломанный матчер даёт exit 0 и ловится только тестами, B4 — контроль, откат побайтовый. Из порядка N8 выбыл; P0-C в бэклоге помечен закрытым по обеим половинам. Остались: N3 (ждёт продуктового решения), N1, N4, N6, N7.
+## Этап 35 (04.10.2026): N8 — закрыто.** Вторая половина P0-C закрыта: rsync исключает все 12 классов файлов-секретов, гейт считает покрытие вычисляемо (было — сверка с собственным списком из пяти шаблонов), ломка доказана: B1 → 7 находок, B2 → 1 находка `.jwt-dev-secret`, B3 → сломанный матчер даёт exit 0 и ловится только тестами, B4 — контроль, откат побайтовый. Из порядка N8 выбыл; P0-C в бэклоге помечен закрытым по обеим половинам. Остались: N3 (ждёт продуктового решения), N1, N4, N6, N7.
 
-**Этап 36 (05.10.2026): N1 — закрыто.** Джоба `test-server` в `ci.yml` получила сервис `mysql:8.0` с health-check и `env` (`DB_HOST`, `DB_USER`, `DB_PASSWORD`, `REQUIRE_MYSQL: '1'`); `race.mysql.test.js` читает флаг строго как `=== '1'` и пропускается только когда флага нет — локальная машина без БД остаётся зелёной, а в CI отсутствие БД становится падением с внятной диагностикой. Новый гейт `check:mysql-race` (`scripts/mysql-race-gate.mjs`, 28 тестов) блокирует деплой: сервис БД, `REQUIRE_MYSQL: '1'`, `DB_*`, реальное превращение пропуска в падение и запрет зеленеть при провале шага. Ломка доказана пятью прогонами (B1 → exit 1, B2 → exit 1, B3 → exit 1 и 3 находки, B4 → exit 1, B5 — контроль, откат побайтовый); первая версия B1 была холостой — вырезала сервис джобы `e2e`, а не `test-server` (питфолл 82). Питфоллы 81–84 (счётчик 80 → 84). Из порядка N1 выбыл; осталось от него — перевести живой тест с мини-схемы из трёх таблиц на `database/mysql_schema.sql`. Остались: N3 (ждёт продуктового решения), N4, N6, N7.
+## Этап 36 (05.10.2026): N1 — закрыто.** Джоба `test-server` в `ci.yml` получила сервис `mysql:8.0` с health-check и `env` (`DB_HOST`, `DB_USER`, `DB_PASSWORD`, `REQUIRE_MYSQL: '1'`); `race.mysql.test.js` читает флаг строго как `=== '1'` и пропускается только когда флага нет — локальная машина без БД остаётся зелёной, а в CI отсутствие БД становится падением с внятной диагностикой. Новый гейт `check:mysql-race` (`scripts/mysql-race-gate.mjs`, 28 тестов) блокирует деплой: сервис БД, `REQUIRE_MYSQL: '1'`, `DB_*`, реальное превращение пропуска в падение и запрет зеленеть при провале шага. Ломка доказана пятью прогонами (B1 → exit 1, B2 → exit 1, B3 → exit 1 и 3 находки, B4 → exit 1, B5 — контроль, откат побайтовый); первая версия B1 была холостой — вырезала сервис джобы `e2e`, а не `test-server` (питфолл 82). Питфоллы 81–84 (счётчик 80 → 84). Из порядка N1 выбыл; осталось от него — перевести живой тест с мини-схемы из трёх таблиц на `database/mysql_schema.sql`. Остались: N3 (ждёт продуктового решения), N4, N6, N7.
 
-**Этап 37 (05.10.2026): N4 — закрыто.** Новый гейт `scripts/check-enum-constraints.mjs` сверяет ограничения `database/mysql_schema.sql` (45 ENUM-колонок, 3 диапазонных CHECK) с кодом: границы `intField` ⊆ CHECK, каждый диапазонный CHECK покрыт проверкой в **пишущем** файле, именованные списки ⊆ ENUM, литералы в `INSERT`/`UPDATE` ⊆ ENUM. Факты прогона печатаются, чтобы зелёный был виден по цифрам (12 из 35 списков реально связаны с ENUM-колонкой). 47 тестов гейта, джоба `enum-constraints` в `ci.yml` (17-я) и шаг в блокирующей `lint-and-typecheck` в `deploy.yml`. Ломка доказана шестью прогонами (B1 → «валидатор разрешает 0..250», B2 → «CHECK не проверяется кодом», B3 → «значения, которых нет в ENUM (bar)», B4 → сузившийся ENUM, B5 → мёртвый список, B6 — контроль, откат побайтовый). Питфоллы 85–89 (счётчик 84 → 89), из них главный: **первая версия ломки B1 правила не то, чем задумано** — замена бралась из экранированной регуляркой строки, гейт покраснел находкой другого класса, и П1 осталась недоказанной при формально «сработавшей» ломке.
+## Этап 37 (05.10.2026): N4 — закрыто.** Новый гейт `scripts/check-enum-constraints.mjs` сверяет ограничения `database/mysql_schema.sql` (45 ENUM-колонок, 3 диапазонных CHECK) с кодом: границы `intField` ⊆ CHECK, каждый диапазонный CHECK покрыт проверкой в **пишущем** файле, именованные списки ⊆ ENUM, литералы в `INSERT`/`UPDATE` ⊆ ENUM. Факты прогона печатаются, чтобы зелёный был виден по цифрам (12 из 35 списков реально связаны с ENUM-колонкой). 47 тестов гейта, джоба `enum-constraints` в `ci.yml` (17-я) и шаг в блокирующей `lint-and-typecheck` в `deploy.yml`. Ломка доказана шестью прогонами (B1 → «валидатор разрешает 0..250», B2 → «CHECK не проверяется кодом», B3 → «значения, которых нет в ENUM (bar)», B4 → сузившийся ENUM, B5 → мёртвый список, B6 — контроль, откат побайтовый). Питфоллы 85–89 (счётчик 84 → 89), из них главный: **первая версия ломки B1 правила не то, чем задумано** — замена бралась из экранированной регуляркой строки, гейт покраснел находкой другого класса, и П1 осталась недоказанной при формально «сработавшей» ломке.
 
 **Что осталось от N4 (не сделано сознательно, записано здесь, а не спрятано):** поток `req.body → INSERT` не анализируется — клиентское значение, уходящее в ENUM-колонку без белого списка, гейт пропустит (`?`-плейсхолдер он игнорирует). Это отдельная работа: нужен разбор потока данных, а не регулярка по вхождениям.
 
-**Этап 38 (05.10.2026): НОВЫЙ КЛАСС — заголовки безопасности на периметре. Работа ОСТАНОВЛЕНА по просьбе владельца, состояние ниже.**
+## Этап 38 (05.10.2026): НОВЫЙ КЛАСС — заголовки безопасности на периметре. Работа ОСТАНОВЛЕНА по просьбе владельца, состояние ниже.**
 
 **Что уже сделано (работает, проверено):**
 - `scripts/check-security-headers.mjs` — гейт. Парсер nginx-конфигов (блоки/директивы/номера строк) + `vercel.json` + `index.html` + `Dockerfile` + порядок `helmet()`/`express.static` в `server/src/index.js`. **exit 0 на текущем дереве.**
