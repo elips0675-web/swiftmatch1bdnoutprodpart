@@ -2,7 +2,7 @@ vi.hoisted(() => {
   process.env.JWT_SECRET = 'test-secret'
 })
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import request from 'supertest'
 import express from 'express'
 import jwt from 'jsonwebtoken'
@@ -192,5 +192,78 @@ describe('POST /api/upload security', () => {
     expect(res.status).toBe(200)
     expect(res.body.url.endsWith('.jpg')).toBe(true)
     expect(res.body.url.includes('.php')).toBe(false)
+  })
+})
+
+describe('POST /api/upload: модерация не настроена (N3, P0-E)', () => {
+  const app3 = createApp()
+  const envKeys = ['NODE_ENV', 'ALLOW_UNMODERATED_PHOTOS', 'OPENAI_API_KEY', 'AWS_ACCESS_KEY_ID', 'JWT_SECRET']
+  const prodSecret = '0123456789abcdef0123456789abcdef0123456789abcdef'
+  let saved
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    saved = {}
+    for (const key of envKeys) saved[key] = process.env[key]
+    delete process.env.OPENAI_API_KEY
+    delete process.env.AWS_ACCESS_KEY_ID
+    delete process.env.ALLOW_UNMODERATED_PHOTOS
+  })
+
+  afterEach(() => {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  })
+
+  const token = () => 'Bearer ' + jwt.sign({ userId: 1, role: 'user' }, process.env.JWT_SECRET, { expiresIn: '1h' })
+
+  const upload = () => {
+    mockSingle.mockImplementationOnce((req, res, cb) => {
+      req.file = { filename: 'a.jpg', originalname: 'a.jpg' }
+      cb(null)
+    })
+    return request(app3)
+      .post('/api/upload')
+      .set('Authorization', token())
+      .attach('photo', Buffer.from('x'), { filename: 'a.jpg', contentType: 'image/jpeg' })
+  }
+
+  it('прод без ключей AI: 503 с кодом, INSERT в user_photos не уходит', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.JWT_SECRET = prodSecret
+    const res = await upload()
+    expect(res.status).toBe(503)
+    expect(res.body.code).toBe('PHOTO_MODERATION_UNAVAILABLE')
+    expect(pool.query).not.toHaveBeenCalled()
+  })
+
+  it('вне прода без разрешения: тот же отказ', async () => {
+    process.env.NODE_ENV = 'development'
+    const res = await upload()
+    expect(res.status).toBe(503)
+    expect(res.body.code).toBe('PHOTO_MODERATION_UNAVAILABLE')
+    expect(pool.query).not.toHaveBeenCalled()
+  })
+
+  it('вне прода с ALLOW_UNMODERATED_PHOTOS=true: фото принимается', async () => {
+    process.env.NODE_ENV = 'development'
+    process.env.ALLOW_UNMODERATED_PHOTOS = 'true'
+    pool.query.mockResolvedValue([{ insertId: 11 }, []])
+    const res = await upload()
+    expect(res.status).toBe(200)
+    const insert = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO user_photos'))
+    expect(insert).toBeTruthy()
+  })
+
+  it('прод с настроенной модерацией: фото принимается', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.JWT_SECRET = prodSecret
+    process.env.OPENAI_API_KEY = 'sk-test-moderation'
+    pool.query.mockResolvedValue([{ insertId: 12 }, []])
+    const res = await upload()
+    expect(res.status).toBe(200)
+    expect(res.body.id).toBe(12)
   })
 })

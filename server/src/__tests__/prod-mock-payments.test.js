@@ -7,7 +7,7 @@ import request from 'supertest'
 import express from 'express'
 import jwt from 'jsonwebtoken'
 import { healthHandler } from '../health.js'
-import { integrationModes, refuseMockPayment } from '../runtime.js'
+import { integrationModes, refuseMockPayment, requirePhotoModerationOrRefuse } from '../runtime.js'
 
 vi.mock('../db.js', () => ({
   default: {
@@ -292,5 +292,93 @@ describe('refuseMockPayment', () => {
     const res = { status: vi.fn(), json: vi.fn() }
     expect(refuseMockPayment(res)).toBe(false)
     expect(res.status).not.toHaveBeenCalled()
+  })
+})
+
+describe('requirePhotoModerationOrRefuse (N3, P0-E)', () => {
+  const envKeys = ['NODE_ENV', 'ALLOW_UNMODERATED_PHOTOS', 'OPENAI_API_KEY', 'AWS_ACCESS_KEY_ID']
+  let saved
+
+  beforeEach(() => {
+    saved = {}
+    for (const key of envKeys) saved[key] = process.env[key]
+    delete process.env.OPENAI_API_KEY
+    delete process.env.AWS_ACCESS_KEY_ID
+    delete process.env.ALLOW_UNMODERATED_PHOTOS
+  })
+
+  afterEach(() => {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  })
+
+  const makeRes = () => ({ status: vi.fn().mockReturnThis(), json: vi.fn() })
+
+  it('прод без ключей AI: отказ 503 с машиночитаемым кодом', () => {
+    process.env.NODE_ENV = 'production'
+    const res = makeRes()
+    expect(requirePhotoModerationOrRefuse(res)).toBe(true)
+    expect(res.status).toHaveBeenCalledWith(503)
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'PHOTO_MODERATION_UNAVAILABLE' }))
+  })
+
+  it('прод с ключом OpenAI: пропускает', () => {
+    process.env.NODE_ENV = 'production'
+    process.env.OPENAI_API_KEY = 'sk-test-moderation'
+    const res = makeRes()
+    expect(requirePhotoModerationOrRefuse(res)).toBe(false)
+    expect(res.status).not.toHaveBeenCalled()
+  })
+
+  it('прод с AWS-ключом: пропускает', () => {
+    process.env.NODE_ENV = 'production'
+    process.env.AWS_ACCESS_KEY_ID = 'AKIA-test-moderation'
+    const res = makeRes()
+    expect(requirePhotoModerationOrRefuse(res)).toBe(false)
+  })
+
+  it('вне прода без разрешения: отказ', () => {
+    process.env.NODE_ENV = 'development'
+    const res = makeRes()
+    expect(requirePhotoModerationOrRefuse(res)).toBe(true)
+    expect(res.status).toHaveBeenCalledWith(503)
+  })
+
+  it('вне прода с ALLOW_UNMODERATED_PHOTOS=true: пропускает', () => {
+    process.env.NODE_ENV = 'development'
+    process.env.ALLOW_UNMODERATED_PHOTOS = 'true'
+    const res = makeRes()
+    expect(requirePhotoModerationOrRefuse(res)).toBe(false)
+  })
+
+  it('тестовое окружение без флага разрешает по умолчанию', () => {
+    process.env.NODE_ENV = 'test'
+    const res = makeRes()
+    expect(requirePhotoModerationOrRefuse(res)).toBe(false)
+  })
+
+  it('тестовое окружение с ALLOW_UNMODERATED_PHOTOS=false отказывает', () => {
+    process.env.NODE_ENV = 'test'
+    process.env.ALLOW_UNMODERATED_PHOTOS = 'false'
+    const res = makeRes()
+    expect(requirePhotoModerationOrRefuse(res)).toBe(true)
+  })
+
+  it('integrationModes: в проде без ключей moderation = unavailable', () => {
+    process.env.NODE_ENV = 'production'
+    expect(integrationModes().moderation).toBe('unavailable')
+  })
+
+  it('integrationModes: с ключом moderation = live', () => {
+    process.env.NODE_ENV = 'production'
+    process.env.OPENAI_API_KEY = 'sk-test-moderation'
+    expect(integrationModes().moderation).toBe('live')
+  })
+
+  it('integrationModes: вне прода без ключей moderation = mock', () => {
+    process.env.NODE_ENV = 'development'
+    expect(integrationModes().moderation).toBe('mock')
   })
 })
