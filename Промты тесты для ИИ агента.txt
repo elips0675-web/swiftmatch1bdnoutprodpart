@@ -173,7 +173,7 @@
 ## Golden Rules (кратко)
 - 807 тестов = 0 failures. Не коммитить с падениями.
 - SQL только через prepared statements (??)
-- adminAuth — passive middleware
+- 
 - JWT в httpOnly cookie, не в localStorage
 - Все строки — translation keys, не русский текст
 - Перед коммитом: npm run test + cd server && npm test + vite build
@@ -356,7 +356,7 @@ npm run check:ports
 ### 3. Golden Rules (нарушение = откат PR)
 - **807 тестов = 0 failures.** Не коммитить с падениями.
 - **SQL только через prepared statements** (`??` в mysql2). Никакой конкатенации.
-- **adminAuth — passive middleware** (вызывает `next()` на ошибке).
+
 - **JWT в httpOnly cookie** (`sm_token`/`sm_refresh`), не в localStorage.
 - **Все строки — translation keys** (`interest.sport`), не русский текст.
 - **Миграции через `database/migrations/`**, не ручным ALTER TABLE.
@@ -366,7 +366,7 @@ npm run check:ports
 1. Никогда не коммитить `.env` с реальными секретами
 2. Никогда не оставлять `console.log` в прод-логике (платежи, письма, auth)
 3. Никогда не добавлять `cors({ origin: '*' })` в веб-продакшен
-4. Никогда не менять `adminAuth` с passive на blocking
+4. Никогда не менять `adminAuth — только active middleware на blocking
 5. Никогда не хранить `refresh_token` в localStorage без httpOnly альтернативы
 
 ## 🔧 Pitfall'ы (проверено на ошибках)
@@ -604,7 +604,7 @@ chmod +x scripts/run-tests.sh
 | **Premium webhook** | `premium-webhook.test.js` | 5 | ✅ security | — |
 | **IAP webhook** | `iap-webhook.test.js` | 6 | ✅ security | — |
 | **Admin dashboard** | `admin.test.js` | 30 | ✅ stats | — |
-| **Admin auth** | `admin-auth.test.js` | 5 | ✅ passive middleware | — |
+| **Admin auth** | `admin-auth.test.js` | 5 | ✅ active middleware | — |
 | **Admin moderation** | `admin-moderation.test.js` | 9 | ✅ photos queue | ⚠️ очередь мертва, тесты не видят |
 | **Admin users ban** | `admin-users-ban.test.js` | 4 | ✅ ban → WS user:banned | — |
 | **Admin backup** | `admin-backup.test.js` | 10 | ✅ route | — |
