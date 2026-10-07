@@ -35,6 +35,11 @@ grep -rE "dev-secret|localhost:300[0-9]|password.*=.*$|JWT_SECRET.*=.*key" \
 ```
 Если нашлось — не коммитить. Сгенерировать `crypto.randomBytes(32).toString('hex')` и вынести в `.env.example` (без реальных значений).
 
+Security-заголовки периметра: `npm run check:headers` — гейт ловит потерю заголовка
+в nginx/`vercel.json`/`index.html`. Обязателен, если задача трогала конфиги nginx,
+`vercel.json`, `index.html` или порядок middleware в `server/src/index.js`
+(см. `docs/AGENTS-security.md`, раздел «Заголовки периметра»).
+
 ### 2. Конфигурационная консистентность
 
 Все порты должны совпадать по цепочке:

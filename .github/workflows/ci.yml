@@ -334,3 +334,22 @@ jobs:
       - run: npm run audit:prod
       - run: npm run audit:prod
         working-directory: server
+
+  # Заголовки безопасности на периметре (этап 38, доделано этапом 43). Гейт
+  # лежал в дереве с коммита 3f1d826, но его не вызывал ни один workflow —
+  # скрипт, который никто не запускает, не защищает ничего. Проверяет все три
+  # nginx-конфига (в образ едет swiftmatch.http.conf — в нём до этапа 38 не
+  # было ни одного заголовка), наследование add_header (с верхнего уровня
+  # директива не действует, если на текущем объявлен свой), vercel.json,
+  # index.html и порядок helmet()/express.static. Статический: доказывает, что
+  # заголовки объявлены, а не что сервер их отдаёт — живой ответ проверяет
+  # security.headers.test.js на поднятом стенде.
+  # Зависимости не нужны: гейт читает файлы, импортов не делает.
+  security-headers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm run check:headers

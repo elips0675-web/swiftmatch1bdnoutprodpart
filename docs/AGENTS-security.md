@@ -24,6 +24,7 @@
 - **Auth-модель (этап 28, ADR):** основной Bearer-токен хранится в sessionStorage (`src/lib/token.ts`) — стандарт для SPA; переход на httpOnly cookie отложен: требует CSRF-защиты, credentials:include во всех 80+ fetch и переписывания E2E. Включать только отдельным этапом с полным прогоном тестов. НЕ добавлять новые sensitive токены (refresh_token) в storage — они в httpOnly-недоступных местах или БД (refresh_tokens)
 - Rate limit: `/api/auth/` 60 req/min, общий `/api/` 30 req/s
 - Helmet: CSP, X-Frame-Options, X-Content-Type-Options, и др. security headers
+- **Заголовки периметра (этап 38):** `helmet()` ставит заголовки **только на ответы Express**, а SPA и статику отдаёт **nginx** — значит security-заголовки обязаны быть продублированы в nginx-конфигах (`nginx/swiftmatch.http.conf` едет в образ, `nginx/swiftmatch.conf`, `nginx.conf`) и в `vercel.json`. Правило наследования nginx: если в `location` объявлен **хотя бы один свой `add_header`** (обычно `Cache-Control`), верхнеуровневые заголовки этого уровня **не действуют** — каждый такой `location` обязан повторить все security-заголовки сам. Проверка: `npm run check:headers` (джоба `security-headers` в `ci.yml`, шаг в `deploy.yml`); живой ответ проверяет `security.headers.test.js`. Меняешь конфиг nginx, `vercel.json` или порядок middleware в `index.js` — прогоняй `check:headers`
 - Request ID: UUID на каждый запрос, X-Request-Id в ответе
 - Модерация чатов: проверка banned-слов при отправке сообщений
 - Бан пользователя + WS `user:banned` (мгновенный разлогин)

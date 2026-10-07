@@ -151,6 +151,7 @@ cd server && npm test            # серверные тесты
 | Дрейф схемы (на БД) | `node scripts/schema-drift-audit.mjs` (нужен `MYSQL_BIN`) | то же + сверка с **живой** MySQL. **В CI не подключён**: `server-test` в `deploy.yml` гоняет `schema-validate`, а не live-дрейф — гейт живёт только локально (в бэклоге, E1) |
 | Секреты | `node scripts/secrets-leak-audit.mjs` | четыре независимых канала: `.dockerignore` пропускает `server/.env`/`.jwt-dev-secret`; rsync без `--exclude .env` стирает прод-`.env`; **rsync исключает не все классы файлов-секретов, которые гейт сам признаёт секретами** (`server/.jwt-dev-secret`, `.env.*`, `*.pfx`, `id_rsa` ехали на VPS при зелёном гейте — этап 35); **значение секрета, вписанное в отслеживаемый файл** (был VAPID-ключ в `README.md`) |
 | Персистентность деплоя | `node scripts/deploy-persistence-audit.mjs` | каталог записи фото не смонтирован volume'ом → `docker compose up --build` удаляет все фото; сверяет путь из кода с compose |
+| Заголовки безопасности на периметре | `npm run check:headers` | SPA и статику отдаёт **nginx**, а не Express — `helmet()` (`server/src/index.js`) покрывает только ответы API, и в образ едущий `nginx/swiftmatch.http.conf` не было ни одного security-заголовка (этап 38); **наследование `add_header`**: в `location` с собственным `add_header` (например `Cache-Control`) верхнеуровневые заголовки не действуют; три nginx-конфига, `vercel.json`, `index.html`, порядок `helmet()`/`express.static` |
 | Счётчики тестов | `node scripts/test-counter-audit.mjs` (`--fix` переписывает) | числа тестов в `README.md`, `project-context.md`, `test/README.md`, `test/project-context.md`, `test/ИНВЕНТАРЬ-ТЕСТОВ.md` разошлись с прогоном |
 | Уязвимости prod-зависимостей | `npm run audit:prod` (корень и в `server/`) | `npm audit --omit=dev --audit-level=high` по обоим lock-файлам: в образ едет только прод-часть |
 | Порты и ключи | `npm run check:ports` | порты vite/proxy/`.env`/`CORS_ORIGIN` + `console.log` в `server/src` |
@@ -208,12 +209,13 @@ cd server && npm test            # серверные тесты
 | `n-plus-one` | `npm run check:n-plus-one` — SQL внутри цикла по коллекции (2N запросов вместо 2) + протухшие оправдания `JUSTIFIED` (этап 33, N5) |
 | `mysql-race` | `npm run check:mysql-race` — джоба `test-server` обязана объявлять сервис БД, `REQUIRE_MYSQL=1` и не иметь права зеленеть при провале; живой тест на MySQL обязан превращать пропуск в падение (этап 36, N1) |
 | `enum-constraints` | `npm run check:enum-constraints` — CHECK/ENUM из `database/mysql_schema.sql` против валидаторов кода: код-валидатор шире CHECK, диапазонный CHECK не покрыт в пишущем файле, белый список кода разрешает значение вне ENUM, литерал в `INSERT`/`UPDATE` вне ENUM (этап 37, N4) |
+| `security-headers` | `npm run check:headers` — security-заголовки на периметре: все три nginx-конфига (в образ едет `swiftmatch.http.conf`), наследование `add_header`, `vercel.json`, `index.html`, порядок `helmet()`/`express.static` (этап 38, подключён этапом 43) |
 
 ### `.github/workflows/deploy.yml` — push в `main`/`develop`, PR в `main` (Node 22)
 
 | Джоба | Что делает |
 |-------|-----------|
-| `lint-and-typecheck` | `check:ports` → `lint` → `lint:server` → `tsc` → **`secrets-leak`**, **`deploy-persistence`**, **`audit:prod` ×2**, **`check:e2e`**, **`check:docs`**, **`check:n-plus-one`**, **`check:mysql-race`**, **`check:enum-constraints`** (блокируют деплой) |
+| `lint-and-typecheck` | `check:ports` → `lint` → `lint:server` → `tsc` → **`secrets-leak`**, **`deploy-persistence`**, **`audit:prod` ×2**, **`check:e2e`**, **`check:docs`**, **`check:headers`**, **`check:n-plus-one`**, **`check:mysql-race`**, **`check:enum-constraints`** (блокируют деплой) |
 | `frontend-test` | витест + `check-native-config` + `vite build` |
 | `server-test` | MySQL 8.0 сервис: схема → `seed-migrations` → `migrate.js` → `schema-validate` → `sql-explain-audit` → `verify-backup` → витест с живой БД |
 | `test-counters` | сверка чисел с прогоном |
