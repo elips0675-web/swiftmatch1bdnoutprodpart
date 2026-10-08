@@ -116,12 +116,12 @@ export default function FiltersPage() {
 
         <FilterSection title={t('filters.city')}>
           <div className="space-y-3">
-            <Select value={selectedCountry} onValueChange={(v) => { setSelectedCountry(v); setSelectedCity("all"); }}>
+            <Select value={selectedCountry} onValueChange={(v) => { setSelectedCountry(v === "all" ? "" : v); setSelectedCity("all"); }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder={t('filters.select_country')} />
               </SelectTrigger>
               <SelectContent className="max-h-60">
-                <SelectItem value="">{t('filters.all_countries')}</SelectItem>
+                <SelectItem value="all">{t('filters.all_countries')}</SelectItem>
                 {ALL_COUNTRIES.map(country => (
                   <SelectItem key={country} value={country}>{country}</SelectItem>
                 ))}

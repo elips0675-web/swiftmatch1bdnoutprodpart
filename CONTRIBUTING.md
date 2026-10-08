@@ -225,6 +225,10 @@ node scripts/schema-drift-audit.mjs --offline        # колонка в эта�
 node scripts/test-counter-audit.mjs                  # числа тестов в 5 документах (--fix переписывает)
 npm run audit:prod                                   # уязвимости prod-зависимостей, корень
 cd server && npm run audit:prod                      # … и server/
+
+# Локальные смоуки (в CI не заведены: смоук требует живых 8081/3002, бюджет — собранного dist)
+npm run check:console                                # обход страниц живого preview: console/5xx/пустые = FAIL
+npm run check:bundle                                 # бюджет gzip бандла (после npx vite build)
 ```
 
 ---
