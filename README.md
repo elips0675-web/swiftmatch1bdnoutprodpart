@@ -164,13 +164,15 @@ cd server && npm test            # серверные тесты
 | SQL внутри цикла | `npm run check:n-plus-one` | `pool.query`/`conn.execute` в теле цикла по коллекции → 51 запрос вместо 2 (рассылка уведомлений об отмене встречи делала по два запроса на участника, профиль — по INSERT на интерес); **протухшее оправдание** из `JUSTIFIED` (номер строки разошёлся с кодом, якорь `expect` не найден); оправдание без якоря; гейт не вызван из `ci.yml`/`deploy.yml` (этап 33) |
 | Живой тест на MySQL | `npm run check:mysql-race` | у джобы `test-server` нет сервиса БД (или у сервиса нет health-check, или он с чужим образом); не задан `REQUIRE_MYSQL: '1'` или `DB_HOST`/`DB_USER`/`DB_PASSWORD`; джоба может зеленеть при провале (`continue-on-error`, `npm test \|\| true`); тест-файл читает флаг не строго как `'1'`, условие пропуска его не учитывает, остался `skipIf(!admin)` или нет теста, падающего при `admin === null` (этап 36, N1) |
 | CHECK/ENUM схемы ↔ валидаторы кода | `npm run check:enum-constraints` | код-валидатор `intField` шире CHECK схемы (клиент проходит код и получает 500 от MySQL); диапазонный CHECK не проверяется ни в одном файле, который пишет в таблицу; белый список кода разрешает значение, которого нет в ENUM (`OFFER_CATEGORIES = […,'bar']`); литерал в `INSERT`/`UPDATE` в ENUM-колонку, которого нет в ENUM; список объявлен и нигде не используется (мёртвая переменная = незакрытая функция) (этап 37, N4) |
+| Переменные окружения против эталонов | `npm run check:env` | «работает у меня»: `process.env.X` на сервере и `import.meta.env.X` на фронте читаются кодом, но не объявлены ни в `server/.env.example`, ни в корневом `.env.example`, ни в compose `environment` сервиса `app` — на VPS/CI переменная undefined и код молча уходит в fallback; compose-ключ, который код не читает и которого нет в эталоне, — мёртвая настройка (этап 45, N7; поймал `ALLOW_UNMODERATED_PHOTOS` и `API_URL`) |
+| Swagger-документация против кода | `npm run check:swagger-coverage` | документация живёт своей жизнью: `@openapi`-операция описывает путь, которого нет в коде (Swagger UI показывает 404-эндпоинт); операций стало меньше базы в 47 (этап 13) — документацию выпилили при рефакторинге; мёртвая операция — путь в коде есть, а метода нет (этап 45, N7) |
 
 Каждый гейт обязан падать на сломанном входе — иначе это декорация
 (см. `docs/AGENTS-pitfalls.md`).
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 497 тестов, 36 файлов — **0 failures**
+- **Фронтенд (Vitest):** 524 теста, 38 файлов — **0 failures**
 - **Сервер (Vitest):** 825 тестов, 56 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 152 теста, 19 spec-файлов — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
@@ -209,13 +211,15 @@ cd server && npm test            # серверные тесты
 | `n-plus-one` | `npm run check:n-plus-one` — SQL внутри цикла по коллекции (2N запросов вместо 2) + протухшие оправдания `JUSTIFIED` (этап 33, N5) |
 | `mysql-race` | `npm run check:mysql-race` — джоба `test-server` обязана объявлять сервис БД, `REQUIRE_MYSQL=1` и не иметь права зеленеть при провале; живой тест на MySQL обязан превращать пропуск в падение (этап 36, N1) |
 | `enum-constraints` | `npm run check:enum-constraints` — CHECK/ENUM из `database/mysql_schema.sql` против валидаторов кода: код-валидатор шире CHECK, диапазонный CHECK не покрыт в пишущем файле, белый список кода разрешает значение вне ENUM, литерал в `INSERT`/`UPDATE` вне ENUM (этап 37, N4) |
+| `env-consistency` | `npm run check:env` — `process.env.*` сервера и `import.meta.env.*` фронта объявлены в `server/.env.example`/корневом `.env.example`/compose `environment`; compose не тащит мёртвых настроек (этап 45, N7) |
+| `swagger-coverage` | `npm run check:swagger-coverage` — база в 47 операций (этап 13), каждый документированный путь существует в коде, мёртвых операций нет (этап 45, N7) |
 | `security-headers` | `npm run check:headers` — security-заголовки на периметре: все три nginx-конфига (в образ едет `swiftmatch.http.conf`), наследование `add_header`, `vercel.json`, `index.html`, порядок `helmet()`/`express.static` (этап 38, подключён этапом 43) |
 
 ### `.github/workflows/deploy.yml` — push в `main`/`develop`, PR в `main` (Node 22)
 
 | Джоба | Что делает |
 |-------|-----------|
-| `lint-and-typecheck` | `check:ports` → `lint` → `lint:server` → `tsc` → **`secrets-leak`**, **`deploy-persistence`**, **`audit:prod` ×2**, **`check:e2e`**, **`check:docs`**, **`check:headers`**, **`check:n-plus-one`**, **`check:mysql-race`**, **`check:enum-constraints`** (блокируют деплой) |
+| `lint-and-typecheck` | `check:ports` → `lint` → `lint:server` → `tsc` → **`secrets-leak`**, **`deploy-persistence`**, **`audit:prod` ×2**, **`check:e2e`**, **`check:docs`**, **`check:headers`**, **`check:n-plus-one`**, **`check:mysql-race`**, **`check:enum-constraints`**, **`check:env`**, **`check:swagger-coverage`** (блокируют деплой) |
 | `frontend-test` | витест + `check-native-config` + `vite build` |
 | `server-test` | MySQL 8.0 сервис: схема → `seed-migrations` → `migrate.js` → `schema-validate` → `sql-explain-audit` → `verify-backup` → витест с живой БД |
 | `test-counters` | сверка чисел с прогоном |

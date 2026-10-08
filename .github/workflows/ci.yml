@@ -315,6 +315,39 @@ jobs:
           node-version: 20
       - run: npm run check:enum-constraints
 
+  # Переменные окружения: код против эталонов (этап 45, N7). Класс дыр —
+  # «работает у меня»: `process.env.X` на сервере и `import.meta.env.X` на
+  # фронте читаются кодом, но не объявлены ни в `server/.env.example`, ни в
+  # корневом `.env.example`, ни в docker-compose (environment сервиса app) —
+  # на VPS/CI переменная undefined и код молча уходит в fallback. На момент
+  # подключения гейт поймал две реальные дыры: `ALLOW_UNMODERATED_PHOTOS`
+  # (runtime.js) и `API_URL` (swagger.js) — ни та, ни другая не была
+  # задокументирована. Зависимости не нужны: гейт читает исходники.
+  env-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm run check:env
+
+  # Swagger-документация против кода (этап 45, N7). Класс дыр — «документация
+  # живёт своей жизнью»: `@openapi`-аннотации собираются в Swagger UI и
+  # /api-docs.json, но могут описывать путь, которого в коде нет (Swagger UI
+  # показывает эндпоинт с 404), либо молча исчезнуть при рефакторинге (фронт,
+  # читающий контракт, теряет его). Гейт держит базу в 47 операций (этап 13),
+  # сверяет каждый документированный путь с кодом и ловит мёртвые операции
+  # (путь есть, метода нет). Зависимости не нужны: свой парсер JSDoc.
+  swagger-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm run check:swagger-coverage
+
   # Уязвимости в prod-зависимостях — гейт без `npm ci`: аудиту нужен только
   # lock-файл, поэтому джоба делает ровно две команды (корень и server) и
   # проверяет обе половины: в контейнер едут обе, а не только фронт.
