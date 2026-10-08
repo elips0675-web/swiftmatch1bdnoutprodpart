@@ -18,7 +18,7 @@ test.describe('Partner ecosystem Wave 1 (deeplink chain)', () => {
   })
 
   test('track creates click conversion and tags deeplink', async ({ request }) => {
-    const offers = await apiCall(request, 'GET', '/api/partners/offers?placement=chat', undefined, adminToken)
+    const offers = await apiCall(request, 'GET', '/api/partners/offers?placement=chat&category=cinema', undefined, adminToken)
     const offer = offers.body.find((o: { category: string }) => o.category === 'cinema')
     expect(offer).toBeTruthy()
 
