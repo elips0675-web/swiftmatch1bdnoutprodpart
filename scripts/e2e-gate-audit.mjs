@@ -28,6 +28,10 @@
  *     - **`vite --port 8081` без `--strictPort`** — при занятом порту Vite не
  *       падает, а молча уходит на 8082, и E2E проверяет то, что висит на 8081
  *       (в локальном замере этого этапа так и вышло: фронт уехал на 8082).
+ *     - **очистка E2E-хвостов только в `globalTeardown`** (N10) — если прогон
+ *       убит таймаутом/SIGKILL или сам teardown упал, `e2e_*`-юзеры остаются в
+ *       БД; поэтому джоба обязана иметь отдельный шаг
+ *       `node scripts/e2e-cleanup.mjs` с `if: always()`.
  *
  *     Рецепт в двух workflow дублируется, поэтому гейт сверяет их между собой:
  *     одинаковый шаг сида, одинаковая команда запуска Playwright. Расхождение
@@ -85,6 +89,31 @@ function branchFilters(onSection) {
 /** Строки `- name:` / `- run:` / `- uses:` джобы в порядке следования. */
 export function getStepLines(jobSection) {
   return jobSection.split(/\r?\n/).filter((l) => /^ {6}- /.test(l))
+}
+
+/**
+ * Шаги джобы вместе с телом каждого шага (строки до следующего `- ` того же или
+ * меньшего отступа). Нужен там, где важно, чтобы флаг стоял в том же шаге, а не
+ * где-то рядом: `if: always()` есть и у `upload-artifact`, поэтому поиск по
+ * всему тексту джобы не доказывает, что очистка тоже безусловная.
+ */
+export function getSteps(jobSection) {
+  const steps = []
+  let current = null
+  let indent = -1
+  for (const raw of jobSection.split(/\r?\n/)) {
+    if (raw.trim().startsWith('#')) continue
+    const marker = raw.match(/^(\s*)- /)
+    if (marker && (current === null || marker[1].length <= indent)) {
+      current = []
+      indent = marker[1].length
+      steps.push(current)
+      current.push(raw)
+      continue
+    }
+    if (current !== null) current.push(raw)
+  }
+  return steps.map((lines) => lines.join('\n'))
 }
 
 /**
@@ -189,6 +218,12 @@ export function auditE2eJob(jobSection, label) {
   }
   if (!/upload-artifact/.test(text) || !/if: always\(\)/.test(text)) {
     problems.push(`${label}: отчёт Playwright не выкладывается при падении (нужен upload-artifact с if: always())`)
+  }
+  const cleanupStep = getSteps(text).find((step) => /e2e-cleanup\.mjs/.test(step))
+  if (!cleanupStep || !/if:\s*always\(\)/.test(cleanupStep)) {
+    problems.push(
+      `${label}: нет независимого шага очистки E2E-данных (\`node scripts/e2e-cleanup.mjs\` с \`if: always()\`) — если прогон или сам teardown упадёт, юзеры e2e_* останутся в БД (N10)`,
+    )
   }
   return problems
 }

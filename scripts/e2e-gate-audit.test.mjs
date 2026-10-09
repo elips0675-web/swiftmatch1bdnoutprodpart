@@ -23,6 +23,7 @@ import {
   getOnSection,
   getPlaywrightCommand,
   getStepLines,
+  getSteps,
   jobCode,
 } from './e2e-gate-audit.mjs'
 import { isReady, parseArgs, waitForUrl } from './wait-for-url.mjs'
@@ -37,6 +38,9 @@ const GOOD_E2E_STEPS = [
   '      - run: node scripts/wait-for-url.mjs http://127.0.0.1:3002/health --status 200 --timeout 120000',
   '      - run: node scripts/wait-for-url.mjs http://127.0.0.1:8081 --timeout 120000',
   '      - run: npm run test:e2e',
+  '      - name: Cleanup E2E data',
+  '        if: always()',
+  '        run: node scripts/e2e-cleanup.mjs',
   '      - name: Playwright report',
   '        if: always()',
   '        uses: actions/upload-artifact@v4',
@@ -248,6 +252,24 @@ describe('audit: исполнимость рецепта', () => {
     expect(problems.join('\n')).toContain('upload-artifact')
   })
 
+  it('ловит отсутствие независимой очистки E2E-данных', () => {
+    const steps = GOOD_E2E_STEPS.split('\n')
+      .filter((l) => !l.includes('e2e-cleanup.mjs') && !l.includes('Cleanup E2E data'))
+      .join('\n')
+    const { problems } = audit(writeRepo(ciYaml(steps), DEPLOY_GOOD))
+    expect(problems.join('\n')).toContain('нет независимого шага очистки E2E-данных')
+  })
+
+  it('ловит очистку без if: always() — при падении прогона она не выполнится', () => {
+    const lines = GOOD_E2E_STEPS.split('\n')
+    const idx = lines.findIndex((l) => l.includes('Cleanup E2E data'))
+    const steps = lines.filter((_, i) => i !== idx + 1).join('\n')
+    const { problems } = audit(writeRepo(ciYaml(steps), DEPLOY_GOOD))
+    const text = problems.join('\n')
+    expect(text).toContain('нет независимого шага очистки E2E-данных')
+    expect(text).not.toContain('upload-artifact')
+  })
+
   it('ловит расхождение команд Playwright между workflow', () => {
     const ci = ciYaml(GOOD_E2E_STEPS.replace('npm run test:e2e', 'npx playwright test --reporter=line'))
     const { problems } = audit(writeRepo(ci, DEPLOY_GOOD))
@@ -305,6 +327,15 @@ describe('парсеры workflow', () => {
   it('getStepLines отдаёт только элементы списка шагов', () => {
     const job = ['    steps:', '      - run: a', '        with:', '          x: 1', '      - run: b'].join('\n')
     expect(getStepLines(job)).toEqual(['      - run: a', '      - run: b'])
+  })
+
+  it('getSteps делит джобу на шаги и видит флаг внутри конкретного шага', () => {
+    const job = ['    steps:', '      - name: A', '        if: always()', '        run: x', '      - run: y'].join('\n')
+    const steps = getSteps(job)
+    expect(steps).toHaveLength(2)
+    expect(steps[0]).toContain('if: always()')
+    expect(steps[0]).not.toContain('run: y')
+    expect(steps[1]).toContain('run: y')
   })
 
   it('jobCode выкидывает комментарии — иначе шаг можно «нарисовать» в комментарии', () => {

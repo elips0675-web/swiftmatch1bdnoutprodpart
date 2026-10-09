@@ -292,6 +292,14 @@ jobs:
         run: node scripts/wait-for-url.mjs http://127.0.0.1:8081 --timeout 120000
       - name: Run E2E tests
         run: npm run test:e2e
+      - name: Cleanup E2E data
+        if: always()
+        run: node scripts/e2e-cleanup.mjs
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASSWORD: swiftmatch_test
+          DB_NAME: swiftmatch_test
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4

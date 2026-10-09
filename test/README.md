@@ -158,7 +158,7 @@ cd server && npm test            # серверные тесты
 | Конфиг Android | `node scripts/check-native-config.mjs` | cleartext для native-сборок |
 | EXPLAIN всех SQL | `node scripts/sql-explain-audit.mjs` (нужна БД) | запросы без индекса |
 | Мохибейк | `node scripts/scan-mojibake.mjs` | сломанная кодировка в текстах (локально, в CI не подключён) |
-| Обязательность E2E | `npm run check:e2e` | джобы `e2e` в `ci.yml` нет / у неё `continue-on-error` или `if:` / триггер ограничен ветками / `deploy` не зависит от `e2e-test`; рецепт без сида демо-данных, без миграций, без `vite preview --strictPort`, с `sleep` вместо `wait-for-url.mjs`, без `upload-artifact`; команды Playwright в двух workflow разошлись |
+| Обязательность E2E | `npm run check:e2e` | джобы `e2e` в `ci.yml` нет / у неё `continue-on-error` или `if:` / триггер ограничен ветками / `deploy` не зависит от `e2e-test`; рецепт без сида демо-данных, без миграций, без `vite preview --strictPort`, с `sleep` вместо `wait-for-url.mjs`, без `upload-artifact`, без независимой очистки E2E-данных (`node scripts/e2e-cleanup.mjs` с `if: always()`); команды Playwright в двух workflow разошлись |
 | Целостность зависимостей | `npm run check:deps` | необъявленный импорт (в т.ч. `import()`) или мёртвая runtime-зависимость в `package.json` |
 | Раскладка документации | `npm run check:docs` | `Промты.txt` снова стал источником правил (шапка пропала, вернулись разделы 0–20 или 21–34); битая ссылка в таблице канона; `docs/product-roadmap.md` потерял один из 14 разделов идей, похудел или набрал чужих правил; запрещённые формулировки (правила `admin-auth-passive` и `zod-version-claim`, буквальные примеры — в `hint` гейта) в отслеживаемых `.md`/`.txt`; архив `context.txt` без пометки «ИСТОРИЧЕСКИЙ СРЕЗ», без даты среза и без ссылки на канон; гейт не вызывается из `ci.yml`/`deploy.yml`, джоба переименована или помечена `continue-on-error`/`if: false` |
 | SQL внутри цикла | `npm run check:n-plus-one` | `pool.query`/`conn.execute` в теле цикла по коллекции → 51 запрос вместо 2 (рассылка уведомлений об отмене встречи делала по два запроса на участника, профиль — по INSERT на интерес); **протухшее оправдание** из `JUSTIFIED` (номер строки разошёлся с кодом, якорь `expect` не найден); оправдание без якоря; гейт не вызван из `ci.yml`/`deploy.yml` (этап 33) |
@@ -176,7 +176,7 @@ cd server && npm test            # серверные тесты
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 540 тестов, 40 файлов — **0 failures**
+- **Фронтенд (Vitest):** 554 теста, 41 файл — **0 failures**
 - **Сервер (Vitest):** 825 тестов, 56 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 152 теста, 19 spec-файлов — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
