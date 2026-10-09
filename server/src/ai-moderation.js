@@ -106,9 +106,10 @@ export async function moderateImage(filePath) {
     }
   }
 
-  // Fallback: no AI means auto-approve (admin reviews via existing flow)
-  rootLogger.info(`AI moderation: no Rekognition client, auto-approving ${filePath}`)
-  return { safe: true, reasons: [], labels: [], source: 'none' }
+  // Fallback: без вердикта AI фото НЕ одобряем автоматически (fail-closed).
+  // Статус остаётся тем, что выставил INSERT (в проде — 'pending' до ручной проверки).
+  rootLogger.warn(`AI moderation: no Rekognition verdict, ${filePath} left unmoderated`)
+  return { safe: null, reasons: ['moderation_unavailable'], labels: [], source: 'none' }
 }
 
 // ─── Bulk profile review ───────────────────────────────────────

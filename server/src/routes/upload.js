@@ -89,6 +89,11 @@ async function getUpload() {
 // Обновление статуса модерации после INSERT (photoId известен только после вставки)
 async function updateModeration(photoId, modResult) {
   if (!photoId) return
+  if (modResult.safe === null || modResult.source === 'none') {
+    // Вердикта AI нет: не трогаем статус от INSERT (в проде это 'pending'), не одобряем вслепую.
+    logger.warn(`Photo ${photoId} left unmoderated (no AI verdict)`)
+    return
+  }
   if (!modResult.safe) {
     await pool.query(
       "UPDATE user_photos SET moderation_status = 'flagged', moderation_reason = ? WHERE id = ?",

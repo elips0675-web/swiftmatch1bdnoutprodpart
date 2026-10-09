@@ -287,4 +287,27 @@ describe('POST /api/upload: модерация не настроена (N3, P0-E
     const insert = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO user_photos'))
     expect(insert[1][3]).toBe('approved')
   })
+
+  it('#34: прод, модерация «настроена», но вердикта Rekognition нет -> pending, автоподтверждения нет', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.JWT_SECRET = prodSecret
+    process.env.OPENAI_API_KEY = 'sk-test-moderation'
+    process.env.PHOTO_MODERATION_MODE = 'strict'
+    mockSingle.mockImplementationOnce((req, res, cb) => {
+      req.file = { filename: 'a.jpg', originalname: 'a.jpg', path: '/tmp/none.jpg' }
+      cb(null)
+    })
+    pool.query.mockResolvedValue([{ insertId: 41 }, []])
+    const res = await request(app3)
+      .post('/api/upload')
+      .set('Authorization', token())
+      .attach('photo', Buffer.from('x'), { filename: 'a.jpg', contentType: 'image/jpeg' })
+    expect(res.status).toBe(200)
+    const insert = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO user_photos'))
+    expect(insert[1][3]).toBe('pending')
+    const approval = pool.query.mock.calls.find(
+      (c) => typeof c[0] === 'string' && c[0].includes("moderation_status = 'approved'"),
+    )
+    expect(approval).toBeUndefined()
+  })
 })

@@ -21,6 +21,7 @@
     "check:n-plus-one": "node scripts/n-plus-one-audit.mjs",
     "check:enum-constraints": "node scripts/check-enum-constraints.mjs",
     "check:env": "node scripts/env-consistency-audit.mjs",
+    "check:env-parity": "node scripts/check-env-parity.mjs",
     "check:swagger-coverage": "node scripts/swagger-coverage-audit.mjs",
     "check:prod-mock": "node scripts/prod-mock-audit.mjs",
     "check:mysql-race": "node scripts/mysql-race-gate.mjs",
