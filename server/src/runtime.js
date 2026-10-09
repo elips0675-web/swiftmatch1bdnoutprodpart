@@ -33,6 +33,17 @@ export function allowUnmoderatedPhotos() {
   return process.env.ALLOW_UNMODERATED_PHOTOS === 'true'
 }
 
+export function photoModerationMode() {
+  const raw = process.env.PHOTO_MODERATION_MODE
+  if (raw === 'strict' || raw === 'permissive') return raw
+  return isProduction() ? 'strict' : 'permissive'
+}
+
+export function initialPhotoModerationStatus() {
+  if (photoModerationMode() === 'permissive' && allowUnmoderatedPhotos()) return 'approved'
+  return 'pending'
+}
+
 export function requirePhotoModerationOrRefuse(res) {
   const prod = isProduction()
   const hasMod = isAIModerationConfigured()

@@ -128,7 +128,7 @@ router.get('/api/profile/me', auth, async (req, res) => {
     if (rows.length === 0) return res.status(404).json({ message: 'Profile not found' })
 
     const [photos] = await pool.query(
-      'SELECT id, url, sort_order, is_avatar FROM user_photos WHERE user_id = ? ORDER BY sort_order',
+      "SELECT id, url, sort_order, is_avatar FROM user_photos WHERE user_id = ? AND moderation_status = 'approved' ORDER BY sort_order",
       [req.userId],
     )
     const [interests] = await pool.query(
@@ -404,7 +404,7 @@ router.get('/api/profile/:id', auth, cacheRoutePerUser(60), async (req, res) => 
     if (rows.length === 0) return res.status(404).json({ message: 'Profile not found' })
 
     const [photos] = await pool.query(
-      'SELECT id, url, sort_order, is_avatar FROM user_photos WHERE user_id = ? ORDER BY sort_order',
+      "SELECT id, url, sort_order, is_avatar FROM user_photos WHERE user_id = ? AND moderation_status = 'approved' ORDER BY sort_order",
       [req.params.id],
     )
     const [interests] = await pool.query(

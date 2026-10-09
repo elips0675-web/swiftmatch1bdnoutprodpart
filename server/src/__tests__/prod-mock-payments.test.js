@@ -7,7 +7,7 @@ import request from 'supertest'
 import express from 'express'
 import jwt from 'jsonwebtoken'
 import { healthHandler } from '../health.js'
-import { integrationModes, refuseMockPayment, requirePhotoModerationOrRefuse } from '../runtime.js'
+import { integrationModes, refuseMockPayment, requirePhotoModerationOrRefuse, photoModerationMode, initialPhotoModerationStatus } from '../runtime.js'
 
 vi.mock('../db.js', () => ({
   default: {
@@ -380,5 +380,67 @@ describe('requirePhotoModerationOrRefuse (N3, P0-E)', () => {
   it('integrationModes: вне прода без ключей moderation = mock', () => {
     process.env.NODE_ENV = 'development'
     expect(integrationModes().moderation).toBe('mock')
+  })
+})
+
+describe('photoModerationMode / initialPhotoModerationStatus (N3-вторая, вариант Б)', () => {
+  const envKeys = ['NODE_ENV', 'ALLOW_UNMODERATED_PHOTOS', 'PHOTO_MODERATION_MODE']
+  let saved
+
+  beforeEach(() => {
+    saved = {}
+    for (const key of envKeys) saved[key] = process.env[key]
+    delete process.env.PHOTO_MODERATION_MODE
+    delete process.env.ALLOW_UNMODERATED_PHOTOS
+  })
+
+  afterEach(() => {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  })
+
+  it('в проде без явного режима — strict', () => {
+    process.env.NODE_ENV = 'production'
+    expect(photoModerationMode()).toBe('strict')
+  })
+
+  it('вне прода без явного режима — permissive', () => {
+    process.env.NODE_ENV = 'development'
+    expect(photoModerationMode()).toBe('permissive')
+  })
+
+  it('явный режим перебивает дефолт', () => {
+    process.env.NODE_ENV = 'production'
+    process.env.PHOTO_MODERATION_MODE = 'permissive'
+    expect(photoModerationMode()).toBe('permissive')
+    process.env.NODE_ENV = 'development'
+    process.env.PHOTO_MODERATION_MODE = 'strict'
+    expect(photoModerationMode()).toBe('strict')
+  })
+
+  it('strict: новое фото всегда pending', () => {
+    process.env.NODE_ENV = 'production'
+    process.env.PHOTO_MODERATION_MODE = 'strict'
+    expect(initialPhotoModerationStatus()).toBe('pending')
+  })
+
+  it('permissive в проде всё равно pending (некому публиковать без модератора)', () => {
+    process.env.NODE_ENV = 'production'
+    process.env.PHOTO_MODERATION_MODE = 'permissive'
+    expect(initialPhotoModerationStatus()).toBe('pending')
+  })
+
+  it('permissive + ALLOW_UNMODERATED_PHOTOS вне прода: approved (иначе dev-фото невидимо)', () => {
+    process.env.NODE_ENV = 'development'
+    process.env.PHOTO_MODERATION_MODE = 'permissive'
+    process.env.ALLOW_UNMODERATED_PHOTOS = 'true'
+    expect(initialPhotoModerationStatus()).toBe('approved')
+  })
+
+  it('permissive в тестовом окружении по умолчанию: approved', () => {
+    process.env.NODE_ENV = 'test'
+    expect(initialPhotoModerationStatus()).toBe('approved')
   })
 })

@@ -41,10 +41,13 @@ router.get('/photos/pending', async (req, res) => {
 
 router.post('/photos/:id/approve', async (req, res) => {
   try {
-    await pool.query(
+    const [result] = await pool.query(
       'UPDATE user_photos SET moderation_status = ? WHERE id = ? AND moderation_status = ?',
       ['approved', req.params.id, 'pending'],
     )
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Photo not found or already moderated' })
+    }
     res.json({ message: 'Photo approved' })
   } catch (err) {
     logger.error('Approve photo error:', err)
@@ -55,10 +58,13 @@ router.post('/photos/:id/approve', async (req, res) => {
 router.post('/photos/:id/reject', async (req, res) => {
   const { reason } = req.body
   try {
-    await pool.query(
+    const [result] = await pool.query(
       'UPDATE user_photos SET moderation_status = ?, moderation_reason = ? WHERE id = ? AND moderation_status = ?',
       ['rejected', reason || null, req.params.id, 'pending'],
     )
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Photo not found or already moderated' })
+    }
     res.json({ message: 'Photo rejected' })
   } catch (err) {
     logger.error('Reject photo error:', err)

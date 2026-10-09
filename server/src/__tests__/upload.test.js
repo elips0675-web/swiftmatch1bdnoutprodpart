@@ -197,7 +197,7 @@ describe('POST /api/upload security', () => {
 
 describe('POST /api/upload: модерация не настроена (N3, P0-E)', () => {
   const app3 = createApp()
-  const envKeys = ['NODE_ENV', 'ALLOW_UNMODERATED_PHOTOS', 'OPENAI_API_KEY', 'AWS_ACCESS_KEY_ID', 'JWT_SECRET']
+  const envKeys = ['NODE_ENV', 'ALLOW_UNMODERATED_PHOTOS', 'PHOTO_MODERATION_MODE', 'OPENAI_API_KEY', 'AWS_ACCESS_KEY_ID', 'JWT_SECRET']
   const prodSecret = '0123456789abcdef0123456789abcdef0123456789abcdef'
   let saved
 
@@ -208,6 +208,7 @@ describe('POST /api/upload: модерация не настроена (N3, P0-E
     delete process.env.OPENAI_API_KEY
     delete process.env.AWS_ACCESS_KEY_ID
     delete process.env.ALLOW_UNMODERATED_PHOTOS
+    delete process.env.PHOTO_MODERATION_MODE
   })
 
   afterEach(() => {
@@ -265,5 +266,25 @@ describe('POST /api/upload: модерация не настроена (N3, P0-E
     const res = await upload()
     expect(res.status).toBe(200)
     expect(res.body.id).toBe(12)
+  })
+
+  it('strict (PHOTO_MODERATION_MODE=strict): INSERT пишет pending, а не approved', async () => {
+    process.env.NODE_ENV = 'test'
+    process.env.PHOTO_MODERATION_MODE = 'strict'
+    pool.query.mockResolvedValueOnce([{ insertId: 21 }, []])
+    const res = await upload()
+    expect(res.status).toBe(200)
+    const insert = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO user_photos'))
+    expect(insert[0]).toContain('moderation_status')
+    expect(insert[1][3]).toBe('pending')
+  })
+
+  it('permissive вне прода: INSERT сразу пишет approved, иначе dev-фото невидимо', async () => {
+    process.env.NODE_ENV = 'test'
+    pool.query.mockResolvedValueOnce([{ insertId: 22 }, []])
+    const res = await upload()
+    expect(res.status).toBe(200)
+    const insert = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO user_photos'))
+    expect(insert[1][3]).toBe('approved')
   })
 })

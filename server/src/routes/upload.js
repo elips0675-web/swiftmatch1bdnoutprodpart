@@ -9,7 +9,7 @@ import { auth } from '../middleware.js'
 import logger from '../logger.js'
 import { processImage } from '../image-pipeline.js'
 import { moderateImage } from '../ai-moderation.js'
-import { requirePhotoModerationOrRefuse } from '../runtime.js'
+import { requirePhotoModerationOrRefuse, initialPhotoModerationStatus } from '../runtime.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(__dirname, '../../uploads')
@@ -123,8 +123,8 @@ router.post('/api/upload', auth, async (req, res) => {
     const url = USE_S3 ? req.file.location : `/uploads/${req.file.filename}`
 
     const [result] = await pool.query(
-      'INSERT INTO user_photos (user_id, url, sort_order) VALUES (?, ?, ?)',
-      [userId, url, parseInt(sortOrder)],
+      'INSERT INTO user_photos (user_id, url, sort_order, moderation_status) VALUES (?, ?, ?, ?)',
+      [userId, url, parseInt(sortOrder), initialPhotoModerationStatus()],
     )
     const photoId = result.insertId
 
@@ -224,7 +224,7 @@ router.delete('/api/photos/:id', auth, async (req, res) => {
 router.get('/api/photos/:userId', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, url, sort_order, is_avatar FROM user_photos WHERE user_id = ? ORDER BY sort_order',
+      "SELECT id, url, sort_order, is_avatar FROM user_photos WHERE user_id = ? AND moderation_status = 'approved' ORDER BY sort_order",
       [req.params.userId],
     )
     res.json(rows)

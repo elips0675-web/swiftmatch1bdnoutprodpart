@@ -1,6 +1,6 @@
 # Что сделано
 
-> Актуально на 09.10.2026. Все тесты: **1379/1379** — сервер 825/825 ✅ (56 файлов), фронт 554/554 ✅ (41 файл). E2E: 152 теста в 19 спеках (`playwright --list`). Vite build: ✅. Lint: 0 errors (фронт 193 warnings). TypeScript: 0 ошибок. Счётчик снят прогоном `node scripts/test-counter-audit.mjs` (exit 0), а не перепечаткой: предыдущая шапка этого файла держала 1009/1009 при факте 1245, и тогда журналы гейтом счётчиков не покрывались (покрыты были 5 файлов). С 08.10.2026 под гейтом 7 файлов — пять доков и шапки обоих журналов, список — карта `DOCS` в `scripts/test-counter-audit.mjs`.
+> Актуально на 09.10.2026. Все тесты: **1390/1390** — сервер 836/836 ✅ (56 файлов), фронт 554/554 ✅ (41 файл). E2E: 152 теста в 19 спеках (`playwright --list`). Vite build: ✅. Lint: 0 errors (фронт 193 warnings). TypeScript: 0 ошибок. Счётчик снят прогоном `node scripts/test-counter-audit.mjs` (exit 0), а не перепечаткой: предыдущая шапка этого файла держала 1009/1009 при факте 1245, и тогда журналы гейтом счётчиков не покрывались (покрыты были 5 файлов). С 08.10.2026 под гейтом 7 файлов — пять доков и шапки обоих журналов, список — карта `DOCS` в `scripts/test-counter-audit.mjs`.
 >
 > (N9) — **в проде без Stripe-ключа платное выдавалось молча: встреча помечалась `paid`, партнёру выдавался Pro на 30 дней, подписка premium активировалась бесплатно**. Собственник решил fail-closed: в проде и в `STRIPE_LIVE` без ключа все пять точек монетизации отвечают `503 {code: 'STRIPE_NOT_CONFIGURED'}`, mock-путь живёт только вне прод-контура; `/health` отдаёт режим интеграций, иначе дыру нечем диагностировать. Найдено **три** точки без guard'а, а не две — `premium.js` в бэклоге не был назван; две другие отказывали по-своему (`502` без `code`), а ветка `STRIPE_LIVE=true` без ключа отвечала `500`.
 >
@@ -2863,3 +2863,29 @@ B3 — самый ценный результат этапа: он показы�
 - **Коммит локальный, push не делался** — по правилу только по отдельной команде владельца.
 
 **Замеры.** `node scripts/e2e-gate-audit.mjs` — exit 0. `npx vitest run scripts/e2e-cleanup.test.mjs scripts/e2e-gate-audit.test.mjs` — **45/45**. `node scripts/test-counter-audit.mjs --fix` — обновил счётчики (фронт 554/554 в 41 файле, сервер 825/825 в 56, E2E 152/19, итого **1379**), повторный прогон exit 0. `check:docs` — 0 находок. `check:mirrors` — 9/9. `npx vite build` — ✅.
+
+## N3-вторая (09.10.2026): модерация фото ожила — статус при INSERT, фильтр выдачи, честный approve/reject
+
+Вторая половина P0-E (решение владельца 07.10.2026, вариант Б). Цепочка модерации была разорвана в трёх местах: схема давала `moderation_status DEFAULT 'approved'`, `INSERT INTO user_photos (user_id, url, sort_order)` статус не задавал (фото всегда попадало в `approved`), очередь `WHERE moderation_status = 'pending'` была вечно пуста, а approve/reject не проверяли `affectedRows` и отвечали 200 на нуле обновлённых строк. Тест `server/src/__tests__/admin-moderation.test.js` это закреплял: `mockResolvedValueOnce([[], []])` и только `expect(res.status).toBe(200)`.
+
+**Что сделано.**
+
+1. **`server/src/runtime.js`** — `photoModerationMode()` (явный `PHOTO_MODERATION_MODE=strict|permissive`; дефолт: прод — `strict`, вне прода — `permissive`) и `initialPhotoModerationStatus()` (permissive + `ALLOW_UNMODERATED_PHOTOS` → `'approved'`, иначе `'pending'`). Существующие фото не трогались (миграции данных нет).
+
+2. **`server/src/routes/upload.js`** — INSERT теперь пишет `moderation_status` четвёртым параметром. В strict (прод) — `'pending'`; в permissive вне прода с `ALLOW_UNMODERATED_PHOTOS` — `'approved'` (иначе в dev фото стало бы невидимым из-за нового фильтра).
+
+3. **Фильтр `moderation_status = 'approved'` в трёх точках выдачи** — `profile.js` (GET `/api/profile/me` и `/api/profile/:id`), `upload.js` (GET `/api/photos/:userId`). Раньше отдавались любые статусы, включая `rejected`.
+
+4. **`server/src/routes/admin-moderation.js`** — approve/reject проверяют `affectedRows`: 0 → `404`, а не 200. В `server/.env.example` добавлена переменная `PHOTO_MODERATION_MODE` с пояснением.
+
+5. **Тесты (+11).** `prod-mock-payments.test.js` — 7 тестов режима и стартового статуса; `upload.test.js` — INSERT пишет `pending` в strict и `approved` в permissive; `admin-moderation.test.js` — approve/reject с `affectedRows: 1` → 200 и с `0` → 404.
+
+**Ломка.** В `upload.js` стартовый статус временно заменён на `'approved'`, в `admin-moderation.js` проверка `affectedRows` отключена (`if (false)`) → `vitest upload.test.js admin-moderation.test.js` — **2 упавших** (strict-INSERT и 404-approve). Возврат → 30/30 зелёные.
+
+**Чего этап не сделал.**
+
+- **Живого прогона с реальным AI-модератором не было** — ключей нет (внешний блокер); проверена логика на моках. Ветка AI (`updateModeration` → `approved`/`flagged`) не менялась.
+- **`flagged`-фото по-прежнему не в очереди `pending`** — админ видит их в `GET /api/admin/photos` (общий список). Отдельная вкладка «flagged» в пункт не входила.
+- **Коммит локальный, push не делался** — по правилу только по отдельной команде владельца.
+
+**Замеры.** `npx vitest run` (server) — **836/836** в 56 файлах; затронутые 4 файла — 81/81. `npx vitest run` (front) — 554/554. `node scripts/test-counter-audit.mjs --fix` — обновил счётчики (сервер 836/56, фронт 554/41, E2E 152/19, итого **1390**), повторный прогон exit 0. `check:docs` — 0 находок. `check:mirrors` — 9/9. `tsc --noEmit` — 0. `eslint` — 0 errors. `vite build` — ✅.

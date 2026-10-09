@@ -96,11 +96,19 @@ describe('POST /api/admin/photos/:id/approve', () => {
   const app = createApp()
 
   it('approves photo', async () => {
-    pool.query.mockResolvedValueOnce([[], []])
+    pool.query.mockResolvedValueOnce([{ affectedRows: 1 }, []])
     const res = await request(app)
       .post('/api/admin/photos/1/approve')
       .set('Authorization', `Bearer ${adminToken()}`)
     expect(res.status).toBe(200)
+  })
+
+  it('отвечает 404, если строка не обновлена (фото не pending/нет)', async () => {
+    pool.query.mockResolvedValueOnce([{ affectedRows: 0 }, []])
+    const res = await request(app)
+      .post('/api/admin/photos/1/approve')
+      .set('Authorization', `Bearer ${adminToken()}`)
+    expect(res.status).toBe(404)
   })
 
   it('handles database error', async () => {
@@ -116,7 +124,7 @@ describe('POST /api/admin/photos/:id/reject', () => {
   const app = createApp()
 
   it('rejects photo with reason', async () => {
-    pool.query.mockResolvedValueOnce([[], []])
+    pool.query.mockResolvedValueOnce([{ affectedRows: 1 }, []])
     const res = await request(app)
       .post('/api/admin/photos/1/reject')
       .set('Authorization', `Bearer ${adminToken()}`)
@@ -125,11 +133,20 @@ describe('POST /api/admin/photos/:id/reject', () => {
   })
 
   it('rejects photo without reason', async () => {
-    pool.query.mockResolvedValueOnce([[], []])
+    pool.query.mockResolvedValueOnce([{ affectedRows: 1 }, []])
     const res = await request(app)
       .post('/api/admin/photos/1/reject')
       .set('Authorization', `Bearer ${adminToken()}`)
     expect(res.status).toBe(200)
+  })
+
+  it('отвечает 404, если строку не обновили', async () => {
+    pool.query.mockResolvedValueOnce([{ affectedRows: 0 }, []])
+    const res = await request(app)
+      .post('/api/admin/photos/1/reject')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ reason: 'x' })
+    expect(res.status).toBe(404)
   })
 
   it('handles database error', async () => {
