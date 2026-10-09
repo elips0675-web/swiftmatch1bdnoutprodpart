@@ -93,7 +93,6 @@ router.post('/api/data/erase/confirm', auth, async (req, res) => {
     await pool.query('DELETE FROM notifications WHERE user_id = ?', [req.userId])
     await pool.query('DELETE FROM activity_log WHERE user_id = ?', [req.userId])
     await pool.query('DELETE FROM consent_log WHERE user_id = ?', [req.userId])
-    await pool.query('DELETE FROM user_sessions WHERE user_id = ?', [req.userId])
     await pool.query('DELETE FROM push_subscriptions WHERE user_id = ?', [req.userId])
     await pool.query('DELETE FROM refresh_tokens WHERE user_id = ?', [req.userId])
     await pool.query('DELETE FROM user_profiles WHERE id = ?', [req.userId])

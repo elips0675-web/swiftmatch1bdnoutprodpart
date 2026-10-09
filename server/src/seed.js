@@ -177,7 +177,7 @@ async function main() {
     'likes', 'user_interests', 'user_photos', 'user_stories', 'user_profiles',
     'notifications', 'reports', 'moderation_log', 'invites', 'push_subscriptions',
     'subscriptions', 'user_blocks', 'saved_filters', 'compatibility_scores',
-    'user_sessions', 'activity_log', 'analytics_events', 'posts', 'post_images',
+    'activity_log', 'analytics_events', 'posts', 'post_images',
     'post_comments', 'post_likes', 'group_members', 'group_posts', 'group_post_likes',
     'group_post_comments', 'users', 'refresh_tokens', 'sms_verification',
     'partner_payouts', 'partner_orders', 'partner_subscriptions',
