@@ -3,6 +3,9 @@ import { rootLogger } from './logger.js'
 
 const REDIS_URL = process.env.REDIS_URL
 const DEFAULT_TTL = 60_000
+// removeOnFail=50 молча вытеснял упавшие джобы: письмо/пуш терялись без следа.
+// Держим больше (настраиваемо), чтобы их было видно в /api/admin/queues и можно было повторить.
+const KEEP_FAILED = Number(process.env.QUEUE_KEEP_FAILED) > 0 ? Number(process.env.QUEUE_KEEP_FAILED) : 1000
 
 export let emailQueue = null
 export let pushQueue = null
@@ -20,7 +23,7 @@ function createQueue(name) {
       attempts: 3,
       backoff: { type: 'exponential', delay: 2000 },
       removeOnComplete: 100,
-      removeOnFail: 50,
+      removeOnFail: KEEP_FAILED,
     },
     settings: {
       lockDuration: DEFAULT_TTL,

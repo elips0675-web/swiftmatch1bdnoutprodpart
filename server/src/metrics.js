@@ -46,6 +46,26 @@ const wsMessagesTotal = new client.Counter({
   registers: [register],
 })
 
+export const queueJobsGauge = new client.Gauge({
+  name: 'queue_jobs',
+  help: 'Bull queue jobs by state (email/push/image)',
+  labelNames: ['queue', 'state'],
+  registers: [register],
+  async collect() {
+    try {
+      const { queueStats } = await import('./queue-monitor.js')
+      const stats = await queueStats()
+      for (const { name, counts } of stats) {
+        for (const [state, value] of Object.entries(counts)) {
+          this.set({ queue: name, state }, value)
+        }
+      }
+    } catch {
+      // недоступный Redis не должен ронять /metrics
+    }
+  },
+})
+
 const cacheHits = new client.Counter({
   name: 'cache_hits_total',
   help: 'Total cache hits',

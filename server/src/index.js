@@ -58,6 +58,7 @@ import eventsRoutes from './routes/events.js'
 import affiliateRoutes from './routes/affiliate.js'
 import adminPartners from './routes/admin/partners.js'
 import adminBackup from './routes/admin/backup.js'
+import adminQueues from './routes/admin/queues.js'
 import notificationsRoutes from './routes/notifications.js'
 import { metricsMiddleware, metricsRoute } from './metrics.js'
 import { JWT_SECRET, verifyToken } from './middleware.js'
@@ -294,6 +295,7 @@ app.use('/api/admin', adminHangouts)
 app.use('/api/admin', adminPartners)
 app.use('/api/admin', adminModerationRoutes)
 app.use('/api/admin', adminBackup)
+app.use('/api/admin', adminQueues)
 app.use(gdprRoutes)
 app.use(referralRoutes)
 app.use('/api/checkin', dateCheckinRoutes)
