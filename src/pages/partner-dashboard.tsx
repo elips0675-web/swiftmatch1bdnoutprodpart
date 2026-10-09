@@ -122,6 +122,10 @@ export default function PartnerDashboard() {
       body: JSON.stringify({ tier: 'pro' }),
     })
     const d = await res.json()
+    if (!res.ok) {
+      toast.error(d.code === 'STRIPE_NOT_CONFIGURED' ? t('partner.stripe_unavailable') : t('partner.subscribe_error'))
+      return
+    }
     if (d.url) { window.location.href = d.url; return }
     if (d.mock) {
       toast.success(t('partner.pro_activated'))

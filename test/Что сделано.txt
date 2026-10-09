@@ -1,6 +1,6 @@
 # Что сделано
 
-> Актуально на 08.10.2026. Все тесты: **1355/1355** — сервер 825/825 ✅ (56 файлов), фронт 530/530 ✅ (39 файлов). E2E: 152 теста в 19 спеках (`playwright --list`). Vite build: ✅. Lint: 0 errors (фронт 193 warnings). TypeScript: 0 ошибок. Счётчик снят прогоном `node scripts/test-counter-audit.mjs` (exit 0), а не перепечаткой: предыдущая шапка этого файла держала 1009/1009 при факте 1245, и тогда журналы гейтом счётчиков не покрывались (покрыты были 5 файлов). С 08.10.2026 под гейтом 7 файлов — пять доков и шапки обоих журналов, список — карта `DOCS` в `scripts/test-counter-audit.mjs`.
+> Актуально на 09.10.2026. Все тесты: **1365/1365** — сервер 825/825 ✅ (56 файлов), фронт 540/540 ✅ (40 файлов). E2E: 152 теста в 19 спеках (`playwright --list`). Vite build: ✅. Lint: 0 errors (фронт 193 warnings). TypeScript: 0 ошибок. Счётчик снят прогоном `node scripts/test-counter-audit.mjs` (exit 0), а не перепечаткой: предыдущая шапка этого файла держала 1009/1009 при факте 1245, и тогда журналы гейтом счётчиков не покрывались (покрыты были 5 файлов). С 08.10.2026 под гейтом 7 файлов — пять доков и шапки обоих журналов, список — карта `DOCS` в `scripts/test-counter-audit.mjs`.
 >
 > (N9) — **в проде без Stripe-ключа платное выдавалось молча: встреча помечалась `paid`, партнёру выдавался Pro на 30 дней, подписка premium активировалась бесплатно**. Собственник решил fail-closed: в проде и в `STRIPE_LIVE` без ключа все пять точек монетизации отвечают `503 {code: 'STRIPE_NOT_CONFIGURED'}`, mock-путь живёт только вне прод-контура; `/health` отдаёт режим интеграций, иначе дыру нечем диагностировать. Найдено **три** точки без guard'а, а не две — `premium.js` в бэклоге не был назван; две другие отказывали по-своему (`502` без `code`), а ветка `STRIPE_LIVE=true` без ключа отвечала `500`.
 >
@@ -2817,3 +2817,25 @@ B3 — самый ценный результат этапа: он показы�
 **Замеры.** `node scripts/test-counter-audit.mjs` — **exit 0** (фронт 530/530 в 39 файлах, сервер 825/825 в 56, E2E 152/19, итого **1355**); `node scripts/check-doc-mirrors.mjs` — **exit 0** (9/9 пар); `npx vitest run scripts/check-doc-mirrors.test.mjs scripts/test-counter-audit.test.mjs` — **33/33**; `node scripts/docs-canon-audit.mjs` (`check:docs`) — **0 находок**.
 
 **Ломка (оба гейта падают на сломанном входе).** `check:mirrors`: лишний байт в `test/README.md` → `[ERR] расхождение SHA256: README.md ↔ test/README.md`, exit 1; `--fix` → exit 0. `test-counter-audit`: подмена цифры в шапке `Что сделано.txt:3` (`1355` → `1356`) → `FAIL: Что сделано.txt:3 [journal-sdelano-total] 1355 → 1356`, exit 1; возврат цифры → exit 0. Оба признака сверены и по тексту, и по коду выхода.
+
+## N9-tail (09.10.2026): гейт `prod-mock-audit` + перевод отказа по `code`
+
+Два остатка этапа 39, вынесенные в хвост N9 (в бэклоге — «N9-хвост (после этапа 39)»). Пункт 1 — гейта на класс «новая mock-ветка отдаёт товар бесплатно» нет; пункт 2 — пользователю показывалось сырое английское `data.message`.
+
+**Что сделано по пунктам.**
+
+1. **1 — `scripts/prod-mock-audit.mjs` (+ `scripts/prod-mock-audit.test.mjs`, 10 тестов), `npm run check:prod-mock`.** Свой парсер хендлеров `router.<method>('путь', …)` в `server/src/routes/*.js` (37 файлов, 212 хендлеров). Платный сток — четыре класса: `mock: true`, `'paid'`, `INSERT INTO … subscriptions`/`partner_subscriptions`, `commission_rate = 15`. Вебхуки (`received: true`) исключены — это контракт Stripe, а не выдача товара; не-Stripe выдача подписки (RevenueCat, `iap.js`) в гейт не попадает по условию Stripe-досягаемости хендлера (`process.env.STRIPE_SECRET_KEY`/локальный `stripeKey`). На живом репозитории: 5 платных хендлеров, все закрыты `refuseMockPayment(res)`; вебхуков исключено 5. Ломка доказана: снятие `refuseMockPayment` в `server/src/routes/hangouts.js` → `FAIL: server/src/routes/hangouts.js:1334 [mock-response, paid-write] POST /api/hangouts/:id/purchase — mock/платная запись достижимы без STRIPE_SECRET_KEY, но в хендлере нет refuseMockPayment(res)`, exit 1; откат — exit 0. Условие (в) бэклога (не ругаться на сам `runtime.js`) выполнено по построению: `runtime.js` — не роут, он держит сам `refuseMockPayment`.
+
+2. **Подключение по образцу `check:env`.** `package.json` — `check:prod-mock`; `ci.yml` — джоба `prod-mock`; `deploy.yml` — шаг после `check:swagger-coverage`. Джоб-гейтов CI стало 22 → **23**.
+
+3. **2 — отказ переводится по `code`, а не по `message`.** В `src/context/language-context.tsx` добавлены ru/en-ключи `premium.stripe_unavailable`, `partner.stripe_unavailable`, `partner.subscribe_error`; в `src/pages/premium.tsx`, `src/components/dialogs/premium-dialog.tsx` при `!res.ok` берётся `t('premium.stripe_unavailable')` для `data.code === 'STRIPE_NOT_CONFIGURED'`, иначе `data.message || t('premium.error')`; в `src/pages/partner-dashboard.tsx` добавлена проверка `!res.ok` с тостом по `code` (раньше обработки статуса не было вовсе — тост показывался и на ошибке). Parity ru/en держит `src/test/i18n-parity.test.ts` (11 тестов зелёные).
+
+4. **Питфолл.** `docs/AGENTS-pitfalls.md` — **питфолл 96**: гейт на «все будущие платные точки» обязан различать контракт и дыру — `'paid'` и `INSERT INTO subscriptions` живут и в Stripe-вебхуке, и в RevenueCat-вебхуке, где fail-closed отказ не нужен; признак берётся из семантики (смотрит ли хендлер на Stripe), а не из совпадения строки, иначе первый же ложный красный закрывают ослаблением и класс дыр возвращается. Счётчик навигации в `AGENTS.md` — 95 → 96.
+
+**Чего этап не сделал.**
+
+- **Ломка — только на реальном репозитории.** Отдельной синтетической фикстуры для парсера нет: 10 тестов гейта проверяют `parseHandlers`/`classifyHandler`/`SINKS` и полный прогон по живому дереву; ручная ломка одного из пяти хендлеров даёт точный текст находки. Ломающая правка откачена `git checkout`.
+- **Общий остаток класса («все API-сообщения английские и показываются дословно») не трогался** — этап закрывал только две точки N9-tail.
+- **Коммит локальный, push не делался** — по правилу только по отдельной команде владельца (к этому моменту незапушены `74da82e`, коммит гейта счётчиков журналов и этот коммит).
+
+**Замеры.** `node scripts/prod-mock-audit.mjs` — 37 файлов, 212 хендлеров, 5 платных закрыты, 5 вебхуков исключены, exit 0. `npx vitest run scripts/prod-mock-audit.test.mjs src/test/i18n-parity.test.ts` — 21/21. `node scripts/test-counter-audit.mjs` — exit 0 после `--fix` (фронт 540/540 в 40 файлах, сервер 825/825 в 56, E2E 152/19, итого **1365**). `check:docs` — 0 находок. `npx vite build` — ✅.

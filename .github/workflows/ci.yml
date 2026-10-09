@@ -348,6 +348,23 @@ jobs:
           node-version: 20
       - run: npm run check:swagger-coverage
 
+  # Mock-платежи не утекают в прод (N9-tail, после этапа 39). Класс дыр —
+  # «пять точек закрыты, шестая появится завтра»: `refuseMockPayment` стоит в
+  # коде, но новая mock-ветка в PR останется незамеченной и отдаст товар
+  # бесплатно. Гейт ищет в `server/src/routes/*.js` платные стоки
+  # (`mock: true`, `'paid'`, `INSERT INTO … subscriptions`,
+  # `commission_rate = 15`) и требует fail-closed `refuseMockPayment(res)` в
+  # том же хендлере; вебхуки (`received: true`) — осознанный контракт Stripe,
+  # вне проверки. Зависимости не нужны: гейт читает исходники.
+  prod-mock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm run check:prod-mock
+
   # Уязвимости в prod-зависимостях — гейт без `npm ci`: аудиту нужен только
   # lock-файл, поэтому джоба делает ровно две команды (корень и server) и
   # проверяет обе половины: в контейнер едут обе, а не только фронт.

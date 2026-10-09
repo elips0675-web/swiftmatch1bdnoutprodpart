@@ -313,6 +313,8 @@ export const translations = {
     'partner.tier_pro_priority': 'Приоритет в выдаче',
     'partner.tier_upgrade': 'Перейти на Pro',
     'partner.pro_activated': 'Pro подписка активирована!',
+    'partner.stripe_unavailable': 'Оплата подписки временно недоступна',
+    'partner.subscribe_error': 'Не удалось оформить подписку',
     'partner.upgrade_required': 'Лимит офферов. Обновитесь до Pro для большего количества.',
     'verification.badge': 'Верифицирован',
     'verification.title': 'Верификация фото',
@@ -1437,6 +1439,7 @@ export const translations = {
     'time.day_ago': 'дн.',
     'hangout.seo.feed_desc': 'Свежие встречи и события рядом с вами — находите новых людей и присоединяйтесь.',
     'premium.error': 'Ошибка оформления подписки',
+    'premium.stripe_unavailable': 'Оплата временно недоступна',
 
     // PWA
     'pwa.install.ios_add': 'На экран "Домой"',
@@ -2054,6 +2057,8 @@ export const translations = {
     'partner.tier_pro_priority': 'Priority listing',
     'partner.tier_upgrade': 'Upgrade to Pro',
     'partner.pro_activated': 'Pro subscription activated!',
+    'partner.stripe_unavailable': 'Subscription payment is temporarily unavailable',
+    'partner.subscribe_error': 'Failed to subscribe',
     'partner.upgrade_required': 'Offer limit reached. Upgrade to Pro for more.',
     'verification.badge': 'Verified',
     'verification.title': 'Photo Verification',
@@ -3180,6 +3185,7 @@ export const translations = {
     'time.day_ago': 'd ago',
     'hangout.seo.feed_desc': 'Fresh meetups and events near you — find new people and join in.',
     'premium.error': 'Failed to process subscription',
+    'premium.stripe_unavailable': 'Payment is temporarily unavailable',
 
     // PWA
     'pwa.install.ios_add': 'Add to Home Screen',

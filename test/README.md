@@ -166,6 +166,7 @@ cd server && npm test            # серверные тесты
 | CHECK/ENUM схемы ↔ валидаторы кода | `npm run check:enum-constraints` | код-валидатор `intField` шире CHECK схемы (клиент проходит код и получает 500 от MySQL); диапазонный CHECK не проверяется ни в одном файле, который пишет в таблицу; белый список кода разрешает значение, которого нет в ENUM (`OFFER_CATEGORIES = […,'bar']`); литерал в `INSERT`/`UPDATE` в ENUM-колонку, которого нет в ENUM; список объявлен и нигде не используется (мёртвая переменная = незакрытая функция) (этап 37, N4) |
 | Переменные окружения против эталонов | `npm run check:env` | «работает у меня»: `process.env.X` на сервере и `import.meta.env.X` на фронте читаются кодом, но не объявлены ни в `server/.env.example`, ни в корневом `.env.example`, ни в compose `environment` сервиса `app` — на VPS/CI переменная undefined и код молча уходит в fallback; compose-ключ, который код не читает и которого нет в эталоне, — мёртвая настройка (этап 45, N7; поймал `ALLOW_UNMODERATED_PHOTOS` и `API_URL`) |
 | Swagger-документация против кода | `npm run check:swagger-coverage` | документация живёт своей жизнью: `@openapi`-операция описывает путь, которого нет в коде (Swagger UI показывает 404-эндпоинт); операций стало меньше базы в 47 (этап 13) — документацию выпилили при рефакторинге; мёртвая операция — путь в коде есть, а метода нет (этап 45, N7) |
+| Mock-платежи не утекают в прод | `npm run check:prod-mock` | `refuseMockPayment` стоит в пяти точках, но новая mock-ветка в PR отдаст товар бесплатно: в `server/src/routes/*.js` каждый хендлер с платным стоком (`mock: true`, `'paid'`, `INSERT INTO … subscriptions`, `commission_rate = 15`) обязан закрываться fail-closed отказом; вебхуки (`received: true`) — контракт Stripe, вне проверки; не-Stripe выдача подписки (RevenueCat) не считается (N9-tail, после этапа 39) |
 | Смоук живого UI | `npm run check:console` | console-ошибки, pageerror и ответы 5xx на статических страницах preview (8081 + API 3002), пустая страница, страница без русского текста (сырой ключ i18n), админ-роут, куда не попали из-за редиректа; фильтры известного шума — как в `e2e/helpers/audit.ts`. **Локально, в CI не подключён** — CI закрыт полным Playwright E2E; требует живых серверов (`запуск-всего.bat`). Перенос из Service Desk |
 | Бюджет бандла | `npm run check:bundle` | gzip initial JS/CSS — все ассеты, на которые ссылается `dist/index.html` (в т.ч. `vendor-*`, который мимо паттерна `index-*` не виден), выше бюджета 500 / 40 KB при базовой линии 371.7 / 20.3 KB на 08.10.2026 — подтянутая крупная зависимость или раздувшийся entry. **Локально, в CI не подключён**: требует собранный `npx vite build` |
 | Зеркала документации `test/` | `npm run check:mirrors` | каталог `test/` — ручная копия ключевых доков; расхождение sha256 с корнем (оба журнала, `README.md`, `project-context.md`, `AGENTS.md`, `CONTRIBUTING.md`, `Промты.txt`, `docs/AGENTS-pitfalls.md`, `docs/product-roadmap.md`) или пропавшее зеркало. **Локально, в CI не подключён**: `test/` под `.gitignore`, при несобранном зеркале (свежий клон, CI) гейт скипает (exit 0). Починить: `node scripts/check-doc-mirrors.mjs --fix` |
@@ -175,7 +176,7 @@ cd server && npm test            # серверные тесты
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 530 тестов, 39 файлов — **0 failures**
+- **Фронтенд (Vitest):** 540 тестов, 40 файлов — **0 failures**
 - **Сервер (Vitest):** 825 тестов, 56 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 152 теста, 19 spec-файлов — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
@@ -216,13 +217,14 @@ cd server && npm test            # серверные тесты
 | `enum-constraints` | `npm run check:enum-constraints` — CHECK/ENUM из `database/mysql_schema.sql` против валидаторов кода: код-валидатор шире CHECK, диапазонный CHECK не покрыт в пишущем файле, белый список кода разрешает значение вне ENUM, литерал в `INSERT`/`UPDATE` вне ENUM (этап 37, N4) |
 | `env-consistency` | `npm run check:env` — `process.env.*` сервера и `import.meta.env.*` фронта объявлены в `server/.env.example`/корневом `.env.example`/compose `environment`; compose не тащит мёртвых настроек (этап 45, N7) |
 | `swagger-coverage` | `npm run check:swagger-coverage` — база в 47 операций (этап 13), каждый документированный путь существует в коде, мёртвых операций нет (этап 45, N7) |
+| `prod-mock` | `npm run check:prod-mock` — каждый хендлер с платным стоком (`mock: true`, `'paid'`, `INSERT INTO … subscriptions`, `commission_rate = 15`) закрыт `refuseMockPayment(res)`; вебхуки исключены (N9-tail, после этапа 39) |
 | `security-headers` | `npm run check:headers` — security-заголовки на периметре: все три nginx-конфига (в образ едет `swiftmatch.http.conf`), наследование `add_header`, `vercel.json`, `index.html`, порядок `helmet()`/`express.static` (этап 38, подключён этапом 43) |
 
 ### `.github/workflows/deploy.yml` — push в `main`/`develop`, PR в `main` (Node 22)
 
 | Джоба | Что делает |
 |-------|-----------|
-| `lint-and-typecheck` | `check:ports` → `lint` → `lint:server` → `tsc` → **`secrets-leak`**, **`deploy-persistence`**, **`audit:prod` ×2**, **`check:e2e`**, **`check:docs`**, **`check:headers`**, **`check:n-plus-one`**, **`check:mysql-race`**, **`check:enum-constraints`**, **`check:env`**, **`check:swagger-coverage`** (блокируют деплой) |
+| `lint-and-typecheck` | `check:ports` → `lint` → `lint:server` → `tsc` → **`secrets-leak`**, **`deploy-persistence`**, **`audit:prod` ×2**, **`check:e2e`**, **`check:docs`**, **`check:headers`**, **`check:n-plus-one`**, **`check:mysql-race`**, **`check:enum-constraints`**, **`check:env`**, **`check:swagger-coverage`**, **`check:prod-mock`** (блокируют деплой) |
 | `frontend-test` | витест + `check-native-config` + `vite build` |
 | `server-test` | MySQL 8.0 сервис: схема → `seed-migrations` → `migrate.js` → `schema-validate` → `sql-explain-audit` → `verify-backup` → витест с живой БД |
 | `test-counters` | сверка чисел с прогоном |

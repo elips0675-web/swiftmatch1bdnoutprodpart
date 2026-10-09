@@ -84,7 +84,7 @@ export default function Premium() {
         body: JSON.stringify({ tier: activeTier.id, duration_months: selectedDuration }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.message)
+      if (!res.ok) throw new Error(data.code === 'STRIPE_NOT_CONFIGURED' ? t('premium.stripe_unavailable') : (data.message || t('premium.error')))
       if (data.url) {
         window.location.href = data.url
       } else {
