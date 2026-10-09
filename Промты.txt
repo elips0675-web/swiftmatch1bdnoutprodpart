@@ -13,8 +13,9 @@
 > расходились четыре файла.
 >
 > **Канон:** `AGENTS.md` + `docs/AGENTS-*.md` — правила, гейты, чек-листы.
-> **Числа прогонов:** `README.md` и `project-context.md` (гейт
-> `node scripts/test-counter-audit.mjs`, он же сверяет зеркало `test/`).
+> **Числа прогонов:** `README.md`, `project-context.md` и шапки `Что сделано.txt` /
+> `Что доделать.txt` (гейт `node scripts/test-counter-audit.mjs`).
+> **Побайтовые зеркала `test/`:** `npm run check:mirrors` (`scripts/check-doc-mirrors.mjs`).
 > **Бэклог и приоритеты:** `Что доделать.txt`. **История этапов:** `Что сделано.txt`.
 > **Раскладку документов проверяет гейт** `node scripts/docs-canon-audit.mjs` (`npm run check:docs`).
 
@@ -22,7 +23,7 @@
 
 | Раздел | Тема | Где правда сейчас |
 |---|---|---|
-| 0 | Итеративный подход по этапам 0–4 | `docs/AGENTS-workflow.md` |
+| 0 | Итеративный подход по этапам 0–4 + завершение этапа (сборка, `check:console`, журналы и побайтовые зеркала `test/`, прогон счётчиков, push) | `docs/AGENTS-workflow.md` |
 | 1 | Pre-flight Checklist | `docs/AGENTS-production.md` — чек-лист из 10 пунктов + Golden Rule «Production ≠ File Created» |
 | 2 | Функциональный аудит приложения | пробелы покрытия — `test/ИНВЕНТАРЬ-ТЕСТОВ.md` (локальное зеркало), бэклог — `Что доделать.txt` |
 | 3 | Аудит связки Админка ↔ БД ↔ Приложение | `docs/AGENTS-admin-auth.md` + `Что доделать.txt` |
@@ -36,7 +37,7 @@
 | 11 | Документация | `README.md` — карта документации; `AGENTS.md` — навигация по модулям |
 | 12 | Git | `AGENTS.md` — Conventional Commits, `git commit --no-verify`, что нельзя коммитить (`.env`) |
 | 13 | Стек технологий | `project-context.md` |
-| 14 | Код-стайл и архитектура | `docs/AGENTS-system-prompt.md` + `docs/AGENTS-pitfalls.md` (89 грабли) |
+| 14 | Код-стайл и архитектура | `docs/AGENTS-system-prompt.md` + `docs/AGENTS-pitfalls.md` (грабли из опыта, нумерация сплошная) |
 | 15 | Golden Rules | `AGENTS.md` (гипер-краткое резюме) + `docs/AGENTS-system-prompt.md` |
 | 16 | Absolute Bans | `docs/AGENTS-security.md` |
 | 17 | Безопасность (Security Rules) | `docs/AGENTS-security.md` |

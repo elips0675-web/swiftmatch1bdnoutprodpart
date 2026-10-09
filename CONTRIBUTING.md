@@ -289,7 +289,7 @@ fix(deps): nodemailer 9.0.1 -> 9.1.1 - closes runtime advisory
 - [ ] Гейты зелёные: `tsc --noEmit`, `eslint src/`, `vite build`, тесты (front + server)
 - [ ] Аудиты зелёные: `check:ports`, `secrets-leak-audit`, `deploy-persistence-audit`, `schema-drift-audit --offline`, `test-counter-audit`, `audit:prod` (корень + `server/`)
 - [ ] Новый функционал покрыт тестами
-- [ ] Документация обновлена (`Что сделано.txt`, `Что доделать.txt`)
+- [ ] Документация обновлена (`Что сделано.txt`, `Что доделать.txt`), зеркала в `test/` синхронизированы побайтово (`npm run check:mirrors`); `node scripts/test-counter-audit.mjs` — exit 0
 - [ ] Commit-сообщения соответствуют Conventional Commits
 - [ ] PR направлен в `main`
 - [ ] Нет конфликтов слияния

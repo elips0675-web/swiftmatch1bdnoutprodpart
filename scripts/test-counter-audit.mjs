@@ -1,8 +1,10 @@
 /**
  * Гейт «счётчики тестов в документации совпадают с прогоном».
  *
- * Счётчики дублируются в пяти файлах (`README.md`, `project-context.md` и три
- * копии в `test/`), и расходились все пять: на 30.09.2026 в репозитории было
+ * Счётчики дублируются в семи файлах (`README.md`, `project-context.md`, три
+ * копии в `test/` и шапки `Что сделано.txt` / `Что доделать.txt` — журналы
+ * добавлены 08.10 по питфоллу 93: шапка истории держала 1009 при факте 1245),
+ * и расходились: на 30.09.2026 в репозитории было
  * 867 тестов (сервер 715 в 52 файлах, фронт 152 в 24, E2E 150 в 19 спеках), а
  * в документации стояло 779 / 807 / 849 в зависимости от файла. Оценка проекта
  * от 30.09 это воспроизвела («ИНВЕНТАРЬ-ТЕСТОВ.md — 807») и построила на этом
@@ -18,7 +20,9 @@
  *
  *  1. Заголовки счётчиков: `README.md` (фронт/сервер/E2E), `project-context.md`
  *     (блок «Актуальный срез»), `test/ИНВЕНТАРЬ-ТЕСТОВ.md` (шапка, блок
- *     «Прогон», заголовки секций, команды прогона). Сверяются все числа,
+ *     «Прогон», заголовки секций, команды прогона), шапки `Что сделано.txt`
+ *     («Актуально на … Все тесты») и `Что доделать.txt` («Счётчики: …»).
+ *     Сверяются все числа,
  *     включая «0 failures» — падение тестов тоже делает документацию ложью.
  *  2. Построчные таблицы `test/ИНВЕНТАРЬ-ТЕСТОВ.md`: у каждого тест-файла
  *     обязана быть строка с **точным** числом тестов. Отсутствующая строка —
@@ -32,6 +36,9 @@
  * умеет проверять, не должна и попадать в документы.
  *
  * Флаги: `--fix`, `--skip-e2e`, `--no-per-file`, `--reports <front.json>,<server.json>`.
+ * Быстрая итерация: `--skip-e2e` (E2E-числа не сверяются) и `--reports` с готовыми
+ * JSON прогона — без него гейт сам запускает vitest и идёт минуты; шаги `[1/3]…[3/3]`
+ * печатаются, чтобы долгая пауза не выглядела зависанием.
  *
  * ⚠️ Русские слова в шаблонах пишутся классом `[а-яё]+`, а не `\w+`: в JS
  * `\w` без флага `u` — это только [A-Za-z0-9_], и `тест\w+` не находит
@@ -233,12 +240,63 @@ const INVENTORY_CLAIMS = [
   CMD_E2E,
 ]
 
+/**
+ * Шапки журналов. Анкор «^> Актуально на … Все тесты:» обязателен: свободное
+ * «Все тесты: **» встречается в теле `Что сделано.txt` 12 раз, и `--fix`
+ * переписал бы хронику. Дата в шапке истории — `dateSlot` (как «Актуальный срез»
+ * в project-context: в обычной проверке не сверяется, `--fix` обновляет на
+ * сегодня). В `Что доделать.txt` даты нет намеренно: «Актуально: <дата>» там
+ * описывает состояние бэклога и правится владельцем, а не прогоном.
+ */
+const JOURNAL_DONE_TOTAL = {
+  id: 'journal-sdelano-total',
+  suite: 'all',
+  re: /^> Актуально на (\d{2}\.\d{2}\.\d{4})\. Все тесты: \*\*(\d+)\/(\d+)\*\* — сервер (\d+)\/(\d+) ✅ \((\d+) файл[а-яё]*\), фронт (\d+)\/(\d+) ✅ \((\d+) файл[а-яё]*\)\. E2E: (\d+) (тест[а-яё]*) в (\d+) спек/m,
+  slots: [
+    dateSlot(1),
+    slot('totalTests', 2),
+    slot('totalTests', 3),
+    slot('serverTests', 4),
+    slot('serverTests', 5),
+    slot('serverFiles', 6),
+    slot('frontTests', 7),
+    slot('frontTests', 8),
+    slot('frontFiles', 9),
+    slot('e2eTests', 10),
+    slot('e2eTests', 11, true),
+    slot('e2eFiles', 12),
+  ],
+}
+
+const JOURNAL_TODO_COUNTERS = {
+  id: 'journal-dodelat-counters',
+  suite: 'all',
+  re: /Счётчики: \*\*(\d+)\/(\d+)\*\* — сервер \*\*(\d+)\/(\d+)\*\* ✅ \((\d+) файл[а-яё]*\), фронт \*\*(\d+)\/(\d+)\*\* ✅ \((\d+) файл[а-яё]*\)\. E2E: (\d+)\/(\d+)/m,
+  slots: [
+    slot('totalTests', 1),
+    slot('totalTests', 2),
+    slot('serverTests', 3),
+    slot('serverTests', 4),
+    slot('serverFiles', 5),
+    slot('frontTests', 6),
+    slot('frontTests', 7),
+    slot('frontFiles', 8),
+    slot('e2eTests', 9),
+    slot('e2eTests', 10),
+  ],
+}
+
+const JOURNAL_DONE_CLAIMS = [JOURNAL_DONE_TOTAL]
+const JOURNAL_TODO_CLAIMS = [JOURNAL_TODO_COUNTERS]
+
 const DOCS = new Map([
   ['README.md', README_CLAIMS],
   ['project-context.md', SNAPSHOT_CLAIMS],
   ['test/README.md', README_CLAIMS],
   ['test/project-context.md', SNAPSHOT_CLAIMS],
   ['test/ИНВЕНТАРЬ-ТЕСТОВ.md', INVENTORY_CLAIMS],
+  ['Что сделано.txt', JOURNAL_DONE_CLAIMS],
+  ['Что доделать.txt', JOURNAL_TODO_CLAIMS],
 ])
 
 const INVENTORY_FILE = 'test/ИНВЕНТАРЬ-ТЕСТОВ.md'
@@ -518,12 +576,18 @@ function runPlaywrightList(root) {
 }
 
 export function measure(root, options = {}) {
+  const onPhase = options.onPhase || (() => {})
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'swiftmatch-counters-'))
   try {
+    onPhase(options.reports ? '[1/3] читаю отчёт фронта (--reports)' : '[1/3] фронт: vitest run --reporter=json — до конца прогона тишина нормальна')
     const frontReport = options.reports ? readJson(options.reports[0]) : runVitest(root, '', path.join(tmp, 'front.json'))
-    const serverReport = options.reports ? readJson(options.reports[1]) : runVitest(root, 'server', path.join(tmp, 'server.json'))
     const front = countsFromVitestReport(frontReport, root)
+    onPhase(`      фронт посчитан: ${front.tests} тестов в ${front.files} файлах`)
+    onPhase(options.reports ? '[2/3] читаю отчёт сервера (--reports)' : '[2/3] сервер: vitest run --reporter=json')
+    const serverReport = options.reports ? readJson(options.reports[1]) : runVitest(root, 'server', path.join(tmp, 'server.json'))
     const server = countsFromVitestReport(serverReport, root)
+    onPhase(`      сервер посчитан: ${server.tests} тестов в ${server.files} файлах`)
+    onPhase(options.skipE2E ? '[3/3] E2E: пропущен (--skip-e2e)' : '[3/3] E2E: playwright test --list')
     const e2e = options.skipE2E
       ? { tests: 0, files: 0, perFile: new Map() }
       : countsFromPlaywrightList(runPlaywrightList(root).suites)
@@ -626,14 +690,16 @@ export function audit(root, counts, options = {}) {
 function main() {
   const args = process.argv.slice(2)
   const root = process.cwd()
-  const reportsArg = args.find((a) => a.startsWith('--reports'))
+  const reportsIdx = args.findIndex((a) => a.startsWith('--reports'))
+  const reportsSpec = reportsIdx === -1
+    ? ''
+    : (args[reportsIdx].slice('--reports'.length).replace(/^=/, '') || args[reportsIdx + 1] || '')
   const options = {
     fix: args.includes('--fix'),
     skipE2E: args.includes('--skip-e2e'),
     skipPerFile: args.includes('--no-per-file'),
-    reports: reportsArg
-      ? reportsArg
-          .slice('--reports'.length)
+    reports: reportsSpec
+      ? reportsSpec
           .split(',')
           .filter(Boolean)
           .map((p) => path.resolve(root, p))
@@ -644,7 +710,8 @@ function main() {
     process.exit(2)
   }
 
-  const counts = measure(root, options)
+  console.log('Гейт счётчиков: измеряю прогоном; итерации — с --skip-e2e, полный прогон один раз в конце')
+  const counts = measure(root, { ...options, onPhase: (m) => console.log(m) })
   const { problems, changed } = audit(root, counts, options)
 
   console.log(`фронт:  ${counts.front.tests} тестов в ${counts.front.files} файлах (зелёных ${counts.front.passed})`)

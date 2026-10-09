@@ -32,7 +32,8 @@
     "test:e2e:report": "playwright show-report",
     "check:headers": "node scripts/check-security-headers.mjs",
     "check:console": "node scripts/check-console.mjs",
-    "check:bundle": "node scripts/check-bundle-size.mjs"
+    "check:bundle": "node scripts/check-bundle-size.mjs",
+    "check:mirrors": "node scripts/check-doc-mirrors.mjs"
   },
   "dependencies": {
     "@capacitor-community/admob": "^6.0.0",
