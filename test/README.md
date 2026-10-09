@@ -148,7 +148,7 @@ cd server && npm test            # серверные тесты
 | Гейт | Команда | Что ловит |
 |------|---------|-----------|
 | Дрейф схемы | `node scripts/schema-drift-audit.mjs --offline` | колонка, которую читает код, есть в `database/mysql_schema.sql`, но её не создаёт ни одна миграция → живой 500 (стоило 500 на `/profile/edit`). В CI — джоба `schema-drift` в `ci.yml` |
-| Дрейф схемы (на БД) | `node scripts/schema-drift-audit.mjs` (нужен `MYSQL_BIN`) | то же + сверка с **живой** MySQL. **В CI не подключён**: `server-test` в `deploy.yml` гоняет `schema-validate`, а не live-дрейф — гейт живёт только локально (в бэклоге, E1) |
+| Дрейф схемы (на БД) | `node scripts/schema-drift-audit.mjs` (читает `DB_*`, нужен MySQL) | то же + сверка с **живой** MySQL: ловит «колонка есть в эталоне, но не создана ни одной миграцией». В CI база строится из эталона, поэтому класс виден только на реальной БД — гейт подключён в `server-test` (`deploy.yml`, реальный MySQL) и на VPS после `migrate.js` (L5) |
 | Секреты | `node scripts/secrets-leak-audit.mjs` | четыре независимых канала: `.dockerignore` пропускает `server/.env`/`.jwt-dev-secret`; rsync без `--exclude .env` стирает прод-`.env`; **rsync исключает не все классы файлов-секретов, которые гейт сам признаёт секретами** (`server/.jwt-dev-secret`, `.env.*`, `*.pfx`, `id_rsa` ехали на VPS при зелёном гейте — этап 35); **значение секрета, вписанное в отслеживаемый файл** (был VAPID-ключ в `README.md`) |
 | Персистентность деплоя | `node scripts/deploy-persistence-audit.mjs` | каталог записи фото не смонтирован volume'ом → `docker compose up --build` удаляет все фото; сверяет путь из кода с compose |
 | Заголовки безопасности на периметре | `npm run check:headers` | SPA и статику отдаёт **nginx**, а не Express — `helmet()` (`server/src/index.js`) покрывает только ответы API, и в образ едущий `nginx/swiftmatch.http.conf` не было ни одного security-заголовка (этап 38); **наследование `add_header`**: в `location` с собственным `add_header` (например `Cache-Control`) верхнеуровневые заголовки не действуют; три nginx-конфига, `vercel.json`, `index.html`, порядок `helmet()`/`express.static` |
@@ -165,6 +165,7 @@ cd server && npm test            # серверные тесты
 | Живой тест на MySQL | `npm run check:mysql-race` | у джобы `test-server` нет сервиса БД (или у сервиса нет health-check, или он с чужим образом); не задан `REQUIRE_MYSQL: '1'` или `DB_HOST`/`DB_USER`/`DB_PASSWORD`; джоба может зеленеть при провале (`continue-on-error`, `npm test \|\| true`); тест-файл читает флаг не строго как `'1'`, условие пропуска его не учитывает, остался `skipIf(!admin)` или нет теста, падающего при `admin === null` (этап 36, N1) |
 | CHECK/ENUM схемы ↔ валидаторы кода | `npm run check:enum-constraints` | код-валидатор `intField` шире CHECK схемы (клиент проходит код и получает 500 от MySQL); диапазонный CHECK не проверяется ни в одном файле, который пишет в таблицу; белый список кода разрешает значение, которого нет в ENUM (`OFFER_CATEGORIES = […,'bar']`); литерал в `INSERT`/`UPDATE` в ENUM-колонку, которого нет в ENUM; список объявлен и нигде не используется (мёртвая переменная = незакрытая функция) (этап 37, N4) |
 | Переменные окружения против эталонов | `npm run check:env` | «работает у меня»: `process.env.X` на сервере и `import.meta.env.X` на фронте читаются кодом, но не объявлены ни в `server/.env.example`, ни в корневом `.env.example`, ни в compose `environment` сервиса `app` — на VPS/CI переменная undefined и код молча уходит в fallback; compose-ключ, который код не читает и которого нет в эталоне, — мёртвая настройка (этап 45, N7; поймал `ALLOW_UNMODERATED_PHOTOS` и `API_URL`) |
+| Корневой `.env.example` против серверного | `npm run check:env-parity` | `docker-compose` (сервис `app`) читает **корневой** `.env` (`env_file`), поэтому ключ, задокументированный только в `server/.env.example`, оператор выставит в `server/.env` — а контейнер его не увидит, и прод молча уходит в fallback. Гейт требует, чтобы все ключи `server/.env.example` были и в корневом `.env.example` (P2 #34) |
 | Swagger-документация против кода | `npm run check:swagger-coverage` | документация живёт своей жизнью: `@openapi`-операция описывает путь, которого нет в коде (Swagger UI показывает 404-эндпоинт); операций стало меньше базы в 47 (этап 13) — документацию выпилили при рефакторинге; мёртвая операция — путь в коде есть, а метода нет (этап 45, N7) |
 | Mock-платежи не утекают в прод | `npm run check:prod-mock` | `refuseMockPayment` стоит в пяти точках, но новая mock-ветка в PR отдаст товар бесплатно: в `server/src/routes/*.js` каждый хендлер с платным стоком (`mock: true`, `'paid'`, `INSERT INTO … subscriptions`, `commission_rate = 15`) обязан закрываться fail-closed отказом; вебхуки (`received: true`) — контракт Stripe, вне проверки; не-Stripe выдача подписки (RevenueCat) не считается (N9-tail, после этапа 39) |
 | Смоук живого UI | `npm run check:console` | console-ошибки, pageerror и ответы 5xx на статических страницах preview (8081 + API 3002), пустая страница, страница без русского текста (сырой ключ i18n), админ-роут, куда не попали из-за редиректа; фильтры известного шума — как в `e2e/helpers/audit.ts`. **Локально, в CI не подключён** — CI закрыт полным Playwright E2E; требует живых серверов (`запуск-всего.bat`). Перенос из Service Desk |
@@ -176,8 +177,8 @@ cd server && npm test            # серверные тесты
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 559 тестов, 41 файл — **0 failures**
-- **Сервер (Vitest):** 849 тестов, 58 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
+- **Фронтенд (Vitest):** 564 теста, 42 файла — **0 failures**
+- **Сервер (Vitest):** 856 тестов, 60 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 152 теста, 19 spec-файлов — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
 ### Зависимости
@@ -196,7 +197,7 @@ cd server && npm test            # серверные тесты
 
 Два workflow. Каждый гейт выше подключён хотя бы в одном из них.
 
-### `.github/workflows/ci.yml` — на **любой** push и PR (Node 20)
+### `.github/workflows/ci.yml` — на **любой** push и PR (Node 22)
 
 | Джоба | Что делает |
 |-------|-----------|
@@ -216,6 +217,7 @@ cd server && npm test            # серверные тесты
 | `mysql-race` | `npm run check:mysql-race` — джоба `test-server` обязана объявлять сервис БД, `REQUIRE_MYSQL=1` и не иметь права зеленеть при провале; живой тест на MySQL обязан превращать пропуск в падение (этап 36, N1) |
 | `enum-constraints` | `npm run check:enum-constraints` — CHECK/ENUM из `database/mysql_schema.sql` против валидаторов кода: код-валидатор шире CHECK, диапазонный CHECK не покрыт в пишущем файле, белый список кода разрешает значение вне ENUM, литерал в `INSERT`/`UPDATE` вне ENUM (этап 37, N4) |
 | `env-consistency` | `npm run check:env` — `process.env.*` сервера и `import.meta.env.*` фронта объявлены в `server/.env.example`/корневом `.env.example`/compose `environment`; compose не тащит мёртвых настроек (этап 45, N7) |
+| `env-parity` | `npm run check:env-parity` — все ключи `server/.env.example` задокументированы и в корневом `.env.example`; compose (сервис `app`) читает корневой `.env`, поэтому серверный ключ до контейнера не доедет (P2 #34) |
 | `swagger-coverage` | `npm run check:swagger-coverage` — база в 47 операций (этап 13), каждый документированный путь существует в коде, мёртвых операций нет (этап 45, N7) |
 | `prod-mock` | `npm run check:prod-mock` — каждый хендлер с платным стоком (`mock: true`, `'paid'`, `INSERT INTO … subscriptions`, `commission_rate = 15`) закрыт `refuseMockPayment(res)`; вебхуки исключены (N9-tail, после этапа 39) |
 | `security-headers` | `npm run check:headers` — security-заголовки на периметре: все три nginx-конфига (в образ едет `swiftmatch.http.conf`), наследование `add_header`, `vercel.json`, `index.html`, порядок `helmet()`/`express.static` (этап 38, подключён этапом 43) |
@@ -224,13 +226,13 @@ cd server && npm test            # серверные тесты
 
 | Джоба | Что делает |
 |-------|-----------|
-| `lint-and-typecheck` | `check:ports` → `lint` → `lint:server` → `tsc` → **`secrets-leak`**, **`deploy-persistence`**, **`audit:prod` ×2**, **`check:e2e`**, **`check:docs`**, **`check:headers`**, **`check:n-plus-one`**, **`check:mysql-race`**, **`check:enum-constraints`**, **`check:env`**, **`check:swagger-coverage`**, **`check:prod-mock`** (блокируют деплой) |
+| `lint-and-typecheck` | `check:ports` → `lint` → `lint:server` → `tsc` → **`secrets-leak`**, **`deploy-persistence`**, **`audit:prod` ×2**, **`check:e2e`**, **`check:docs`**, **`check:headers`**, **`check:n-plus-one`**, **`check:mysql-race`**, **`check:enum-constraints`**, **`check:env`**, **`check:env-parity`**, **`check:swagger-coverage`**, **`check:prod-mock`** (блокируют деплой) |
 | `frontend-test` | витест + `check-native-config` + `vite build` |
-| `server-test` | MySQL 8.0 сервис: схема → `seed-migrations` → `migrate.js` → `schema-validate` → `sql-explain-audit` → `verify-backup` → витест с живой БД |
+| `server-test` | MySQL 8.0 сервис: схема → `seed-migrations` → `migrate.js` → `schema-validate` → **live `schema-drift-audit`** → `sql-explain-audit` → `verify-backup` → витест с живой БД |
 | `test-counters` | сверка чисел с прогоном |
 | `e2e-test` | Playwright на поднятом стеке (needs: lint, frontend, server) + выгрузка отчёта; с этапа 30 рецепт идентичен `e2e` в `ci.yml` (сид демо-данных, `wait-for-url` вместо `sleep`, `vite preview --strictPort`) |
 | `docker-config-check` | `docker compose config` + сборка образов `server`/`web` + Trivy (сейчас `exit-code: 0`, режим baseline) |
-| `deploy` | **только push в `main`**: rsync на VPS (с `--exclude .env`, `uploads`, ключи) → `docker compose up -d --build` → `migrate.js` → `schema-validate.mjs` |
+| `deploy` | **только push в `main`**: rsync на VPS (с `--exclude .env`, `uploads`, ключи) → `docker compose up -d --build` → `migrate.js` → `schema-validate.mjs` → **`schema-drift-audit.mjs` (live, код + эталон против БД VPS)** |
 
 `deploy` в `needs`: `lint-and-typecheck`, `frontend-test`, `server-test`,
 `e2e-test`, `test-counters`.

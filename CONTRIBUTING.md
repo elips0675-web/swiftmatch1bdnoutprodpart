@@ -65,7 +65,7 @@
 
 ### Требования
 
-- Node.js 22+ (продовый образ `node:22-alpine`, `NODE_VERSION: '22'` в `deploy.yml`; в `ci.yml` часть джоб пока на 20 — расхождение в бэклоге)
+- Node.js 22+ (продовый образ `node:22-alpine`, `NODE_VERSION: '22'` в `deploy.yml`; в `ci.yml` все джобы тоже на 22 с 09.10.2026 — расхождение закрыто)
 - MySQL 8.0+ (Laragon/XAMPP или локальный инстанс, порт 3306)
 - Git
 - PowerShell (Windows)
