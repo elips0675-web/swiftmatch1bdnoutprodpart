@@ -22,6 +22,7 @@ import { adminAuth } from './middleware/adminAuth.js'
 import { initSentry, registerSentryErrorHandler } from './sentry.js'
 import { getRedis, disconnectRedis } from './redis.js'
 import { initQueues, closeQueues } from './queue.js'
+import { createGracefulShutdown } from './shutdown.js'
 import { healthHandler } from './health.js'
 
 import adminDashboard from './routes/admin/dashboard.js'
@@ -331,11 +332,14 @@ httpServer.listen(PORT, () => {
   getRedis() // lazy connect
 })
 
-process.on('SIGTERM', async () => {
-  rootLogger.info('SIGTERM received — shutting down')
-  stopWsTimers()
-  await closeQueues()
-  await disconnectRedis()
-  await pool.end().catch(() => {})
-  httpServer.close(() => process.exit(0))
+const shutdown = createGracefulShutdown({
+  httpServer,
+  stopWsTimers,
+  closeQueues,
+  disconnectRedis,
+  closePool: () => pool.end().catch(() => {}),
+  logger: rootLogger,
 })
+
+process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('SIGINT', () => shutdown('SIGINT'))
