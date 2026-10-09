@@ -359,3 +359,62 @@ describe("fixInventoryRows", () => {
     expect(checkInventoryRows("inv.md", fixInventoryRows(threeSections, perFile), perFile)).toEqual([]);
   });
 });
+
+describe("дефект парсера инвентаря: экранированная черта и дубли", () => {
+  const escapedTable = [
+    "| Файл | Что покрывает | Тестов |",
+    "|---|---|---|",
+    "| `scripts/gate.test.mjs` | команда `npm test \\|\\| true` | 21 |",
+  ].join("\n");
+
+  it("парсит строку с `\\|` в описании", () => {
+    expect(parseInventoryRows(escapedTable).get("scripts/gate.test.mjs").claimed).toBe(21);
+  });
+
+  it("не сообщает «нет строки» про строку с `\\|`", () => {
+    const problems = checkInventoryRows("inv.md", escapedTable, new Map([["scripts/gate.test.mjs", 21]]));
+    expect(problems).toEqual([]);
+  });
+
+  it("видит дубль строки, а не молчит", () => {
+    const dup = [
+      "| Файл | Что покрывает | Тестов |",
+      "|---|---|---|",
+      "| `scripts/gate.test.mjs` | первая | 21 |",
+      "| `scripts/gate.test.mjs` | вторая | 21 |",
+    ].join("\n");
+    const problems = checkInventoryRows("inv.md", dup, new Map([["scripts/gate.test.mjs", 21]]));
+    expect(problems.map((p) => p.message)).toEqual(["scripts/gate.test.mjs: две строки в инвентаре"]);
+  });
+
+  it("правит число в строке с `\\|` и не дописывает вторую", () => {
+    const table = [
+      "## Скрипты гейтов — 1 файл, 0 тестов",
+      "",
+      "| Файл | Что покрывает | Тестов |",
+      "|---|---|---|",
+      "| `scripts/gate.test.mjs` | команда `npm test \\|\\| true` | 0 |",
+    ].join("\n");
+    const perFile = new Map([["scripts/gate.test.mjs", 21]]);
+    const fixed = fixInventoryRows(table, perFile);
+    expect(fixed).toContain("| `scripts/gate.test.mjs` | команда `npm test \\|\\| true` | 21 |");
+    expect(fixed.match(/scripts\/gate\.test\.mjs/g)).toHaveLength(1);
+    expect(fixInventoryRows(fixed, perFile)).toBe(fixed);
+  });
+
+  it("схлопывает дубль до одной строки", () => {
+    const table = [
+      "## Скрипты гейтов — 1 файл, 0 тестов",
+      "",
+      "| Файл | Что покрывает | Тестов |",
+      "|---|---|---|",
+      "| `scripts/gate.test.mjs` | первая | 0 |",
+      "| `scripts/gate.test.mjs` | вторая | 0 |",
+    ].join("\n");
+    const perFile = new Map([["scripts/gate.test.mjs", 21]]);
+    const fixed = fixInventoryRows(table, perFile);
+    expect(fixed.match(/scripts\/gate\.test\.mjs/g)).toHaveLength(1);
+    expect(fixed).toContain("| `scripts/gate.test.mjs` | первая | 21 |");
+    expect(checkInventoryRows("inv.md", fixed, perFile)).toEqual([]);
+  });
+});

@@ -300,7 +300,14 @@ const DOCS = new Map([
 ])
 
 const INVENTORY_FILE = 'test/ИНВЕНТАРЬ-ТЕСТОВ.md'
-const ROW_RE = /^\| `([^`]+)` \|[^|]*\| (\d+) \|$/gm
+/**
+ * Средняя ячейка — `(?:\\\||[^|])*`, а не `[^|]*`: описание вида
+ * «команда `npm test \|\| true`» (экранированная черта — валидный markdown)
+ * старым шаблоном не парсилось, и гейт сообщал ложное «нет строки в инвентаре»,
+ * а `--fix` дописывал вторую строку на тот же файл.
+ */
+const ROW_RE = /^\| `([^`]+)` \|(?:\\\||[^|])*\| (\d+) \|$/gm
+const ROW_LINE_RE = /^\| `([^`]+)` \|(?:\\\||[^|])*\| (\d+) \|$/
 /**
  * `m?[jt]sx?`, а не `[jt]sx?`: расширение `.mjs` — это `m` + `j` + `s`, и без
  * `m?` тест-файлы гейтов (`scripts/*.test.mjs`) молча выпадали из инвентаря —
@@ -415,32 +422,47 @@ export function fixClaims(text, claims, counts, today = todayRu()) {
   return out
 }
 
+/** Все строки таблиц инвентаря по порядку (нужны для поиска дублей). */
+export function listInventoryRows(text) {
+  const rows = []
+  for (const m of text.matchAll(ROW_RE)) {
+    if (!TEST_PATH_RE.test(m[1])) continue
+    rows.push({ file: m[1], claimed: Number(m[2]), index: m.index, text: m[0] })
+  }
+  return rows
+}
+
 /** Строки таблиц инвентаря: путь тест-файла → заявленное число тестов. */
 export function parseInventoryRows(text) {
   const rows = new Map()
-  for (const m of text.matchAll(ROW_RE)) {
-    if (!TEST_PATH_RE.test(m[1])) continue
-    rows.set(m[1], { claimed: Number(m[2]), index: m.index, text: m[0] })
+  for (const row of listInventoryRows(text)) {
+    rows.set(row.file, { claimed: row.claimed, index: row.index, text: row.text })
   }
   return rows
 }
 
 export function checkInventoryRows(relPath, text, perFile, options = {}) {
   const problems = []
-  const rows = parseInventoryRows(text)
-  for (const [file, row] of rows) {
-    if (options.skipE2E && file.startsWith('e2e/')) continue
-    if (!perFile.has(file)) {
-      problems.push({ file: relPath, claim: 'inventory-row', line: lineOf(text, row.index), message: `${file} — в прогоне такого тест-файла нет` })
+  const seen = new Set()
+  for (const row of listInventoryRows(text)) {
+    if (options.skipE2E && row.file.startsWith('e2e/')) continue
+    if (seen.has(row.file)) {
+      problems.push({ file: relPath, claim: 'inventory-row', line: lineOf(text, row.index), message: `${row.file}: две строки в инвентаре` })
       continue
     }
-    const actual = perFile.get(file)
+    seen.add(row.file)
+    if (!perFile.has(row.file)) {
+      problems.push({ file: relPath, claim: 'inventory-row', line: lineOf(text, row.index), message: `${row.file} — в прогоне такого тест-файла нет` })
+      continue
+    }
+    const actual = perFile.get(row.file)
     if (row.claimed !== actual) {
-      problems.push({ file: relPath, claim: 'inventory-row', line: lineOf(text, row.index), message: `${file}: в прогоне ${actual}, в инвентаре ${row.claimed}` })
+      problems.push({ file: relPath, claim: 'inventory-row', line: lineOf(text, row.index), message: `${row.file}: в прогоне ${actual}, в инвентаре ${row.claimed}` })
     }
   }
   for (const [file, actual] of perFile) {
-    if (!rows.has(file)) {
+    if (options.skipE2E && file.startsWith('e2e/')) continue
+    if (!seen.has(file)) {
       problems.push({ file: relPath, claim: 'inventory-row', line: 0, message: `${file} (${actual} тестов) — нет строки в инвентаре` })
     }
   }
@@ -457,7 +479,7 @@ function sectionRange(text, headingRe) {
 }
 
 export function fixInventoryRows(text, perFile) {
-  let out = text
+  let out = dedupeInventoryRows(text)
   for (const section of INVENTORY_TABLES) {
     const range = sectionRange(out, section.re)
     if (!range) continue
@@ -465,7 +487,7 @@ export function fixInventoryRows(text, perFile) {
     const lines = block.split('\n')
     let lastRow = -1
     for (let i = 0; i < lines.length; i += 1) {
-      if (/^\| `[^`]+` \|[^|]*\| \d+ \|$/.test(lines[i])) lastRow = i
+      if (ROW_LINE_RE.test(lines[i])) lastRow = i
     }
     const present = parseInventoryRows(out)
     const missing = []
@@ -493,6 +515,32 @@ export function fixInventoryRows(text, perFile) {
   }
   edits.sort((a, b) => b.index - a.index)
   for (const e of edits) out = out.slice(0, e.index) + e.replacement + out.slice(e.index + e.length)
+  return out
+}
+
+/**
+ * Дубли строк инвентаря (один файл — две строки) лечатся удалением всех, кроме
+ * первой: именно их и порождал старый `--fix`, а `parseInventoryRows` через `Map`
+ * молча схлопывал их в одну — гейт не замечал, что инвентарь испорчен.
+ */
+function dedupeInventoryRows(text) {
+  const seen = new Set()
+  const dups = []
+  for (const row of listInventoryRows(text)) {
+    if (seen.has(row.file)) dups.push(row)
+    else seen.add(row.file)
+  }
+  let out = text
+  for (const row of dups.reverse()) {
+    const after = row.index + row.text.length
+    if (out[after] === '\n') {
+      out = out.slice(0, row.index) + out.slice(after + 1)
+    } else if (out[row.index - 1] === '\n') {
+      out = out.slice(0, row.index - 1) + out.slice(after)
+    } else {
+      out = out.slice(0, row.index) + out.slice(after)
+    }
+  }
   return out
 }
 
