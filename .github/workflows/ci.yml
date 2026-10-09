@@ -9,7 +9,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npx eslint src/
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm ci
       - run: npm run lint:server
 
@@ -65,7 +65,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm ci
       - run: npm ci --prefix server
       - name: Init DB schema
@@ -116,7 +116,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm ci
       - run: npm test
 
@@ -153,7 +153,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm ci
       - run: npm test
 
@@ -168,20 +168,22 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: node scripts/mysql-race-gate.mjs
 
   # Дрейф схемы: каждая колонка, которую читает код в server/src, должна
-  # существовать в эталоне database/mysql_schema.sql. Без MySQL — только эта
-  # половина проверки; полный режим (с живой БД) ловит ещё и «колонка есть в
-  # эталоне, но не создана миграцией» — см. бэклог (P1: MySQL-service в CI).
+  # существовать в эталоне database/mysql_schema.sql. Здесь — offline-половина
+  # (MySQL не нужен). Live-режим (`node scripts/schema-drift-audit.mjs`) сверяет
+  # ещё и с настоящей БД: ловит «колонка есть в эталоне, но не создана
+  # миграцией» и «код читает колонку, которой на живой БД нет». Он запускается
+  # в server-test (deploy.yml, реальный MySQL) и на VPS после migrate.js.
   schema-drift:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: node scripts/schema-drift-audit.mjs --offline
 
   # Пагинация обязана быть детерминированной: `ORDER BY created_at LIMIT 20`
@@ -198,7 +200,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: node scripts/order-by-audit.mjs
 
   # Секреты и мусор не должны попадать в артефакты (этап 20, P0-C). Ловит два
@@ -210,7 +212,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: node scripts/secrets-leak-audit.mjs
 
   # Счётчики тестов в документации не должны расходиться с прогоном. Гейт
@@ -225,7 +227,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm ci
       - run: npm ci --prefix server
       - run: node scripts/test-counter-audit.mjs
@@ -241,8 +243,20 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: node scripts/deploy-persistence-audit.mjs
+
+  # Корневой .env.example обязан документировать все ключи server/.env.example:
+  # docker-compose (сервис app) читает КОРНЕВОЙ .env (env_file), поэтому ключ,
+  # описанный только в серверном шаблоне, в контейнер не попадёт (P2 #34).
+  env-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/check-env-parity.mjs
 
   # E2E объявлен обязательным гейтом (этап 30, B2) — проверяем, что он и правда
   # обязательный, а рецепт в ci.yml и deploy.yml не разошёлся. Сам E2E здесь не
@@ -253,7 +267,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm run check:e2e
 
   # Целостность зависимостей (этап 31, P1-B5). Гейт двусторонний: импортируемое
@@ -268,7 +282,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm ci
       - run: npm run check:deps
 
@@ -283,7 +297,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm run check:docs
 
   # SQL внутри цикла (этап 33, N5). Гейт искал такие места с самого начала,
@@ -301,7 +315,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm run check:n-plus-one
 
   # CHECK/ENUM в схеме против валидаторов кода (этап 37, N4). MySQL отвечает на
@@ -315,7 +329,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm run check:enum-constraints
 
   # Переменные окружения: код против эталонов (этап 45, N7). Класс дыр —
@@ -332,7 +346,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm run check:env
 
   # Swagger-документация против кода (этап 45, N7). Класс дыр — «документация
@@ -348,7 +362,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm run check:swagger-coverage
 
   # Mock-платежи не утекают в прод (N9-tail, после этапа 39). Класс дыр —
@@ -365,7 +379,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm run check:prod-mock
 
   # Уязвимости в prod-зависимостях — гейт без `npm ci`: аудиту нужен только
@@ -383,7 +397,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm run audit:prod
       - run: npm run audit:prod
         working-directory: server
@@ -404,5 +418,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm run check:headers

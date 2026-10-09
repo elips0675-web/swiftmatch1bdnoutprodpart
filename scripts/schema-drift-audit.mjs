@@ -114,30 +114,28 @@ async function main() {
     live = new Map([...reference].map(([t, cols]) => [t, new Set(cols)]))
     console.log('mode: OFFLINE (code vs database/mysql_schema.sql, no MySQL needed)')
   } else {
-    const mysql = process.env.MYSQL_BIN
-    if (!mysql) {
-      console.error('MYSQL_BIN is not set. Example:')
-      console.error('  MYSQL_BIN="C:/laragon/bin/mysql/mysql-8.4.3-winx64/bin/mysql.exe" node scripts/schema-drift-audit.mjs')
-      console.error('or without a database:  node scripts/schema-drift-audit.mjs --offline')
-      process.exit(2)
+    const mysql = (await import('mysql2/promise')).default
+    const dbName = process.env.DB_NAME || 'swiftmatch'
+    const connection = await mysql.createConnection({
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '3306', 10),
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      database: dbName,
+    })
+    try {
+      const [rows] = await connection.query(
+        'SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME, ORDINAL_POSITION',
+      )
+      live = new Map()
+      for (const { TABLE_NAME: table, COLUMN_NAME: column } of rows) {
+        if (!live.has(table)) live.set(table, new Set())
+        live.get(table).add(column)
+      }
+    } finally {
+      await connection.end()
     }
-
-    const { execFileSync } = await import('node:child_process')
-    const run = (sql) => {
-      const out = execFileSync(mysql, ['-uroot', 'swiftmatch', '-N', '-B', '-e', sql], { encoding: 'utf8' })
-      return out
-        .split('\n')
-        .map((l) => l.replace(/\r$/, '').split('\t'))
-        .filter((r) => r.length > 0 && r[0] !== '')
-    }
-
-    live = new Map()
-    for (const [table, column] of run(
-      "SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='swiftmatch' ORDER BY TABLE_NAME, ORDINAL_POSITION",
-    )) {
-      if (!live.has(table)) live.set(table, new Set())
-      live.get(table).add(column)
-    }
+    console.log(`mode: LIVE (code + mysql_schema.sql vs DB "${dbName}")`)
   }
 
   const dbLabel = offline ? 'mysql_schema.sql' : 'live DB'
