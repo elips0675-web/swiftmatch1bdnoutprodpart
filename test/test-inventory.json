@@ -1,0 +1,515 @@
+{
+  "generated": "2026-10-09T14:13:03.405Z",
+  "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
+  "verified_by": "vitest run (actual execution)",
+  "frontend": {
+    "files": 42,
+    "tests": 569,
+    "passed": 569,
+    "failed": 0,
+    "perFile": [
+      {
+        "file": "scripts/check-doc-mirrors.test.mjs",
+        "tests": 6
+      },
+      {
+        "file": "scripts/check-enum-constraints.test.mjs",
+        "tests": 47
+      },
+      {
+        "file": "scripts/check-env-parity.test.mjs",
+        "tests": 5
+      },
+      {
+        "file": "scripts/check-security-headers.test.mjs",
+        "tests": 46
+      },
+      {
+        "file": "scripts/dependency-audit.test.mjs",
+        "tests": 26
+      },
+      {
+        "file": "scripts/docs-canon-audit.test.mjs",
+        "tests": 47
+      },
+      {
+        "file": "scripts/e2e-cleanup.test.mjs",
+        "tests": 11
+      },
+      {
+        "file": "scripts/e2e-gate-audit.test.mjs",
+        "tests": 34
+      },
+      {
+        "file": "scripts/env-consistency-audit.test.mjs",
+        "tests": 18
+      },
+      {
+        "file": "scripts/eslint-server-lint.test.mjs",
+        "tests": 8
+      },
+      {
+        "file": "scripts/mysql-race-gate.test.mjs",
+        "tests": 28
+      },
+      {
+        "file": "scripts/n-plus-one-audit.test.mjs",
+        "tests": 31
+      },
+      {
+        "file": "scripts/prod-mock-audit.test.mjs",
+        "tests": 10
+      },
+      {
+        "file": "scripts/secrets-leak-audit.test.mjs",
+        "tests": 22
+      },
+      {
+        "file": "scripts/swagger-coverage-audit.test.mjs",
+        "tests": 9
+      },
+      {
+        "file": "scripts/test-counter-audit.test.mjs",
+        "tests": 37
+      },
+      {
+        "file": "src/hooks/__tests__/use-fcm-token.test.tsx",
+        "tests": 3
+      },
+      {
+        "file": "src/test/api.test.ts",
+        "tests": 5
+      },
+      {
+        "file": "src/test/auth-context.test.tsx",
+        "tests": 8
+      },
+      {
+        "file": "src/test/chat-partner-actions.test.tsx",
+        "tests": 3
+      },
+      {
+        "file": "src/test/chats-history.test.tsx",
+        "tests": 7
+      },
+      {
+        "file": "src/test/error-boundary.test.tsx",
+        "tests": 5
+      },
+      {
+        "file": "src/test/example.test.ts",
+        "tests": 1
+      },
+      {
+        "file": "src/test/feature-flags-context.test.tsx",
+        "tests": 3
+      },
+      {
+        "file": "src/test/flower-order-dialog.test.tsx",
+        "tests": 4
+      },
+      {
+        "file": "src/test/hangout-create.test.tsx",
+        "tests": 3
+      },
+      {
+        "file": "src/test/hangout-detail.test.tsx",
+        "tests": 2
+      },
+      {
+        "file": "src/test/hangout-edit.test.tsx",
+        "tests": 4
+      },
+      {
+        "file": "src/test/hangouts.test.tsx",
+        "tests": 33
+      },
+      {
+        "file": "src/test/home-hangouts.test.tsx",
+        "tests": 2
+      },
+      {
+        "file": "src/test/i18n-parity.test.ts",
+        "tests": 11
+      },
+      {
+        "file": "src/test/language-context.test.tsx",
+        "tests": 6
+      },
+      {
+        "file": "src/test/login.test.tsx",
+        "tests": 6
+      },
+      {
+        "file": "src/test/notification-preferences-section.test.tsx",
+        "tests": 12
+      },
+      {
+        "file": "src/test/profile-edit.test.tsx",
+        "tests": 11
+      },
+      {
+        "file": "src/test/register.test.tsx",
+        "tests": 9
+      },
+      {
+        "file": "src/test/restaurant-booking-dialog.test.tsx",
+        "tests": 3
+      },
+      {
+        "file": "src/test/sessions-section.test.tsx",
+        "tests": 17
+      },
+      {
+        "file": "src/test/two-fa-settings.test.tsx",
+        "tests": 2
+      },
+      {
+        "file": "src/test/use-premium.test.ts",
+        "tests": 5
+      },
+      {
+        "file": "src/test/use-websocket.test.tsx",
+        "tests": 11
+      },
+      {
+        "file": "src/test/utils.test.ts",
+        "tests": 8
+      }
+    ]
+  },
+  "server": {
+    "files": 60,
+    "tests": 856,
+    "passed": 856,
+    "failed": 0,
+    "perFile": [
+      {
+        "file": "server/src/__tests__/active-user.test.js",
+        "tests": 31
+      },
+      {
+        "file": "server/src/__tests__/admin-auth.test.js",
+        "tests": 5
+      },
+      {
+        "file": "server/src/__tests__/admin-backup.test.js",
+        "tests": 10
+      },
+      {
+        "file": "server/src/__tests__/admin-moderation.test.js",
+        "tests": 11
+      },
+      {
+        "file": "server/src/__tests__/admin-queues.test.js",
+        "tests": 6
+      },
+      {
+        "file": "server/src/__tests__/admin-users-ban.test.js",
+        "tests": 4
+      },
+      {
+        "file": "server/src/__tests__/admin.test.js",
+        "tests": 32
+      },
+      {
+        "file": "server/src/__tests__/affiliate.test.js",
+        "tests": 5
+      },
+      {
+        "file": "server/src/__tests__/ai-moderation.test.js",
+        "tests": 1
+      },
+      {
+        "file": "server/src/__tests__/api-contract.test.js",
+        "tests": 14
+      },
+      {
+        "file": "server/src/__tests__/auth.test.js",
+        "tests": 21
+      },
+      {
+        "file": "server/src/__tests__/blocks.test.js",
+        "tests": 16
+      },
+      {
+        "file": "server/src/__tests__/cleanup.test.js",
+        "tests": 3
+      },
+      {
+        "file": "server/src/__tests__/cookies.test.js",
+        "tests": 8
+      },
+      {
+        "file": "server/src/__tests__/csrf.test.js",
+        "tests": 6
+      },
+      {
+        "file": "server/src/__tests__/date-only.test.js",
+        "tests": 6
+      },
+      {
+        "file": "server/src/__tests__/deploy-persistence-audit.test.js",
+        "tests": 14
+      },
+      {
+        "file": "server/src/__tests__/events.test.js",
+        "tests": 14
+      },
+      {
+        "file": "server/src/__tests__/fcm.test.js",
+        "tests": 10
+      },
+      {
+        "file": "server/src/__tests__/geo-radius.test.js",
+        "tests": 18
+      },
+      {
+        "file": "server/src/__tests__/hangout-suggest.test.js",
+        "tests": 6
+      },
+      {
+        "file": "server/src/__tests__/hangouts.test.js",
+        "tests": 63
+      },
+      {
+        "file": "server/src/__tests__/iap-webhook.test.js",
+        "tests": 6
+      },
+      {
+        "file": "server/src/__tests__/icebreakers.test.js",
+        "tests": 3
+      },
+      {
+        "file": "server/src/__tests__/idor.test.js",
+        "tests": 21
+      },
+      {
+        "file": "server/src/__tests__/image-pipeline.test.js",
+        "tests": 8
+      },
+      {
+        "file": "server/src/__tests__/jwt-rotation.test.js",
+        "tests": 12
+      },
+      {
+        "file": "server/src/__tests__/lockout.test.js",
+        "tests": 6
+      },
+      {
+        "file": "server/src/__tests__/mail.test.js",
+        "tests": 14
+      },
+      {
+        "file": "server/src/__tests__/middleware.test.js",
+        "tests": 22
+      },
+      {
+        "file": "server/src/__tests__/moderation.test.js",
+        "tests": 11
+      },
+      {
+        "file": "server/src/__tests__/notification-gates.test.js",
+        "tests": 13
+      },
+      {
+        "file": "server/src/__tests__/notification-prefs.test.js",
+        "tests": 45
+      },
+      {
+        "file": "server/src/__tests__/notifications.test.js",
+        "tests": 7
+      },
+      {
+        "file": "server/src/__tests__/notify-failure.test.js",
+        "tests": 7
+      },
+      {
+        "file": "server/src/__tests__/order-by-audit.test.js",
+        "tests": 30
+      },
+      {
+        "file": "server/src/__tests__/partner-webhook.test.js",
+        "tests": 6
+      },
+      {
+        "file": "server/src/__tests__/partners.test.js",
+        "tests": 66
+      },
+      {
+        "file": "server/src/__tests__/premium-webhook.test.js",
+        "tests": 5
+      },
+      {
+        "file": "server/src/__tests__/premium.test.js",
+        "tests": 11
+      },
+      {
+        "file": "server/src/__tests__/prod-mock-payments.test.js",
+        "tests": 30
+      },
+      {
+        "file": "server/src/__tests__/profile-fields.test.js",
+        "tests": 10
+      },
+      {
+        "file": "server/src/__tests__/profile.test.js",
+        "tests": 33
+      },
+      {
+        "file": "server/src/__tests__/push.test.js",
+        "tests": 6
+      },
+      {
+        "file": "server/src/__tests__/queue-monitor.test.js",
+        "tests": 7
+      },
+      {
+        "file": "server/src/__tests__/race.mysql.test.js",
+        "tests": 6
+      },
+      {
+        "file": "server/src/__tests__/race.test.js",
+        "tests": 8
+      },
+      {
+        "file": "server/src/__tests__/ratelimit.test.js",
+        "tests": 4
+      },
+      {
+        "file": "server/src/__tests__/redis-fallback.test.js",
+        "tests": 7
+      },
+      {
+        "file": "server/src/__tests__/sanitize.test.js",
+        "tests": 7
+      },
+      {
+        "file": "server/src/__tests__/schema-drift.test.js",
+        "tests": 16
+      },
+      {
+        "file": "server/src/__tests__/secrets-leak-audit.test.js",
+        "tests": 24
+      },
+      {
+        "file": "server/src/__tests__/security.headers.test.js",
+        "tests": 7
+      },
+      {
+        "file": "server/src/__tests__/sessions-auth.test.js",
+        "tests": 20
+      },
+      {
+        "file": "server/src/__tests__/shutdown.test.js",
+        "tests": 5
+      },
+      {
+        "file": "server/src/__tests__/sms.test.js",
+        "tests": 11
+      },
+      {
+        "file": "server/src/__tests__/social.test.js",
+        "tests": 14
+      },
+      {
+        "file": "server/src/__tests__/totp.test.js",
+        "tests": 10
+      },
+      {
+        "file": "server/src/__tests__/upload.test.js",
+        "tests": 20
+      },
+      {
+        "file": "server/src/__tests__/ws-auth-reverify.test.js",
+        "tests": 14
+      }
+    ]
+  },
+  "e2e": {
+    "files": 19,
+    "tests": 152,
+    "perFile": [
+      {
+        "file": "e2e/admin-content.spec.ts",
+        "tests": 15
+      },
+      {
+        "file": "e2e/admin-features.spec.ts",
+        "tests": 8
+      },
+      {
+        "file": "e2e/admin-messaging.spec.ts",
+        "tests": 8
+      },
+      {
+        "file": "e2e/admin-users.spec.ts",
+        "tests": 8
+      },
+      {
+        "file": "e2e/audit-full.spec.ts",
+        "tests": 22
+      },
+      {
+        "file": "e2e/auth.spec.ts",
+        "tests": 20
+      },
+      {
+        "file": "e2e/ban-realtime.spec.ts",
+        "tests": 1
+      },
+      {
+        "file": "e2e/chats-groups.spec.ts",
+        "tests": 11
+      },
+      {
+        "file": "e2e/features.spec.ts",
+        "tests": 14
+      },
+      {
+        "file": "e2e/hangouts.spec.ts",
+        "tests": 4
+      },
+      {
+        "file": "e2e/hangouts2.spec.ts",
+        "tests": 6
+      },
+      {
+        "file": "e2e/interests.spec.ts",
+        "tests": 10
+      },
+      {
+        "file": "e2e/login.spec.ts",
+        "tests": 5
+      },
+      {
+        "file": "e2e/partner-b2b.spec.ts",
+        "tests": 3
+      },
+      {
+        "file": "e2e/partners.spec.ts",
+        "tests": 4
+      },
+      {
+        "file": "e2e/premium.spec.ts",
+        "tests": 7
+      },
+      {
+        "file": "e2e/profile.spec.ts",
+        "tests": 1
+      },
+      {
+        "file": "e2e/register.spec.ts",
+        "tests": 2
+      },
+      {
+        "file": "e2e/security-blind-spots.spec.ts",
+        "tests": 3
+      }
+    ]
+  },
+  "total": {
+    "files": 102,
+    "tests": 1425
+  }
+}

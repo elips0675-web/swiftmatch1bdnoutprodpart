@@ -1,0 +1,23 @@
+===== E2E (Playwright) =====
+152 тестов в 19 файлах (playwright test --list)
+
+# файл | тестов
+e2e/admin-content.spec.ts | 15
+e2e/admin-features.spec.ts | 8
+e2e/admin-messaging.spec.ts | 8
+e2e/admin-users.spec.ts | 8
+e2e/audit-full.spec.ts | 22
+e2e/auth.spec.ts | 20
+e2e/ban-realtime.spec.ts | 1
+e2e/chats-groups.spec.ts | 11
+e2e/features.spec.ts | 14
+e2e/hangouts.spec.ts | 4
+e2e/hangouts2.spec.ts | 6
+e2e/interests.spec.ts | 10
+e2e/login.spec.ts | 5
+e2e/partner-b2b.spec.ts | 3
+e2e/partners.spec.ts | 4
+e2e/premium.spec.ts | 7
+e2e/profile.spec.ts | 1
+e2e/register.spec.ts | 2
+e2e/security-blind-spots.spec.ts | 3

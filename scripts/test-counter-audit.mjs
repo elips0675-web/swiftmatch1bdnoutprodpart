@@ -301,6 +301,19 @@ const DOCS = new Map([
 
 const INVENTORY_FILE = 'test/ИНВЕНТАРЬ-ТЕСТОВ.md'
 /**
+ * Машинный инвентарь (кандидат 1 из «перенять у Service Desk»): JSON и
+ * пофайловые `.txt` — только вывод этого же прогона, не рукописные числа.
+ * Гейт сверяет их с прогоном наравне с таблицей `ИНВЕНТАРЬ-ТЕСТОВ.md`, а `--fix`
+ * перегенерирует. В `--skip-e2e`/`--no-per-file` артефакты не трогаются:
+ * частичный прогон записал бы нули вместо E2E.
+ */
+const INVENTORY_JSON = 'test/test-inventory.json'
+const INVENTORY_TXT = [
+  { id: 'front', file: 'test/frontend-tests.txt', title: 'Фронт (Vitest)', runner: 'vitest --reporter=json' },
+  { id: 'server', file: 'test/server-tests.txt', title: 'Сервер (Vitest)', runner: 'vitest --reporter=json' },
+  { id: 'e2e', file: 'test/e2e-tests.txt', title: 'E2E (Playwright)', runner: 'playwright test --list' },
+]
+/**
  * Средняя ячейка — `(?:\\\||[^|])*`, а не `[^|]*`: описание вида
  * «команда `npm test \|\| true`» (экранированная черта — валидный markdown)
  * старым шаблоном не парсилось, и гейт сообщал ложное «нет строки в инвентаре»,
@@ -596,6 +609,168 @@ export function countsFromPlaywrightList(suites) {
   return { tests: total, files: perFile.size, perFile }
 }
 
+function compareByFile(a, b) {
+  return a.file < b.file ? -1 : a.file > b.file ? 1 : 0
+}
+
+function perFileList(map) {
+  return [...map].map(([file, tests]) => ({ file, tests })).sort(compareByFile)
+}
+
+export function buildInventory(counts, generated) {
+  const suite = (c) => ({
+    files: c.files,
+    tests: c.tests,
+    passed: c.passed,
+    failed: c.failed,
+    perFile: perFileList(c.perFile),
+  })
+  return {
+    generated,
+    tool: 'node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)',
+    verified_by: 'vitest run (actual execution)',
+    frontend: suite(counts.front),
+    server: suite(counts.server),
+    e2e: {
+      files: counts.e2e.files,
+      tests: counts.e2e.tests,
+      perFile: perFileList(counts.e2e.perFile),
+    },
+    total: {
+      files: counts.front.files + counts.server.files,
+      tests: counts.front.tests + counts.server.tests,
+    },
+  }
+}
+
+function withoutGenerated(inv) {
+  const { generated, ...rest } = inv
+  return rest
+}
+
+export function renderInventoryJson(inv) {
+  return `${JSON.stringify(inv, null, 2)}\n`
+}
+
+function pushSuiteDiff(problems, relPath, label, expected, actual) {
+  if (!actual || typeof actual !== 'object') {
+    problems.push({ file: relPath, claim: 'inventory-json', line: 0, message: `${label}: нет в инвентаре` })
+    return
+  }
+  for (const field of ['files', 'tests', 'passed', 'failed']) {
+    if (expected[field] === undefined) continue
+    if (actual[field] !== expected[field]) {
+      problems.push({ file: relPath, claim: 'inventory-json', line: 0, message: `${label}.${field}: в прогоне ${expected[field]}, в инвентаре ${actual[field]}` })
+    }
+  }
+  if (JSON.stringify(actual.perFile) !== JSON.stringify(expected.perFile)) {
+    const exp = new Map((expected.perFile || []).map((r) => [r.file, r.tests]))
+    const act = new Map((actual.perFile || []).map((r) => [r.file, r.tests]))
+    const diff = []
+    for (const [file, tests] of exp) if (act.get(file) !== tests) diff.push(`${file}: ${act.get(file) ?? 'нет'} вместо ${tests}`)
+    for (const file of act.keys()) if (!exp.has(file)) diff.push(`${file} — лишний`)
+    problems.push({
+      file: relPath,
+      claim: 'inventory-json',
+      line: 0,
+      message: `${label}.perFile: ${diff.slice(0, 3).join('; ')}${diff.length > 3 ? ` … ещё ${diff.length - 3}` : ''}`,
+    })
+  }
+}
+
+export function checkInventoryJson(relPath, text, counts) {
+  let parsed
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return [{ file: relPath, claim: 'inventory-json', line: 0, message: 'не парсится как JSON' }]
+  }
+  const expected = withoutGenerated(buildInventory(counts, ''))
+  const problems = []
+  pushSuiteDiff(problems, relPath, 'frontend', expected.frontend, parsed.frontend)
+  pushSuiteDiff(problems, relPath, 'server', expected.server, parsed.server)
+  for (const field of ['files', 'tests']) {
+    const act = parsed.e2e && parsed.e2e[field]
+    if (act !== expected.e2e[field]) {
+      problems.push({ file: relPath, claim: 'inventory-json', line: 0, message: `e2e.${field}: в прогоне ${expected.e2e[field]}, в инвентаре ${act}` })
+    }
+  }
+  if (JSON.stringify(parsed.e2e && parsed.e2e.perFile) !== JSON.stringify(expected.e2e.perFile)) {
+    problems.push({ file: relPath, claim: 'inventory-json', line: 0, message: 'e2e.perFile: расходится с прогоном' })
+  }
+  for (const field of ['files', 'tests']) {
+    const act = parsed.total && parsed.total[field]
+    if (act !== expected.total[field]) {
+      problems.push({ file: relPath, claim: 'inventory-json', line: 0, message: `total.${field}: в прогоне ${expected.total[field]}, в инвентаре ${act}` })
+    }
+  }
+  return problems
+}
+
+export function renderPerFileTxt(spec, countData) {
+  const green = countData.passed === undefined ? '' : ` (зелёных ${countData.passed})`
+  const lines = [
+    `===== ${spec.title} =====`,
+    `${countData.tests} тестов в ${countData.files} файлах${green} (${spec.runner})`,
+    '',
+    '# файл | тестов',
+  ]
+  for (const { file, tests } of perFileList(countData.perFile)) lines.push(`${file} | ${tests}`)
+  return `${lines.join('\n')}\n`
+}
+
+export function checkPerFileTxt(relPath, spec, text, countData) {
+  const problems = []
+  const head = /^(\d+) тестов в (\d+) файлах/m.exec(text)
+  if (!head) return [{ file: relPath, claim: 'inventory-txt', line: 0, message: 'нет строки с числом тестов' }]
+  if (Number(head[1]) !== countData.tests) {
+    problems.push({ file: relPath, claim: 'inventory-txt', line: 0, message: `тестов: в прогоне ${countData.tests}, в файле ${head[1]}` })
+  }
+  if (Number(head[2]) !== countData.files) {
+    problems.push({ file: relPath, claim: 'inventory-txt', line: 0, message: `файлов: в прогоне ${countData.files}, в файле ${head[2]}` })
+  }
+  const parsed = new Map()
+  for (const m of text.matchAll(/^(\S+) \| (\d+)$/gm)) parsed.set(m[1], Number(m[2]))
+  const expected = new Map(perFileList(countData.perFile).map((r) => [r.file, r.tests]))
+  for (const [file, tests] of expected) {
+    if (parsed.get(file) !== tests) {
+      problems.push({ file: relPath, claim: 'inventory-txt', line: 0, message: `${file}: в прогоне ${tests}, в файле ${parsed.get(file) ?? 'нет'}` })
+    }
+  }
+  for (const file of parsed.keys()) {
+    if (!expected.has(file)) {
+      problems.push({ file: relPath, claim: 'inventory-txt', line: 0, message: `${file} — в прогоне такого тест-файла нет` })
+    }
+  }
+  return problems
+}
+
+export function writeInventoryArtifacts(root, counts, generated) {
+  const changed = []
+  const jsonAbs = path.join(root, INVENTORY_JSON)
+  const inventory = buildInventory(counts, generated)
+  let keep = false
+  if (fs.existsSync(jsonAbs)) {
+    try {
+      keep = JSON.stringify(withoutGenerated(JSON.parse(fs.readFileSync(jsonAbs, 'utf8')))) === JSON.stringify(withoutGenerated(inventory))
+    } catch {
+      keep = false
+    }
+  }
+  if (!keep) {
+    fs.writeFileSync(jsonAbs, renderInventoryJson(inventory))
+    changed.push(INVENTORY_JSON)
+  }
+  for (const spec of INVENTORY_TXT) {
+    const abs = path.join(root, spec.file)
+    const next = renderPerFileTxt(spec, counts[spec.id])
+    if (fs.existsSync(abs) && fs.readFileSync(abs, 'utf8') === next) continue
+    fs.writeFileSync(abs, next)
+    changed.push(spec.file)
+  }
+  return changed
+}
+
 function runVitest(root, sub, outFile) {
   const bin = path.join(root, sub, 'node_modules', 'vitest', 'vitest.mjs')
   if (!fs.existsSync(bin)) throw new Error(`не найден vitest: ${bin} — выполни npm ci (${sub || '.'})`)
@@ -719,6 +894,24 @@ export function audit(root, counts, options = {}) {
           fs.writeFileSync(abs, eol === '\r\n' ? fixed.replace(/\n/g, '\r\n') : fixed)
           if (!changed.includes(INVENTORY_FILE)) changed.push(INVENTORY_FILE)
         }
+      }
+    }
+  }
+
+  if (!options.skipPerFile && !options.skipE2E) {
+    const jsonAbs = path.join(root, INVENTORY_JSON)
+    if (fs.existsSync(jsonAbs)) {
+      problems.push(...checkInventoryJson(INVENTORY_JSON, fs.readFileSync(jsonAbs, 'utf8'), counts))
+    }
+    for (const spec of INVENTORY_TXT) {
+      const abs = path.join(root, spec.file)
+      if (fs.existsSync(abs)) {
+        problems.push(...checkPerFileTxt(spec.file, spec, fs.readFileSync(abs, 'utf8'), counts[spec.id]))
+      }
+    }
+    if (options.fix) {
+      for (const rel of writeInventoryArtifacts(root, counts, new Date().toISOString())) {
+        if (!changed.includes(rel)) changed.push(rel)
       }
     }
   }

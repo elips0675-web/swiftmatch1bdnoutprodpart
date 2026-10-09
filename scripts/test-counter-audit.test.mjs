@@ -14,8 +14,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   activeClaims,
+  buildInventory,
   checkClaims,
+  checkInventoryJson,
   checkInventoryRows,
+  checkPerFileTxt,
   countsFromPlaywrightList,
   countsFromVitestReport,
   fixClaims,
@@ -23,6 +26,8 @@ import {
   normalizeEol,
   parseInventoryRows,
   plural,
+  renderInventoryJson,
+  renderPerFileTxt,
   totalsOf,
 } from "./test-counter-audit.mjs";
 
@@ -416,5 +421,75 @@ describe("дефект парсера инвентаря: экранирован
     expect(fixed.match(/scripts\/gate\.test\.mjs/g)).toHaveLength(1);
     expect(fixed).toContain("| `scripts/gate.test.mjs` | первая | 21 |");
     expect(checkInventoryRows("inv.md", fixed, perFile)).toEqual([]);
+  });
+});
+
+describe("машинный инвентарь (test-inventory.json / *-tests.txt)", () => {
+  const counts = {
+    front: {
+      tests: 3,
+      files: 2,
+      passed: 3,
+      failed: 0,
+      perFile: new Map([
+        ["src/b.test.tsx", 1],
+        ["scripts/gate.test.mjs", 2],
+      ]),
+    },
+    server: {
+      tests: 4,
+      files: 1,
+      passed: 4,
+      failed: 0,
+      perFile: new Map([["server/src/__tests__/a.test.js", 4]]),
+    },
+    e2e: { tests: 7, files: 1, perFile: new Map([["e2e/c.spec.ts", 7]]) },
+    total: 7,
+  };
+
+  it("buildInventory сортирует пофайловый список и считает итог без E2E", () => {
+    const inv = buildInventory(counts, "2026-10-09T00:00:00.000Z");
+    expect(inv.frontend.tests).toBe(3);
+    expect(inv.frontend.perFile.map((r) => r.file)).toEqual([
+      "scripts/gate.test.mjs",
+      "src/b.test.tsx",
+    ]);
+    expect(inv.total).toEqual({ files: 3, tests: 7 });
+    expect(inv.e2e.tests).toBe(7);
+  });
+
+  it("checkInventoryJson молчит на совпадающем файле", () => {
+    const text = renderInventoryJson(buildInventory(counts, "2026-10-09T00:00:00.000Z"));
+    expect(checkInventoryJson("test/test-inventory.json", text, counts)).toEqual([]);
+  });
+
+  it("checkInventoryJson краснеет на устаревшем числе", () => {
+    const inv = buildInventory(counts, "2026-10-09T00:00:00.000Z");
+    inv.frontend.tests = 2;
+    const problems = checkInventoryJson("test/test-inventory.json", JSON.stringify(inv), counts);
+    expect(problems.map((p) => p.message)).toContain(
+      "frontend.tests: в прогоне 3, в инвентаре 2"
+    );
+  });
+
+  it("checkInventoryJson краснеет на битом JSON", () => {
+    expect(checkInventoryJson("test/test-inventory.json", "{", counts)[0].message).toMatch(
+      /не парсится/
+    );
+  });
+
+  it("txt-инвентарь совпадает с прогоном и ловит недостающий файл", () => {
+    const spec = {
+      id: "front",
+      file: "test/frontend-tests.txt",
+      title: "Фронт (Vitest)",
+      runner: "vitest --reporter=json",
+    };
+    const text = renderPerFileTxt(spec, counts.front);
+    expect(checkPerFileTxt(spec.file, spec, text, counts.front)).toEqual([]);
+    const broken = text.replace("scripts/gate.test.mjs | 2", "scripts/gate.test.mjs | 1");
+    expect(checkPerFileTxt(spec.file, spec, broken, counts.front).map((p) => p.message)).toContain(
+      "scripts/gate.test.mjs: в прогоне 2, в файле 1"
+    );
   });
 });

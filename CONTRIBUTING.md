@@ -222,7 +222,7 @@ npm run check:ports                                  # порты vite/proxy/.en
 node scripts/secrets-leak-audit.mjs                  # .dockerignore, rsync --delete, значения секретов в текстах
 node scripts/deploy-persistence-audit.mjs            # volume для фото + совпадение путей записи/отдачи
 node scripts/schema-drift-audit.mjs --offline        # колонка в эталоне ↔ миграции (с MySQL — без --offline)
-node scripts/test-counter-audit.mjs                  # числа тестов в 5 документах (--fix переписывает)
+node scripts/test-counter-audit.mjs                  # числа тестов в 5 документах + test/test-inventory.json и test/*-tests.txt (--fix переписывает и перегенерирует)
 npm run audit:prod                                   # уязвимости prod-зависимостей, корень
 cd server && npm run audit:prod                      # … и server/
 
