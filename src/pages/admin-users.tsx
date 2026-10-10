@@ -8,10 +8,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Search, MoveHorizontal as MoreHorizontal, Download, ChevronLeft, ChevronRight, Ban, Trash2, TriangleAlert as AlertTriangle, UserCheck, Loader2 } from "lucide-react";
+import { Search, MoveHorizontal as MoreHorizontal, Download, ChevronLeft, ChevronRight, Ban, Trash2, TriangleAlert as AlertTriangle, UserCheck, Loader2, LogIn } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/language-context";
 import { getToken } from "@/lib/token";
+import { startImpersonation } from "@/lib/impersonation";
 
 interface AdminUser {
   id: number;
@@ -171,6 +172,19 @@ export default function AdminUsersPage() {
     } catch { toast.error(t('admin.error.operation')); }
   };
 
+  const handleImpersonate = async (user: AdminUser) => {
+    try {
+      const token = getToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+      const res = await fetch(`/api/admin/impersonate/${user.id}`, { method: 'POST', headers });
+      if (!res.ok) { toast.error(t('admin.impersonate.error')); return; }
+      const data = await res.json();
+      if (!data?.token) { toast.error(t('admin.impersonate.error')); return; }
+      startImpersonation(data.token, { id: user.id, name: user.name });
+      window.location.href = '/';
+    } catch { toast.error(t('admin.impersonate.error')); }
+  };
+
   const handleExport = () => {
     const csvRows = users.map(u => ({
       ID: u.id, Name: u.name, Age: u.age, Email: u.email, City: u.city,
@@ -287,6 +301,9 @@ export default function AdminUsersPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="rounded-xl">
                         <DropdownMenuItem onClick={() => fetchUserDetail(user.id)}>{t('admin.users.view')}</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleImpersonate(user)}>
+                          <LogIn size={14} className="mr-2" /> {t('admin.users.impersonate')}
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleBan(user.id, user.status === 'banned')}>
                           {user.status === 'banned' ? t('admin.users.unblock') : t('admin.users.block')}
                         </DropdownMenuItem>
@@ -336,6 +353,9 @@ export default function AdminUsersPage() {
                   <p className="text-[10px] font-bold text-muted-foreground uppercase">{t('admin.users.last_active')}: {drawerUser.lastActive}</p>
                 </div>
                 <div className="flex gap-2 pt-2">
+                  <Button size="sm" variant="outline" className="flex-1 rounded-xl" data-testid="impersonate-drawer" onClick={() => handleImpersonate(drawerUser)}>
+                    <LogIn size={14} className="mr-1" /> {t('admin.users.impersonate')}
+                  </Button>
                   <Button size="sm" variant="outline" className="flex-1 rounded-xl" onClick={() => handleBan(drawerUser.id, drawerUser.status === 'banned')}>
                     {drawerUser.status === 'banned' ? <><UserCheck size={14} className="mr-1" /> {t('admin.users.unblock')}</> : <><Ban size={14} className="mr-1" /> {t('admin.users.block')}</>}
                   </Button>

@@ -25,6 +25,7 @@ vi.mock('../ws.js', () => ({
 vi.mock('../audit.js', () => ({
   softDelete: vi.fn().mockResolvedValue([{}]),
   softDeleteWhere: vi.fn().mockResolvedValue([{}]),
+  auditLog: vi.fn().mockResolvedValue(undefined),
 }))
 
 import pool from '../db.js'

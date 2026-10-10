@@ -1,7 +1,9 @@
 import { Router } from 'express'
+import jwt from 'jsonwebtoken'
 import pool from '../../db.js'
 import logger from '../../logger.js'
-import { softDelete, softDeleteWhere } from '../../audit.js'
+import { softDelete, softDeleteWhere, auditLog } from '../../audit.js'
+import { JWT_SECRET } from '../../middleware.js'
 import { getIO } from '../../ws.js'
 
 const router = Router()
@@ -174,6 +176,46 @@ router.post('/users/bulk', async (req, res) => {
   } catch (err) {
     logger.error('Bulk action error:', err)
     res.status(500).json({ message: 'Failed to perform bulk action' })
+  }
+})
+
+const IMPERSONATION_TTL_SECONDS = 3600
+
+router.post('/impersonate/:userId', async (req, res) => {
+  const targetId = Number(req.params.userId)
+  if (!Number.isInteger(targetId) || targetId <= 0) {
+    return res.status(400).json({ message: 'Invalid user id' })
+  }
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, email FROM users WHERE id = ? AND is_active = 1 AND deleted_at IS NULL',
+      [targetId],
+    )
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+    const adminId = req.admin?.id ?? null
+    const token = jwt.sign(
+      { userId: targetId, role: 'user', impersonatedBy: adminId },
+      JWT_SECRET(),
+      { expiresIn: '1h' },
+    )
+    await auditLog({
+      tableName: 'users',
+      recordId: targetId,
+      action: 'impersonate',
+      newValues: { impersonatedBy: adminId },
+      userId: adminId,
+      ipAddress: req.ip,
+    })
+    res.json({
+      token,
+      expiresIn: IMPERSONATION_TTL_SECONDS,
+      user: { id: rows[0].id, email: rows[0].email },
+    })
+  } catch (err) {
+    logger.error('Impersonate error:', err)
+    res.status(500).json({ message: 'Failed to impersonate' })
   }
 })
 

@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-10T07:30:23.938Z",
+  "generated": "2026-10-10T07:37:20.674Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 45,
-    "tests": 589,
-    "passed": 589,
+    "files": 47,
+    "tests": 595,
+    "passed": 595,
     "failed": 0,
     "gate": {
       "files": 17,
       "tests": 397
     },
     "product": {
-      "files": 28,
-      "tests": 192
+      "files": 30,
+      "tests": 198
     },
     "perFile": [
       {
@@ -149,6 +149,14 @@
         "tests": 11
       },
       {
+        "file": "src/test/impersonation-banner.test.tsx",
+        "tests": 2
+      },
+      {
+        "file": "src/test/impersonation.test.ts",
+        "tests": 4
+      },
+      {
         "file": "src/test/language-context.test.tsx",
         "tests": 6
       },
@@ -199,17 +207,17 @@
     ]
   },
   "server": {
-    "files": 60,
-    "tests": 873,
-    "passed": 873,
+    "files": 61,
+    "tests": 877,
+    "passed": 877,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 118
     },
     "product": {
-      "files": 55,
-      "tests": 755
+      "files": 56,
+      "tests": 759
     },
     "perFile": [
       {
@@ -223,6 +231,10 @@
       {
         "file": "server/src/__tests__/admin-backup.test.js",
         "tests": 10
+      },
+      {
+        "file": "server/src/__tests__/admin-impersonate.test.js",
+        "tests": 4
       },
       {
         "file": "server/src/__tests__/admin-moderation.test.js",
@@ -545,7 +557,7 @@
     ]
   },
   "total": {
-    "files": 105,
-    "tests": 1462
+    "files": 108,
+    "tests": 1472
   }
 }

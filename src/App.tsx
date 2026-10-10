@@ -16,6 +16,7 @@ import { PartnerGuard } from "@/components/shared/partner-guard"
 import { ClientOnly } from "@/components/shared/client-only"
 import { CookieConsent } from "@/components/shared/cookie-consent"
 import { PwaInstallBanner } from "@/components/shared/pwa-install-banner"
+import { ImpersonationBanner } from "@/components/impersonation-banner"
 import { useFcmToken } from "@/hooks/use-fcm-token"
 import { GeolocationInit } from "@/components/shared/geolocation-init"
 
@@ -172,6 +173,7 @@ const App = () => (
           <AuthProvider>
             <LanguageProvider>
                 <FeatureFlagsProvider>
+                  <ImpersonationBanner />
                   <DocumentTitle />
                   <FcmInit />
                   <GeolocationInit />
