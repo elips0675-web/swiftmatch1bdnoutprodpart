@@ -7,6 +7,33 @@ const router = Router()
 
 const REVENUECAT_WEBHOOK_SECRET = process.env.REVENUECAT_WEBHOOK_SECRET
 
+const IAP_TIERS = [
+  { id: 'plus', name: 'Plus', price: 499 },
+  { id: 'gold', name: 'Gold', price: 999 },
+  { id: 'platinum', name: 'Platinum', price: 1990 },
+]
+
+const IAP_DURATIONS = [
+  { months: 1, discount: 0, period: 'month' },
+  { months: 6, discount: 20, period: '6months' },
+  { months: 12, discount: 40, period: 'year' },
+]
+
+function iapDurationSuffix(months) {
+  return months >= 12 ? '12m' : months >= 6 ? '6m' : '1m'
+}
+
+const IAP_PRODUCTS = IAP_TIERS.flatMap((tier) =>
+  IAP_DURATIONS.map((d) => ({
+    id: `${tier.id}_${iapDurationSuffix(d.months)}`,
+    tier: tier.id,
+    name: `${tier.name} ${d.months} Month`,
+    price: Math.round(tier.price * d.months * (1 - d.discount / 100)),
+    period: d.period,
+    duration_months: d.months,
+  })),
+)
+
 // POST /api/iap/webhook — RevenueCat webhook
 router.post('/api/iap/webhook', async (req, res) => {
   if (!REVENUECAT_WEBHOOK_SECRET) {
@@ -25,14 +52,34 @@ router.post('/api/iap/webhook', async (req, res) => {
 
     switch (type) {
       case 'INITIAL_PURCHASE':
-      case 'RENEWAL':
+      case 'RENEWAL': {
+        const product = IAP_PRODUCTS.find((p) => p.id === product_id)
+        if (!product) {
+          logger.error(`IAP webhook: unknown product_id ${product_id} for user ${app_user_id}`)
+          return res.status(400).json({ received: false, message: 'Unknown product_id' })
+        }
+        const expiresAt = new Date(expiration_at_ms)
         await pool.query(
-          `INSERT INTO subscriptions (user_id, tier, provider, provider_subscription_id, status, current_period_end)
-           VALUES (?, ?, 'revenuecat', ?, 'active', ?)
-           ON DUPLICATE KEY UPDATE status = 'active', current_period_end = ?`,
-          [app_user_id, product_id, product_id, new Date(expiration_at_ms), new Date(expiration_at_ms)],
+          `INSERT INTO subscriptions (user_id, tier, provider, provider_subscription_id, status, duration_months, price, expires_at, current_period_end)
+           VALUES (?, ?, 'revenuecat', ?, 'active', ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE status = 'active', duration_months = ?, price = ?, expires_at = ?, current_period_end = ?, tier = ?`,
+          [
+            app_user_id,
+            product.tier,
+            product_id,
+            product.duration_months,
+            product.price,
+            expiresAt,
+            expiresAt,
+            product.duration_months,
+            product.price,
+            expiresAt,
+            expiresAt,
+            product.tier,
+          ],
         )
         break
+      }
       case 'CANCELLATION':
         await pool.query(
           "UPDATE subscriptions SET status = 'canceled' WHERE user_id = ? AND provider_subscription_id = ?",
@@ -56,26 +103,7 @@ router.post('/api/iap/webhook', async (req, res) => {
 
 // GET /api/iap/products — available IAP products (ids = RevenueCat product ids, см. src/lib/iap.ts productIdFor)
 router.get('/api/iap/products', (req, res) => {
-  const tiers = [
-    { id: 'plus', name: 'Plus', price: 499 },
-    { id: 'gold', name: 'Gold', price: 999 },
-    { id: 'platinum', name: 'Platinum', price: 1990 },
-  ]
-  const durations = [
-    { months: 1, discount: 0, period: 'month' },
-    { months: 6, discount: 20, period: '6months' },
-    { months: 12, discount: 40, period: 'year' },
-  ]
-  res.json(
-    tiers.flatMap((tier) =>
-      durations.map((d) => ({
-        id: `${tier.id}_${d.months >= 12 ? '12m' : d.months >= 6 ? '6m' : '1m'}`,
-        name: `${tier.name} ${d.months} Month`,
-        price: Math.round(tier.price * d.months * (1 - d.discount / 100)),
-        period: d.period,
-      })),
-    ),
-  )
+  res.json(IAP_PRODUCTS.map(({ id, name, price, period }) => ({ id, name, price, period })))
 })
 
 // GET /api/iap/status — check IAP subscription status
