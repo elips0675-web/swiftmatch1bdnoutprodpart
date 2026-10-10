@@ -1,5 +1,5 @@
 ===== Сервер (Vitest) =====
-903 тестов в 64 файлах (зелёных 903) (vitest --reporter=json)
+910 тестов в 64 файлах (зелёных 910) (vitest --reporter=json)
 
 # файл | тестов
 server/src/__tests__/active-user.test.js | 33
@@ -61,7 +61,7 @@ server/src/__tests__/security.headers.test.js | 7
 server/src/__tests__/sessions-auth.test.js | 20
 server/src/__tests__/shutdown.test.js | 5
 server/src/__tests__/sms.test.js | 11
-server/src/__tests__/social.test.js | 19
+server/src/__tests__/social.test.js | 26
 server/src/__tests__/totp.test.js | 10
 server/src/__tests__/upload.test.js | 20
 server/src/__tests__/webhook-journal.test.js | 6
