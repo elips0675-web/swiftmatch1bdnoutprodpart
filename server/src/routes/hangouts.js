@@ -12,6 +12,7 @@ import { parseRadiusKm, RADIUS_DEFAULT_KM } from '../geo.js'
 import { activeUser } from '../active-user.js'
 import { notBlocked } from '../user-blocks.js'
 import { trackEvent } from './experiments.js'
+import { logWebhookDelivery, markWebhookProcessed, markWebhookFailed, WEBHOOK_PROVIDERS } from '../webhooks.js'
 import { createBreaker } from '../circuit-breaker.js'
 import { getPrefs, getPrefsMap, isAllowed, isAllowedIn } from '../notification-prefs.js'
 import { refuseMockPayment } from '../runtime.js'
@@ -1592,26 +1593,24 @@ router.post('/api/hangouts/order/webhook', async (req, res) => {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object
-    const { hangout_id: hangoutId, user_id: userId } = session.metadata || {}
     if (session.payment_status !== 'paid') return res.json({ received: true })
+    const eventId = String(event.id || '')
+    await logWebhookDelivery({ provider: WEBHOOK_PROVIDERS.hangoutTicket, eventId, eventType: event.type, payload: event })
     try {
       const conn = await pool.getConnection()
       try {
         await conn.beginTransaction()
         const [evt] = await conn.query(
           'INSERT IGNORE INTO webhook_events (provider, event_id) VALUES (?, ?)',
-          ['stripe_hangout_ticket', String(event.id || '')],
+          [WEBHOOK_PROVIDERS.hangoutTicket, eventId],
         )
         if (!evt || evt.affectedRows === 0) {
           await conn.rollback()
           return res.json({ received: true })
         }
-        await conn.query(
-          `UPDATE hangout_tickets SET status = 'paid', paid_at = NOW()
-           WHERE hangout_id = ? AND user_id = ? AND stripe_session_id = ?`,
-          [hangoutId, userId, session.id],
-        )
+        await applyHangoutTicket(event, conn)
         await conn.commit()
+        await markWebhookProcessed(WEBHOOK_PROVIDERS.hangoutTicket, eventId)
       } catch (err) {
         await conn.rollback()
         throw err
@@ -1620,9 +1619,20 @@ router.post('/api/hangouts/order/webhook', async (req, res) => {
       }
     } catch (err) {
       logger.error('Hangout ticket webhook processing error:', err)
+      await markWebhookFailed(WEBHOOK_PROVIDERS.hangoutTicket, eventId, err.message)
     }
   }
   res.json({ received: true })
 })
+
+export async function applyHangoutTicket(event, conn) {
+  const session = event.data.object
+  const { hangout_id: hangoutId, user_id: userId } = session.metadata || {}
+  await conn.query(
+    `UPDATE hangout_tickets SET status = 'paid', paid_at = NOW()
+     WHERE hangout_id = ? AND user_id = ? AND stripe_session_id = ?`,
+    [hangoutId, userId, session.id],
+  )
+}
 
 export default router

@@ -1396,5 +1396,24 @@ CREATE TABLE `webhook_events` (
   UNIQUE KEY `uq_webhook_event` (`provider`,`event_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `webhook_deliveries`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `webhook_deliveries` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `provider` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `event_id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `event_type` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('received','processed','failed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'received',
+  `payload` mediumtext COLLATE utf8mb4_unicode_ci,
+  `error` text COLLATE utf8mb4_unicode_ci,
+  `attempts` int unsigned NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `processed_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_webhook_delivery` (`provider`,`event_id`),
+  KEY `idx_webhook_delivery_status` (`status`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
 SET FOREIGN_KEY_CHECKS = 1;

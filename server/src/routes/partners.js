@@ -7,6 +7,7 @@ import { getIO } from '../ws.js'
 import { getCached, setCached } from '../cache.js'
 import { parseRadiusKm } from '../geo.js'
 import { refuseMockPayment } from '../runtime.js'
+import { logWebhookDelivery, markWebhookProcessed, markWebhookFailed, WEBHOOK_PROVIDERS } from '../webhooks.js'
 
 const router = Router()
 
@@ -529,29 +530,23 @@ router.post('/api/partners/order/webhook', async (req, res) => {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object
     if (session.payment_status !== 'paid') return res.json({ received: true })
+    const eventId = String(event.id || '')
+    await logWebhookDelivery({ provider: WEBHOOK_PROVIDERS.partnerOrder, eventId, eventType: event.type, payload: event })
     try {
       const conn = await pool.getConnection()
       try {
         await conn.beginTransaction()
         const [evt] = await conn.query(
           'INSERT IGNORE INTO webhook_events (provider, event_id) VALUES (?, ?)',
-          ['stripe_partner_order', String(event.id || '')],
+          [WEBHOOK_PROVIDERS.partnerOrder, eventId],
         )
         if (!evt || evt.affectedRows === 0) {
           await conn.rollback()
           return res.json({ received: true })
         }
-        await conn.query(
-          `UPDATE partner_orders SET status = 'paid' WHERE stripe_session_id = ? AND status = 'pending'`,
-          [session.id],
-        )
-        await conn.query(
-          `INSERT INTO partner_conversions (partner_id, offer_id, user_id, conversion_type, external_order_id, stripe_session_id, amount, commission, status)
-           SELECT po.partner_id, po.offer_id, po.user_id, 'purchase', po.stripe_session_id, po.stripe_session_id, po.amount, po.commission, 'approved'
-           FROM partner_orders po WHERE po.stripe_session_id = ? LIMIT 1`,
-          [session.id],
-        )
+        await applyPartnerOrder(event, conn)
         await conn.commit()
+        await markWebhookProcessed(WEBHOOK_PROVIDERS.partnerOrder, eventId)
       } catch (err) {
         await conn.rollback()
         throw err
@@ -560,10 +555,25 @@ router.post('/api/partners/order/webhook', async (req, res) => {
       }
     } catch (err) {
       logger.error('Partner order webhook processing error:', err)
+      await markWebhookFailed(WEBHOOK_PROVIDERS.partnerOrder, eventId, err.message)
     }
   }
   res.json({ received: true })
 })
+
+export async function applyPartnerOrder(event, conn) {
+  const session = event.data.object
+  await conn.query(
+    `UPDATE partner_orders SET status = 'paid' WHERE stripe_session_id = ? AND status = 'pending'`,
+    [session.id],
+  )
+  await conn.query(
+    `INSERT INTO partner_conversions (partner_id, offer_id, user_id, conversion_type, external_order_id, stripe_session_id, amount, commission, status)
+     SELECT po.partner_id, po.offer_id, po.user_id, 'purchase', po.stripe_session_id, po.stripe_session_id, po.amount, po.commission, 'approved'
+     FROM partner_orders po WHERE po.stripe_session_id = ? LIMIT 1`,
+    [session.id],
+  )
+}
 
 /**
  * @openapi

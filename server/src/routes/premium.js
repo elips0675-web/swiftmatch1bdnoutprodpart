@@ -5,6 +5,7 @@ import logger from '../logger.js'
 import { trackEvent } from './experiments.js'
 import { createBreaker } from '../circuit-breaker.js'
 import { refuseMockPayment } from '../runtime.js'
+import { logWebhookDelivery, markWebhookProcessed, markWebhookFailed, WEBHOOK_PROVIDERS } from '../webhooks.js'
 
 const router = Router()
 
@@ -193,35 +194,27 @@ router.post('/api/premium/webhook', async (req, res) => {
   }
 
   if (event.type === 'checkout.session.completed') {
-    const session = event.data.object
-    const { userId, tier, duration_months } = session.metadata
+    const { userId, tier } = event.data.object.metadata
     if (userId && tier) {
+      const eventId = String(event.id || '')
+      await logWebhookDelivery({ provider: WEBHOOK_PROVIDERS.premium, eventId, eventType: event.type, payload: event })
       try {
-        const tierConfig = TIERS.find(t => t.id === tier)
-        const price = tierConfig ? tierConfig.price * Number(duration_months || 1) : 0
         const conn = await pool.getConnection()
         try {
           await conn.beginTransaction()
           // Идемпотентность (этап 39, аудит дипсик): повторная доставка события игнорируется
           const [evt] = await conn.query(
             'INSERT IGNORE INTO webhook_events (provider, event_id) VALUES (?, ?)',
-            ['stripe', String(event.id || '')],
+            [WEBHOOK_PROVIDERS.premium, eventId],
           )
           if (!evt || evt.affectedRows === 0) {
             await conn.rollback()
             logger.warn(`Webhook event ${event.id} already processed, skipping`)
             return res.json({ received: true })
           }
-          await conn.query(
-            "UPDATE subscriptions SET is_active = 0 WHERE user_id = ? AND is_active = 1 AND expires_at > NOW()",
-            [Number(userId)],
-          )
-          await conn.query(
-            `INSERT INTO subscriptions (user_id, tier, duration_months, price, expires_at, is_active)
-             VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MONTH), 1)`,
-            [Number(userId), tier, Number(duration_months || 1), price, Number(duration_months || 1)],
-          )
+          await applyPremiumCheckout(event, conn)
           await conn.commit()
+          await markWebhookProcessed(WEBHOOK_PROVIDERS.premium, eventId)
         } catch (err) {
           await conn.rollback()
           throw err
@@ -230,11 +223,29 @@ router.post('/api/premium/webhook', async (req, res) => {
         }
       } catch (err) {
         logger.error('Webhook insert error:', err)
+        await markWebhookFailed(WEBHOOK_PROVIDERS.premium, eventId, err.message)
       }
     }
   }
 
   res.json({ received: true })
 })
+
+export async function applyPremiumCheckout(event, conn) {
+  const session = event.data.object
+  const { userId, tier, duration_months } = session.metadata
+  if (!userId || !tier) return
+  const tierConfig = TIERS.find(t => t.id === tier)
+  const price = tierConfig ? tierConfig.price * Number(duration_months || 1) : 0
+  await conn.query(
+    "UPDATE subscriptions SET is_active = 0 WHERE user_id = ? AND is_active = 1 AND expires_at > NOW()",
+    [Number(userId)],
+  )
+  await conn.query(
+    `INSERT INTO subscriptions (user_id, tier, duration_months, price, expires_at, is_active)
+     VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MONTH), 1)`,
+    [Number(userId), tier, Number(duration_months || 1), price, Number(duration_months || 1)],
+  )
+}
 
 export default router

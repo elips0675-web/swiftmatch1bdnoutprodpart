@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-10T07:43:25.861Z",
+  "generated": "2026-10-10T07:56:05.253Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 47,
-    "tests": 595,
-    "passed": 595,
+    "files": 48,
+    "tests": 597,
+    "passed": 597,
     "failed": 0,
     "gate": {
       "files": 17,
       "tests": 397
     },
     "product": {
-      "files": 30,
-      "tests": 198
+      "files": 31,
+      "tests": 200
     },
     "perFile": [
       {
@@ -91,6 +91,10 @@
       {
         "file": "src/test/activity-list.test.tsx",
         "tests": 3
+      },
+      {
+        "file": "src/test/admin-webhooks.test.tsx",
+        "tests": 2
       },
       {
         "file": "src/test/api.test.ts",
@@ -207,17 +211,17 @@
     ]
   },
   "server": {
-    "files": 62,
-    "tests": 884,
-    "passed": 884,
+    "files": 64,
+    "tests": 898,
+    "passed": 898,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 118
     },
     "product": {
-      "files": 57,
-      "tests": 766
+      "files": 59,
+      "tests": 780
     },
     "perFile": [
       {
@@ -247,6 +251,10 @@
       {
         "file": "server/src/__tests__/admin-users-ban.test.js",
         "tests": 5
+      },
+      {
+        "file": "server/src/__tests__/admin-webhooks.test.js",
+        "tests": 8
       },
       {
         "file": "server/src/__tests__/admin.test.js",
@@ -465,6 +473,10 @@
         "tests": 20
       },
       {
+        "file": "server/src/__tests__/webhook-journal.test.js",
+        "tests": 6
+      },
+      {
         "file": "server/src/__tests__/ws-auth-reverify.test.js",
         "tests": 14
       }
@@ -561,7 +573,7 @@
     ]
   },
   "total": {
-    "files": 109,
-    "tests": 1479
+    "files": 112,
+    "tests": 1495
   }
 }

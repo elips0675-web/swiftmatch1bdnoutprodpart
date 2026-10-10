@@ -35,6 +35,7 @@ const AdminPhotos = lazy(() => import("./pages/admin-photos"))
 const AdminUsers = lazy(() => import("./pages/admin-users"))
 const AdminExperiments = lazy(() => import("./pages/admin-experiments"))
 const AdminBackup = lazy(() => import("./pages/admin-backup"))
+const AdminWebhooks = lazy(() => import("./pages/admin-webhooks"))
 const Chats = lazy(() => import("./pages/chats"))
 const ChatId = lazy(() => import("./pages/_chats-chatId-adapter"))
 const Contest = lazy(() => import("./pages/contest"))
@@ -135,6 +136,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/admin/hangouts": "Модерация встреч — SwiftMatch",
   "/admin/partners": "Партнёры — SwiftMatch",
   "/admin/backup": "Резервные копии — SwiftMatch",
+  "/admin/webhooks": "Вебхуки — SwiftMatch",
 }
 
 function DocumentTitle() {
@@ -191,6 +193,7 @@ const App = () => (
                     <Route path="/admin/partners" element={<AdminGuard><AdminLayout><SuspenseWrapper><AdminPartners /></SuspenseWrapper></AdminLayout></AdminGuard>} />
                     <Route path="/admin/users" element={<AdminGuard><AdminLayout><SuspenseWrapper><AdminUsers /></SuspenseWrapper></AdminLayout></AdminGuard>} />
                     <Route path="/admin/backup" element={<AdminGuard><AdminLayout><SuspenseWrapper><AdminBackup /></SuspenseWrapper></AdminLayout></AdminGuard>} />
+                    <Route path="/admin/webhooks" element={<AdminGuard><AdminLayout><SuspenseWrapper><AdminWebhooks /></SuspenseWrapper></AdminLayout></AdminGuard>} />
                     <Route path="/premium" element={<SuspenseWrapper><Premium /></SuspenseWrapper>} />
                     <Route path="/premium/success" element={<SuspenseWrapper><PremiumSuccess /></SuspenseWrapper>} />
                     <Route path="/premium/cancel" element={<SuspenseWrapper><PremiumCancel /></SuspenseWrapper>} />

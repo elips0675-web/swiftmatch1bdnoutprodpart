@@ -16,6 +16,7 @@ const CYRILLIC = /[Ѐ-ӿ]/
 
 const LATIN_ONLY_OK = [
   "admin.users.email",
+  "admin.webhooks.provider.revenuecat",
   "ads.swiftmatch_title",
   "app.lang.en",
   "auth.email",

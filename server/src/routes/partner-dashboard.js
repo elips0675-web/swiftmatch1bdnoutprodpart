@@ -5,6 +5,7 @@ import { auth } from '../middleware.js'
 import logger from '../logger.js'
 import { invalidate } from '../cache.js'
 import { refuseMockPayment } from '../runtime.js'
+import { logWebhookDelivery, markWebhookProcessed, markWebhookFailed, WEBHOOK_PROVIDERS } from '../webhooks.js'
 
 const router = Router()
 
@@ -313,30 +314,24 @@ router.post('/api/partner/webhook', async (req, res) => {
     const { partner_id: partnerId, tier } = session.metadata || {}
     if (!partnerId || tier !== 'pro') return res.json({ received: true })
     if (session.payment_status !== 'paid') return res.json({ received: true })
+    const eventId = String(event.id || '')
+    await logWebhookDelivery({ provider: WEBHOOK_PROVIDERS.partnerSubscription, eventId, eventType: event.type, payload: event })
     try {
       const conn = await pool.getConnection()
       try {
         await conn.beginTransaction()
         const [evt] = await conn.query(
           'INSERT IGNORE INTO webhook_events (provider, event_id) VALUES (?, ?)',
-          ['stripe_partner_sub', String(event.id || '')],
+          [WEBHOOK_PROVIDERS.partnerSubscription, eventId],
         )
         if (!evt || evt.affectedRows === 0) {
           await conn.rollback()
           logger.warn(`Partner webhook event ${event.id} already processed, skipping`)
           return res.json({ received: true })
         }
-        await conn.query(
-          "UPDATE partner_subscriptions SET status = 'cancelled' WHERE partner_id = ? AND status = 'active'",
-          [Number(partnerId)],
-        )
-        await conn.query(
-          `INSERT INTO partner_subscriptions (partner_id, tier, status, stripe_session_id, expires_at)
-           VALUES (?, 'pro', 'active', ?, DATE_ADD(NOW(), INTERVAL 30 DAY))`,
-          [Number(partnerId), session.id],
-        )
-        await conn.query('UPDATE partners SET commission_rate = 15 WHERE id = ?', [Number(partnerId)])
+        await applyPartnerSubscription(event, conn)
         await conn.commit()
+        await markWebhookProcessed(WEBHOOK_PROVIDERS.partnerSubscription, eventId)
       } catch (err) {
         await conn.rollback()
         throw err
@@ -345,9 +340,25 @@ router.post('/api/partner/webhook', async (req, res) => {
       }
     } catch (err) {
       logger.error('Partner subscribe webhook processing error:', err)
+      await markWebhookFailed(WEBHOOK_PROVIDERS.partnerSubscription, eventId, err.message)
     }
   }
   res.json({ received: true })
 })
+
+export async function applyPartnerSubscription(event, conn) {
+  const session = event.data.object
+  const { partner_id: partnerId } = session.metadata || {}
+  await conn.query(
+    "UPDATE partner_subscriptions SET status = 'cancelled' WHERE partner_id = ? AND status = 'active'",
+    [Number(partnerId)],
+  )
+  await conn.query(
+    `INSERT INTO partner_subscriptions (partner_id, tier, status, stripe_session_id, expires_at)
+     VALUES (?, 'pro', 'active', ?, DATE_ADD(NOW(), INTERVAL 30 DAY))`,
+    [Number(partnerId), session.id],
+  )
+  await conn.query('UPDATE partners SET commission_rate = 15 WHERE id = ?', [Number(partnerId)])
+}
 
 export default router

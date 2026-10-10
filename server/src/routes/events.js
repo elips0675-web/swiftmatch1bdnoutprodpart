@@ -3,6 +3,7 @@ import pool from '../db.js'
 import { auth } from '../middleware.js'
 import logger from '../logger.js'
 import { refuseMockPayment } from '../runtime.js'
+import { logWebhookDelivery, markWebhookProcessed, markWebhookFailed, WEBHOOK_PROVIDERS } from '../webhooks.js'
 
 const router = Router()
 
@@ -243,35 +244,23 @@ router.post('/api/events/order/webhook', async (req, res) => {
     const session = event.data.object
     if (!session.metadata || session.metadata.kind !== 'event') return res.json({ received: true })
     if (session.payment_status !== 'paid') return res.json({ received: true })
-    const { offer_id: offerId } = session.metadata
+    const eventId = String(event.id || '')
+    await logWebhookDelivery({ provider: WEBHOOK_PROVIDERS.events, eventId, eventType: event.type, payload: event })
     try {
       const conn = await pool.getConnection()
       try {
         await conn.beginTransaction()
         const [evt] = await conn.query(
           'INSERT IGNORE INTO webhook_events (provider, event_id) VALUES (?, ?)',
-          ['stripe_event', String(event.id || '')],
+          [WEBHOOK_PROVIDERS.events, eventId],
         )
         if (!evt || evt.affectedRows === 0) {
           await conn.rollback()
           return res.json({ received: true })
         }
-        const [upd] = await conn.query(
-          `UPDATE event_tickets SET status = 'paid', paid_at = NOW()
-           WHERE stripe_session_id = ? AND status = 'pending'`,
-          [session.id],
-        )
-        if (upd && upd.affectedRows > 0) {
-          await conn.query('UPDATE partner_offers SET tickets_sold = tickets_sold + 1 WHERE id = ?', [offerId])
-          await conn.query(
-            `INSERT INTO partner_conversions (partner_id, offer_id, user_id, conversion_type, external_order_id, stripe_session_id, amount, commission, status)
-             SELECT po.partner_id, po.offer_id, po.user_id, 'purchase', po.stripe_session_id, po.stripe_session_id, po.amount, po.commission, 'approved'
-             FROM partner_orders po WHERE po.stripe_session_id = ? LIMIT 1`,
-            [session.id],
-          )
-          await conn.query("UPDATE partner_orders SET status = 'paid' WHERE stripe_session_id = ? AND status = 'pending'", [session.id])
-        }
+        await applyEventTicket(event, conn)
         await conn.commit()
+        await markWebhookProcessed(WEBHOOK_PROVIDERS.events, eventId)
       } catch (err) {
         await conn.rollback()
         throw err
@@ -280,9 +269,30 @@ router.post('/api/events/order/webhook', async (req, res) => {
       }
     } catch (err) {
       logger.error('Event webhook processing error:', err)
+      await markWebhookFailed(WEBHOOK_PROVIDERS.events, eventId, err.message)
     }
   }
   res.json({ received: true })
 })
+
+export async function applyEventTicket(event, conn) {
+  const session = event.data.object
+  const { offer_id: offerId } = session.metadata
+  const [upd] = await conn.query(
+    `UPDATE event_tickets SET status = 'paid', paid_at = NOW()
+     WHERE stripe_session_id = ? AND status = 'pending'`,
+    [session.id],
+  )
+  if (upd && upd.affectedRows > 0) {
+    await conn.query('UPDATE partner_offers SET tickets_sold = tickets_sold + 1 WHERE id = ?', [offerId])
+    await conn.query(
+      `INSERT INTO partner_conversions (partner_id, offer_id, user_id, conversion_type, external_order_id, stripe_session_id, amount, commission, status)
+       SELECT po.partner_id, po.offer_id, po.user_id, 'purchase', po.stripe_session_id, po.stripe_session_id, po.amount, po.commission, 'approved'
+       FROM partner_orders po WHERE po.stripe_session_id = ? LIMIT 1`,
+      [session.id],
+    )
+    await conn.query("UPDATE partner_orders SET status = 'paid' WHERE stripe_session_id = ? AND status = 'pending'", [session.id])
+  }
+}
 
 export default router
