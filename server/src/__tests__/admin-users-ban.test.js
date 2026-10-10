@@ -109,3 +109,19 @@ describe('admin ban chain → WS user:banned', () => {
     expect(ioMock.emit).not.toHaveBeenCalled()
   })
 })
+
+describe('DELETE /api/admin/users/:id — soft delete, а не hard', () => {
+  it('зовёт softDelete, обнуляет is_active, строку не удаляет жёстко', async () => {
+    const { softDelete } = await import('../audit.js')
+    pool.query.mockResolvedValue([{}])
+    const res = await request(app)
+      .delete('/api/admin/users/42')
+      .set('Authorization', `Bearer ${adminToken()}`)
+
+    expect(res.status).toBe(200)
+    expect(softDelete).toHaveBeenCalledWith('users', '42', 1, expect.anything())
+    expect(pool.query).toHaveBeenCalledWith('UPDATE users SET is_active = 0 WHERE id = ?', ['42'])
+    const hardDelete = pool.query.mock.calls.find((c) => /DELETE\s+FROM\s+users/i.test(String(c[0])))
+    expect(hardDelete, 'жёсткого DELETE FROM users быть не должно').toBeUndefined()
+  })
+})

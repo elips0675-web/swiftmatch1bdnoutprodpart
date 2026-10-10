@@ -35,7 +35,7 @@ import socialRoutes from '../routes/social.js'
 import hangoutRoutes from '../routes/hangouts.js'
 import profileRoutes from '../routes/profile.js'
 import scheduleRoutes from '../routes/schedule.js'
-import { softDeleteWhere } from '../audit.js'
+import { softDelete, softDeleteWhere } from '../audit.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ROUTES = path.join(HERE, '..', 'routes')
@@ -250,6 +250,12 @@ describe('Пользовательские выборки отсекают is_ac
     const src = fs.readFileSync(path.join(ROUTES, 'hangouts.js'), 'utf8')
     expect(src).toContain("activeUser('up3')")
   })
+
+  it('GET /api/profile/:id отдаёт 404, когда активного юзера нет (удалён)', async () => {
+    pool.query.mockResolvedValue([[], []])
+    const res = await request(createApp()).get('/api/profile/5').set('Authorization', `Bearer ${token(ACTOR)}`)
+    expect(res.status).toBe(404)
+  })
 })
 
 // ─── 4. audit_log при массовом удалении ──────────────────────────────────────
@@ -274,5 +280,21 @@ describe('softDeleteWhere пишет след в audit_log', () => {
       softDeleteWhere('users; DROP TABLE users', 'id = ?', [1], 99, '10.0.0.1'),
     ).rejects.toThrow()
     expect(pool.query).not.toHaveBeenCalled()
+  })
+})
+
+describe('softDelete (одна запись) пишет deleted_at и след action=delete', () => {
+  it('UPDATE ... SET deleted_at = NOW() WHERE id = ? + INSERT audit_log', async () => {
+    await softDelete('users', 5, 99, '10.0.0.1')
+    const statements = executedSql()
+    expect(statements.some((s) => s.includes('UPDATE `users` SET deleted_at = NOW() WHERE id = ?'))).toBe(true)
+    const audit = pool.query.mock.calls.find((c) => String(c[0]).includes('INSERT INTO audit_log'))
+    expect(audit).toBeTruthy()
+    const [, params] = audit
+    expect(params[0]).toBe('users')
+    expect(params[1]).toBe(5)
+    expect(params[2]).toBe('delete')
+    expect(params[5]).toBe(99)
+    expect(params[6]).toBe('10.0.0.1')
   })
 })
