@@ -285,3 +285,101 @@ describe('Ответ на сообщение (reply-to)', () => {
     }, { timeout: 5000 })
   })
 })
+
+describe('Редактирование сообщения (P1 #9)', () => {
+  // Своё сообщение: sender_id 7 (пользователь теста), партнёр — user_id 8.
+  function ownMsg(id: number, text: string, created_at: string, edited_at?: string | null) {
+    return {
+      id,
+      sender_id: 7,
+      text,
+      image_url: null,
+      reply_to: null,
+      ttl_seconds: null,
+      created_at,
+      edited_at: edited_at ?? null,
+      sender_name: 'Я',
+      seen: true,
+      reactions: [],
+    }
+  }
+
+  const nowIso = () => new Date().toISOString()
+  const oldIso = () => new Date(Date.now() - 16 * 60 * 1000).toISOString()
+
+  it('своё свежее сообщение показывает кнопку «Редактировать», чужое и старое — нет', async () => {
+    firstPage = {
+      messages: [ownMsg(50, 'моё свежее', nowIso()), msg(51, 'чужое'), ownMsg(52, 'моё старое', oldIso()), msg(53, 'ещё чужое')],
+      has_more: false,
+      next_before: 50,
+    }
+    renderChat()
+    await screen.findByText('моё свежее', {}, { timeout: 5000 })
+
+    const editButtons = screen.getAllByTestId('edit-message-button')
+    expect(editButtons).toHaveLength(1)
+    expect(screen.getByText('моё старое')).toBeTruthy()
+    expect(screen.getByText('чужое')).toBeTruthy()
+  })
+
+  it('сохранение правки шлёт PUT на /messages/:id с новым текстом и обновляет список', async () => {
+    firstPage = { messages: [ownMsg(50, 'было так', nowIso())], has_more: false, next_before: 50 }
+    let edited = false
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      const u = String(url)
+      const method = init?.method ?? 'GET'
+      if (method === 'PUT' && u.startsWith(`/api/chats/${CHAT_ID}/messages/`)) {
+        edited = true
+        return Promise.resolve(jsonResponse({ ok: true }))
+      }
+      if (u.startsWith(`/api/chats/${CHAT_ID}/messages`)) {
+        const page = edited
+          ? { messages: [ownMsg(50, 'стало так', nowIso(), nowIso())], has_more: false, next_before: 50 }
+          : firstPage
+        return Promise.resolve(jsonResponse(page))
+      }
+      if (u === `/api/chats/${CHAT_ID}`) return Promise.resolve(jsonResponse(partner))
+      if (u.includes('/api/hangouts/by-chat/')) return Promise.resolve(jsonResponse({}, 404))
+      if (u.includes('/read')) return Promise.resolve(jsonResponse({}))
+      return Promise.resolve(jsonResponse({}, 404))
+    })
+
+    renderChat()
+    await screen.findByText('было так', {}, { timeout: 5000 })
+
+    fireEvent.click(screen.getByTestId('edit-message-button'))
+    const input = await screen.findByTestId('message-edit-input', {}, { timeout: 5000 })
+    fireEvent.change(input, { target: { value: 'стало так' } })
+    fireEvent.click(screen.getByTestId('edit-save'))
+
+    await waitFor(() => {
+      const putCall = mockFetch.mock.calls.find(([url, init]) => String(url).includes('/messages/') && (init as RequestInit | undefined)?.method === 'PUT')
+      expect(putCall).toBeTruthy()
+      expect(String(putCall![0])).toBe(`/api/chats/${CHAT_ID}/messages/50`)
+      const body = JSON.parse(String((putCall![1] as RequestInit).body))
+      expect(body.text).toBe('стало так')
+    }, { timeout: 5000 })
+
+    await screen.findByText('стало так', {}, { timeout: 5000 })
+    expect(screen.queryByText('было так')).toBeNull()
+  })
+
+  it('отредактированное сообщение несёт пометку «изменено» рядом с временем', async () => {
+    firstPage = { messages: [ownMsg(50, 'правленое', nowIso(), nowIso())], has_more: false, next_before: 50 }
+    renderChat()
+    await screen.findByText('правленое', {}, { timeout: 5000 })
+    expect(screen.getByTestId('edited-mark')).toBeTruthy()
+  })
+
+  it('кнопка отмены закрывает инпут без запроса', async () => {
+    firstPage = { messages: [ownMsg(50, 'не трону', nowIso())], has_more: false, next_before: 50 }
+    renderChat()
+    await screen.findByText('не трону', {}, { timeout: 5000 })
+
+    fireEvent.click(screen.getByTestId('edit-message-button'))
+    await screen.findByTestId('message-edit-input', {}, { timeout: 5000 })
+    fireEvent.click(screen.getByTestId('edit-cancel'))
+    await waitFor(() => expect(screen.queryByTestId('message-edit-input')).toBeNull(), { timeout: 5000 })
+    expect(mockFetch.mock.calls.filter(([url, init]) => String(url).includes('/messages/') && (init as RequestInit | undefined)?.method === 'PUT')).toHaveLength(0)
+  })
+})

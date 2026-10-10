@@ -711,7 +711,7 @@ router.get('/api/chats/:chatId/messages', auth, async (req, res) => {
     }
 
     const [fetched] = await pool.query(
-      `SELECT m.id, m.sender_id, m.text, m.image_url, m.reply_to, m.ttl_seconds, m.created_at,
+      `SELECT m.id, m.sender_id, m.text, m.image_url, m.reply_to, m.ttl_seconds, m.created_at, m.edited_at,
               up.display_name as sender_name,
               rup.display_name as reply_sender_name,
               CASE WHEN rup.id IS NOT NULL THEN rm.text END as reply_text,
@@ -821,7 +821,7 @@ router.post('/api/chats/:chatId/messages', auth, async (req, res) => {
     )
 
     const [[msg]] = await pool.query(
-      `SELECT m.id, m.sender_id, m.text, m.image_url, m.reply_to, m.ttl_seconds, m.created_at,
+      `SELECT m.id, m.sender_id, m.text, m.image_url, m.reply_to, m.ttl_seconds, m.created_at, m.edited_at,
               up.display_name as sender_name,
               rup.display_name as reply_sender_name,
               CASE WHEN rup.id IS NOT NULL THEN rm.text END as reply_text,
@@ -876,6 +876,87 @@ router.delete('/api/chats/:chatId/messages/:msgId', auth, async (req, res) => {
   } catch (err) {
     logger.error('Delete message error:', err)
     res.status(500).json({ message: 'Failed to delete message' })
+  }
+})
+
+// ─── Edit message ─────────────────────────────────────────────
+// Правка сообщения доступна автору в течение 15 минут с момента отправки.
+// Редактированный текст пересматривается на banned words, как и новый.
+const MESSAGE_EDIT_WINDOW_MS = 15 * 60 * 1000
+
+router.put('/api/chats/:chatId/messages/:msgId', auth, async (req, res) => {
+  const { text } = req.body
+  if (!text || !String(text).trim()) {
+    return res.status(400).json({ message: 'Text is required' })
+  }
+
+  try {
+    const bannedWords = await getBannedWords()
+    if (containsBannedWord(text, bannedWords)) {
+      return res.status(403).json({ message: 'Message contains prohibited content' })
+    }
+  } catch (err) {
+    logger.error('Banned words check error:', err)
+  }
+
+  try {
+    const [participant] = await pool.query(
+      'SELECT chat_id FROM chat_participants WHERE chat_id = ? AND user_id = ?',
+      [req.params.chatId, req.userId],
+    )
+    if (participant.length === 0) return res.status(403).json({ message: 'Not a participant' })
+
+    const [rows] = await pool.query(
+      'SELECT id, sender_id, created_at FROM messages WHERE id = ? AND chat_id = ?',
+      [req.params.msgId, req.params.chatId],
+    )
+    if (rows.length === 0) return res.status(404).json({ message: 'Message not found' })
+    if (rows[0].sender_id !== req.userId) return res.status(403).json({ message: 'Not your message' })
+
+    const ageMs = Date.now() - new Date(rows[0].created_at).getTime()
+    if (ageMs > MESSAGE_EDIT_WINDOW_MS) {
+      return res.status(403).json({ message: 'Edit window expired' })
+    }
+
+    await pool.query(
+      'UPDATE messages SET text = ?, edited_at = NOW() WHERE id = ?',
+      [String(text).trim(), req.params.msgId],
+    )
+
+    const [[msg]] = await pool.query(
+      `SELECT m.id, m.sender_id, m.text, m.image_url, m.reply_to, m.ttl_seconds, m.created_at, m.edited_at,
+              up.display_name as sender_name,
+              rup.display_name as reply_sender_name,
+              CASE WHEN rup.id IS NOT NULL THEN rm.text END as reply_text,
+              CASE WHEN rup.id IS NOT NULL THEN rm.image_url END as reply_image_url
+       FROM messages m
+       JOIN user_profiles up ON m.sender_id = up.id
+       LEFT JOIN messages rm ON rm.id = m.reply_to
+       LEFT JOIN user_profiles rup ON rup.id = rm.sender_id AND ${activeUser('rup')}
+       WHERE m.id = ? AND ${activeUser('up')}`,
+      [req.params.msgId],
+    )
+
+    const [otherParticipant] = await pool.query(
+      'SELECT user_id FROM chat_participants WHERE chat_id = ? AND user_id != ? LIMIT 1',
+      [req.params.chatId, req.userId],
+    )
+    if (otherParticipant.length > 0) {
+      try {
+        const io = getIO()
+        if (io) {
+          io.to(`user:${otherParticipant[0].user_id}`).emit('chat:message-edited', {
+            chatId: Number(req.params.chatId),
+            message: msg,
+          })
+        }
+      } catch {}
+    }
+
+    res.json(msg)
+  } catch (err) {
+    logger.error('Edit message error:', err)
+    res.status(500).json({ message: 'Failed to edit message' })
   }
 })
 

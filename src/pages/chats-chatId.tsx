@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { ChevronLeft, Send, MoreVertical, Smile, Heart, Laugh, Zap, Star, Flame, Eye, CheckCheck, Phone, Video, Timer, Clock, CornerUpLeft, X } from "lucide-react";
+import { ChevronLeft, Send, MoreVertical, Smile, Heart, Laugh, Zap, Star, Flame, Eye, CheckCheck, Phone, Video, Timer, Clock, CornerUpLeft, X, Pencil } from "lucide-react";
 import Image from "@/shims/next-image";
 import { useRouter } from "@/shims/next-navigation";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,7 @@ import { useFeatureFlags } from "@/context/feature-flags-context";
 import { ChatPartnerActions } from "@/components/chat/chat-partner-actions";
 
 const MESSAGES_PAGE_SIZE = 50;
+const MESSAGE_EDIT_WINDOW_MS = 15 * 60 * 1000;
 
 type MessagesPage = { messages: any[]; has_more: boolean; next_before: number | null };
 
@@ -99,6 +100,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
   const [reactionMsgId, setReactionMsgId] = useState<number | null>(null);
   const [replyTo, setReplyTo] = useState<{ id: number; name: string; text: string } | null>(null);
+  const [editingMsg, setEditingMsg] = useState<{ id: number | string; text: string } | null>(null);
   const [isVideoCall, setIsVideoCall] = useState(false);
   const [isVoiceCall, setIsVoiceCall] = useState(false);
   const [isCallMuted, setIsCallMuted] = useState(false);
@@ -227,6 +229,17 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     return () => { socket.off('chat:message-deleted', handler) }
   }, [socket, params.chatId])
 
+  useEffect(() => {
+    if (!socket) return
+    const handler = (data: { chatId: number }) => {
+      if (data.chatId === Number(params.chatId)) {
+        refetchMessages()
+      }
+    }
+    socket.on('chat:message-edited', handler)
+    return () => { socket.off('chat:message-edited', handler) }
+  }, [socket, params.chatId])
+
   const handleSendMessage = async (textOverride?: string) => {
     const content = textOverride || inputValue.trim();
     if (!content) return;
@@ -273,6 +286,24 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     } catch { /* ignored */ }
     setReactionMsgId(null)
   }
+
+  const handleEditMessage = async (msgId: number | string, text: string) => {
+    const content = text.trim();
+    if (!content) return;
+    try {
+      const token = getToken();
+      const res = await fetch(`/api/chats/${params.chatId}/messages/${msgId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ text: content }),
+      });
+      if (!res.ok) {
+        toast({ title: t('error.generic_title'), description: t('error.edit_message'), variant: "destructive" });
+        return;
+      }
+      refetchMessages();
+    } catch { /* ignored */ }
+  };
 
   const getReactionsGrouped = (reactions: any[]) => {
     const grouped: Record<string, { emoji: string; count: number; users: number[] }> = {}
@@ -358,17 +389,36 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                       <div className="truncate">{msg.reply_text || (msg.reply_image_url ? '📷' : t('chats.reply_unavailable'))}</div>
                     </div>
                   )}
-                  {msg.text}
-                  <div className="absolute -bottom-3 right-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button data-testid="reply-button" onClick={() => setReplyTo({ id: msg.id, name: msg.sender_id !== chatPartner.user_id ? t('chats.you') : (chatPartner.name || ''), text: msg.text || '' })}
-                      className={cn("text-[10px]", msg.sender_id !== chatPartner.user_id ? "text-white" : "text-muted-foreground")}>
-                      <CornerUpLeft size={12} />
-                    </button>
-                    <button onClick={() => setReactionMsgId(reactionMsgId === msg.id ? null : msg.id)}
-                      className={cn("text-[10px]", msg.sender_id !== chatPartner.user_id ? "text-white" : "text-muted-foreground")}>
-                      😊
-                    </button>
-                  </div>
+                  {editingMsg?.id === msg.id ? (
+                    <div className="mb-1">
+                      <Input data-testid="message-edit-input" value={editingMsg.text} onChange={(e) => setEditingMsg({ id: msg.id, text: e.target.value })} autoFocus
+                        onKeyDown={(e) => { if (e.key === 'Enter') { handleEditMessage(msg.id, editingMsg.text); setEditingMsg(null); } }} className="h-8 text-sm" />
+                      <div className="mt-1 flex gap-1.5">
+                        <button data-testid="edit-save" onClick={() => { handleEditMessage(msg.id, editingMsg.text); setEditingMsg(null); }} className="text-[10px] text-muted-foreground">{t('button.save')}</button>
+                        <button data-testid="edit-cancel" onClick={() => setEditingMsg(null)} className="text-[10px] text-muted-foreground">{t('button.cancel')}</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {msg.text}
+                      <div className="absolute -bottom-3 right-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button data-testid="reply-button" onClick={() => setReplyTo({ id: msg.id, name: msg.sender_id !== chatPartner.user_id ? t('chats.you') : (chatPartner.name || ''), text: msg.text || '' })}
+                          className={cn("text-[10px]", msg.sender_id !== chatPartner.user_id ? "text-white" : "text-muted-foreground")}>
+                          <CornerUpLeft size={12} />
+                        </button>
+                        <button onClick={() => setReactionMsgId(reactionMsgId === msg.id ? null : msg.id)}
+                          className={cn("text-[10px]", msg.sender_id !== chatPartner.user_id ? "text-white" : "text-muted-foreground")}>
+                          😊
+                        </button>
+                        {msg.sender_id !== chatPartner.user_id && Date.now() - new Date(msg.created_at).getTime() <= MESSAGE_EDIT_WINDOW_MS && (
+                          <button data-testid="edit-message-button" onClick={() => setEditingMsg({ id: msg.id, text: msg.text || '' })}
+                            className="text-[10px] text-white">
+                            <Pencil size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
                   {reactionMsgId === msg.id && (
                     <div className={cn("absolute bottom-full right-0 mb-1 flex gap-0.5 bg-white rounded-full shadow-lg border p-1 z-10", msg.sender_id !== chatPartner.user_id ? "" : "")}>
                       {QUICK_REACTIONS.map(r => (
@@ -378,7 +428,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                   )}
                 </div>
                 <div className="flex items-center gap-1 mt-1 px-1">
-                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">{msg.ttl_seconds && <Clock size={10} className="inline" />}{format(new Date(msg.created_at), 'HH:mm')}</span>
+                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">{msg.ttl_seconds && <Clock size={10} className="inline" />}{format(new Date(msg.created_at), 'HH:mm')}{msg.edited_at && <span data-testid="edited-mark"> · {t('chats.edited')}</span>}</span>
                   {msg.sender_id !== chatPartner.user_id && (
                     msg.seen
                       ? <CheckCheck size={12} className="text-blue-500" />

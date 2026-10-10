@@ -253,6 +253,91 @@ describe('POST /api/chats/:chatId/messages', () => {
   })
 })
 
+describe('PUT /api/chats/:chatId/messages/:msgId', () => {
+  const freshCreatedAt = () => new Date(Date.now() - 60_000).toISOString()
+
+  function createApp() {
+    const app = express()
+    app.use(express.json())
+    app.use(socialRoutes)
+    return app
+  }
+
+  function put(msgId = 5, body = { text: 'новый текст' }) {
+    return request(createApp()).put(`/api/chats/1/messages/${msgId}`).set('Authorization', `Bearer ${authToken()}`).send(body)
+  }
+
+  it('автор правит своё свежее сообщение: текст и edited_at в ответе, WS другому участнику', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ chat_id: 1 }], []])
+      .mockResolvedValueOnce([[{ id: 5, sender_id: 1, created_at: freshCreatedAt() }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ id: 5, sender_id: 1, text: 'новый текст', image_url: null, reply_to: null, ttl_seconds: null, created_at: freshCreatedAt(), edited_at: new Date().toISOString(), sender_name: 'Me', reply_sender_name: null, reply_text: null, reply_image_url: null }], []])
+      .mockResolvedValueOnce([[{ user_id: 2 }], []])
+    const emit = vi.fn()
+    const io = { to: vi.fn(() => ({ emit })) }
+    const { getIO } = await import('../ws.js')
+    getIO.mockReturnValue(io)
+    const res = await put()
+    expect(res.status).toBe(200)
+    expect(res.body.text).toBe('новый текст')
+    expect(res.body.edited_at).toBeTruthy()
+    expect(io.to).toHaveBeenCalledWith('user:2')
+    expect(emit).toHaveBeenCalledWith('chat:message-edited', { chatId: 1, message: expect.objectContaining({ text: 'новый текст' }) })
+  })
+
+  it('чужое сообщение → 403, UPDATE не уходит', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ chat_id: 1 }], []])
+      .mockResolvedValueOnce([[{ id: 5, sender_id: 2, created_at: freshCreatedAt() }], []])
+    const res = await put()
+    expect(res.status).toBe(403)
+    expect(pool.query.mock.calls.filter(([sql]) => /UPDATE messages/.test(sql))).toHaveLength(0)
+  })
+
+  it('не участник чата → 403', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    const res = await put()
+    expect(res.status).toBe(403)
+  })
+
+  it('нет такого сообщения → 404', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ chat_id: 1 }], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await put()
+    expect(res.status).toBe(404)
+  })
+
+  it('сообщение старше 15 минут → 403', async () => {
+    const oldCreatedAt = new Date(Date.now() - 20 * 60 * 1000).toISOString()
+    pool.query
+      .mockResolvedValueOnce([[{ chat_id: 1 }], []])
+      .mockResolvedValueOnce([[{ id: 5, sender_id: 1, created_at: oldCreatedAt }], []])
+    const res = await put()
+    expect(res.status).toBe(403)
+    expect(pool.query.mock.calls.filter(([sql]) => /UPDATE messages/.test(sql))).toHaveLength(0)
+  })
+
+  it('пустой текст → 400 без запросов к БД', async () => {
+    pool.query.mockReset()
+    for (const bad of ['', '   ', undefined, null]) {
+      const res = await put(5, { text: bad })
+      expect(res.status).toBe(400)
+    }
+    expect(pool.query).not.toHaveBeenCalled()
+  })
+
+  it('запрещённое слово → 403 без UPDATE', async () => {
+    const { getBannedWords, containsBannedWord } = await import('../banned-words.js')
+    getBannedWords.mockResolvedValueOnce(['badword'])
+    containsBannedWord.mockReturnValueOnce(true)
+    const res = await put(5, { text: 'содержит badword' })
+    expect(res.status).toBe(403)
+    expect(pool.query.mock.calls.filter(([sql]) => /UPDATE messages/.test(sql))).toHaveLength(0)
+  })
+})
+
 describe('POST /api/chats/:chatId/messages/:msgId/reactions', () => {
   it('toggles reaction', async () => {
     pool.query

@@ -780,6 +780,7 @@ CREATE TABLE `messages` (
   `ttl_seconds` int unsigned DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `deleted_at` timestamp NULL DEFAULT NULL,
+  `edited_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `reply_to` (`reply_to`),
   KEY `idx_messages_chat` (`chat_id`),

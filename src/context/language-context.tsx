@@ -364,6 +364,8 @@ export const translations = {
     'chats.reply_unavailable': 'Сообщение недоступно',
     'chats.cancel_reply': 'Отменить ответ',
     'chats.you': 'Вы',
+    'chats.edit': 'Редактировать',
+    'chats.edited': 'изменено',
     'schedule.title': 'Видеосвидания',
     'schedule.propose': 'Предложить видеосвидание',
     'schedule.accept': 'Принять',
@@ -1070,6 +1072,7 @@ export const translations = {
     'error.chat_not_found': 'Чат не найден',
     'error.generic_title': 'Что-то пошло не так',
     'error.send_message': 'Не удалось отправить сообщение',
+    'error.edit_message': 'Не удалось изменить сообщение',
 
     // Gallery
     'gallery.viewer': 'Просмотр фото',
@@ -2147,6 +2150,8 @@ export const translations = {
     'chats.reply_unavailable': 'Message unavailable',
     'chats.cancel_reply': 'Cancel reply',
     'chats.you': 'You',
+    'chats.edit': 'Edit',
+    'chats.edited': 'edited',
     'schedule.title': 'Video Dates',
     'schedule.propose': 'Propose a video date',
     'schedule.accept': 'Accept',
@@ -2855,6 +2860,7 @@ export const translations = {
     'error.chat_not_found': 'Chat not found',
     'error.generic_title': 'Something went wrong',
     'error.send_message': 'Could not send message',
+    'error.edit_message': 'Could not edit message',
 
     // Gallery
     'gallery.viewer': 'Photo Viewer',
