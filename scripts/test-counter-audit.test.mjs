@@ -23,11 +23,14 @@ import {
   countsFromVitestReport,
   fixClaims,
   fixInventoryRows,
+  gateClassificationProblems,
   normalizeEol,
   parseInventoryRows,
   plural,
   renderInventoryJson,
   renderPerFileTxt,
+  SERVER_GATE_TESTS,
+  testKind,
   totalsOf,
 } from "./test-counter-audit.mjs";
 
@@ -491,5 +494,83 @@ describe("машинный инвентарь (test-inventory.json / *-tests.txt
     expect(checkPerFileTxt(spec.file, spec, broken, counts.front).map((p) => p.message)).toContain(
       "scripts/gate.test.mjs: в прогоне 2, в файле 1"
     );
+  });
+});
+
+describe("разбивка product / gate", () => {
+  const counts = {
+    front: {
+      tests: 3,
+      files: 2,
+      passed: 3,
+      failed: 0,
+      perFile: new Map([
+        ["src/b.test.tsx", 1],
+        ["scripts/gate.test.mjs", 2],
+      ]),
+    },
+    server: {
+      tests: 4,
+      files: 1,
+      passed: 4,
+      failed: 0,
+      perFile: new Map([["server/src/__tests__/a.test.js", 4]]),
+    },
+    e2e: { tests: 7, files: 1, perFile: new Map([["e2e/c.spec.ts", 7]]) },
+    total: 7,
+  };
+
+  it("у фронта граница по каталогу, у сервера — по списку гейтов", () => {
+    expect(testKind("scripts/gate.test.mjs")).toBe("gate");
+    expect(testKind("src/pages/a.test.tsx")).toBe("product");
+    expect(testKind("server/src/__tests__/a.test.js")).toBe("product");
+    expect(testKind(SERVER_GATE_TESTS[0])).toBe("gate");
+    expect(testKind("e2e/c.spec.ts")).toBe("product");
+  });
+
+  it("buildInventory делит каждую секцию на gate и product", () => {
+    const inv = buildInventory(counts, "2026-10-09T00:00:00.000Z");
+    expect(inv.frontend.gate).toEqual({ files: 1, tests: 2 });
+    expect(inv.frontend.product).toEqual({ files: 1, tests: 1 });
+    expect(inv.server.gate).toEqual({ files: 0, tests: 0 });
+    expect(inv.server.product).toEqual({ files: 1, tests: 4 });
+    expect(inv.e2e.product).toEqual({ files: 1, tests: 7 });
+  });
+
+  it("totalsOf выводит плоские ключи для claim'а", () => {
+    const totals = totalsOf(counts);
+    expect([totals.frontGateTests, totals.frontProductTests]).toEqual([2, 1]);
+    expect([totals.serverGateTests, totals.serverProductTests]).toEqual([0, 4]);
+    expect([totals.e2eGateTests, totals.e2eProductTests]).toEqual([0, 7]);
+  });
+
+  it("checkInventoryJson краснеет на разошедшейся разбивке", () => {
+    const inv = buildInventory(counts, "2026-10-09T00:00:00.000Z");
+    inv.frontend.gate = { files: 0, tests: 0 };
+    const problems = checkInventoryJson("test/test-inventory.json", JSON.stringify(inv), counts);
+    expect(problems.map((p) => p.message)).toContain(
+      "frontend.gate.tests: в прогоне 2, в инвентаре 0"
+    );
+  });
+
+  it("ловит гейтовый тест сервера, забытый в списке", () => {
+    const problems = gateClassificationProblems({
+      server: { perFile: new Map([["server/src/__tests__/new-audit.test.js", 3]]) },
+    });
+    expect(problems.map((p) => p.message)).toEqual([
+      "server/src/__tests__/new-audit.test.js похож на тест гейта, но его нет в SERVER_GATE_TESTS — добавь или переименуй",
+      ...SERVER_GATE_TESTS.map((f) => `SERVER_GATE_TESTS: ${f} нет в прогоне — убери из списка`),
+    ]);
+  });
+
+  it("ловит запись в списке, которой нет в прогоне", () => {
+    const problems = gateClassificationProblems({ server: { perFile: new Map() } });
+    expect(problems).toHaveLength(SERVER_GATE_TESTS.length);
+    expect(problems[0].message).toMatch(/нет в прогоне/);
+  });
+
+  it("молчит, когда список совпадает с прогоном", () => {
+    const perFile = new Map(SERVER_GATE_TESTS.map((f) => [f, 1]));
+    expect(gateClassificationProblems({ server: { perFile } })).toEqual([]);
   });
 });

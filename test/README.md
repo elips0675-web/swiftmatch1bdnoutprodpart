@@ -153,7 +153,7 @@ cd server && npm test            # серверные тесты
 | Секреты | `node scripts/secrets-leak-audit.mjs` | четыре независимых канала: `.dockerignore` пропускает `server/.env`/`.jwt-dev-secret`; rsync без `--exclude .env` стирает прод-`.env`; **rsync исключает не все классы файлов-секретов, которые гейт сам признаёт секретами** (`server/.jwt-dev-secret`, `.env.*`, `*.pfx`, `id_rsa` ехали на VPS при зелёном гейте — этап 35); **значение секрета, вписанное в отслеживаемый файл** (был VAPID-ключ в `README.md`) |
 | Персистентность деплоя | `node scripts/deploy-persistence-audit.mjs` | каталог записи фото не смонтирован volume'ом → `docker compose up --build` удаляет все фото; сверяет путь из кода с compose |
 | Заголовки безопасности на периметре | `npm run check:headers` | SPA и статику отдаёт **nginx**, а не Express — `helmet()` (`server/src/index.js`) покрывает только ответы API, и в образ едущий `nginx/swiftmatch.http.conf` не было ни одного security-заголовка (этап 38); **наследование `add_header`**: в `location` с собственным `add_header` (например `Cache-Control`) верхнеуровневые заголовки не действуют; три nginx-конфига, `vercel.json`, `index.html`, порядок `helmet()`/`express.static` |
-| Счётчики тестов | `node scripts/test-counter-audit.mjs` (`--fix` переписывает и перегенерирует) | числа тестов в `README.md`, `project-context.md`, `test/README.md`, `test/project-context.md`, `test/ИНВЕНТАРЬ-ТЕСТОВ.md` разошлись с прогоном; машинный инвентарь `test/test-inventory.json` + `test/frontend-tests.txt`/`server-tests.txt`/`e2e-tests.txt` устарел (кандидат 1 «перенять у Service Desk») |
+| Счётчики тестов | `node scripts/test-counter-audit.mjs` (`--fix` переписывает и перегенерирует) | числа тестов в `README.md`, `project-context.md`, `test/README.md`, `test/project-context.md`, `test/ИНВЕНТАРЬ-ТЕСТОВ.md` разошлись с прогоном; машинный инвентарь `test/test-inventory.json` + `test/frontend-tests.txt`/`server-tests.txt`/`e2e-tests.txt` устарел; разбивка `product`/`gate` в инвентаре и строке «Продукт/гейты» (`scripts/**` и `*-audit`/`schema-drift`/`prod-mock`-тесты сервера — гейты, остальное — продукт; новый `*-audit.test.js` без записи в `SERVER_GATE_TESTS` — красный), иначе вывеска прячет мета-тесты |
 | Уязвимости prod-зависимостей | `npm run audit:prod` (корень и в `server/`) | `npm audit --omit=dev --audit-level=high` по обоим lock-файлам: в образ едет только прод-часть |
 | Порты и ключи | `npm run check:ports` | порты vite/proxy/`.env`/`CORS_ORIGIN` + `console.log` в `server/src` |
 | Конфиг Android | `node scripts/check-native-config.mjs` | cleartext для native-сборок |
@@ -178,7 +178,7 @@ cd server && npm test            # серверные тесты
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 569 тестов, 42 файла — **0 failures**
+- **Фронтенд (Vitest):** 576 тестов, 42 файла — **0 failures**
 - **Сервер (Vitest):** 856 тестов, 60 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 152 теста, 19 spec-файлов — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 

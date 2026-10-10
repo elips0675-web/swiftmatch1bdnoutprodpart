@@ -207,6 +207,76 @@ const INVENTORY_SECTION_CLAIMS = INVENTORY_TABLES.map((t) => ({
   slots: [slot(t.files, 1), slot(t.tests, 2)],
 }))
 
+/**
+ * Разбивка тестов на продуктовые и гейтовые.
+ *
+ * У фронта граница — каталог: `scripts/**` тестирует сами гейты, `src/**` — продукт.
+ * У сервера всё лежит в `server/src/__tests__/`, поэтому граница только явным
+ * списком (`SERVER_GATE_TESTS`). `SERVER_GATE_RE` ловит новичка по имени — без
+ * него список протухает молча: добавили `*-audit.test.js`, он посчитался
+ * продуктовым, и вывеска завысила покрытие.
+ */
+export const SERVER_GATE_TESTS = [
+  'server/src/__tests__/deploy-persistence-audit.test.js',
+  'server/src/__tests__/order-by-audit.test.js',
+  'server/src/__tests__/prod-mock-payments.test.js',
+  'server/src/__tests__/schema-drift.test.js',
+  'server/src/__tests__/secrets-leak-audit.test.js',
+]
+const SERVER_GATE_RE = /(?:-audit|schema-drift|prod-mock)[^/]*\.test\.js$/
+
+export function testKind(file) {
+  if (file.startsWith('scripts/')) return 'gate'
+  if (SERVER_GATE_TESTS.includes(file)) return 'gate'
+  return 'product'
+}
+
+function kindCounts(countData) {
+  let gateFiles = 0
+  let gateTests = 0
+  let productFiles = 0
+  let productTests = 0
+  for (const [file, tests] of countData.perFile) {
+    if (testKind(file) === 'gate') {
+      gateFiles += 1
+      gateTests += tests
+    } else {
+      productFiles += 1
+      productTests += tests
+    }
+  }
+  return {
+    gate: { files: gateFiles, tests: gateTests },
+    product: { files: productFiles, tests: productTests },
+  }
+}
+
+export function gateClassificationProblems(counts) {
+  const problems = []
+  for (const [file] of counts.server.perFile) {
+    if (!SERVER_GATE_RE.test(file)) continue
+    if (!SERVER_GATE_TESTS.includes(file)) {
+      problems.push({
+        file: 'server/src/__tests__',
+        claim: 'gate-classification',
+        line: 0,
+        message: `${file} похож на тест гейта, но его нет в SERVER_GATE_TESTS — добавь или переименуй`,
+      })
+    }
+  }
+  for (const file of SERVER_GATE_TESTS) {
+    if (!counts.server.perFile.has(file)) {
+      problems.push({
+        file: 'server/src/__tests__',
+        claim: 'gate-classification',
+        line: 0,
+        message: `SERVER_GATE_TESTS: ${file} нет в прогоне — убери из списка`,
+      })
+    }
+  }
+  return problems
+}
+
 const CMD_SERVER = {
   id: 'inventory-cmd-server',
   suite: 'unit',
@@ -228,6 +298,18 @@ const CMD_E2E = {
   slots: [slot('e2eFiles', 1)],
 }
 
+const INVENTORY_KINDS = {
+  id: 'inventory-kinds',
+  suite: 'unit',
+  re: /^> Продукт\/гейты: фронт \*\*(\d+)\*\* продукт \/ \*\*(\d+)\*\* гейты, сервер \*\*(\d+)\*\* продукт \/ \*\*(\d+)\*\* гейты/m,
+  slots: [
+    slot('frontProductTests', 1),
+    slot('frontGateTests', 2),
+    slot('serverProductTests', 3),
+    slot('serverGateTests', 4),
+  ],
+}
+
 const README_CLAIMS = [README_FRONTS, README_SERVER, README_E2E]
 const SNAPSHOT_CLAIMS = [SNAPSHOT_TOTAL, SNAPSHOT_SUITES, SNAPSHOT_DATE]
 const INVENTORY_CLAIMS = [
@@ -238,6 +320,7 @@ const INVENTORY_CLAIMS = [
   CMD_SERVER,
   CMD_FRONT,
   CMD_E2E,
+  INVENTORY_KINDS,
 ]
 
 /**
@@ -623,6 +706,7 @@ export function buildInventory(counts, generated) {
     tests: c.tests,
     passed: c.passed,
     failed: c.failed,
+    ...kindCounts(c),
     perFile: perFileList(c.perFile),
   })
   return {
@@ -634,6 +718,7 @@ export function buildInventory(counts, generated) {
     e2e: {
       files: counts.e2e.files,
       tests: counts.e2e.tests,
+      ...kindCounts(counts.e2e),
       perFile: perFileList(counts.e2e.perFile),
     },
     total: {
@@ -661,6 +746,15 @@ function pushSuiteDiff(problems, relPath, label, expected, actual) {
     if (expected[field] === undefined) continue
     if (actual[field] !== expected[field]) {
       problems.push({ file: relPath, claim: 'inventory-json', line: 0, message: `${label}.${field}: в прогоне ${expected[field]}, в инвентаре ${actual[field]}` })
+    }
+  }
+  for (const kind of ['gate', 'product']) {
+    const exp = expected[kind] || { files: 0, tests: 0 }
+    const act = actual[kind] || {}
+    for (const field of ['files', 'tests']) {
+      if (act[field] !== exp[field]) {
+        problems.push({ file: relPath, claim: 'inventory-json', line: 0, message: `${label}.${kind}.${field}: в прогоне ${exp[field]}, в инвентаре ${act[field]}` })
+      }
     }
   }
   if (JSON.stringify(actual.perFile) !== JSON.stringify(expected.perFile)) {
@@ -697,6 +791,15 @@ export function checkInventoryJson(relPath, text, counts) {
   }
   if (JSON.stringify(parsed.e2e && parsed.e2e.perFile) !== JSON.stringify(expected.e2e.perFile)) {
     problems.push({ file: relPath, claim: 'inventory-json', line: 0, message: 'e2e.perFile: расходится с прогоном' })
+  }
+  for (const kind of ['gate', 'product']) {
+    const exp = expected.e2e[kind] || { files: 0, tests: 0 }
+    const act = (parsed.e2e && parsed.e2e[kind]) || {}
+    for (const field of ['files', 'tests']) {
+      if (act[field] !== exp[field]) {
+        problems.push({ file: relPath, claim: 'inventory-json', line: 0, message: `e2e.${kind}.${field}: в прогоне ${exp[field]}, в инвентаре ${act[field]}` })
+      }
+    }
   }
   for (const field of ['files', 'tests']) {
     const act = parsed.total && parsed.total[field]
@@ -842,6 +945,13 @@ export function totalsOf(counts) {
     flat[table.files] = files
     flat[table.tests] = tests
   }
+  for (const [label, countData] of [['front', counts.front], ['server', counts.server], ['e2e', counts.e2e]]) {
+    const { gate, product } = kindCounts(countData)
+    flat[`${label}GateFiles`] = gate.files
+    flat[`${label}GateTests`] = gate.tests
+    flat[`${label}ProductFiles`] = product.files
+    flat[`${label}ProductTests`] = product.tests
+  }
   return flat
 }
 
@@ -924,6 +1034,8 @@ export function audit(root, counts, options = {}) {
       message: `зелёных не всё: фронт ${counts.front.passed}/${counts.front.tests}, сервер ${counts.server.passed}/${counts.server.tests} — «0 failures» в документации становится ложью`,
     })
   }
+
+  problems.push(...gateClassificationProblems(counts))
 
   return { problems, changed }
 }
