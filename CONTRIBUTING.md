@@ -218,9 +218,9 @@ npx vitest run                # фронт — все зелёные
 cd server && npm run test     # сервер — все зелёные
 
 # Гейты-аудиты (все блокирующие в CI, полный список — README, раздел «Команды и гейты»)
-npm run check:ports                                  # порты vite/proxy/.env/CORS + console.log в server/src
+npm run check:ports                                  # порты vite/proxy/.env/CORS + console.log в server/src (seed.js исключён)
 node scripts/secrets-leak-audit.mjs                  # .dockerignore, rsync --delete, значения секретов в текстах
-node scripts/deploy-persistence-audit.mjs            # volume для фото + совпадение путей записи/отдачи
+node scripts/deploy-persistence-audit.mjs            # volume для фото + совпадение путей записи/отдачи (читает USE_S3)
 node scripts/schema-drift-audit.mjs --offline        # колонка в эталоне ↔ миграции (с MySQL — без --offline)
 node scripts/test-counter-audit.mjs                  # числа тестов в 5 документах + test/test-inventory.json и test/*-tests.txt; разбивка product/gate (--fix переписывает и перегенерирует)
 npm run audit:prod                                   # уязвимости prod-зависимостей, корень

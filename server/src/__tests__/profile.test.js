@@ -112,6 +112,8 @@ describe('GET /api/profile/:id', () => {
 describe('PUT /api/profile/:id', () => {
   it('updates profile fields', async () => {
     pool.query
+      .mockResolvedValueOnce([[{ id: 1, display_name: 'Old', bio: 'Old bio', age: 30 }], []])
+      .mockResolvedValueOnce([[], []])
       .mockResolvedValueOnce([[], []])
       .mockResolvedValueOnce([[{ id: 1, display_name: 'Updated', bio: 'New bio' }], []])
 
@@ -125,9 +127,11 @@ describe('PUT /api/profile/:id', () => {
 
   it('updates interests if provided: один INSERT на весь список, а не по интересу', async () => {
     pool.query
+      .mockResolvedValueOnce([[{ id: 1, display_name: 'Old' }], []])
       .mockResolvedValueOnce([[], []])
       .mockResolvedValueOnce([[{ interests: '["sport","music"]' }], []])
       .mockResolvedValueOnce([[{ id: 1, name_en: 'Sport' }, { id: 2, name_en: 'Music' }], []])
+      .mockResolvedValueOnce([[], []])
       .mockResolvedValue([[], []])
 
     const res = await request(app)
@@ -145,9 +149,11 @@ describe('PUT /api/profile/:id', () => {
 
   it('filters out non-canonical interest ids on save (e.g. Animals/Politics)', async () => {
     pool.query
+      .mockResolvedValueOnce([[{ id: 1, display_name: 'Old' }], []])
       .mockResolvedValueOnce([[], []])
       .mockResolvedValueOnce([[{ interests: '["sport"]' }], []])
       .mockResolvedValueOnce([[{ id: 13, name_en: 'Animals' }, { id: 1, name_en: 'Sport' }], []])
+      .mockResolvedValueOnce([[], []])
       .mockResolvedValue([[], []])
 
     const res = await request(app)
@@ -164,6 +170,7 @@ describe('PUT /api/profile/:id', () => {
 
   it('keeps canonical interests added later (Coffee=26, Design=37) and drops Animals(13)', async () => {
     pool.query
+      .mockResolvedValueOnce([[{ id: 1, display_name: 'Old' }], []])
       .mockResolvedValueOnce([[], []])
       .mockResolvedValueOnce([[{ interests: '["sport","coffee","design"]' }], []])
       .mockResolvedValueOnce([
@@ -174,6 +181,7 @@ describe('PUT /api/profile/:id', () => {
         ],
         [],
       ])
+      .mockResolvedValueOnce([[], []])
       .mockResolvedValue([[], []])
 
     const res = await request(app)
@@ -197,6 +205,8 @@ describe('PUT /api/profile/:id', () => {
     expectedAge = Math.max(18, expectedAge)
 
     pool.query
+      .mockResolvedValueOnce([[{ id: 1, age: 25, birth_date: '1999-01-01' }], []])
+      .mockResolvedValueOnce([[], []])
       .mockResolvedValueOnce([[], []])
       .mockResolvedValueOnce([[{ id: 1, display_name: 'Updated' }], []])
 
@@ -220,6 +230,8 @@ describe('PUT /api/profile/:id', () => {
     const birthDateStr = `${bd.getFullYear()}-${String(bd.getMonth() + 1).padStart(2, '0')}-${String(bd.getDate()).padStart(2, '0')}`
 
     pool.query
+      .mockResolvedValueOnce([[{ id: 1, age: 30 }], []])
+      .mockResolvedValueOnce([[], []])
       .mockResolvedValueOnce([[], []])
       .mockResolvedValueOnce([[{ id: 1, display_name: 'Baby' }], []])
 
@@ -426,5 +438,101 @@ describe('Static routes before /:id (regression: shadowing)', () => {
       .set('Authorization', `Bearer ${authToken()}`)
     expect(res.status).toBe(200)
     expect(res.body.verified).toBe(false)
+  })
+})
+
+describe('audit_log: история изменений профиля (L7)', () => {
+  function auditInsertCall() {
+    return pool.query.mock.calls.find(
+      (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO audit_log'),
+    )
+  }
+
+  it('PUT /api/profile/:id пишет запись только по изменившимся полям', async () => {
+    const before = { id: 1, display_name: 'Old', bio: 'Old bio', age: 25 }
+    pool.query
+      .mockResolvedValueOnce([[before], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ id: 1, display_name: 'New', bio: 'Old bio', age: 25 }], []])
+
+    const res = await request(app)
+      .put('/api/profile/1')
+      .set('Authorization', `Bearer ${authToken(1)}`)
+      .send({ display_name: 'New' })
+    expect(res.status).toBe(200)
+
+    const call = auditInsertCall()
+    expect(call).toBeDefined()
+    expect(call[1][2]).toBe('update')
+    expect(JSON.parse(call[1][3])).toEqual({ display_name: 'Old' })
+    expect(JSON.parse(call[1][4])).toEqual({ display_name: 'New' })
+  })
+
+  it('PUT без фактических изменений не пишет запись (дифф, а не "сохранил вообще")', async () => {
+    const before = { id: 1, display_name: 'Same', age: 30 }
+    pool.query
+      .mockResolvedValueOnce([[before], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ id: 1, display_name: 'Same', age: 30 }], []])
+
+    await request(app)
+      .put('/api/profile/1')
+      .set('Authorization', `Bearer ${authToken(1)}`)
+      .send({ display_name: 'Same' })
+    expect(auditInsertCall()).toBeUndefined()
+  })
+
+  it('birth_date в истории нормализован: пересохранение той же даты не считается изменением', async () => {
+    const before = { id: 1, display_name: 'Same', birth_date: new Date('1990-07-04T00:00:00Z') }
+    pool.query
+      .mockResolvedValueOnce([[before], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ id: 1, display_name: 'Same', birth_date: '1990-07-04' }], []])
+
+    await request(app)
+      .put('/api/profile/1')
+      .set('Authorization', `Bearer ${authToken(1)}`)
+      .send({ display_name: 'Same' })
+    expect(auditInsertCall()).toBeUndefined()
+  })
+
+  it('PUT /api/settings/privacy пишет запись в историю', async () => {
+    const before = { incognito: 0, passport_mode: 0, passport_city: null, passport_lat: null, passport_lng: null }
+    pool.query
+      .mockResolvedValueOnce([[{ id: 7 }], []])
+      .mockResolvedValueOnce([[before], []])
+      .mockResolvedValueOnce([[], []])
+
+    const res = await request(app)
+      .put('/api/settings/privacy')
+      .set('Authorization', `Bearer ${authToken(1)}`)
+      .send({ incognito: 1 })
+    expect(res.status).toBe(200)
+
+    const call = auditInsertCall()
+    expect(call).toBeDefined()
+    expect(call[1][2]).toBe('update')
+    expect(JSON.parse(call[1][4])).toEqual({ incognito: 1 })
+    expect(JSON.parse(call[1][3])).toEqual({ incognito: 0 })
+  })
+
+  it('GET /api/profile/activity отдаёт разобранные записи истории', async () => {
+    pool.query.mockResolvedValueOnce([[
+      {
+        id: 5,
+        table_name: 'user_profiles',
+        record_id: 1,
+        action: 'update',
+        old_values: '{"display_name":"Old"}',
+        new_values: '{"display_name":"New"}',
+        created_at: '2026-10-10T10:00:00.000Z',
+      },
+    ], []])
+    const res = await request(app).get('/api/profile/activity').set('Authorization', `Bearer ${authToken(1)}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].action).toBe('update')
+    expect(res.body[0].old_values).toEqual({ display_name: 'Old' })
+    expect(res.body[0].new_values).toEqual({ display_name: 'New' })
   })
 })

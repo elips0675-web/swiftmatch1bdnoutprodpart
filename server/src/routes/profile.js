@@ -7,6 +7,7 @@ import { stripHtml } from '../sanitize.js'
 import { activeUser } from '../active-user.js'
 import { notBlocked } from '../user-blocks.js'
 import { dateOnly } from '../date-only.js'
+import { auditUpdate } from '../audit.js'
 import { FieldError, blankToUndef, dateField, enumField, intField, numField, textField } from '../profile-fields.js'
 
 const GENDERS = ['male', 'female', 'other']
@@ -242,6 +243,11 @@ router.put('/api/settings/privacy', auth, async (req, res) => {
       }
     }
 
+    const [[privacyBefore]] = await pool.query(
+      'SELECT incognito, passport_mode, passport_city, passport_lat, passport_lng FROM user_profiles WHERE id = ?',
+      [req.userId],
+    )
+
     await pool.query(
       `UPDATE user_profiles SET
         incognito = COALESCE(?, incognito),
@@ -255,6 +261,24 @@ router.put('/api/settings/privacy', auth, async (req, res) => {
     // Префикс `user:*` — под ключ `cacheRoutePerUser`, и шире старого: приватность
     // меняет то, что видят ДРУГИЕ, поэтому сбрасываем кэш у всех, а не у владельца.
     invalidate(`user:*:/api/profile/${req.userId}*`).catch(() => {})
+
+    const privacySent = (key) => Object.prototype.hasOwnProperty.call(req.body, key)
+    const privacyNewValues = {}
+    // incognito/passport_mode бинарные — в бд идут 0/1, в историю пишем те же биты.
+    if (privacySent('incognito')) privacyNewValues.incognito = incognito ? 1 : 0
+    if (privacySent('passport_mode')) privacyNewValues.passport_mode = passport_mode ? 1 : 0
+    if (privacySent('passport_city')) privacyNewValues.passport_city = passport_city
+    if (privacySent('passport_lat')) privacyNewValues.passport_lat = passport_lat
+    if (privacySent('passport_lng')) privacyNewValues.passport_lng = passport_lng
+    await auditUpdate({
+      tableName: 'user_profiles',
+      recordId: req.userId,
+      oldValues: privacyBefore,
+      newValues: privacyNewValues,
+      userId: req.userId,
+      ipAddress: req.ip,
+    })
+
     res.json({ message: 'Privacy settings updated' })
   } catch (err) {
     logger.error('Privacy PUT error:', err)
@@ -388,6 +412,32 @@ router.post('/api/profile/verification', auth, async (req, res) => {
   }
 })
 
+// ─── Activity (история изменений профиля из audit_log) ────────
+// Статический путь обязан быть ДО `/api/profile/:id` — иначе "activity"
+// уйдёт в :id как значение id и вернёт 404 профиля (как было с aliases).
+router.get('/api/profile/activity', auth, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, table_name, record_id, action, old_values, new_values, created_at FROM audit_log WHERE user_id = ? ORDER BY id DESC LIMIT 50',
+      [req.userId],
+    )
+    res.json(
+      rows.map((r) => ({
+        id: r.id,
+        table_name: r.table_name,
+        record_id: r.record_id,
+        action: r.action,
+        old_values: r.old_values ? JSON.parse(r.old_values) : null,
+        new_values: r.new_values ? JSON.parse(r.new_values) : null,
+        created_at: r.created_at,
+      })),
+    )
+  } catch (err) {
+    logger.error('Profile activity error:', err)
+    res.status(500).json({ message: 'Failed to fetch activity' })
+  }
+})
+
 router.get('/api/profile/:id', auth, cacheRoutePerUser(60), async (req, res) => {
   try {
     const blockFilter = notBlocked('up', req.userId)
@@ -483,6 +533,13 @@ router.put('/api/profile/:id', auth, async (req, res) => {
       }
     }
 
+    // Старая строка нужна для audit-update: история изменений пишет дифф, а не
+    // полный слепок, поэтому читаем её ДО апдейта (L7). birth_date нормализуем
+    // через dateOnly — без этого mysql2-вый Date и строковый ответ клиента
+    // сравнивались бы как разные всегда.
+    const [[before]] = await pool.query('SELECT * FROM user_profiles WHERE id = ?', [req.params.id])
+    const oldProfile = before ? { ...before, birth_date: dateOnly(before.birth_date) } : {}
+
     await pool.query(
       `UPDATE user_profiles SET
         display_name = COALESCE(?, display_name),
@@ -522,6 +579,42 @@ router.put('/api/profile/:id', auth, async (req, res) => {
     }
 
     invalidate(`user:*:/api/profile/${req.params.id}*`).catch(() => {})
+
+    // Собираем новые значения только по присланным полям: COALESCE-поля, которые
+    // клиент не трогал, в историю не попадают (иначе "просто сохранил" плодил бы
+    // записи с половиной анкеты). age пишется, когда прислали age или birth_date
+    // (второй пересчитывает возраст).
+    const newValues = {}
+    const sent = (key) => Object.prototype.hasOwnProperty.call(req.body, key)
+    if (sent('display_name')) newValues.display_name = clean.display_name
+    if (sent('name')) newValues.name = clean.name
+    if (sent('bio')) newValues.bio = clean.bio
+    if (sent('city')) newValues.city = clean.city
+    if (sent('country')) newValues.country = clean.country
+    if (sent('education')) newValues.education = clean.education
+    if (sent('dating_goal')) newValues.dating_goal = clean.dating_goal
+    if (sent('zodiac')) newValues.zodiac = clean.zodiac
+    if (sent('gender')) newValues.gender = clean.gender
+    if (sent('looking_for')) newValues.looking_for = clean.looking_for
+    if (sent('circadian')) newValues.circadian = clean.circadian
+    if (sent('attachment_style')) newValues.attachment_style = clean.attachment_style
+    if (sent('incognito')) newValues.incognito = clean.incognito
+    if (sent('passport_mode')) newValues.passport_mode = clean.passport_mode
+    if (sent('passport_city')) newValues.passport_city = clean.passport_city
+    if (sent('passport_lat')) newValues.passport_lat = clean.passport_lat
+    if (sent('passport_lng')) newValues.passport_lng = clean.passport_lng
+    if (heightSent) newValues.height = clearHeight ? null : clean.height
+    if (sent('birth_date')) newValues.birth_date = clearBirthDate ? null : cleanBirthDate
+    if (sent('age') || cleanBirthDate) newValues.age = computedAge
+
+    await auditUpdate({
+      tableName: 'user_profiles',
+      recordId: Number(req.params.id),
+      oldValues: oldProfile,
+      newValues,
+      userId: req.userId,
+      ipAddress: req.ip,
+    })
 
     const [rows] = await pool.query('SELECT * FROM user_profiles WHERE id = ?', [req.params.id])
     const row = rows[0]

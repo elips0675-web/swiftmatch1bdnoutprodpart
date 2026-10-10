@@ -20,6 +20,29 @@ export async function auditLog({ tableName, recordId, action, oldValues, newValu
   }
 }
 
+/**
+ * Пишет 'update'-запись только по фактически изменившимся полям (L7): история
+ * изменений профиля не должна быть шумом из «пересохранил то же самое».
+ * Сравнение строковое, чтобы mysql2-вые DATE (объект Date) и пришедшие с
+ * клиента 'YYYY-MM-DD', числа и их строковые формы на одной строке не считались
+ * изменением; undefined в newValues — это «поле не трогали» (COALESCE), такой
+ * ключ пропускается.
+ */
+export async function auditUpdate({ tableName, recordId, oldValues, newValues, userId, ipAddress }) {
+  const changedOld = {}
+  const changedNew = {}
+  for (const [key, next] of Object.entries(newValues)) {
+    if (next === undefined) continue
+    const prev = oldValues ? oldValues[key] : undefined
+    if (String(prev ?? '') !== String(next ?? '')) {
+      changedOld[key] = prev ?? null
+      changedNew[key] = next
+    }
+  }
+  if (Object.keys(changedNew).length === 0) return
+  await auditLog({ tableName, recordId, action: 'update', oldValues: changedOld, newValues: changedNew, userId, ipAddress })
+}
+
 export async function softDelete(tableName, id, userId, ipAddress) {
   validateTableName(tableName)
   await pool.query(`UPDATE \`${tableName}\` SET deleted_at = NOW() WHERE id = ?`, [id])

@@ -1,24 +1,18 @@
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import path from 'node:path'
 
-const root = process.cwd()
-const problems = []
-const notes = []
+/**
+ * Осознанное исключение: `server/src/seed.js` — CLI-скрипт сида демо-данных
+ * (`node server/src/seed.js`, CI global-setup), его `console.log` — progress-вывод
+ * операции, а не отладочный мусор в рантайм-хендлере, ради которого гейт ищет
+ * `console.log` в `server/src`. Решение зафиксировано (L7): логи оставляем,
+ * из отчёта они исключены, количество пропущенных строк печатается отдельно,
+ * чтобы гейт не был молчаливым про это решение.
+ */
+export const CONSOLE_LOG_EXEMPT_FILES = new Set(['server/src/seed.js'])
 
-function read(rel, optional = false) {
-  const p = join(root, rel)
-  if (!existsSync(p)) {
-    if (!optional) problems.push(`Файл не найден: ${rel}`)
-    return ''
-  }
-  return readFileSync(p, 'utf8')
-}
-
-const viteCfg = read('vite.config.ts')
-const serverEnv = read('server/.env', true)
-const envExample = read('server/.env.example')
-
-function extractPort(text, pattern, label, optional = false) {
+export function extractPort(text, pattern, label, optional = false, problems) {
   const m = text.match(pattern)
   if (!m) {
     if (!optional) problems.push(`Не найден порт для "${label}"`)
@@ -53,35 +47,6 @@ export function resolveTargetAliases(cfg) {
   return out
 }
 
-const vitePort = extractPort(viteCfg, /server:\s*\{[\s\S]*?port:\s*(\d+)/, 'vite.config.ts server.port')
-const proxyPort = extractPort(resolveTargetAliases(viteCfg), /proxy:\s*\{[\s\S]*?target:\s*['"]http:\/\/[^'"]*:(\d+)/, 'vite.config.ts proxy target')
-const envPort = extractPort(serverEnv, /^PORT=(\d+)/m, 'server/.env PORT', true)
-const examplePort = extractPort(envExample, /^PORT=(\d+)/m, 'server/.env.example PORT')
-const corsOrigin = serverEnv.match(/^CORS_ORIGIN=(.+)$/m)?.[1] ?? null
-const corsPort = corsOrigin ? Number(corsOrigin.match(/:(\d+)$/)?.[1] ?? 0) : null
-
-const apiPorts = [proxyPort, envPort, examplePort].filter((p) => p != null)
-const uiPorts = [vitePort, corsPort].filter((p) => p != null)
-
-if (apiPorts.length && !apiPorts.every((p) => p === apiPorts[0])) {
-  problems.push(`API-порт рассинхронизирован: vite proxy=${proxyPort ?? '-'}, server/.env=${envPort ?? 'отсутствует'}, .env.example=${examplePort ?? '-'} (эталон — ${examplePort ?? proxyPort})`)
-}
-if (uiPorts.length && !uiPorts.every((p) => p === uiPorts[0])) {
-  problems.push(`UI-порт рассинхронизирован: vite server=${vitePort ?? '-'}, CORS_ORIGIN=${corsOrigin ?? 'отсутствует'} (эталон — ${vitePort ?? '-'})`)
-}
-
-if (apiPorts.length && uiPorts.length && apiPorts[0] === uiPorts[0]) {
-  problems.push(`API-порт (${apiPorts[0]}) совпадает с UI-портом (${uiPorts[0]})`)
-}
-
-if (serverEnv) {
-  if (!/^JWT_SECRET=.+/m.test(serverEnv)) {
-    problems.push('server/.env: JWT_SECRET не задан — при старте будет сгенерирован случайный секрет и все существующие токены станут невалидными')
-  }
-} else {
-  console.log('  server/.env       = отсутствует (CI: JWT_SECRET/DB_* передаются env-переменными — ок)')
-}
-
 function walk(dir) {
   const out = []
   if (!existsSync(dir)) return out
@@ -98,32 +63,103 @@ function walk(dir) {
   return out
 }
 
-for (const file of walk(join(root, 'server', 'src'))) {
-  const rel = file.replace(root + '\\', '').replace(root + '/', '')
-  const lines = readFileSync(file, 'utf8').split('\n')
-  lines.forEach((line, i) => {
-    const m = line.match(/console\.(log|debug)\s*\(/)
-    if (m) notes.push(`console.${m[1]} в ${rel}:${i + 1}`)
-  })
+/**
+ * console.log/debug в `server/src` (вне __tests__), кроме осознанных логов
+ * seed.js. Возвращает список заметок и число пропущенных строк — гейт печатает
+ * оба числа, чтобы исключение не превращалось в тишину.
+ */
+export function collectConsoleNotes(rootDir) {
+  const notes = []
+  let skipped = 0
+  for (const file of walk(join(rootDir, 'server', 'src'))) {
+    const rel = file.replace(rootDir + '\\', '').replace(rootDir + '/', '').split('\\').join('/')
+    const lines = readFileSync(file, 'utf8').split('\n')
+    lines.forEach((line, i) => {
+      const m = line.match(/console\.(log|debug)\s*\(/)
+      if (!m) return
+      if (CONSOLE_LOG_EXEMPT_FILES.has(rel)) {
+        skipped += 1
+        return
+      }
+      notes.push(`console.${m[1]} в ${rel}:${i + 1}`)
+    })
+  }
+  return { notes, skipped }
 }
 
-console.log('=== check:ports ===')
-console.log(`  vite server.port   = ${vitePort ?? '-'}`)
-console.log(`  vite proxy target  = ${proxyPort ?? '-'}`)
-console.log(`  server/.env PORT   = ${envPort ?? '-'}`)
-console.log(`  .env.example PORT  = ${examplePort ?? '-'}`)
-console.log(`  CORS_ORIGIN        = ${corsOrigin ?? '-'}`)
+function main() {
+  const root = process.cwd()
+  const problems = []
+  const notes = []
 
-if (notes.length) {
-  console.log('\n[WARN] console.log/debug в server/src (вне __tests__):')
-  notes.slice(0, 10).forEach((n) => console.log(`  - ${n}`))
-  if (notes.length > 10) console.log(`  ... ещё ${notes.length - 10}`)
+  function read(rel, optional = false) {
+    const p = join(root, rel)
+    if (!existsSync(p)) {
+      if (!optional) problems.push(`Файл не найден: ${rel}`)
+      return ''
+    }
+    return readFileSync(p, 'utf8')
+  }
+
+  const viteCfg = read('vite.config.ts')
+  const serverEnv = read('server/.env', true)
+  const envExample = read('server/.env.example')
+
+  const vitePort = extractPort(viteCfg, /server:\s*\{[\s\S]*?port:\s*(\d+)/, 'vite.config.ts server.port', false, problems)
+  const proxyPort = extractPort(resolveTargetAliases(viteCfg), /proxy:\s*\{[\s\S]*?target:\s*['"]http:\/\/[^'"]*:(\d+)/, 'vite.config.ts proxy target', false, problems)
+  const envPort = extractPort(serverEnv, /^PORT=(\d+)/m, 'server/.env PORT', true, problems)
+  const examplePort = extractPort(envExample, /^PORT=(\d+)/m, 'server/.env.example PORT', false, problems)
+  const corsOrigin = serverEnv.match(/^CORS_ORIGIN=(.+)$/m)?.[1] ?? null
+  const corsPort = corsOrigin ? Number(corsOrigin.match(/:(\d+)$/)?.[1] ?? 0) : null
+
+  const apiPorts = [proxyPort, envPort, examplePort].filter((p) => p != null)
+  const uiPorts = [vitePort, corsPort].filter((p) => p != null)
+
+  if (apiPorts.length && !apiPorts.every((p) => p === apiPorts[0])) {
+    problems.push(`API-порт рассинхронизирован: vite proxy=${proxyPort ?? '-'}, server/.env=${envPort ?? 'отсутствует'}, .env.example=${examplePort ?? '-'} (эталон — ${examplePort ?? proxyPort})`)
+  }
+  if (uiPorts.length && !uiPorts.every((p) => p === uiPorts[0])) {
+    problems.push(`UI-порт рассинхронизирован: vite server=${vitePort ?? '-'}, CORS_ORIGIN=${corsOrigin ?? 'отсутствует'} (эталон — ${vitePort ?? '-'})`)
+  }
+
+  if (apiPorts.length && uiPorts.length && apiPorts[0] === uiPorts[0]) {
+    problems.push(`API-порт (${apiPorts[0]}) совпадает с UI-портом (${uiPorts[0]})`)
+  }
+
+  if (serverEnv) {
+    if (!/^JWT_SECRET=.+/m.test(serverEnv)) {
+      problems.push('server/.env: JWT_SECRET не задан — при старте будет сгенерирован случайный секрет и все существующие токены станут невалидными')
+    }
+  } else {
+    console.log('  server/.env       = отсутствует (CI: JWT_SECRET/DB_* передаются env-переменными — ок)')
+  }
+
+  const { notes: consoleNotes, skipped } = collectConsoleNotes(root)
+  notes.push(...consoleNotes)
+
+  console.log('=== check:ports ===')
+  console.log(`  vite server.port   = ${vitePort ?? '-'}`)
+  console.log(`  vite proxy target  = ${proxyPort ?? '-'}`)
+  console.log(`  server/.env PORT   = ${envPort ?? '-'}`)
+  console.log(`  .env.example PORT  = ${examplePort ?? '-'}`)
+  console.log(`  CORS_ORIGIN        = ${corsOrigin ?? '-'}`)
+
+  if (skipped > 0) {
+    console.log(`  [note] server/src/seed.js: ${skipped} console.log — осознанные progress-логи сида, пропущены (L7)`)
+  }
+  if (notes.length) {
+    console.log('\n[WARN] console.log/debug в server/src (вне __tests__):')
+    notes.slice(0, 10).forEach((n) => console.log(`  - ${n}`))
+    if (notes.length > 10) console.log(`  ... ещё ${notes.length - 10}`)
+  }
+
+  if (problems.length) {
+    console.error('\n[FAIL]')
+    problems.forEach((p) => console.error(`  - ${p}`))
+    process.exit(1)
+  }
+
+  console.log('\n[OK] Порты согласованы')
 }
 
-if (problems.length) {
-  console.error('\n[FAIL]')
-  problems.forEach((p) => console.error(`  - ${p}`))
-  process.exit(1)
-}
-
-console.log('\n[OK] Порты согласованы')
+if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]))) main()

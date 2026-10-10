@@ -1,15 +1,15 @@
 {
-  "generated": "2026-10-10T06:23:18.001Z",
+  "generated": "2026-10-10T06:57:53.062Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 42,
-    "tests": 576,
-    "passed": 576,
+    "files": 43,
+    "tests": 581,
+    "passed": 581,
     "failed": 0,
     "gate": {
-      "files": 16,
-      "tests": 392
+      "files": 17,
+      "tests": 397
     },
     "product": {
       "files": 26,
@@ -26,6 +26,10 @@
       },
       {
         "file": "scripts/check-env-parity.test.mjs",
+        "tests": 5
+      },
+      {
+        "file": "scripts/check-ports.test.mjs",
         "tests": 5
       },
       {
@@ -188,16 +192,16 @@
   },
   "server": {
     "files": 60,
-    "tests": 856,
-    "passed": 856,
+    "tests": 865,
+    "passed": 865,
     "failed": 0,
     "gate": {
       "files": 5,
-      "tests": 114
+      "tests": 118
     },
     "product": {
       "files": 55,
-      "tests": 742
+      "tests": 747
     },
     "perFile": [
       {
@@ -266,7 +270,7 @@
       },
       {
         "file": "server/src/__tests__/deploy-persistence-audit.test.js",
-        "tests": 14
+        "tests": 18
       },
       {
         "file": "server/src/__tests__/events.test.js",
@@ -370,7 +374,7 @@
       },
       {
         "file": "server/src/__tests__/profile.test.js",
-        "tests": 33
+        "tests": 38
       },
       {
         "file": "server/src/__tests__/push.test.js",
@@ -533,7 +537,7 @@
     ]
   },
   "total": {
-    "files": 102,
-    "tests": 1432
+    "files": 103,
+    "tests": 1446
   }
 }

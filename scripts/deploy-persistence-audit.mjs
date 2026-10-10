@@ -23,8 +23,13 @@
  *     именованные volume'а из раздела `volumes:`.
  *
  * Если запись в `uploads` в проде не нужна (S3/CDN вместо диска), гейт надо
- * не отключать, а научить читать переключатель: `upload.js` уже умеет S3
- * (`USE_S3`), и тогда проверка 2 теряет смысл.
+ * не отключать, а научить читать переключатель. `upload.js` уже умеет S3
+ * (`USE_S3 = !!(S3_BUCKET && AWS_ACCESS_KEY_ID)`, URL пишется в S3, а не на
+ * диск). Правило (L7): дисковые проверки применяются, пока env сервиса `app`
+ * (environment: в compose или корневой `.env` через env_file) не содержит
+ * обоих ключей; если содержит — S3-режим включён, фото на диск не пишутся,
+ * и гейт пропускает проверки тома/путей, но с явной пометкой в выводе, а не
+ * молча. Ключи без S3-ветки в коде — FAIL: деплой ждёт S3, которого код не умеет.
  */
 
 import fs from 'node:fs'
@@ -116,14 +121,66 @@ export function getDeclaredVolumes(compose) {
   return names
 }
 
+/** Ключи `environment:` сервиса `app` из docker-compose (форма `KEY: value`). */
+export function appServiceEnv(compose) {
+  const section = getAppServiceSection(compose)
+  const env = {}
+  let started = false
+  for (const line of section.split(/\r?\n/)) {
+    if (/^\s+environment:\s*$/.test(line)) {
+      started = true
+      continue
+    }
+    if (!started) continue
+    if (/^\s*[a-z_]/.test(line) && !/^\s+[A-Z]/.test(line)) break
+    const m = line.match(/^\s+([A-Z][A-Z0-9_]*)\s*:\s*(.*)$/)
+    if (m) env[m[1]] = m[2].trim()
+  }
+  return env
+}
+
+/** Разбор `KEY=VALUE`-строк корневого `.env` (env_file сервиса app). */
+export function parseEnvFile(text) {
+  const env = {}
+  for (const m of text.matchAll(/^([A-Za-z_][A-Za-z0-9_]*)=(.+)$/gm)) env[m[1]] = m[2].trim()
+  return env
+}
+
+/** S3 включён, если в env сервиса app или в корневом .env есть оба ключа (не пустые). */
+export function envHasS3(appEnv, rootEnv) {
+  const has = (obj, keys) => keys.every((k) => obj[k] && obj[k] !== '')
+  return has(appEnv, ['S3_BUCKET', 'AWS_ACCESS_KEY_ID']) || has(rootEnv, ['S3_BUCKET', 'AWS_ACCESS_KEY_ID'])
+}
+
+/** upload.js действительно умеет S3: переключатель объявлен и URL пишется в S3. */
+export function hasS3Branch(uploadSrc) {
+  return /const\s+USE_S3/.test(uploadSrc) && /USE_S3\s*\?\s*req\.file\.location/.test(uploadSrc)
+}
+
 export function audit(root) {
   const compose = readRepoFile(root, COMPOSE)
+  const uploadSrc = readRepoFile(root, UPLOAD_ROUTE)
   const writeDir = findUploadWriteDir(root)
   const staticDir = findUploadStaticDir(root)
   const mounts = getAppNamedVolumeMounts(compose)
   const declared = getDeclaredVolumes(compose)
 
+  const s3Branch = hasS3Branch(uploadSrc)
+  const envFile = fs.existsSync(path.join(root, '.env')) ? readRepoFile(root, '.env') : ''
+  const s3Credentials = envHasS3(appServiceEnv(compose), parseEnvFile(envFile))
+  const s3Enabled = s3Branch && s3Credentials
+
   const problems = []
+  const notes = []
+
+  if (s3Credentials && !s3Branch) {
+    problems.push(`env сервиса app включает S3-ключи (S3_BUCKET/AWS_ACCESS_KEY_ID), но ${UPLOAD_ROUTE} не имеет S3-ветки (USE_S3) — деплой ждёт S3, а фото пойдут не туда`)
+  }
+  if (s3Enabled) {
+    notes.push('S3-режим включён (S3_BUCKET + AWS_ACCESS_KEY_ID в env app): фото пишутся в S3, дисковые проверки записи/тома не применяются')
+    return { writeDir, staticDir, mounts, s3Enabled, notes, problems }
+  }
+
   if (!writeDir) {
     problems.push(`не найден UPLOAD_DIR в ${UPLOAD_ROUTE} — гейт не может вывести путь записи`)
   }
@@ -141,16 +198,18 @@ export function audit(root) {
       problems.push(`том ${mount.name} смонтирован в app, но не объявлен в разделе volumes:`)
     }
   }
-  return { writeDir, staticDir, mounts, problems }
+  return { writeDir, staticDir, mounts, s3Enabled, notes, problems }
 }
 
 function main() {
   const root = process.argv[2] || process.cwd()
-  const { writeDir, staticDir, mounts, problems } = audit(root)
+  const { writeDir, staticDir, mounts, s3Enabled, notes, problems } = audit(root)
 
   console.log(`путь записи (${UPLOAD_ROUTE}): ${writeDir || 'не найден'}`)
   console.log(`путь отдачи (${SERVER_ENTRY}): ${staticDir || 'не найден'}`)
   console.log(`тома в сервисе app: ${mounts.length ? mounts.map((m) => `${m.name} → ${m.target}`).join(', ') : 'нет'}`)
+  console.log(`S3-режим: ${s3Enabled ? 'включён' : 'выключен'}${s3Enabled ? '' : ' (дисковые проверки применяются)'}`)
+  for (const n of notes) console.log(`note: ${n}`)
 
   if (problems.length) {
     console.log('')
@@ -158,7 +217,9 @@ function main() {
     console.log('\nИтог: деплой теряет (или уже потерял) данные на диске.')
     process.exit(1)
   }
-  console.log('\nИтог: фото пишутся и отдаются из одного каталога, каталог переживает пересоздание контейнера.')
+  console.log(s3Enabled
+    ? '\nИтог: фото в S3 — дисковые проверки не нужны (переключатель прочитан).'
+    : '\nИтог: фото пишутся и отдаются из одного каталога, каталог переживает пересоздание контейнера.')
 }
 
 if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]))) main()

@@ -87,6 +87,7 @@ describe('PUT /api/profile/:id — mass assignment в чужой профиль'
   })
 
   it('владелец правит свой профиль (id из токена)', async () => {
+    pool.query.mockResolvedValueOnce([[{ id: VICTIM, display_name: 'Старое' }], []])
     pool.query.mockResolvedValueOnce([{ affectedRows: 1 }, []])
     pool.query.mockResolvedValueOnce([[{ id: VICTIM, display_name: 'Моё' }], []])
 
@@ -101,6 +102,7 @@ describe('PUT /api/profile/:id — mass assignment в чужой профиль'
   })
 
   it('владелец может удалить и пересобрать только свои интересы', async () => {
+    pool.query.mockResolvedValueOnce([[{ id: VICTIM, display_name: 'Старое' }], []])
     pool.query.mockResolvedValueOnce([{ affectedRows: 1 }, []])
     pool.query.mockResolvedValueOnce([[{ interests: '[]' }], []])
     pool.query.mockResolvedValueOnce([[], []])
