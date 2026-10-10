@@ -87,6 +87,11 @@ describe.skipIf(!admin && !requireMysql)('гонки на живом MySQL (P0 #
     expect(admin).not.toBeNull()
   })
 
+  // Явный таймаут хука: дефолтный hookTimeout (10 с) отмеряется под полным
+  // прогоном (64 файла параллельно), где загрузка всей mysql_schema.sql в
+  // свежую базу не укладывается в 10 с — «Hook timed out in 10000ms» на самом
+  // тесте гонок, который в одиночном прогоне зелёный. Это гонка по времени
+  // вокруг теста, а не падение гонки: 60 с хватает и под нагрузкой.
   beforeAll(async () => {
     // Без этого падение выглядит как «Cannot read properties of null (reading
     // 'query')» в beforeAll, и вывод не говорит ни про БД, ни про REQUIRE_MYSQL:
@@ -110,7 +115,7 @@ describe.skipIf(!admin && !requireMysql)('гонки на живом MySQL (P0 #
       'INSERT INTO users (id, email, password_hash) VALUES (1, ?, ?), (2, ?, ?)',
       ['race-1@test.local', 'x', 'race-2@test.local', 'x'],
     )
-  })
+  }, 60000)
 
   afterAll(async () => {
     if (pool) await pool.end().catch(() => {})
@@ -120,7 +125,9 @@ describe.skipIf(!admin && !requireMysql)('гонки на живом MySQL (P0 #
     if (!admin) return
     await admin.query(`DROP DATABASE IF EXISTS \`${DB_NAME}\``).catch(() => {})
     await admin.end().catch(() => {})
-  })
+    // Та же причина, что у beforeAll: DROP под полным прогоном тоже может не
+    // уложиться в 10 с, а падение afterAll оставило бы базу-сироту.
+  }, 60000)
 
   it('два параллельных INSERT IGNORE INTO likes дают одну строку и affectedRows 1/0', async () => {
     const insert = (from, to) =>
