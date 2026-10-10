@@ -1,18 +1,21 @@
-# SwiftMatch1BD — снимок для AI-анализа (август 2026)
+# SwiftMatch1BD — снимок для AI-анализа
 
-> **⚠️ УСТАРЕВШИЙ СРЕЗ (август 2026) — заморожен, не источник истины.** Числа и
-> статусы внутри относятся к моменту среза: в исходной шапке стояло «388/388»,
-> фактический счёт даёт `node scripts/test-counter-audit.mjs` на текущем HEAD.
-> Разделы «Последние этапы» и «Честный список "не сделано"» тоже исторические.
+> **О чтении файла.** Историческая часть (хотфиксы 26.08, этапы 30–47) — это
+> датированный срез августа 2026 и оставлена как есть. **Статусные числа и раздел
+> «Честный список "не сделано"» актуализированы 10.10.2026** (см. блоки «Статус
+> проверок» и «Честный список» ниже): ложные пункты сняты — партнёрская
+> экосистема (Wave 1–4), Admin TOTP 2FA, наблюдаемость очередей, модерация фото,
+> live schema-drift и Node в CI уже **закрыты**. Единственный источник истины по
+> открытым пунктам — `Что доделать.txt`; по истории — `Что сделано.txt`.
 > Файл оставлен как **самодостаточный вход для внешних AI-аудитов** (kimi / qwen /
-> deepseek). Актуальное состояние: `project-context.md`, `README.md`,
-> `Что сделано.txt`, указатель канона — `Промты.txt`. Тот же снимок лежит в
-> `test/Для анализа.txt`.
+> deepseek). Текущий счёт тестов даёт `node scripts/test-counter-audit.mjs` на
+> HEAD; актуальные доки — `project-context.md`, `README.md`, `Промты.txt`
+> (указатель канона). Копия лежит в `test/Для анализа.txt`.
 
 > Самодостаточный контекст для аудита моделями (kimi / qwen / deepseek и т.д.).
-> Свежие детали: «Что сделано.txt» (этап 35 = Hangouts), «Что доделать.txt» (журнал до этапа 46),
-> AGENTS.md (грабли #1–52), context.txt, project-context.md, README.md.
-> Предыдущие оценки: «Оценка kimi.txt», «Оценка qwen.txt», «Оценка дипсик.txt».
+> Свежие детали: «Что сделано.txt» (журнал этапов), «Что доделать.txt» (актуальный
+> бэклог), `AGENTS.md` / `docs/AGENTS-*.md` (98 граблей), `project-context.md`,
+> `README.md`. Предыдущие оценки: «Оценка kimi/qwen/дипсик.txt».
 
 ## Что это за проект
 
@@ -21,12 +24,12 @@ Node.js/Express + MySQL (mysql2) бэкенд, Socket.IO real-time, Capacitor An
 Локальная тестовая копия с реальной БД (50 демо-юзеров). Порты: фронт 8081
 (vite proxy /api→3002), API+WS 3002, MySQL 3306, Redis 6379.
 
-## Статус проверок (всё зелёное)
+## Статус проверок (10.10.2026, всё зелёное)
 
-- Тесты **388/388**: сервер 307/307 (25 файлов), фронт 81/81 (15 файлов), E2E 55/55 (9 spec: audit-full, features, hangouts, partners, security-blind-spots, login, profile, register + cross-browser по флагу)
-- vite build ✅, eslint 0 errors (154 warnings — стилевые), Swagger ✅
-- E2E: Playwright, storageState из global-setup (.auth/*.json), аудит console-errors на каждой странице, screenshot/video/trace на падение
-- Pre-flight: `npm run check:ports` (порты + JWT_SECRET), `scripts/check-keys.ps1` (какие прод-ключи не заполнены)
+- Тесты **1500/1500**: сервер 903/903 (64 файлов), фронт 597/597 (48 файлов: 200 в `src/` + 397 тестов гейтов в 17 файлах `scripts/`), E2E 152 в 19 спеках (статический счёт `playwright test --list`). Гейты: 24/24.
+- vite build ✅, tsc --noEmit 0 ошибок, eslint 0 errors (фронт 193 warnings — стилевые), Swagger ✅
+- E2E: Playwright, storageState из global-setup (.auth/*.json), аудит console-errors на каждой странице, screenshot/video/trace на падение; независимая очистка БД `scripts/e2e-cleanup.mjs` шагом с `if: always()`.
+- Pre-flight: `npm run check:ports`, `node scripts/schema-drift-audit.mjs --offline`, `npm run check:docs`, `npm run check:enum-constraints`, `npm run check:prod-mock`, `npm run check:headers`, `node scripts/test-counter-audit.mjs`.
 
 ## Последние хотфиксы (26.08.2026)
 
@@ -53,7 +56,7 @@ Node.js/Express + MySQL (mysql2) бэкенд, Socket.IO real-time, Capacitor An
 - WS handshake принимает токен только из `handshake.auth.token` (query-param убран).
 - CSRF: SameSite=Lax + строгий CORS_ORIGIN (fail-fast в production без него).
   Полные CSRF-токены отложены до выноса API на отдельный домен (осознанное решение, см. AGENTS Security Rules);
-  Admin TOTP 2FA и fingerprinting сессий — этап 35+ после staging.
+  Admin TOTP 2FA (otplib) — **сделано** (см. этапы 35–45 ниже); fingerprinting сессий — сделано.
 - Helmet (CSP и др.), request-id, Sentry c PII-фильтром в beforeSend, Winston без тела запросов.
 - Rate-limit: глобальный 600/мин, лайки 30/мин, auth 60/мин (поднят для E2E) + лок-аут логина.
 - Модерация: banned-words в чатах, auto-escalation репортов (3+ → temp ban, severe → мгновенный).
@@ -95,14 +98,14 @@ Node.js/Express + MySQL (mysql2) бэкенд, Socket.IO real-time, Capacitor An
   Попутно починен pre-existing баг: отсутствовал GET /api/chats/:chatId — страница чата падала HTML-404.
 - Тесты этапа: сервер hangouts.test.js 33 + notifications.test.js 7 + XSS-чтение профиля; фронт hangouts.test.tsx 5 +
   home-hangouts.test.tsx 2; E2E hangouts.spec.ts 4 (создание→отклик→accept→чат).
-- Хвосты (не блокируют): UI редактирования объявления (PUT есть), date_from/date_to фильтры, пагинация, лимит 1/день для free.
+- Хвосты этапа 46 (историческая запись; актуальный список открытых — `Что доделать.txt`): UI редактирования объявления (PUT есть), date_from/date_to фильтры, пагинация, лимит 1/день для free.
 
-## Следующая большая задача — партнёрская экосистема (Mesta.txt)
+## Партнёрская экосистема (Mesta.txt) — сделано (Wave 1–4, этапы 47/56/58)
 
 Единый движок партнёров (10 типов: афиша, рестораны, цветы, такси, отели, спа, фотографы, психологи, стриминг, эвенты):
 миграция 030 (partners/partner_offers/partner_conversions), роутер partners.js (offers c гео/placement + track
 c utm_source=swiftmatch&ref), chat-partner-actions.tsx («Такси/Ресторан/Кино» в чате), выбор «из афиши» в hangout-create,
-admin-partners.tsx, флаг partnerOffersEnabled. Wave 1 = deeplink-партнёры без сложных API. План и DoD — в part.txt («Доделать»).
+admin-partners.tsx, флаг partnerOffersEnabled. Wave 1 = deeplink-партнёры без сложных API; реализованы Wave 1–4 (этапы 47/56/58). Исходные `Mesta.txt`/`part.txt` в проекте отсутствуют — актуальный бэклог в `Что доделать.txt`.
 
 ## Этап 47 — партнёрская экосистема Wave 1 (23.08.2026)
 
@@ -136,17 +139,26 @@ Video Date Scheduling, Safety Check-in, Profile Score, Ghost Mode + Passport Mod
 GDPR: consent при регистрации (consent_log), data export, erasure requests — покрыто E2E.
 i18n RU/EN, push VAPID + FCM hook, deep links hook, рефералка.
 
-## Честный список «не сделано»
+## Честный список «не сделано» (актуализировано 10.10.2026)
 
-1. Staging-сервер: нужен VPS + secrets DEPLOY_HOST/USER/SSH_KEY; полный k6 и Docker-up только там.
-2. Реальные ключи: Stripe LIVE, SMTP, Sentry DSN, S3, Twilio, OpenAI/Rekognition, FCM_SERVER_KEY,
-   REVENUECAT_WEBHOOK_SECRET (+VITE_REVENUECAT_API_KEY сейчас плейсхолдер). Без ключей всё деградирует мягко
-   (mock/fallback), кроме Stripe-webhook и RevenueCat-webhook (осознанные 502/503 в prod).
-3. Релиз Android: домен вместо LAN-IP, keystore-подпись, App Links (assetlinks.json), AAB + Google Play (политика 17+, сторы).
-4. Полная CSRF-защита (double-submit token) — только при выносе API на отдельный домен.
-5. Design System/Storybook — не начато.
-6. Хвосты Hangouts: UI редактирования объявления, фильтры дат, пагинация ленты, лимит 1 объявление/день для free.
-7. Партнёрская экосистема (Mesta.txt) — не начата; план в part.txt («Доделать»).
+Полный и единственный актуальный список открытых пунктов — `Что доделать.txt`
+(чистый бэклог; закрытые пункты там не живут). Кратко на 10.10.2026:
+
+1. **Блокеры среды (не решаются кодом):** staging-VPS + secrets `DEPLOY_HOST/USER/SSH_KEY`;
+   реальные ключи (Stripe LIVE, SMTP, Sentry DSN, S3, Twilio, OpenAI/Rekognition, FCM,
+   `REVENUECAT_WEBHOOK_SECRET`). Без ключей всё деградирует мягко (mock/fallback),
+   кроме Stripe- и RevenueCat-вебхуков (осознанные 502/503 в проде).
+2. **Релиз Android:** домен вместо LAN-IP, keystore-подпись, App Links (`assetlinks.json`), AAB + Google Play.
+3. **Кодовый бэклог (открыт):** M5 (`tier` из вебхука RevenueCat — это `product_id`), остаток переноса
+   `profile-fields.js` (N4), мажорное обновление `react-router-dom` 6→7, логи сервера (G3 #36), P2-мелочи.
+4. **Осознанно отложено (не «забыто»):** полная CSRF-защита (double-submit token) — до выноса API
+   на отдельный домен; окно времени у check-in (продуктовое решение). См. `Что доделать.txt`.
+5. **Не начато:** Design System / Storybook.
+
+Что **уже закрыто** и не должно читаться как «не сделано»: партнёрская экосистема Wave 1–4
+(этапы 47/56/58), Admin TOTP 2FA, Stripe idempotency (`webhook_events`), наблюдаемость очередей
+(N6), модерация фото (P0-E), live schema-drift (L5), Node 22 в обоих workflow (L4),
+независимая очистка E2E (N10).
 
 ## Ключевые файлы
 
@@ -162,7 +174,7 @@ i18n RU/EN, push VAPID + FCM hook, deep links hook, рефералка.
 | `src/context/auth-context.tsx` | restore через /me → dev-login fallback, logout через API |
 | `src/lib/native.ts` | нативный адаптер fetch/WS (Bearer вместо cookie) |
 | `e2e/setup/global-setup.ts` | health-check API + сеет storageState (localStorage.token!) |
-| `database/migrations/` | 29 нумерованных миграций + migrate.js |
+| `database/migrations/` | 57 нумерованных миграций + migrate.js |
 
 ## Демо-доступы
 
