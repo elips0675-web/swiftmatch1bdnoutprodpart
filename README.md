@@ -238,9 +238,9 @@ cd server && npm test            # серверные тесты
 `deploy` в `needs`: `lint-and-typecheck`, `frontend-test`, `server-test`,
 `e2e-test`, `test-counters`.
 
-> Расхождение, которое стоит знать: `ci.yml` гоняет тесты на Node **20**,
-> `deploy.yml` и образ — на Node **22**. Продовый рантайм — 22, это же значение
-> стоит перенести в `ci.yml` (в бэклоге, P1).
+> Node в обоих workflow — **22**: `ci.yml` пинит `node-version: 22` в каждой
+> джобе, `deploy.yml` берёт его из `env.NODE_VERSION: '22'`, как и прод-образ
+> `node:22-alpine`. Расхождение рантаймов закрыто (L4).
 
 ---
 
@@ -305,7 +305,7 @@ cd server && npm test            # серверные тесты
 
 ### 🗄️ База данных
 - MySQL через mysql2, пул соединений
-- **Миграции:** `database/migrations/` — 51 пронумерованный `.sql` + `migrate.js` (таблица `_migrations`)
+- **Миграции:** `database/migrations/` — 57 пронумерованных `.sql` + `migrate.js` (таблица `_migrations`)
 - Эталон схемы: `database/mysql_schema.sql` (его и сверяет дрейф-аудит)
 
 ### 📧 Коммуникации
@@ -417,7 +417,7 @@ cd server && npm test            # серверные тесты
 | `server/src/redis.js` | ioredis lazy client (main/pub/sub) |
 | `server/src/audit.js` | soft delete + audit log |
 | `server/src/seed.js` | Генератор демо-данных (50 users, 30 matches, 200 msgs) |
-| `database/` | `mysql_schema.sql` + `demo_data.sql` + `migrations/` (51 SQL) |
+| `database/` | `mysql_schema.sql` + `demo_data.sql` + `migrations/` (57 SQL) |
 | `scripts/` | Гейты и утилиты (аудит схемы/секретов/счётчиков/персистентности, бэкап, EXPLAIN) |
 | `e2e/` | Playwright-спеки (19) |
 | `android/` | Capacitor/Gradle-проект |

@@ -27,11 +27,9 @@
 | 1 | Pre-flight Checklist | `docs/AGENTS-production.md` — чек-лист из 10 пунктов + Golden Rule «Production ≠ File Created» |
 | 2 | Функциональный аудит приложения | пробелы покрытия — `test/ИНВЕНТАРЬ-ТЕСТОВ.md` (локальное зеркало), бэклог — `Что доделать.txt` |
 | 3 | Аудит связки Админка ↔ БД ↔ Приложение | `docs/AGENTS-admin-auth.md` + `Что доделать.txt` |
-| 4 | Добавление `data-testid` | **выполнено:** 301 `data-testid` в `src/**/*.tsx`, 119 использований в `e2e/*.ts` |
-19 спеков, 150 тестов; джобы `e2e` (`.github/workflows/ci.yml`) и `e2e-test`
-   (`.github/workflows/deploy.yml`); рецепт сверяет `npm run check:e2e` |
-| 7 | Починка `src/pages/chats.tsx`
-| 8 | Починка `src/pages/settings-privacy.tsx`
+| 4 | Добавление `data-testid` | **выполнено:** 335 `data-testid` в `src/**/*.tsx`, 119 использований в `e2e/*.ts`; 19 спеков, 152 теста; джобы `e2e` (`.github/workflows/ci.yml`) и `e2e-test` (`.github/workflows/deploy.yml`); рецепт сверяет `npm run check:e2e` |
+| 7 | Починка `src/pages/chats.tsx` | **выполнено:** восстановлен `GET /api/chats/:chatId` (страница падала HTML-404); см. `Что сделано.txt` |
+| 8 | Починка `src/pages/settings-privacy.tsx` | **выполнено:** страница сохранена; блок «Где остановиться» при `passport_mode`; см. `Что сделано.txt` |
 | 9 | Redis + Backup | **выполнено:** RedisStore в `server/src/middleware/limiters.js`, redis-adapter в `server/src/index.js`, `scripts/backup-mysql.ps1` (74 строки) |
 | 10 | Production Readiness Checklist | `docs/AGENTS-production.md` |
 | 11 | Документация | `README.md` — карта документации; `AGENTS.md` — навигация по модулям |
