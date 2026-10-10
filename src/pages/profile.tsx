@@ -44,6 +44,8 @@ import {
 } from "@/components/ui/carousel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ATTACHMENT_STYLE_INFO } from "@/lib/attachment-styles";
+import { useFeatureFlags } from "@/context/feature-flags-context";
+import { ActivityList } from "@/components/profile/activity-list";
 
 const interestIconsMap: Record<string, any> = {
   "Photography": Camera, "Travel": Globe, "Sports": Dumbbell, "Art": Palette, "Movies": Film, "Yoga": Flower2, "Business": Briefcase, "Gaming": Gamepad2, "Cats": Dog,
@@ -56,6 +58,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const { t, language } = useLanguage();
   const { interests: allowedInterests } = useContentConfig();
+  const { profileActivityEnabled } = useFeatureFlags();
   const [profile, setProfile] = useState<any>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [isMounted, setIsMounted] = useState(false);
@@ -523,11 +526,12 @@ function normalizeInterests(interests: InterestInput[]): string[] {
           </div>
 
           <Tabs defaultValue="profile" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 bg-muted p-1 rounded-xl mb-6">
+            <TabsList className={cn("grid w-full bg-muted p-1 rounded-xl mb-6", profileActivityEnabled ? "grid-cols-5" : "grid-cols-4")}>
               <TabsTrigger value="profile" className="text-[11px]">{t('profile.tab.data')}</TabsTrigger>
               <TabsTrigger value="gallery" className="text-[11px]">{t('profile.tab.gallery')}</TabsTrigger>
               <TabsTrigger value="stories" className="text-[11px]">{t('profile.tab.stories')}</TabsTrigger>
               <TabsTrigger value="groups" className="text-[11px]">{t('profile.tab.groups')}</TabsTrigger>
+              {profileActivityEnabled && <TabsTrigger value="activity" className="text-[11px]">{t('profile.tab.activity')}</TabsTrigger>}
             </TabsList>
             <TabsContent value="profile">
               <div className="bg-white rounded-2xl p-6 app-shadow border border-border/40 space-y-6">
@@ -869,6 +873,11 @@ function normalizeInterests(interests: InterestInput[]): string[] {
                 )}
               </div>
             </TabsContent>
+            {profileActivityEnabled && (
+              <TabsContent value="activity">
+                <ActivityList />
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </main>

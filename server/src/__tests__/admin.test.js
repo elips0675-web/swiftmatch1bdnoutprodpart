@@ -151,6 +151,24 @@ describe('GET /api/admin/features', () => {
     expect(res.body).toHaveProperty('aiIcebreakers')
   })
 
+  it('profileActivity трактуется как «включено», если колонки ещё нет (миграция не применена)', async () => {
+    pool.query.mockResolvedValue([[{ id: 1, video_calls_enabled: 1 }], []])
+    const res = await request(app)
+      .get('/api/admin/features')
+      .set('Authorization', `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body.profileActivity).toBe(true)
+  })
+
+  it('profileActivity отражает колонку profile_activity_enabled', async () => {
+    pool.query.mockResolvedValue([[{ id: 1, profile_activity_enabled: 0 }], []])
+    const res = await request(app)
+      .get('/api/admin/features')
+      .set('Authorization', `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body.profileActivity).toBe(false)
+  })
+
   it('returns defaults when no row', async () => {
     pool.query.mockResolvedValue([[], []])
     const res = await request(app)
@@ -188,6 +206,18 @@ describe('PUT /api/admin/features', () => {
       .set('Authorization', `Bearer ${adminToken()}`)
       .send({ videoCalls: true, aiIcebreakers: false })
     expect(res.status).toBe(200)
+  })
+
+  it('принимает profileActivity и пишет profile_activity_enabled', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    const res = await request(app)
+      .put('/api/admin/features')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ profileActivity: false })
+    expect(res.status).toBe(200)
+    const updateCall = pool.query.mock.calls.find(([sql]) => /profile_activity_enabled/.test(sql))
+    expect(updateCall).toBeTruthy()
+    expect(updateCall[1][9]).toBe(false)
   })
 })
 

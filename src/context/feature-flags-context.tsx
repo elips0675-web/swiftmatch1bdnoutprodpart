@@ -10,6 +10,7 @@ export interface FeatureFlags {
   showAdsEnabled: boolean;
   hangoutsEnabled: boolean;
   partnerOffersEnabled: boolean;
+  profileActivityEnabled: boolean;
 }
 
 const defaultFlags: FeatureFlags = {
@@ -20,6 +21,7 @@ const defaultFlags: FeatureFlags = {
   showAdsEnabled: false,
   hangoutsEnabled: true,
   partnerOffersEnabled: false,
+  profileActivityEnabled: true,
 };
 
 const mapApiFlags = (data: Record<string, boolean>): FeatureFlags => ({
@@ -30,6 +32,7 @@ const mapApiFlags = (data: Record<string, boolean>): FeatureFlags => ({
   showAdsEnabled: data.showAds ?? false,
   hangoutsEnabled: data.hangouts ?? true,
   partnerOffersEnabled: data.partnerOffers ?? false,
+  profileActivityEnabled: data.profileActivity ?? true,
 });
 
 const FeatureFlagsContext = createContext<FeatureFlags>(defaultFlags);

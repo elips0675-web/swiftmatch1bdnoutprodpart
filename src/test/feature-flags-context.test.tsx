@@ -41,6 +41,10 @@ describe("FeatureFlagsProvider", () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith("/api/admin/features", expect.any(Object))
     })
+
+    await waitFor(() => {
+      expect(screen.getByTestId("flags").textContent).toContain('"profileActivityEnabled":true')
+    })
   })
 
   it("returns default flags when API fails", async () => {

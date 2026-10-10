@@ -390,6 +390,7 @@ CREATE TABLE `feature_flags` (
   `autosearch_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `hangouts_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `partner_offers_enabled` tinyint(1) NOT NULL DEFAULT '0',
+  `profile_activity_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `b2b_marketplace_enabled` tinyint(1) NOT NULL DEFAULT '0',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

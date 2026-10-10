@@ -45,6 +45,7 @@ export default function FeatureFlagsPage() {
           { key: 'showAds', label: t('admin.features.show_ads'), description: t('admin.features.show_ads_desc'), enabled: data.showAds ?? false, affectedUsers: 12480 },
           { key: 'hangouts', label: t('admin.features.hangouts'), description: t('admin.features.hangouts_desc'), enabled: data.hangouts ?? false, affectedUsers: 12480 },
           { key: 'partnerOffers', label: t('admin.features.partner_offers'), description: t('admin.features.partner_offers_desc'), enabled: data.partnerOffers ?? false, affectedUsers: 12480 },
+          { key: 'profileActivity', label: t('admin.features.profile_activity'), description: t('admin.features.profile_activity_desc'), enabled: data.profileActivity ?? true, affectedUsers: 12480 },
         ];
         setFlags(mapped);
         setSavedFlags(mapped);
