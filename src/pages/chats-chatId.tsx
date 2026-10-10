@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { ChevronLeft, Send, MoreVertical, Smile, Heart, Laugh, Zap, Star, Flame, Eye, CheckCheck, Phone, Video, Timer, Clock } from "lucide-react";
+import { ChevronLeft, Send, MoreVertical, Smile, Heart, Laugh, Zap, Star, Flame, Eye, CheckCheck, Phone, Video, Timer, Clock, CornerUpLeft, X } from "lucide-react";
 import Image from "@/shims/next-image";
 import { useRouter } from "@/shims/next-navigation";
 import { Input } from "@/components/ui/input";
@@ -98,6 +98,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const [optimisticMessages, setOptimisticMessages] = useState<any[]>([]);
   const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
   const [reactionMsgId, setReactionMsgId] = useState<number | null>(null);
+  const [replyTo, setReplyTo] = useState<{ id: number; name: string; text: string } | null>(null);
   const [isVideoCall, setIsVideoCall] = useState(false);
   const [isVoiceCall, setIsVoiceCall] = useState(false);
   const [isCallMuted, setIsCallMuted] = useState(false);
@@ -230,20 +231,29 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     const content = textOverride || inputValue.trim();
     if (!content) return;
 
+    const reply = replyTo;
     const tempId = `temp-${Date.now()}`;
-    const optimisticMessage = { id: tempId, text: content, sender_id: 'me', created_at: new Date().toISOString(), reactions: [], seen: false };
+    const optimisticMessage = {
+      id: tempId, text: content, sender_id: 'me', created_at: new Date().toISOString(), reactions: [], seen: false,
+      reply_to: reply?.id ?? null,
+      reply_text: reply?.text ?? null,
+      reply_sender_name: reply?.name ?? null,
+    };
 
     setOptimisticMessages(prev => [...prev, optimisticMessage]);
     if (!textOverride) setInputValue("");
+    setReplyTo(null);
 
     try {
       const body: Record<string, unknown> = { text: content }
       if (selectedTtl) body.ttl_seconds = selectedTtl
+      if (reply) body.reply_to = reply.id
       await sendMessage(`/api/chats/${params.chatId}/messages`, 'POST', body);
       trackEvent('message_sent', { chat_id: Number(params.chatId), ttl: selectedTtl ?? null });
     } catch (error) {
       toast({ title: t('error.generic_title'), description: t('error.send_message'), variant: "destructive" });
       setOptimisticMessages(prev => prev.filter(m => m.id !== tempId));
+      if (reply) setReplyTo(reply);
     } finally {
       refetchMessages();
       setOptimisticMessages([]);
@@ -342,11 +352,23 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               <motion.div key={msg.id} layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.2 } }}
                 className={cn("flex flex-col max-w-[80%]", msg.sender_id !== chatPartner.user_id ? "ml-auto items-end" : "items-start")} >
                 <div className={cn("px-3 py-2 rounded-lg text-sm relative group", msg.sender_id !== chatPartner.user_id ? "gradient-bg text-white rounded-br-none" : "bg-white text-foreground rounded-bl-none border")}>
+                  {msg.reply_to && (
+                    <div className={cn("mb-1 overflow-hidden rounded border-l-2 py-0.5 pl-2 text-[11px] leading-tight", msg.sender_id !== chatPartner.user_id ? "border-white/60 text-white/80" : "border-primary/50 text-muted-foreground")}>
+                      <div className="truncate font-semibold">{msg.reply_sender_name || t('chats.reply_unavailable')}</div>
+                      <div className="truncate">{msg.reply_text || (msg.reply_image_url ? '📷' : t('chats.reply_unavailable'))}</div>
+                    </div>
+                  )}
                   {msg.text}
-                  <button onClick={() => setReactionMsgId(reactionMsgId === msg.id ? null : msg.id)}
-                    className={cn("absolute -bottom-3 right-0 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity", msg.sender_id !== chatPartner.user_id ? "text-white" : "text-muted-foreground")}>
-                    😊
-                  </button>
+                  <div className="absolute -bottom-3 right-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button data-testid="reply-button" onClick={() => setReplyTo({ id: msg.id, name: msg.sender_id !== chatPartner.user_id ? t('chats.you') : (chatPartner.name || ''), text: msg.text || '' })}
+                      className={cn("text-[10px]", msg.sender_id !== chatPartner.user_id ? "text-white" : "text-muted-foreground")}>
+                      <CornerUpLeft size={12} />
+                    </button>
+                    <button onClick={() => setReactionMsgId(reactionMsgId === msg.id ? null : msg.id)}
+                      className={cn("text-[10px]", msg.sender_id !== chatPartner.user_id ? "text-white" : "text-muted-foreground")}>
+                      😊
+                    </button>
+                  </div>
                   {reactionMsgId === msg.id && (
                     <div className={cn("absolute bottom-full right-0 mb-1 flex gap-0.5 bg-white rounded-full shadow-lg border p-1 z-10", msg.sender_id !== chatPartner.user_id ? "" : "")}>
                       {QUICK_REACTIONS.map(r => (
@@ -382,6 +404,15 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
       <div className="p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] bg-white border-t">
         {partnerOffersEnabled && <div className="mb-2"><ChatPartnerActions placement="chat" /></div>}
+        {replyTo && (
+          <div data-testid="reply-bar" className="mb-2 flex items-center gap-2 rounded-lg border-l-4 border-primary bg-muted/50 px-3 py-1.5">
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-xs font-semibold text-primary">{t('chats.reply_to', { name: replyTo.name })}</div>
+              <div className="truncate text-xs text-muted-foreground">{replyTo.text}</div>
+            </div>
+            <button onClick={() => setReplyTo(null)} aria-label={t('chats.cancel_reply')} className="shrink-0 text-muted-foreground hover:text-foreground"><X size={16} /></button>
+          </div>
+        )}
          <div className="flex items-center gap-3">
           <div className="flex-1 relative">
             <Input data-testid="message-input" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onFocus={() => setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "auto" }), 300)} onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} placeholder={t('chats.placeholder')} className="pr-24 h-11 bg-muted/50 border-0 rounded-xl" />

@@ -178,6 +178,79 @@ describe('GET /api/chats/:chatId/messages', () => {
     expect(res.body.next_before).toBeNull()
     expect(pool.query).toHaveBeenCalledTimes(3)
   })
+
+  it('цитата: SQL джойнит quoted-сообщение, поля цитаты идут в ответ', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ chat_id: 1 }], []])
+      .mockResolvedValueOnce([[{ id: 9, sender_id: 1, text: 'reply', reply_to: 5, reply_text: 'orig', reply_sender_name: 'Bob', created_at: new Date().toISOString() }], []])
+      .mockResolvedValueOnce([[{ user_id: 2, last_read_at: null }], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await get()
+    expect(res.status).toBe(200)
+    const [sql] = pool.query.mock.calls[1]
+    expect(sql).toMatch(/LEFT JOIN messages rm ON rm\.id = m\.reply_to/)
+    expect(res.body.messages[0].reply_text).toBe('orig')
+    expect(res.body.messages[0].reply_sender_name).toBe('Bob')
+  })
+})
+
+describe('POST /api/chats/:chatId/messages', () => {
+  function post(body) {
+    const app = createApp()
+    return request(app).post('/api/chats/1/messages').set('Authorization', `Bearer ${authToken()}`).send(body)
+  }
+
+  it('без reply_to вставляет null и не делает проверочный SELECT', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ chat_id: 1 }], []])
+      .mockResolvedValueOnce([{ insertId: 20 }, []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ id: 20, sender_id: 1, text: 'hi', reply_to: null, created_at: new Date().toISOString() }], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await post({ text: 'hi' })
+    expect(res.status).toBe(201)
+    const insertCall = pool.query.mock.calls.find(([sql]) => /INSERT INTO messages/.test(sql))
+    expect(insertCall).toBeTruthy()
+    expect(insertCall[1]).toEqual(['1', 1, 'hi', null, null, null])
+    expect(pool.query.mock.calls.filter(([sql]) => /SELECT id FROM messages WHERE id = \? AND chat_id = \?/.test(sql))).toHaveLength(0)
+  })
+
+  it('reply_to на сообщение того же чата проходит, id уезжает в INSERT и в ответ', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ chat_id: 1 }], []])
+      .mockResolvedValueOnce([[{ id: 5 }], []])
+      .mockResolvedValueOnce([{ insertId: 20 }, []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ id: 20, sender_id: 1, text: 'hi', reply_to: 5, reply_text: 'orig', reply_sender_name: 'Bob', created_at: new Date().toISOString() }], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await post({ text: 'hi', reply_to: 5 })
+    expect(res.status).toBe(201)
+    const checkCall = pool.query.mock.calls.find(([sql]) => /SELECT id FROM messages WHERE id = \? AND chat_id = \?/.test(sql))
+    expect(checkCall[1]).toEqual([5, '1'])
+    const insertCall = pool.query.mock.calls.find(([sql]) => /INSERT INTO messages/.test(sql))
+    expect(insertCall[1]).toEqual(['1', 1, 'hi', null, null, 5])
+    expect(res.body.reply_to).toBe(5)
+    expect(res.body.reply_text).toBe('orig')
+    expect(res.body.reply_sender_name).toBe('Bob')
+  })
+
+  it('reply_to на сообщение чужого чата → 400, INSERT не уходит', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ chat_id: 1 }], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await post({ text: 'hi', reply_to: 999 })
+    expect(res.status).toBe(400)
+    expect(pool.query.mock.calls.filter(([sql]) => /INSERT INTO messages/.test(sql))).toHaveLength(0)
+  })
+
+  it('нецелый или отрицательный reply_to → 400 без единого запроса к БД', async () => {
+    for (const bad of ['abc', -3, 1.5, {}, true]) {
+      pool.query.mockReset()
+      const res = await post({ text: 'hi', reply_to: bad })
+      expect(res.status).toBe(400)
+      expect(pool.query).not.toHaveBeenCalled()
+    }
+  })
 })
 
 describe('POST /api/chats/:chatId/messages/:msgId/reactions', () => {

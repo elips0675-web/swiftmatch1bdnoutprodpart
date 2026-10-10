@@ -1,11 +1,11 @@
 {
-  "generated": "2026-10-10T06:57:53.062Z",
+  "generated": "2026-10-10T07:11:14.538Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
     "files": 43,
-    "tests": 581,
-    "passed": 581,
+    "tests": 584,
+    "passed": 584,
     "failed": 0,
     "gate": {
       "files": 17,
@@ -13,7 +13,7 @@
     },
     "product": {
       "files": 26,
-      "tests": 184
+      "tests": 187
     },
     "perFile": [
       {
@@ -102,7 +102,7 @@
       },
       {
         "file": "src/test/chats-history.test.tsx",
-        "tests": 7
+        "tests": 10
       },
       {
         "file": "src/test/error-boundary.test.tsx",
@@ -192,8 +192,8 @@
   },
   "server": {
     "files": 60,
-    "tests": 865,
-    "passed": 865,
+    "tests": 870,
+    "passed": 870,
     "failed": 0,
     "gate": {
       "files": 5,
@@ -201,7 +201,7 @@
     },
     "product": {
       "files": 55,
-      "tests": 747
+      "tests": 752
     },
     "perFile": [
       {
@@ -430,7 +430,7 @@
       },
       {
         "file": "server/src/__tests__/social.test.js",
-        "tests": 14
+        "tests": 19
       },
       {
         "file": "server/src/__tests__/totp.test.js",
@@ -538,6 +538,6 @@
   },
   "total": {
     "files": 103,
-    "tests": 1446
+    "tests": 1454
   }
 }

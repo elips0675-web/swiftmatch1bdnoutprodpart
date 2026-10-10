@@ -229,3 +229,59 @@ describe('История чата: страницы вместо «первых 
     expect(screen.getByText('свежее-1')).toBeTruthy()
   })
 })
+
+describe('Ответ на сообщение (reply-to)', () => {
+  it('рисует цитату над текстом: имя автора и текст', async () => {
+    firstPage = {
+      messages: [{ ...msg(50, 'мой ответ'), reply_to: 49, reply_text: 'исходный текст', reply_sender_name: 'Борис' }],
+      has_more: false,
+      next_before: 50,
+    }
+    renderChat()
+    await screen.findByText('мой ответ', {}, { timeout: 5000 })
+    expect(screen.getByText('Борис')).toBeTruthy()
+    expect(screen.getByText('исходный текст')).toBeTruthy()
+  })
+
+  it('кнопка ответа открывает полосу ответа, а отправка кладёт reply_to в тело POST', async () => {
+    renderChat()
+    await screen.findByText('свежее-2', {}, { timeout: 5000 })
+
+    expect(screen.queryByTestId('reply-bar')).toBeNull()
+    fireEvent.click(screen.getAllByTestId('reply-button')[0])
+    await screen.findByTestId('reply-bar', {}, { timeout: 5000 })
+
+    fireEvent.change(screen.getByTestId('message-input'), { target: { value: 'мой ответ' } })
+    fireEvent.click(screen.getByTestId('send-button'))
+
+    await waitFor(() => {
+      const postCall = mockFetch.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'POST')
+      expect(postCall).toBeTruthy()
+      const body = JSON.parse(String((postCall![1] as RequestInit).body))
+      expect(body.reply_to).toBe(50)
+      expect(body.text).toBe('мой ответ')
+    }, { timeout: 5000 })
+
+    await waitFor(() => expect(screen.queryByTestId('reply-bar')).toBeNull(), { timeout: 5000 })
+  })
+
+  it('отмена ответа убирает полосу и отправка идёт без reply_to', async () => {
+    renderChat()
+    await screen.findByText('свежее-2', {}, { timeout: 5000 })
+
+    fireEvent.click(screen.getAllByTestId('reply-button')[0])
+    await screen.findByTestId('reply-bar', {}, { timeout: 5000 })
+    fireEvent.click(screen.getByLabelText('chats.cancel_reply'))
+    await waitFor(() => expect(screen.queryByTestId('reply-bar')).toBeNull(), { timeout: 5000 })
+
+    fireEvent.change(screen.getByTestId('message-input'), { target: { value: 'обычное' } })
+    fireEvent.click(screen.getByTestId('send-button'))
+
+    await waitFor(() => {
+      const postCall = mockFetch.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'POST')
+      expect(postCall).toBeTruthy()
+      const body = JSON.parse(String((postCall![1] as RequestInit).body))
+      expect(body.reply_to).toBeUndefined()
+    }, { timeout: 5000 })
+  })
+})

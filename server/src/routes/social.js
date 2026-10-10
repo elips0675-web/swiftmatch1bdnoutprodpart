@@ -86,6 +86,9 @@ const likeLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, ma
  *                       text: { type: string }
  *                       image_url: { type: string, nullable: true }
  *                       reply_to: { type: integer, nullable: true }
+ *                       reply_sender_name: { type: string, nullable: true, description: Имя автора цитируемого сообщения }
+ *                       reply_text: { type: string, nullable: true, description: Текст цитаты; null если автор удалён }
+ *                       reply_image_url: { type: string, nullable: true, description: Картинка цитаты }
  *                       ttl_seconds: { type: integer, nullable: true }
  *                       created_at: { type: string }
  *                       sender_name: { type: string }
@@ -709,9 +712,14 @@ router.get('/api/chats/:chatId/messages', auth, async (req, res) => {
 
     const [fetched] = await pool.query(
       `SELECT m.id, m.sender_id, m.text, m.image_url, m.reply_to, m.ttl_seconds, m.created_at,
-              up.display_name as sender_name
+              up.display_name as sender_name,
+              rup.display_name as reply_sender_name,
+              CASE WHEN rup.id IS NOT NULL THEN rm.text END as reply_text,
+              CASE WHEN rup.id IS NOT NULL THEN rm.image_url END as reply_image_url
        FROM messages m
        JOIN user_profiles up ON m.sender_id = up.id
+       LEFT JOIN messages rm ON rm.id = m.reply_to
+       LEFT JOIN user_profiles rup ON rup.id = rm.sender_id AND ${activeUser('rup')}
        WHERE m.chat_id = ?
          AND (m.ttl_seconds IS NULL OR m.created_at > DATE_SUB(NOW(), INTERVAL m.ttl_seconds SECOND))
          AND ${activeUser('up')}
@@ -764,6 +772,18 @@ router.post('/api/chats/:chatId/messages', auth, async (req, res) => {
   const { text, image_url, ttl_seconds } = req.body
   if (!text && !image_url) return res.status(400).json({ message: 'Text or image is required' })
 
+  const rawReplyTo = req.body.reply_to
+  let replyTo = null
+  if (rawReplyTo !== undefined && rawReplyTo !== null && rawReplyTo !== '') {
+    const parsed = typeof rawReplyTo === 'number'
+      ? rawReplyTo
+      : (typeof rawReplyTo === 'string' && /^\d+$/.test(rawReplyTo) ? Number(rawReplyTo) : NaN)
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      return res.status(400).json({ message: 'Invalid reply target' })
+    }
+    replyTo = parsed
+  }
+
   try {
     const bannedWords = await getBannedWords()
     if (containsBannedWord(text, bannedWords)) {
@@ -780,10 +800,18 @@ router.post('/api/chats/:chatId/messages', auth, async (req, res) => {
     )
     if (participant.length === 0) return res.status(403).json({ message: 'Not a participant' })
 
+    if (replyTo !== null) {
+      const [target] = await pool.query(
+        'SELECT id FROM messages WHERE id = ? AND chat_id = ?',
+        [replyTo, req.params.chatId],
+      )
+      if (target.length === 0) return res.status(400).json({ message: 'Invalid reply target' })
+    }
+
     const ttl = ttl_seconds > 0 ? ttl_seconds : null
     const [result] = await pool.query(
-      'INSERT INTO messages (chat_id, sender_id, text, image_url, ttl_seconds) VALUES (?, ?, ?, ?, ?)',
-      [req.params.chatId, req.userId, stripHtml(text) || null, image_url || null, ttl],
+      'INSERT INTO messages (chat_id, sender_id, text, image_url, ttl_seconds, reply_to) VALUES (?, ?, ?, ?, ?, ?)',
+      [req.params.chatId, req.userId, stripHtml(text) || null, image_url || null, ttl, replyTo],
     )
 
     const preview = image_url ? '📷 Photo' : (text || '')
@@ -794,9 +822,14 @@ router.post('/api/chats/:chatId/messages', auth, async (req, res) => {
 
     const [[msg]] = await pool.query(
       `SELECT m.id, m.sender_id, m.text, m.image_url, m.reply_to, m.ttl_seconds, m.created_at,
-              up.display_name as sender_name
+              up.display_name as sender_name,
+              rup.display_name as reply_sender_name,
+              CASE WHEN rup.id IS NOT NULL THEN rm.text END as reply_text,
+              CASE WHEN rup.id IS NOT NULL THEN rm.image_url END as reply_image_url
        FROM messages m
        JOIN user_profiles up ON m.sender_id = up.id
+       LEFT JOIN messages rm ON rm.id = m.reply_to
+       LEFT JOIN user_profiles rup ON rup.id = rm.sender_id AND ${activeUser('rup')}
        WHERE m.id = ? AND ${activeUser('up')}`,
       [result.insertId],
     )

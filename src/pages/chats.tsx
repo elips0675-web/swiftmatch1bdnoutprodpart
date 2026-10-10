@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Search, ChevronLeft, Send, MoveVertical as MoreVertical, Smile, Heart, Laugh, Zap, Flame, Star, Ghost, Rocket, Crown, Music, Phone, Video, Flag, Info, ChevronRight, Trash2, ThumbsUp, PartyPopper, Eye, Frown, Award, Compass, Coffee, MessageSquareQuote, PawPrint, Globe, Film, BookOpen, Baby, Sun, Timer, Clock, Calendar } from "lucide-react";
+import { Search, ChevronLeft, Send, MoveVertical as MoreVertical, Smile, Heart, Laugh, Zap, Flame, Star, Ghost, Rocket, Crown, Music, Phone, Video, Flag, Info, ChevronRight, Trash2, ThumbsUp, PartyPopper, Eye, Frown, Award, Compass, Coffee, MessageSquareQuote, PawPrint, Globe, Film, BookOpen, Baby, Sun, Timer, Clock, Calendar, CornerUpLeft, X } from "lucide-react";
 import Image from "@/shims/next-image";
 import { useSearchParams, useRouter } from "@/shims/next-navigation";
 import dynamic from "@/shims/next-dynamic";
@@ -60,6 +60,10 @@ function toChatMessage(m: any, myId?: number) {
     sender: m.sender_id === myId ? 'me' : 'other',
     time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     reactions: m.reactions || [],
+    reply_to: m.reply_to ?? null,
+    reply_text: m.reply_text ?? null,
+    reply_sender_name: m.reply_sender_name ?? null,
+    reply_image_url: m.reply_image_url ?? null,
   };
 }
 
@@ -228,6 +232,7 @@ function ChatsContent() {
   const openingChatRef = useRef<number | null>(null);
   const [reactions, setReactions] = useState<Record<number, any[]>>({});
   const [reactionMsgId, setReactionMsgId] = useState<number | null>(null);
+  const [replyTo, setReplyTo] = useState<{ id: number; name: string; text: string } | null>(null);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
@@ -423,6 +428,10 @@ function ChatsContent() {
               sender: 'other',
               time: new Date(event.message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               reactions: [],
+              reply_to: event.message.reply_to ?? null,
+              reply_text: event.message.reply_text ?? null,
+              reply_sender_name: event.message.reply_sender_name ?? null,
+              reply_image_url: event.message.reply_image_url ?? null,
             }];
           });
         } else {
@@ -516,6 +525,9 @@ function ChatsContent() {
 
     const body: Record<string, unknown> = { text: textToSend }
     if (selectedTtl) body.ttl_seconds = selectedTtl
+    const reply = replyTo
+    if (reply) body.reply_to = reply.id
+    setReplyTo(null)
 
     fetch(`/api/chats/${selectedChat.id}/messages`, {
       method: 'POST',
@@ -525,12 +537,20 @@ function ChatsContent() {
       .then(res => res.ok ? res.json() : null)
       .then(msg => {
         if (msg) {
-          const newMessage = { id: msg.id, text: msg.text, sender: 'me', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), ttl_seconds: msg.ttl_seconds };
+          const newMessage = {
+            id: msg.id, text: msg.text, sender: 'me',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            ttl_seconds: msg.ttl_seconds,
+            reply_to: msg.reply_to ?? null,
+            reply_text: msg.reply_text ?? null,
+            reply_sender_name: msg.reply_sender_name ?? null,
+            reply_image_url: msg.reply_image_url ?? null,
+          };
           const updated = [...messages, newMessage];
           setMessages(updated);
         }
       })
-      .catch(() => {});
+      .catch(() => { if (reply) setReplyTo(reply); });
     if (!textOverride) setInputValue('');
   };
 
@@ -684,6 +704,12 @@ function ChatsContent() {
               return (
               <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} key={msg.id} className={cn("flex flex-col max-w-[80%]", msg.sender === "me" ? "ml-auto items-end" : "items-start")}>
                 <div onClick={() => setReactionMsgId(isReactionPickerOpen ? null : msg.id)} className={cn("px-3 py-2 rounded-lg text-sm shadow-sm font-medium leading-snug text-left w-full transition-all active:scale-95", msg.sender === "me" ? "gradient-bg text-white rounded-br-none shadow-primary/10" : "bg-white text-foreground rounded-bl-none border border-border/40")}>
+                  {msg.reply_to && (
+                    <div className={cn("mb-1 overflow-hidden rounded border-l-2 py-0.5 pl-2 text-[11px] leading-tight", msg.sender === "me" ? "border-white/60 text-white/80" : "border-primary/50 text-muted-foreground")}>
+                      <div className="truncate font-semibold">{msg.reply_sender_name || t('chats.reply_unavailable')}</div>
+                      <div className="truncate">{msg.reply_text || (msg.reply_image_url ? '📷' : t('chats.reply_unavailable'))}</div>
+                    </div>
+                  )}
                   {msg.image_url && <img src={msg.image_url} alt="" className="w-full rounded-lg mb-2 max-h-64 object-cover" />}
                   {msg.text && <p>{msg.text}</p>}
                 </div>
@@ -714,7 +740,7 @@ function ChatsContent() {
                     })}
                   </div>
                 )}
-                <span className="flex items-center gap-1 text-[9px] text-muted-foreground mt-1 px-1 font-bold uppercase tracking-tighter opacity-60">{msg.ttl_seconds && <Clock size={10} className="inline" />}{msg.time}</span>
+                <span className="flex items-center gap-1 text-[9px] text-muted-foreground mt-1 px-1 font-bold uppercase tracking-tighter opacity-60">{msg.ttl_seconds && <Clock size={10} className="inline" />}{msg.time}<button data-testid="reply-button" onClick={() => setReplyTo({ id: msg.id, name: msg.sender === "me" ? t('chats.you') : (selectedChat?.name || ''), text: msg.text || '' })} className="ml-1 hover:text-foreground transition-colors"><CornerUpLeft size={10} /></button></span>
               </motion.div>
             )})}</AnimatePresence></div>
             {isTyping && (<motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-1.5 text-muted-foreground"><div className="flex gap-1 bg-white px-3 py-2.5 rounded-lg border border-border/40 shadow-sm rounded-bl-none"><span className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce"></span><span className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce [animation-delay:0.2s]"></span><span className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce [animation-delay:0.4s]"></span></div><span className="text-[9px] font-bold uppercase tracking-widest">{t('chats.typing')}</span></motion.div>)}
@@ -722,6 +748,15 @@ function ChatsContent() {
           </div>
         </main>
         <div className="shrink-0 px-4 py-3 bg-white border-t border-border">
+          {replyTo && (
+            <div data-testid="reply-bar" className="mb-2 flex items-center gap-2 rounded-xl border-l-4 border-primary bg-muted/50 px-3 py-1.5">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-xs font-bold text-primary">{t('chats.reply_to', { name: replyTo.name })}</div>
+                <div className="truncate text-xs text-muted-foreground">{replyTo.text}</div>
+              </div>
+              <button onClick={() => setReplyTo(null)} aria-label={t('chats.cancel_reply')} className="shrink-0 text-muted-foreground hover:text-foreground"><X size={16} /></button>
+            </div>
+          )}
           <div className="flex items-center gap-3">
             <div className="flex-1 relative">
               <Input data-testid="message-input" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onFocus={() => setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "auto" }), 300)} onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} placeholder={t('chats.placeholder')} className="pr-20 h-11 bg-muted/50 border-0 rounded-2xl font-medium px-5 text-sm" />
