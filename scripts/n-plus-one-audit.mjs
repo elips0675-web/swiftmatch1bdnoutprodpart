@@ -39,6 +39,18 @@ export const JUSTIFIED = [
     expect: 'DELETE',
     reason: 'то же: чистка подписок по 410/404, а не по каждой подписке',
   },
+  {
+    file: 'routes/admin/users.js',
+    lines: [425],
+    expect: 'UPDATE IGNORE',
+    reason: 'админ-мердж дубликатов: фиксированный список FK-колонок на users, запрос один на пару таблица/колонка, а не на строку данных',
+  },
+  {
+    file: 'routes/admin/users.js',
+    lines: [428],
+    expect: 'DELETE FROM',
+    reason: 'то же: подчистка «с самим собой» по фиксированному списку парных колонок после переноса',
+  },
 ]
 
 export function collectFiles(dir) {

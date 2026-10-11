@@ -1,15 +1,15 @@
 {
-  "generated": "2026-10-11T06:48:42.250Z",
+  "generated": "2026-10-11T08:24:45.353Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
     "files": 50,
-    "tests": 650,
-    "passed": 650,
+    "tests": 654,
+    "passed": 654,
     "failed": 0,
     "gate": {
       "files": 19,
-      "tests": 446
+      "tests": 450
     },
     "product": {
       "files": 31,
@@ -18,7 +18,7 @@
     "perFile": [
       {
         "file": "scripts/check-doc-mirrors.test.mjs",
-        "tests": 6
+        "tests": 10
       },
       {
         "file": "scripts/check-enum-constraints.test.mjs",
@@ -219,17 +219,17 @@
     ]
   },
   "server": {
-    "files": 66,
-    "tests": 918,
-    "passed": 918,
+    "files": 67,
+    "tests": 926,
+    "passed": 926,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 118
     },
     "product": {
-      "files": 61,
-      "tests": 800
+      "files": 62,
+      "tests": 808
     },
     "perFile": [
       {
@@ -263,6 +263,10 @@
       {
         "file": "server/src/__tests__/admin-users-ban.test.js",
         "tests": 5
+      },
+      {
+        "file": "server/src/__tests__/admin-users-merge.test.js",
+        "tests": 8
       },
       {
         "file": "server/src/__tests__/admin-webhooks.test.js",
@@ -589,7 +593,7 @@
     ]
   },
   "total": {
-    "files": 116,
-    "tests": 1568
+    "files": 117,
+    "tests": 1580
   }
 }

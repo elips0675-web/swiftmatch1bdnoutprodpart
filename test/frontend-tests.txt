@@ -1,8 +1,8 @@
 ===== Фронт (Vitest) =====
-650 тестов в 50 файлах (зелёных 650) (vitest --reporter=json)
+654 тестов в 50 файлах (зелёных 654) (vitest --reporter=json)
 
 # файл | тестов
-scripts/check-doc-mirrors.test.mjs | 6
+scripts/check-doc-mirrors.test.mjs | 10
 scripts/check-enum-constraints.test.mjs | 47
 scripts/check-env-parity.test.mjs | 5
 scripts/check-ports.test.mjs | 5

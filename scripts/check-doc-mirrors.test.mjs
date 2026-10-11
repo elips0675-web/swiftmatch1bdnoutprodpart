@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { PAIRS, sha256Of, syncMirrors } from './check-doc-mirrors.mjs'
+import { PAIRS, evaluate, sha256Of, syncMirrors } from './check-doc-mirrors.mjs'
 
 const roots = []
 function makeRoot() {
@@ -60,6 +60,37 @@ describe('syncMirrors', () => {
   it('нет исходника — source-missing (skip), не ошибка', () => {
     const root = makeRoot()
     expect(syncMirrors(root, { pairs: [['nope.txt', 'test/nope.txt']] })[0].status).toBe('source-missing')
+  })
+})
+
+describe('evaluate', () => {
+  it('все пары ok — ok (гейт зелёный)', () => {
+    const res = evaluate([{ src: 'a', dst: 'test/a', status: 'ok' }])
+    expect(res).toEqual({ ok: true, missing: 0, total: 1 })
+  })
+
+  it('missing без --fix — ok:false (падение, а не пропуск)', () => {
+    const res = evaluate(
+      [
+        { src: 'a', dst: 'test/a', status: 'ok' },
+        { src: 'b', dst: 'test/b', status: 'missing' },
+      ],
+      {},
+    )
+    expect(res).toEqual({ ok: false, missing: 1, total: 2 })
+  })
+
+  it('missing с --fix — ok:true (создаётся, а не падает)', () => {
+    const res = evaluate(
+      [{ src: 'b', dst: 'test/b', status: 'missing' }],
+      { fix: true },
+    )
+    expect(res).toEqual({ ok: true, missing: 0, total: 1 })
+  })
+
+  it('source-missing не считается отсутствием зеркала', () => {
+    const res = evaluate([{ src: 'a', dst: 'test/a', status: 'source-missing' }])
+    expect(res).toEqual({ ok: true, missing: 0, total: 1 })
   })
 })
 

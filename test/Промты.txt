@@ -1,0 +1,68 @@
+# Промты для SwiftMatch — указатели (бывшие разделы 0–34)
+
+> **04.10.2026, этап 32: этот файл больше не источник правил.** Разделы 0–20
+> (правила, чек-листы, промты «починить конкретный баг») заменены таблицей
+> «тема → канон»; разделы 21–34 (продуктовые roadmap’и) перенесены **дословно** в
+> `docs/product-roadmap.md`.
+>
+> Почему: у проекта было три источника одних и тех же правил, и файл, попавший в
+> конец цепочки, оказывался слабой версией. Именно здесь предлагалось сделать
+> `adminAuth` пассивным (пропускать неавторизованных) — это неверно и закрыто
+> этапом 24, а правило `adminAuth ACTIVE` живёт в `AGENTS.md` и
+> `docs/AGENTS-admin-auth.md`. Такую правку нельзя было доводить до конца:
+> расходились четыре файла.
+>
+> **Канон:** `AGENTS.md` + `docs/AGENTS-*.md` — правила, гейты, чек-листы.
+> **Числа прогонов:** `README.md`, `project-context.md` и шапки `Что сделано.txt` /
+> `Что доделать.txt` (гейт `node scripts/test-counter-audit.mjs`).
+> **Побайтовые зеркала `test/`:** `npm run check:mirrors` (`scripts/check-doc-mirrors.mjs`).
+> **Бэклог и приоритеты:** `Что доделать.txt`. **История этапов:** `Что сделано.txt`.
+> **Раскладку документов проверяет гейт** `node scripts/docs-canon-audit.mjs` (`npm run check:docs`).
+
+## Канон по темам
+
+| Раздел | Тема | Где правда сейчас |
+|---|---|---|
+| 0 | Итеративный подход по этапам 0–4 + завершение этапа (сборка, `check:console`, журналы и побайтовые зеркала `test/`, прогон счётчиков, push) | `docs/AGENTS-workflow.md` |
+| 1 | Pre-flight Checklist | `docs/AGENTS-production.md` — чек-лист из 10 пунктов + Golden Rule «Production ≠ File Created» |
+| 2 | Функциональный аудит приложения | пробелы покрытия — `test/ИНВЕНТАРЬ-ТЕСТОВ.md` (локальное зеркало), бэклог — `Что доделать.txt` |
+| 3 | Аудит связки Админка ↔ БД ↔ Приложение | `docs/AGENTS-admin-auth.md` + `Что доделать.txt` |
+| 4 | Добавление `data-testid` | **выполнено:** 335 `data-testid` в `src/**/*.tsx`, 119 использований в `e2e/*.ts`; 19 спеков, 152 теста; джобы `e2e` (`.github/workflows/ci.yml`) и `e2e-test` (`.github/workflows/deploy.yml`); рецепт сверяет `npm run check:e2e` |
+| 7 | Починка `src/pages/chats.tsx` | **выполнено:** восстановлен `GET /api/chats/:chatId` (страница падала HTML-404); см. `Что сделано.txt` |
+| 8 | Починка `src/pages/settings-privacy.tsx` | **выполнено:** страница сохранена; блок «Где остановиться» при `passport_mode`; см. `Что сделано.txt` |
+| 9 | Redis + Backup | **выполнено:** RedisStore в `server/src/middleware/limiters.js`, redis-adapter в `server/src/index.js`, `scripts/backup-mysql.ps1` (74 строки) |
+| 10 | Production Readiness Checklist | `docs/AGENTS-production.md` |
+| 11 | Документация | `README.md` — карта документации; `AGENTS.md` — навигация по модулям |
+| 12 | Git | `AGENTS.md` — Conventional Commits, `git commit --no-verify`, что нельзя коммитить (`.env`) |
+| 13 | Стек технологий | `project-context.md` |
+| 14 | Код-стайл и архитектура | `docs/AGENTS-system-prompt.md` + `docs/AGENTS-pitfalls.md` (грабли из опыта, нумерация сплошная) |
+| 15 | Golden Rules | `AGENTS.md` (гипер-краткое резюме) + `docs/AGENTS-system-prompt.md` |
+| 16 | Absolute Bans | `docs/AGENTS-security.md` |
+| 17 | Безопасность (Security Rules) | `docs/AGENTS-security.md` |
+| 18 | Миграции БД | `AGENTS.md` («Дрейф схемы = живой 500», «Ограничение в схеме = проверка в коде») + `node scripts/schema-drift-audit.mjs` + `npm run check:enum-constraints` |
+| 19 | Capacitor / нативные правила | `capacitor.config.ts`, гейт `node scripts/check-native-config.mjs`, сборка `npm run build:native` |
+| 20 | Past Mistakes | `docs/past-mistakes.md` + `docs/AGENTS-pitfalls.md` |
+| 21–34 | Продуктовые roadmap’и (roadmap, DevEx, a11y, observability, IaC, IAP, GDPR, Chaos Engineering) | `docs/product-roadmap.md` — перенесено дословно, 775 строк |
+
+## Что убрано и почему
+
+- **Правила не дублируются.** Пересказ правил в этом файле был слабее канона и
+  протухал отдельно от него: агент, читавший `Промты.txt`, получал текст,
+  который уже не соответствует коду.
+- **Промты «починки» уже сделанных багов** (разделы 7 и 8) — выполнены,
+  оставлены только строкой выше со ссылкой на текущее состояние.
+- **Числа тестов из промтов выброшены:** они устаревают молча, а числа в проекте
+  живут под гейтом `test-counter-audit`.
+- **Продуктовые идеи не потеряны:** они целиком в `docs/product-roadmap.md`,
+  файл отслеживается в git и проверяется гейтом мусора в кодировке.
+
+## Как это проверяется
+
+`node scripts/docs-canon-audit.mjs` (npm-скрипт `check:docs`) падает, если:
+
+1. в этом файле снова появятся разделы `## 0.`–`## 20.` или пропадёт шапка;
+2. в таблице канона ссылка на несуществующий файл;
+3. `docs/product-roadmap.md` потеряет хотя бы один из 14 заголовков разделов 21–34;
+4. в отслеживаемых документах появится нормативное требование сделать
+   `adminAuth` пассивным (правило — ACTIVE) или упоминание удалённой зависимости
+   `zod` как установленной;

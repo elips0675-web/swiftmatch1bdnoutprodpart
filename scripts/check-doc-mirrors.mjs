@@ -1,10 +1,12 @@
 /**
  * Гейт «зеркала `test/` совпадают с корнем побайтово» (`npm run check:mirrors`).
  *
- * Каталог `test/` — ручная копия ключевых доков для внешнего анализа; он живёт
- * под `.gitignore`, поэтому сверка локальная. Если зеркало не собрано (свежий
- * клон или CI: части файлов нет) — гейт пропускает проверку (exit 0); собрать
- * зеркало: `--fix`. Забытый синк уже случался: зеркало
+ * Каталог `test/` — копия ключевых доков для внешнего анализа. Все 9 пар
+ * трекаются в git (добавляются `git add -f`, т.к. каталог в `.gitignore`),
+ * поэтому гейт вызывается и из CI, и отсутствие зеркала или расхождение —
+ * это падение (exit 1), а не пропуск: скип-на-отсутствии давал зелёный гейт
+ * без единой сверки (свежий клон получал часть пар, остальные молча
+ * пропускались). Забытый синк уже случался: зеркало
  * `Что сделано.txt` отставало и несло утёкший VAPID-ключ (журнал, 217-219).
  *
  * Сверка — sha256 по явным парам (не обход каталога): только эти файлы обязаны
@@ -77,18 +79,39 @@ export function syncMirrors(root, options = {}) {
   return results
 }
 
+/**
+ * Итог сверки: зелёный гейт только когда каждая пара `ok` (при `--fix` — ещё и
+ * `created`/`synced`). `missing` без `--fix` — падение, а не пропуск (скип
+ * давал зелёный гейт без единой сверки на свежем клоне). `source-missing` —
+ * отсутствует исходник в корне (конфигурация пары), не блокирует.
+ * @param {Array<{src: string, status: string}>} results
+ * @param {{fix?: boolean}} options
+ */
+export function evaluate(results, options = {}) {
+  const fix = Boolean(options.fix)
+  const missing = results.filter((r) => r.status === 'missing')
+  if (!fix && missing.length) {
+    return { ok: false, missing: missing.length, total: results.length }
+  }
+  return { ok: true, missing: 0, total: results.length }
+}
+
 function main() {
   const fix = process.argv.slice(2).includes('--fix')
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-  if (!fs.existsSync(path.join(root, 'test'))) {
-    console.log('test/ не существует — пропуск (skip): зеркала под .gitignore, в CI их нет')
-    process.exit(0)
+  const testDir = path.join(root, 'test')
+  if (!fs.existsSync(testDir)) {
+    if (!fix) {
+      console.error('test/ не существует — зеркала отсутствуют (FAIL). Собрать: node scripts/check-doc-mirrors.mjs --fix')
+      process.exit(1)
+    }
+    fs.mkdirSync(testDir, { recursive: true })
   }
   const results = syncMirrors(root, { fix })
-  const missing = results.filter((r) => r.status === 'missing')
-  if (!fix && missing.length) {
-    console.log(`зеркало test/ не собрано (${missing.length} из ${results.length} пар отсутствуют) — пропуск (skip); собрать: node scripts/check-doc-mirrors.mjs --fix`)
-    process.exit(0)
+  const verdict = evaluate(results, { fix })
+  if (!fix && verdict.missing) {
+    console.log(`зеркало test/ не собрано (${verdict.missing} из ${verdict.total} пар отсутствуют) — FAIL; собрать: node scripts/check-doc-mirrors.mjs --fix`)
+    process.exit(1)
   }
   let ok = true
   for (const { src, dst, status } of results) {
