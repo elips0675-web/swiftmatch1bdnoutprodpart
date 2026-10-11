@@ -38,12 +38,19 @@ import {
   MOVED_SECTIONS,
   ROADMAP_MIN_TOTAL_LINES,
   FILE_LINK_RE,
+  TODO_JOURNAL,
+  DONE_JOURNAL,
+  AGENDA_ARCHIVE,
+  CLOSURE_DATE_RE,
   collectPromptsFindings,
   collectRoadmapFindings,
   collectForbiddenFindings,
   collectArchiveFindings,
+  collectBacklogFindings,
+  collectAgendaFindings,
   collectWiringFindings,
   collectTrackedDocs,
+  tableIds,
   getJobBlock,
   getStepBlock,
   blockAllowsFailure,
@@ -370,5 +377,76 @@ describe('интеграция на реальном репозитории', ()
   it('audit() на текущем дереве — без находок', () => {
     const { findings } = audit(ROOT)
     expect(findings).toEqual([])
+  })
+})
+
+describe('структурный гейт бэклога (Что доделать.txt)', () => {
+  it('текущие бэклог и хроника проходят проверки', () => {
+    expect(collectBacklogFindings(read(TODO_JOURNAL), read(DONE_JOURNAL))).toEqual([])
+  })
+
+  it('задвоенный ID в таблице — находка', () => {
+    const text = '| # | Пункт |\n|---|---|\n| 11 | Merge |\n| 11 | Merge снова |\n'
+    expect(ids(collectBacklogFindings(text, ''))).toContain('backlog-table-id-dup')
+  })
+
+  it('ID открытого пункта не считается дублем с чужим номером', () => {
+    const text = '| ~~9б~~ | закрыто |\n| 11 | открыто |\n'
+    expect(collectBacklogFindings(text, '')).toEqual([])
+  })
+
+  it('tableIds отдаёт первые ячейки строк `| … |` без зачёркиваний и служебных', () => {
+    expect(tableIds('| ~~9б~~ | x |\n| 11 | y |\n| # | h |\n|---|---|\n| `nginx.conf` | корень |')).toEqual(['9б', '11', 'nginx.conf'])
+  })
+
+  it('задвоенный заголовок — находка', () => {
+    const text = '### M1. Чек-ин\nтекст\n### M1. Чек-ин\n'
+    expect(ids(collectBacklogFindings(text, ''))).toContain('backlog-heading-dup')
+  })
+
+  it('`⏳` на строке с признаком закрытия — находка', () => {
+    const text = '- ⏳ **P1 #11** ~~сделано~~ ✅\n'
+    expect(ids(collectBacklogFindings(text, ''))).toContain('backlog-closed-waiting')
+  })
+
+  it('`⏳` в цитате правила («нет ⏳ на закрытом») — не находка', () => {
+    const text = '> закрыты **X** (правило: нет `⏳` на закрытом пункте, дата «ЗАКРЫТО 05.05.2028»)\n'
+    expect(collectBacklogFindings(text, 'хроника 05.05.2028')).toEqual([])
+  })
+
+  it('хронический заголовок `## … (ДД.ММ.ГГГГ): …` в бэклоге — находка', () => {
+    const text = '## Этап 22 (30.09.2026): P0-D\n'
+    expect(ids(collectBacklogFindings(text, ''))).toContain('backlog-history-header')
+  })
+
+  it('заголовок без даты и в формате бэклога — не находка', () => {
+    const text = '## Правила работы с журналами и бэклогом\n'
+    expect(collectBacklogFindings(text, '')).toEqual([])
+  })
+
+  it('дата «ЗАКРЫТО …» без хроники — находка; с хроникой — тишина', () => {
+    const todo = '### X — ЗАКРЫТО 05.05.2028\n'
+    expect(ids(collectBacklogFindings(todo, ''))).toContain('backlog-closure-unchronicled')
+    expect(collectBacklogFindings(todo, 'хроника 05.05.2028')).toEqual([])
+  })
+
+  it('все даты закрытий реального бэклога есть в реальной хронике', () => {
+    const todo = read(TODO_JOURNAL)
+    const done = read(DONE_JOURNAL)
+    const dates = [...todo.matchAll(CLOSURE_DATE_RE)].map((m) => m[1])
+    expect(dates.length).toBeGreaterThan(0)
+    for (const d of new Set(dates)) {
+      expect(done, `нет даты ${d} в «Что сделано.txt»`).toContain(d)
+    }
+  })
+})
+
+describe('agenda-archive.md остаётся архивом', () => {
+  it('текущий файл проходит', () => {
+    expect(collectAgendaFindings(read(AGENDA_ARCHIVE))).toEqual([])
+  })
+
+  it('без метки «архив/снимок» в шапке — находка', () => {
+    expect(ids(collectAgendaFindings('# Заметки\n\nтекст\n'))).toContain('agenda-archive-role')
   })
 })

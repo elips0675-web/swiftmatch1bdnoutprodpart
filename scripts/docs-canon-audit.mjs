@@ -19,7 +19,7 @@
  *     одному гейту: `docs/roadmap.md` оказался журналом этапов, а не списком
  *     идей, поэтому они перенесены в `docs/product-roadmap.md` дословно.
  *
- * Гейт проверяет пять вещей, каждую — на обоих концах (и «плохо», и «хорошо»):
+ * Гейт проверяет шесть вещей, каждую — на обоих концах (и «плохо», и «хорошо»):
  *
  *  1. **`Промты.txt` — указатель, а не источник правил.** Есть шапка со словами
  *     «больше не источник правил», нет разделов `## 0.`–`## 20.`, нет
@@ -36,7 +36,12 @@
  *  4. **Архивный снимок `context.txt` помечен.** В первых строках есть пометка
  *     «ИСТОРИЧЕСКИЙ СРЕЗ», дата среза и указание канона (`project-context.md`):
  *     иначе агент читает 141 КБ августа как текущее состояние.
- *  5. **Гейт реально запускается.** Скрипт `check:docs` есть в `package.json`,
+ *  5. **Структура бэклога.** `Что доделать.txt` — только открытые пункты:
+ *     каждый ID (первая ячейка строк `| … |`) ровно один раз, заголовки
+ *     уникальны, нет `⏳` на закрытом, нет хронических заголовков
+ *     «## … (ДД.ММ.ГГГГ): …», каждая дата «ЗАКРЫТО …» обязана быть в хронике
+ *     «Что сделано.txt», а `docs/agenda-archive.md` обязан оставаться архивом.
+ *  6. **Гейт реально запускается.** Скрипт `check:docs` есть в `package.json`,
  *     а `docs-canon-audit.mjs` упомянут в `.github/workflows/ci.yml` и
  *     `deploy.yml`. Гейт, который никто не зовёт, зелёный всегда (питфолл 56).
  *
@@ -241,6 +246,108 @@ export function collectArchiveFindings(text) {
   return findings
 }
 
+/**
+ * Структурный гейт бэклога (P2, закрыто 11.10.2026). `docs-canon-audit` ловил
+ * формулировки и ссылки, счётчики — только числа; структуру `Что доделать.txt`
+ * не проверял никто, и автоматизация записи этапов закрепила бы дублирование.
+ * Правила (каждое на обоих концах):
+ *
+ *  1. **Каждый открытый ID ровно один раз.** ID — первая ячейка строк `| … |`
+ *     (номера пунктов таблиц, имена конфигов): задвоенная ячейка — это пункт,
+ *     учтённый дважды, или две секции, претендующие на один ID.
+ *  2. **Заголовки `##`/`###` уникальны** — дубль заголовка прячет секцию от
+ *     читателя и от поиска.
+ *  3. **Нет `⏳` на закрытом пункте** — строка с `⏳` и одновременно с
+ *     ✅/`ЗАКРЫТО`/зачёркиванием противоречит «бэклог ≠ история».
+ *  4. **В бэклоге не живут хронические заголовки** `## … (ДД.ММ.ГГГГ): …` —
+ *     это формат записей «Что сделано.txt»; разделение ролей: открытые пункты
+ *     — бэклог, хроника — «Что сделано.txt», архив срезов — `agenda-archive.md`.
+ *  5. **Каждая дата «ЗАКРЫТО …» обязана быть в «Что сделано.txt»** — закрытие
+ *     без хроники = запись, которая существует только в бэклоге.
+ */
+export const TODO_JOURNAL = 'Что доделать.txt'
+export const DONE_JOURNAL = 'Что сделано.txt'
+export const AGENDA_ARCHIVE = 'docs/agenda-archive.md'
+export const AGENDA_BANNER_RE = /(архив|снимок)/i
+export const CLOSURE_DATE_RE = /ЗАКРЫТО[^\d]{0,20}(\d{2}\.\d{2}\.\d{4})/g
+export const CHRONICLE_HEADER_RE = /^##\s+[^\n]*\(\d{2}\.\d{2}\.\d{4}\)[):]/
+
+export function tableIds(text) {
+  const ids = []
+  text.split(/\r?\n/).forEach((line) => {
+    if (!line.startsWith('|')) return
+    const cells = line.split('|').map((c) => c.trim())
+    if (cells.length < 2) return
+    const id = cells[1].replace(/^~+/g, '').replace(/~+$/g, '').replace(/\*\*/g, '').replace(/`/g, '')
+    if (!id || id === '#' || /^-{2,}$/.test(id)) return
+    ids.push(id)
+  })
+  return ids
+}
+
+/** Структурные проверки бэклога. */
+export function collectBacklogFindings(todoText, doneText) {
+  const findings = []
+  const lines = todoText.split(/\r?\n/)
+
+  const seenIds = new Map()
+  lines.forEach((line, i) => {
+    if (!line.startsWith('|')) return
+    const cells = line.split('|').map((c) => c.trim())
+    if (cells.length < 2) return
+    const id = cells[1].replace(/^~+/g, '').replace(/~+$/g, '').replace(/\*\*/g, '').replace(/`/g, '')
+    if (!id || id === '#' || /^-{2,}$/.test(id)) return
+    if (seenIds.has(id)) {
+      findings.push({ id: 'backlog-table-id-dup', file: TODO_JOURNAL, line: i + 1, text: `ID «${id}» повторяется (ранее: строка ${seenIds.get(id)}) — открытый пункт обязан быть ровно один раз` })
+    } else {
+      seenIds.set(id, i + 1)
+    }
+  })
+
+  const seenHeads = new Map()
+  lines.forEach((line, i) => {
+    const m = /^#{2,3}\s+(.+)$/.exec(line)
+    if (!m) return
+    const heading = m[1].replace(/\s+/g, ' ').trim()
+    if (seenHeads.has(heading)) {
+      findings.push({ id: 'backlog-heading-dup', file: TODO_JOURNAL, line: i + 1, text: `заголовок «${heading}» повторяется (ранее: строка ${seenHeads.get(heading)})` })
+    } else {
+      seenHeads.set(heading, i + 1)
+    }
+  })
+
+  lines.forEach((line, i) => {
+    const leadingWait = /^\s*(?:[|>-]\s*)*⏳/.test(line)
+    if (leadingWait && /(✅|ЗАКРЫТО|~~)/.test(line)) {
+      findings.push({ id: 'backlog-closed-waiting', file: TODO_JOURNAL, line: i + 1, text: '`⏳` (ждёт действий) в начале строки с признаком закрытия — закрытый пункт в бэклоге не живёт' })
+    }
+    const head = CHRONICLE_HEADER_RE.exec(line)
+    if (head) {
+      findings.push({ id: 'backlog-history-header', file: TODO_JOURNAL, line: i + 1, text: 'заголовок в формате хроники «## … (ДД.ММ.ГГГГ): …» — записи этапов живут в «Что сделано.txt»' })
+    }
+  })
+
+  const closureDates = [...todoText.matchAll(CLOSURE_DATE_RE)].map((m) => m[1])
+  const done = String(doneText || '')
+  for (const date of [...new Set(closureDates)]) {
+    if (!done.includes(date)) {
+      findings.push({ id: 'backlog-closure-unchronicled', file: TODO_JOURNAL, line: 1, text: `дата «ЗАКРЫТО ${date}» отсутствует в ${DONE_JOURNAL} — закрытие без хроники` })
+    }
+  }
+
+  return findings
+}
+
+/** Роль `docs/agenda-archive.md` — архив срезов, а не живой документ. */
+export function collectAgendaFindings(text) {
+  const findings = []
+  const head = text.split(/\r?\n/).slice(0, 6).join('\n')
+  if (!AGENDA_BANNER_RE.test(head)) {
+    findings.push({ id: 'agenda-archive-role', file: AGENDA_ARCHIVE, line: 1, text: 'в первых 6 строках нет «архив»/«снимок» — файл обязан оставаться архивом срезов' })
+  }
+  return findings
+}
+
 /** Блок джобы по отступу: от `  <имя>:` до следующей строки с тем же или меньшим отступом. */
 export function getJobBlock(yaml, jobName) {
   if (!yaml) return null
@@ -414,6 +521,9 @@ export function audit(root) {
   const prompts = read(PROMPTS_INDEX)
   const roadmap = read(ROADMAP_FILE)
   const archive = read(ARCHIVE_FILE)
+  const todo = read(TODO_JOURNAL)
+  const done = read(DONE_JOURNAL)
+  const agenda = read(AGENDA_ARCHIVE)
   const findings = []
   let promptsCheck = { findings: [], links: [] }
   let roadmapCheck = { findings: [], nonEmptyLines: 0 }
@@ -433,6 +543,12 @@ export function audit(root) {
   if (!archive) findings.push({ id: 'archive-missing', file: ARCHIVE_FILE, line: 1, text: 'файл не найден' })
   else findings.push(...collectArchiveFindings(archive))
 
+  if (!todo) findings.push({ id: 'backlog-missing', file: TODO_JOURNAL, line: 1, text: 'файл не найден' })
+  else findings.push(...collectBacklogFindings(todo, done || ''))
+
+  if (!agenda) findings.push({ id: 'agenda-archive-missing', file: AGENDA_ARCHIVE, line: 1, text: `файл не найден — бэклог ссылается на него как на архив срезов` })
+  else findings.push(...collectAgendaFindings(agenda))
+
   const { docs, missing, source } = collectTrackedDocs(root)
   findings.push(...collectForbiddenFindings(docs))
 
@@ -449,7 +565,7 @@ function main() {
 
   console.log(`docs-canon audit: ${docs.length} отслеживаемых .md/.txt (список: ${source}${missing.length ? `, пропущено отсутствующих: ${missing.length}` : ''})`)
   for (const m of missing) console.log(`  [SKIP] ${m} — отслеживается в git, но отсутствует в дереве`)
-  console.log(`Канон-указатель: ${PROMPTS_INDEX} (ссылок: ${promptsCheck.links.length}); идеи: ${ROADMAP_FILE} (${roadmapCheck.nonEmptyLines} непустых строк); архив: ${ARCHIVE_FILE}`)
+  console.log(`Канон-указатель: ${PROMPTS_INDEX} (ссылок: ${promptsCheck.links.length}); идеи: ${ROADMAP_FILE} (${roadmapCheck.nonEmptyLines} непустых строк); архив: ${ARCHIVE_FILE}; бэклог: ${TODO_JOURNAL} (структура), хроника: ${DONE_JOURNAL}, архив срезов: ${AGENDA_ARCHIVE}`)
   console.log(`\nНаходок: ${findings.length}\n`)
 
   if (!findings.length) {
@@ -467,7 +583,8 @@ function main() {
   console.log(`  2) идеи — в ${ROADMAP_FILE}, раздел за разделом 21–34, дословно;`)
   console.log(`  3) архив (${ARCHIVE_FILE}) — шапка «${ARCHIVE_BANNER}» с датой среза и ссылкой на канон;`)
   console.log('  4) запрещённые формулировки — переформулировать, а не цитировать как правило;')
-  console.log(`  5) исключение для журналов задано в FORBIDDEN_EXEMPT_FILES (${FORBIDDEN_EXEMPT_FILES.join(', ')}) и проверяется тестом.`)
+  console.log(`  5) исключение для журналов задано в FORBIDDEN_EXEMPT_FILES (${FORBIDDEN_EXEMPT_FILES.join(', ')}) и проверяется тестом;`)
+  console.log(`  6) структура бэклога (${TODO_JOURNAL}) — уникальные ID и заголовки, закрытие с хроникой в ${DONE_JOURNAL}, записи этапов — только там.`)
   process.exit(1)
 }
 
