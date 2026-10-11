@@ -1,15 +1,15 @@
 {
-  "generated": "2026-10-11T05:37:14.042Z",
+  "generated": "2026-10-11T06:16:13.816Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 48,
-    "tests": 601,
-    "passed": 601,
+    "files": 50,
+    "tests": 638,
+    "passed": 638,
     "failed": 0,
     "gate": {
-      "files": 17,
-      "tests": 397
+      "files": 19,
+      "tests": 434
     },
     "product": {
       "files": 31,
@@ -42,7 +42,7 @@
       },
       {
         "file": "scripts/docs-canon-audit.test.mjs",
-        "tests": 47
+        "tests": 60
       },
       {
         "file": "scripts/e2e-cleanup.test.mjs",
@@ -75,6 +75,14 @@
       {
         "file": "scripts/secrets-leak-audit.test.mjs",
         "tests": 22
+      },
+      {
+        "file": "scripts/stage-facts.test.mjs",
+        "tests": 15
+      },
+      {
+        "file": "scripts/stage-section.test.mjs",
+        "tests": 9
       },
       {
         "file": "scripts/swagger-coverage-audit.test.mjs",
@@ -581,7 +589,7 @@
     ]
   },
   "total": {
-    "files": 114,
-    "tests": 1519
+    "files": 116,
+    "tests": 1556
   }
 }
