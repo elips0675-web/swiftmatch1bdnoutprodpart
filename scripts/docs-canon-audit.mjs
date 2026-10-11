@@ -264,13 +264,28 @@ export function collectArchiveFindings(text) {
  *     — бэклог, хроника — «Что сделано.txt», архив срезов — `agenda-archive.md`.
  *  5. **Каждая дата «ЗАКРЫТО …» обязана быть в «Что сделано.txt»** — закрытие
  *     без хроники = запись, которая существует только в бэклоге.
+ *  6. **У закрытого заголовка нет тела.** `### … — ЗАКРЫТО <дата>` обязан
+ *     стоять один: следующий непустой абзац под ним — это тело надгробия,
+ *     то есть история, вернувшаяся в бэклог (правило «Бэклог ≠ история»,
+ *     `Что доделать.txt`). Развёрнутая запись живёт только в «Что сделано.txt».
+ *     Признак закрытия — маркер **в конце** заголовка (`— ЗАКРЫТО <дата>` или
+ *     `✅`); `✅` в середине (`## ✅ Принятые решения`) — маркер всей секции,
+ *     не закрытие пункта, и телом она не считается.
+ *     Проверка появилась после реального дефекта: инструмент `stage-section.mjs`
+ *     и `docs/AGENTS-workflow.md` диктовали «надгробие с телом», и три этапа
+ *     копили закрытые секции, пока правило не поймали глазами.
  */
 export const TODO_JOURNAL = 'Что доделать.txt'
 export const DONE_JOURNAL = 'Что сделано.txt'
 export const AGENDA_ARCHIVE = 'docs/agenda-archive.md'
+export const CHANGELOG_FILE = 'CHANGELOG.md'
 export const AGENDA_BANNER_RE = /(архив|снимок)/i
 export const CLOSURE_DATE_RE = /ЗАКРЫТО[^\d]{0,20}(\d{2}\.\d{2}\.\d{4})/g
 export const CHRONICLE_HEADER_RE = /^##\s+[^\n]*\(\d{2}\.\d{2}\.\d{4}\)[):]/
+export const CHANGELOG_HEAD_RE = /Keep a Changelog/
+export const CHANGELOG_UNRELEASED_RE = /^##\s+\[Unreleased\]/im
+export const CHANGELOG_RELEASE_RE = /^##\s+\[[0-9]+\.[0-9]+\.[0-9]+\][^\n]*\d{4}-\d{2}-\d{2}/m
+export const CLOSED_HEADING_RE = /(?:ЗАКРЫТО\s*\d{2}\.\d{2}\.\d{4}|✅)\s*$/
 
 export function tableIds(text) {
   const ids = []
@@ -325,6 +340,16 @@ export function collectBacklogFindings(todoText, doneText) {
     if (head) {
       findings.push({ id: 'backlog-history-header', file: TODO_JOURNAL, line: i + 1, text: 'заголовок в формате хроники «## … (ДД.ММ.ГГГГ): …» — записи этапов живут в «Что сделано.txt»' })
     }
+    const closedHead = /^#{2,6}\s+(.+)$/.exec(line)
+    if (closedHead && CLOSED_HEADING_RE.test(closedHead[1])) {
+      for (let j = i + 1; j < lines.length; j++) {
+        const next = lines[j]
+        if (/^#{1,6}\s/.test(next)) break
+        if (!next.trim() || next.trim() === '---') continue
+        findings.push({ id: 'backlog-closed-body', file: TODO_JOURNAL, line: j + 1, text: 'тело под закрытым заголовком — закрытый пункт в бэклоге не живёт, развёрнутая запись — в «Что сделано.txt»' })
+        break
+      }
+    }
   })
 
   const closureDates = [...todoText.matchAll(CLOSURE_DATE_RE)].map((m) => m[1])
@@ -344,6 +369,36 @@ export function collectAgendaFindings(text) {
   const head = text.split(/\r?\n/).slice(0, 6).join('\n')
   if (!AGENDA_BANNER_RE.test(head)) {
     findings.push({ id: 'agenda-archive-role', file: AGENDA_ARCHIVE, line: 1, text: 'в первых 6 строках нет «архив»/«снимок» — файл обязан оставаться архивом срезов' })
+  }
+  return findings
+}
+
+/**
+ * Публичный `CHANGELOG.md` (P2, перенесено у Service Desk). Это
+ * пользовательская сводка по релизам (Keep a Changelog), **не** вторая
+ * хроника: развёрнутая история этапов живёт в «Что сделано.txt», и changelog
+ * обязан на неё ссылаться. Без структурного контракта файл протухает молча
+ * (питфолл «три копии правил вместо одной»), поэтому проверяются форма и
+ * наличие живых разделов, а не содержание.
+ */
+export function collectChangelogFindings(text) {
+  const findings = []
+  if (!text) {
+    findings.push({ id: 'changelog-missing', file: CHANGELOG_FILE, line: 1, text: 'файл не найден — публичный changelog обязан существовать' })
+    return findings
+  }
+  const head = text.split(/\r?\n/).slice(0, 8).join('\n')
+  if (!CHANGELOG_HEAD_RE.test(head)) {
+    findings.push({ id: 'changelog-format', file: CHANGELOG_FILE, line: 1, text: 'в первых 8 строках нет «Keep a Changelog» — формат обязан быть объявлен' })
+  }
+  if (!CHANGELOG_UNRELEASED_RE.test(text)) {
+    findings.push({ id: 'changelog-unreleased', file: CHANGELOG_FILE, line: 1, text: 'нет раздела «## [Unreleased]» — незакрытым изменениям некуда писаться' })
+  }
+  if (!CHANGELOG_RELEASE_RE.test(text)) {
+    findings.push({ id: 'changelog-release', file: CHANGELOG_FILE, line: 1, text: 'нет ни одного заголовка «## [X.Y.Z] — ГГГГ-ММ-ДД» — changelog без релизов бесполезен' })
+  }
+  if (!text.includes(DONE_JOURNAL)) {
+    findings.push({ id: 'changelog-chronicle-link', file: CHANGELOG_FILE, line: 1, text: `нет ссылки на «${DONE_JOURNAL}» — публичная сводка обязана указывать внутреннюю хронику (иначе это вторая история)` })
   }
   return findings
 }
@@ -548,6 +603,8 @@ export function audit(root) {
 
   if (!agenda) findings.push({ id: 'agenda-archive-missing', file: AGENDA_ARCHIVE, line: 1, text: `файл не найден — бэклог ссылается на него как на архив срезов` })
   else findings.push(...collectAgendaFindings(agenda))
+
+  findings.push(...collectChangelogFindings(read(CHANGELOG_FILE)))
 
   const { docs, missing, source } = collectTrackedDocs(root)
   findings.push(...collectForbiddenFindings(docs))

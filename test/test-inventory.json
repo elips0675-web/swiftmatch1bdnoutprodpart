@@ -1,15 +1,15 @@
 {
-  "generated": "2026-10-11T06:16:13.816Z",
+  "generated": "2026-10-11T06:48:42.250Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
     "files": 50,
-    "tests": 638,
-    "passed": 638,
+    "tests": 650,
+    "passed": 650,
     "failed": 0,
     "gate": {
       "files": 19,
-      "tests": 434
+      "tests": 446
     },
     "product": {
       "files": 31,
@@ -42,7 +42,7 @@
       },
       {
         "file": "scripts/docs-canon-audit.test.mjs",
-        "tests": 60
+        "tests": 71
       },
       {
         "file": "scripts/e2e-cleanup.test.mjs",
@@ -82,7 +82,7 @@
       },
       {
         "file": "scripts/stage-section.test.mjs",
-        "tests": 9
+        "tests": 10
       },
       {
         "file": "scripts/swagger-coverage-audit.test.mjs",
@@ -590,6 +590,6 @@
   },
   "total": {
     "files": 116,
-    "tests": 1556
+    "tests": 1568
   }
 }

@@ -48,6 +48,12 @@ describe('buildHeaderChecklist', () => {
     expect(checklist).toContain('test-counter-audit.mjs --fix')
     expect(checklist).toContain('check-doc-mirrors.mjs --fix')
   })
+
+  it('диктует канон закрытия (✅-строка без тела), а не надгробие', () => {
+    const checklist = buildHeaderChecklist({ date: '11.10.2026' })
+    expect(checklist).toContain('без тела')
+    expect(checklist).not.toContain('надгробие')
+  })
 })
 
 describe('diffSummary', () => {

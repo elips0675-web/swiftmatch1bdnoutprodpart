@@ -41,6 +41,7 @@ import {
   TODO_JOURNAL,
   DONE_JOURNAL,
   AGENDA_ARCHIVE,
+  CHANGELOG_FILE,
   CLOSURE_DATE_RE,
   collectPromptsFindings,
   collectRoadmapFindings,
@@ -48,6 +49,7 @@ import {
   collectArchiveFindings,
   collectBacklogFindings,
   collectAgendaFindings,
+  collectChangelogFindings,
   collectWiringFindings,
   collectTrackedDocs,
   tableIds,
@@ -438,6 +440,58 @@ describe('структурный гейт бэклога (Что доделат�
     for (const d of new Set(dates)) {
       expect(done, `нет даты ${d} в «Что сделано.txt»`).toContain(d)
     }
+  })
+
+  it('тело под закрытым заголовком — находка', () => {
+    const text = '### X — ЗАКРЫТО 05.05.2028\n\n**Что сделано.** разбор этапа\n'
+    expect(ids(collectBacklogFindings(text, 'хроника 05.05.2028'))).toContain('backlog-closed-body')
+  })
+
+  it('✅-заголовок без тела — тишина', () => {
+    const text = '### X ✅\n\n### Открытый пункт\n\nтело открытого пункта\n'
+    expect(collectBacklogFindings(text, '')).toEqual([])
+  })
+
+  it('открытый заголовок с телом — не находка (проверка не глушит бэклог)', () => {
+    const text = '### Открытый пункт\n\nтело открытого пункта\n'
+    expect(collectBacklogFindings(text, '')).toEqual([])
+  })
+
+  it('✅ в середине заголовка — маркер секции, не закрытие (ложное срабатывание закрыто)', () => {
+    const text = '## ✅ Принятые решения (не пересматривать без владельца)\n\n- **N3:** текст\n'
+    expect(collectBacklogFindings(text, '')).toEqual([])
+  })
+})
+
+describe('CHANGELOG.md — публичная сводка по релизам', () => {
+  it('текущий файл проходит', () => {
+    expect(collectChangelogFindings(read(CHANGELOG_FILE))).toEqual([])
+  })
+
+  it('отсутствующий файл — находка', () => {
+    expect(ids(collectChangelogFindings(null))).toContain('changelog-missing')
+  })
+
+  const good = '# Changelog\n\n> Формат — [Keep a Changelog](https://keepachangelog.com/).\n> Внутренняя история — в `Что сделано.txt`.\n\n## [Unreleased]\n\n## [0.1.0] — 2026-10-11\n\n### Добавлено\n\n- X\n'
+
+  it('правильный файл проходит все проверки', () => {
+    expect(collectChangelogFindings(good)).toEqual([])
+  })
+
+  it('без объявления формата — находка', () => {
+    expect(ids(collectChangelogFindings(good.replace('Keep a Changelog', 'список изменений')))).toContain('changelog-format')
+  })
+
+  it('без раздела [Unreleased] — находка', () => {
+    expect(ids(collectChangelogFindings(good.replace('## [Unreleased]', '## Скоро')))).toContain('changelog-unreleased')
+  })
+
+  it('без релиза «[X.Y.Z] — ГГГГ-ММ-ДД» — находка', () => {
+    expect(ids(collectChangelogFindings(good.replace('## [0.1.0] — 2026-10-11', '## [0.1.0] — 11.10.2026')))).toContain('changelog-release')
+  })
+
+  it('без ссылки на «Что сделано.txt» — находка (иначе это вторая история)', () => {
+    expect(ids(collectChangelogFindings(good.replace('`Что сделано.txt`', 'журнал')))).toContain('changelog-chronicle-link')
   })
 })
 
