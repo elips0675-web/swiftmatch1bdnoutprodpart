@@ -158,15 +158,6 @@ export function findSpecifiers(file, text) {
   return out
 }
 
-function isDeclared(manifest, name) {
-  return Boolean(
-    manifest?.dependencies?.[name] ||
-      manifest?.devDependencies?.[name] ||
-      manifest?.peerDependencies?.[name] ||
-      manifest?.optionalDependencies?.[name],
-  )
-}
-
 function runtimeDeps(manifest) {
   return Object.keys(manifest?.dependencies || {})
 }

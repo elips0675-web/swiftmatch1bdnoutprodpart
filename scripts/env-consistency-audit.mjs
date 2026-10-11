@@ -123,28 +123,28 @@ export function parseComposeEnv(text) {
   let inApp = false
   let inEnvironment = false
   for (const line of lines) {
-    if (/^  app:/.test(line)) {
+    if (/^ {2}app:/.test(line)) {
       inApp = true
       inEnvironment = false
       continue
     }
     if (!inApp) continue
-    if (/^  \w/.test(line) && !/^  app:/.test(line)) {
+    if (/^ {2}\w/.test(line) && !/^ {2}app:/.test(line)) {
       // вышли из сервиса app (следующий сервис на отступе 2)
       inApp = false
       inEnvironment = false
       continue
     }
-    if (/^    environment:/.test(line)) {
+    if (/^ {4}environment:/.test(line)) {
       inEnvironment = true
       continue
     }
-    if (/^    [a-z_]+:/.test(line) && !/^    environment:/.test(line)) {
+    if (/^ {4}[a-z_]+:/.test(line) && !/^ {4}environment:/.test(line)) {
       inEnvironment = false
       continue
     }
     if (inEnvironment) {
-      const m = /^      ([A-Za-z_][A-Za-z0-9_]*):/.exec(line)
+      const m = /^ {6}([A-Za-z_][A-Za-z0-9_]*):/.exec(line)
       if (m) envKeys.add(m[1])
     }
   }

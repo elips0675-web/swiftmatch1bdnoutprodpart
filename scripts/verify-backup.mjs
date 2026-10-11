@@ -6,7 +6,6 @@
 import fs from 'fs'
 import path from 'path'
 import { execSync } from 'child_process'
-import { pathToFileURL } from 'url'
 import mysql from 'mysql2/promise'
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1')), '..')
@@ -106,7 +105,7 @@ async function main() {
         await conn.query(`USE \`${VERIFY_DB}\``)
         await conn.query(trimmed)
         executed++
-      } catch (e) {
+      } catch {
         // Skip warnings (e.g., table already exists)
       }
     }

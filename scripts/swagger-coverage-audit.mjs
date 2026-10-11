@@ -35,7 +35,6 @@ import path from 'node:path'
 const SERVER_SRC = 'server/src'
 const ROUTES_DIR = 'server/src/routes'
 const BASELINE_OPS = 47 // этап 13: 47 операций из 208 роутов (api-contract.test.js)
-const METHODS = ['get', 'post', 'put', 'patch', 'delete']
 
 function readRepoFile(root, rel) {
   return fs.readFileSync(path.join(root, rel), 'utf8')

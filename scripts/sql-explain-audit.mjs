@@ -53,7 +53,6 @@ function extractQueries(source) {
       // Template literal — may span multiple lines
       let j = i
       let started = false
-      let depth = 0
       while (j < lines.length) {
         for (let k = 0; k < lines[j].length; k++) {
           const ch = lines[j][k]
@@ -172,8 +171,6 @@ async function main() {
       // Check for problematic EXPLAIN rows
       for (const row of rows) {
         const type = (row.type || row.join_type || '').toUpperCase()
-        const key = row.key || ''
-        const extra = (row.Extra || '').toUpperCase()
 
         // Warning: table scan on large tables (ALL type without LIMIT)
         if (type === 'ALL' && !sql.toUpperCase().includes('LIMIT')) {

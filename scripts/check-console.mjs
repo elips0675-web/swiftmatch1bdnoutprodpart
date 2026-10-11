@@ -56,6 +56,7 @@ async function saveStorageState(email, password) {
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage()
   await page.goto(BASE)
+  /* global localStorage, sessionStorage, document */
   await page.evaluate((t) => {
     localStorage.setItem('token', t)
     sessionStorage.setItem('swiftmatch_auth_token', t)
