@@ -16,6 +16,8 @@ if (typeof window !== 'undefined') {
 
 const AUTH_ERRORS = ['authentication required', 'invalid token', 'unauthorized']
 
+const TOKEN_REFRESH_INTERVAL_MS = 5 * 60 * 1000
+
 function isAuthError(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err ?? '')
   return AUTH_ERRORS.some((needle) => message.toLowerCase().includes(needle))
@@ -46,18 +48,8 @@ export function useWebSocket() {
     // сокет с новым. Сетевой обрыв — не повод разлогинивать.
     let refreshing = false
 
-    socket.on('connect', () => setConnected(true))
-    socket.on('disconnect', () => setConnected(false))
-    socket.on('user:banned', () => {
-      if (import.meta.env.DEV) console.log('[ws] user:banned — server banned this user')
-      logout()
-    })
-    socket.on('auth:unauthorized', () => {
-      logout()
-    })
-    socket.on('connect_error', (err) => {
-      setConnected(false)
-      if (!isAuthError(err) || refreshing) return
+    const refreshAndReconnect = (socket: Socket) => {
+      if (refreshing) return
       refreshing = true
       refreshAuthToken().then((newToken) => {
         refreshing = false
@@ -70,11 +62,40 @@ export function useWebSocket() {
         socket.disconnect()
         socket.connect()
       })
+    }
+
+    socket.on('connect', () => setConnected(true))
+    socket.on('disconnect', () => setConnected(false))
+    socket.on('user:banned', () => {
+      if (import.meta.env.DEV) console.log('[ws] user:banned — server banned this user')
+      logout()
     })
+    socket.on('auth:unauthorized', () => {
+      refreshAndReconnect(socket)
+    })
+    socket.on('connect_error', (err) => {
+      setConnected(false)
+      if (!isAuthError(err) || refreshing) return
+      refreshAndReconnect(socket)
+    })
+
+    const timer = window.setInterval(() => {
+      if (refreshing) return
+      refreshing = true
+      refreshAuthToken().then((newToken) => {
+        refreshing = false
+        if (!newToken) return
+        if (socket.auth?.token === newToken) return
+        socket.auth = { token: newToken }
+        socket.disconnect()
+        socket.connect()
+      })
+    }, TOKEN_REFRESH_INTERVAL_MS)
 
     socketRef.current = socket
 
     return () => {
+      window.clearInterval(timer)
       socket.removeAllListeners()
       socket.disconnect()
       socketRef.current = null

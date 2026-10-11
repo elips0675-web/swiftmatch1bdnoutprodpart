@@ -8,7 +8,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Search, MoveHorizontal as MoreHorizontal, Download, ChevronLeft, ChevronRight, Ban, Trash2, TriangleAlert as AlertTriangle, UserCheck, Loader2, LogIn } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Search, MoveHorizontal as MoreHorizontal, Download, ChevronLeft, ChevronRight, Ban, Trash2, TriangleAlert as AlertTriangle, UserCheck, Loader2, LogIn, GitMerge } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/language-context";
 import { getToken } from "@/lib/token";
@@ -34,6 +36,29 @@ interface UsersResponse {
   users: AdminUser[];
   total: number;
   cities: string[];
+}
+
+interface DupUser {
+  id: number;
+  name: string;
+  email: string;
+  phone: string | null;
+  city: string | null;
+  joined: string;
+  status: string;
+  matchesCount: number;
+  messagesCount: number;
+  activeSubs: number;
+}
+
+interface DupGroup {
+  key: string;
+  kind: 'phone' | 'email';
+  users: DupUser[];
+}
+
+interface DuplicatesResponse {
+  groups: DupGroup[];
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -67,6 +92,11 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [drawerUser, setDrawerUser] = useState<AdminUser | null>(null);
+  const [dupGroups, setDupGroups] = useState<DupGroup[]>([]);
+  const [dupLoading, setDupLoading] = useState(false);
+  const [dupKeep, setDupKeep] = useState<Record<string, number>>({});
+  const [dupMerging, setDupMerging] = useState(false);
+  const [activeTab, setActiveTab] = useState<'users' | 'duplicates'>('users');
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -108,6 +138,51 @@ export default function AdminUsersPage() {
       setDrawerUser(data);
     } catch {
       toast.error(t('admin.error.load'));
+    }
+  };
+
+  const fetchDuplicates = useCallback(async () => {
+    setDupLoading(true);
+    try {
+      const token = getToken();
+      const res = await fetch('/api/admin/users/duplicates', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data: DuplicatesResponse = await res.json();
+      setDupGroups(data.groups ?? []);
+    } catch {
+      toast.error(t('admin.error.load'));
+    } finally {
+      setDupLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => { if (activeTab === 'duplicates') fetchDuplicates(); }, [activeTab, fetchDuplicates]);
+
+  const handleMergeGroup = async (group: DupGroup) => {
+    const keepId = dupKeep[group.key];
+    if (!keepId) return;
+    setDupMerging(true);
+    try {
+      const token = getToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+      for (const u of group.users) {
+        if (u.id === keepId) continue;
+        const res = await fetch(`/api/admin/users/${u.id}/merge`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ keepId }),
+        });
+        if (!res.ok) throw new Error('Merge failed');
+      }
+      toast.success(t('admin.users.duplicates.merged'));
+      setDupKeep(prev => { const next = { ...prev }; delete next[group.key]; return next; });
+      fetchDuplicates();
+    } catch {
+      toast.error(t('admin.users.duplicates.merge_error'));
+    } finally {
+      setDupMerging(false);
     }
   };
 
@@ -209,6 +284,61 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-4">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'users' | 'duplicates')}>
+        <TabsList className="h-9 bg-muted/50 rounded-xl p-1">
+          <TabsTrigger value="users" data-testid="tab-users" className="rounded-lg font-bold text-xs">{t('admin.users')}</TabsTrigger>
+          <TabsTrigger value="duplicates" data-testid="tab-duplicates" className="rounded-lg font-bold text-xs">{t('admin.users.duplicates')}</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {activeTab === 'duplicates' ? (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            {dupLoading ? (
+              <div className="py-8 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" /></div>
+            ) : dupGroups.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">{t('admin.users.duplicates.empty')}</p>
+            ) : (
+              <div className="space-y-4">
+                {dupGroups.map((group) => (
+                  <div key={group.key} data-testid={`dup-group-${group.key}`} className="border rounded-xl p-3 space-y-3">
+                    <p className="text-xs font-bold text-muted-foreground uppercase">
+                      {group.kind === 'phone' ? t('admin.users.duplicates.phone') : t('admin.users.duplicates.email')}: {group.key.replace(/^(phone|email):/, '')}
+                    </p>
+                    <RadioGroup value={dupKeep[group.key] ? String(dupKeep[group.key]) : ''} onValueChange={(val) => setDupKeep(prev => ({ ...prev, [group.key]: Number(val) }))}>
+                      {group.users.map((u) => (
+                        <div key={u.id} data-testid={`dup-user-${u.id}`} className="flex items-center gap-3 p-2 rounded-lg bg-muted/40">
+                          <RadioGroupItem value={String(u.id)} id={`dup-keep-${group.key}-${u.id}`} data-testid={`dup-radio-${u.id}`} />
+                          <label htmlFor={`dup-keep-${group.key}-${u.id}`} className="flex-1 cursor-pointer text-sm min-w-0">
+                            <span className="font-bold">{u.name || '—'} · #{u.id}</span>
+                            <span className="block text-xs text-muted-foreground truncate">
+                              {u.email}
+                              {u.phone ? ` · ${u.phone}` : ''}
+                              {u.city ? ` · ${u.city}` : ''}
+                            </span>
+                            <span className="block text-[10px] text-muted-foreground">
+                              {t('admin.users.duplicates.matches')}: {u.matchesCount} · {t('admin.users.duplicates.messages')}: {u.messagesCount} · {t('admin.users.duplicates.subs')}: {u.activeSubs}
+                            </span>
+                          </label>
+                          <Badge variant="outline" className={`text-[9px] ${STATUS_COLORS[u.status] || ''}`}>{STATUS_LABELS[u.status] || u.status}</Badge>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-muted-foreground">{t('admin.users.duplicates.keep')}: {dupKeep[group.key] ? `#${dupKeep[group.key]}` : '—'}</span>
+                      <Button size="sm" variant="outline" className="rounded-lg h-8 text-xs" data-testid={`merge-group-${group.key}`}
+                        disabled={!dupKeep[group.key] || dupMerging} onClick={() => handleMergeGroup(group)}>
+                        <GitMerge size={12} className="mr-1" /> {t('admin.users.duplicates.merge')}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <>
       <div className="flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -368,6 +498,8 @@ export default function AdminUsersPage() {
           )}
         </SheetContent>
       </Sheet>
+        </>
+      )}
     </div>
   );
 }

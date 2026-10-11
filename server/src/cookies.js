@@ -6,6 +6,9 @@ const isProduction = process.env.NODE_ENV === 'production'
 export const ACCESS_COOKIE = isProduction ? '__Host-sm_token' : 'sm_token'
 export const REFRESH_COOKIE = isProduction ? '__Host-sm_refresh' : 'sm_refresh'
 
+export const ACCESS_TOKEN_TTL = '15m'
+export const ACCESS_TOKEN_TTL_MS = 15 * 60 * 1000
+
 const baseOptions = {
   httpOnly: true,
   secure: isProduction,
@@ -14,7 +17,7 @@ const baseOptions = {
 }
 
 export function setAuthCookies(res, token, refreshToken) {
-  res.cookie(ACCESS_COOKIE, token, { ...baseOptions, maxAge: 24 * 60 * 60 * 1000 })
+  res.cookie(ACCESS_COOKIE, token, { ...baseOptions, maxAge: ACCESS_TOKEN_TTL_MS })
   if (refreshToken) {
     res.cookie(REFRESH_COOKIE, refreshToken, { ...baseOptions, maxAge: 7 * 24 * 60 * 60 * 1000 })
   }

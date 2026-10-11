@@ -65,7 +65,7 @@ import adminWebhooks from './routes/admin/webhooks.js'
 import notificationsRoutes from './routes/notifications.js'
 import { metricsMiddleware, metricsRoute } from './metrics.js'
 import { JWT_SECRET, verifyToken } from './middleware.js'
-import { setAuthCookies, clearAuthCookies, extractToken, REFRESH_COOKIE } from './cookies.js'
+import { setAuthCookies, clearAuthCookies, extractToken, REFRESH_COOKIE, ACCESS_TOKEN_TTL } from './cookies.js'
 import { setupSwagger } from './swagger.js'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -144,9 +144,11 @@ app.post('/api/auth/dev-login', async (req, res) => {
     const [[admin]] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND is_active = 1 LIMIT 1")
     if (admin) { userId = admin.id; role = 'admin' }
   } catch { /* fallback to userId=2 */ }
-  const token = jwt.sign({ userId, role }, JWT_SECRET(), { expiresIn: '24h' })
-  setAuthCookies(res, token)
-  res.json({ token, role })
+  const token = jwt.sign({ userId, role }, JWT_SECRET(), { expiresIn: ACCESS_TOKEN_TTL })
+  const devFp = crypto.createHash('sha256').update((req.ip || '') + '|' + (req.headers['user-agent'] || '')).digest('hex').slice(0, 32)
+  const devRefresh = await createRefreshToken(userId, undefined, devFp, req)
+  setAuthCookies(res, token, devRefresh)
+  res.json({ token, refresh_token: devRefresh, role })
 })
 
 app.post('/api/auth/login', async (req, res) => {
@@ -194,7 +196,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
     await recordSuccess(lockKey)
 
-    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET(), { expiresIn: '24h' })
+    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET(), { expiresIn: ACCESS_TOKEN_TTL })
     const fp = crypto.createHash('sha256').update((req.ip || '') + '|' + (req.headers['user-agent'] || '')).digest('hex').slice(0, 32)
     const refresh_token = await createRefreshToken(user.id, undefined, fp, req)
     setAuthCookies(res, token, refresh_token)

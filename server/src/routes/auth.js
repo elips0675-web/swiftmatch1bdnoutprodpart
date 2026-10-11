@@ -6,7 +6,7 @@ import { JWT_SECRET, auth, verifyToken } from '../middleware.js'
 import { sendVerificationEmail, sendPasswordResetEmail } from '../mail.js'
 import logger from '../logger.js'
 import { trackEvent } from './experiments.js'
-import { setAuthCookies, clearAuthCookies, ACCESS_COOKIE, REFRESH_COOKIE } from '../cookies.js'
+import { setAuthCookies, clearAuthCookies, ACCESS_COOKIE, REFRESH_COOKIE, ACCESS_TOKEN_TTL } from '../cookies.js'
 import { stripHtml } from '../sanitize.js'
 
 const router = Router()
@@ -185,7 +185,7 @@ router.post('/api/auth/register', async (req, res) => {
       [userId, stripHtml(displayName || email.split('@')[0]), stripHtml(displayName || email.split('@')[0])],
     )
 
-    const token = jwt.sign({ userId, role: 'user' }, JWT_SECRET(), { expiresIn: '24h' })
+    const token = jwt.sign({ userId, role: 'user' }, JWT_SECRET(), { expiresIn: ACCESS_TOKEN_TTL })
     const fp = makeFingerprint(req)
     const refresh_token = await createRefreshToken(userId, undefined, fp, req)
     setAuthCookies(res, token, refresh_token)
@@ -361,7 +361,7 @@ router.post('/api/auth/refresh', async (req, res) => {
       return res.status(401).json({ message: 'Token reuse detected' })
     }
 
-    const token = jwt.sign({ userId: current.user_id, role: 'user' }, JWT_SECRET(), { expiresIn: '24h' })
+    const token = jwt.sign({ userId: current.user_id, role: 'user' }, JWT_SECRET(), { expiresIn: ACCESS_TOKEN_TTL })
     const new_refresh_token = await createRefreshToken(current.user_id, current.family_id, makeFingerprint(req), req)
     setAuthCookies(res, token, new_refresh_token)
     res.json({ token, refresh_token: new_refresh_token })

@@ -64,7 +64,7 @@ describe('cookie names (__Host- prefix)', () => {
     expect(opts.secure).toBe(true)
     expect(opts.sameSite).toBe('lax')
     expect(opts.path).toBe('/')
-    expect(opts.maxAge).toBe(24 * 60 * 60 * 1000)
+    expect(opts.maxAge).toBe(15 * 60 * 1000)
     const [rName, rVal, rOpts] = res.cookie.mock.calls[1]
     expect(rName).toBe('__Host-sm_refresh')
     expect(rVal).toBe('refresh-jwt')

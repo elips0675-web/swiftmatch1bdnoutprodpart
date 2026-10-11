@@ -8,7 +8,7 @@ import { wsConnectionsGauge, wsRoomsGauge, trackWsMessage } from './metrics.js'
 
 let io = null
 const CLEANUP_INTERVAL = 10000
-// Access-токен живёт 24 ч (routes/auth.js, expiresIn: '24h'), а сокет держится,
+// Access-токен живёт 15 мин (cookies.js, ACCESS_TOKEN_TTL), а сокет держится,
 // пока открыта вкладка: pingInterval/pingTimeout ниже его не рвут. Проверка
 // токена только в handshake (этап 68) означала, что истёкшая сессия продолжает
 // получать realtime-события неограниченно долго. Перепроверка раз в минуту.

@@ -172,6 +172,19 @@ describe('POST /api/auth/refresh (rotation, этап 34)', () => {
     expect(String(claim[0])).toContain('revoked = 0')
   })
 
+  it('issues short-lived access token (TTL 15 min, P2 #36)', async () => {
+    pool.query
+      .mockResolvedValueOnce([[validTokenRow], []]) // SELECT
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []]) // atomic claim
+      .mockResolvedValueOnce([{}, []]) // INSERT new
+    const app = createApp()
+    const res = await request(app).post('/api/auth/refresh').send({ refresh_token: 'tok' })
+    expect(res.status).toBe(200)
+    const decoded = jwt.decode(res.body.token)
+    const ttl = decoded.exp - decoded.iat
+    expect(ttl).toBe(15 * 60)
+  })
+
   it('detects reuse of already-revoked token and revokes the whole family', async () => {
     pool.query
       .mockResolvedValueOnce([[{ ...validTokenRow, revoked: 1 }], []]) // SELECT: токен ротирован

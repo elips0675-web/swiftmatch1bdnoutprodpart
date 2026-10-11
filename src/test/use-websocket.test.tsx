@@ -196,11 +196,73 @@ describe("useWebSocket", () => {
     await waitFor(() => expect(mockSocket.connect).toHaveBeenCalledTimes(1))
   })
 
-  it("auth:unauthorized от сервера (истёк токен на живом сокете) → logout", async () => {
+  it("auth:unauthorized от сервера (истёк access на живом сокете) → refresh + reconnect", async () => {
+    mockRefresh.refreshAuthToken.mockResolvedValue("fresh-token")
     const { useWebSocket } = await import("@/hooks/use-websocket")
     renderHook(() => useWebSocket())
 
-    trigger("auth:unauthorized")
-    expect(mockAuth.logout).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      trigger("auth:unauthorized")
+    })
+
+    await waitFor(() => expect(mockSocket.connect).toHaveBeenCalledTimes(1))
+    expect(mockSocket.auth).toEqual({ token: "fresh-token" })
+    expect(mockAuth.logout).not.toHaveBeenCalled()
+  })
+
+  it("auth:unauthorized при неудачном refresh → logout (сессия мертва)", async () => {
+    mockRefresh.refreshAuthToken.mockResolvedValue(null)
+    const { useWebSocket } = await import("@/hooks/use-websocket")
+    renderHook(() => useWebSocket())
+
+    await act(async () => {
+      trigger("auth:unauthorized")
+    })
+
+    await waitFor(() => expect(mockAuth.logout).toHaveBeenCalledTimes(1))
+    expect(mockRefresh.notifyUnauthorized).toHaveBeenCalledTimes(1)
+    expect(mockSocket.connect).not.toHaveBeenCalled()
+  })
+
+  it("таймер проактивно обновляет токен и переподключается с новым", async () => {
+    vi.useFakeTimers()
+    try {
+      mockRefresh.refreshAuthToken.mockResolvedValue("timer-token")
+      const { useWebSocket } = await import("@/hooks/use-websocket")
+      renderHook(() => useWebSocket())
+
+      expect(mockRefresh.refreshAuthToken).not.toHaveBeenCalled()
+
+      await act(async () => {
+        vi.advanceTimersByTime(5 * 60 * 1000)
+      })
+      await act(async () => {})
+
+      expect(mockRefresh.refreshAuthToken).toHaveBeenCalledTimes(1)
+      expect(mockSocket.auth).toEqual({ token: "timer-token" })
+      expect(mockSocket.disconnect).toHaveBeenCalledTimes(1)
+      expect(mockSocket.connect).toHaveBeenCalledTimes(1)
+      expect(mockAuth.logout).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("таймер молчит без токена (не логинит впустую)", async () => {
+    vi.useFakeTimers()
+    try {
+      mockAuth.token = null
+      const { useWebSocket } = await import("@/hooks/use-websocket")
+      renderHook(() => useWebSocket())
+
+      await act(async () => {
+        vi.advanceTimersByTime(5 * 60 * 1000)
+      })
+
+      expect(mockIo).not.toHaveBeenCalled()
+      expect(mockRefresh.refreshAuthToken).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
