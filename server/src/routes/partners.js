@@ -247,6 +247,17 @@ router.post('/api/partners/postback/:id', async (req, res) => {
 
 const HOTEL_CACHE_TTL = 3600
 
+/**
+ * @openapi
+ * /api/partners/offers/hotel:
+ *   get:
+ *     tags: [Partners]
+ *     summary: Hotel partner offers by city (passport placement)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of hotel offers }
+ */
 router.get('/api/partners/offers/hotel', auth, async (req, res) => {
   const { city } = req.query
   if (!city || !String(city).trim()) {
@@ -279,6 +290,17 @@ router.get('/api/partners/offers/hotel', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/partners/hotel/book:
+ *   post:
+ *     tags: [Partners]
+ *     summary: Book a hotel offer and get a tagged deeplink
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Booking created }
+ */
 router.post('/api/partners/hotel/book', auth, async (req, res) => {
   const { offer_id: offerId, check_in: checkIn, check_out: checkOut, guests } = req.body || {}
   if (!offerId || !/^\d+$/.test(String(offerId))) {
@@ -328,6 +350,17 @@ router.post('/api/partners/hotel/book', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/partners/spa/book:
+ *   post:
+ *     tags: [Partners]
+ *     summary: Book a spa/fitness offer and get a tagged deeplink
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Booking created }
+ */
 router.post('/api/partners/spa/book', auth, async (req, res) => {
   const { offer_id: offerId, date, time, service } = req.body || {}
   if (!offerId || !/^\d+$/.test(String(offerId))) {

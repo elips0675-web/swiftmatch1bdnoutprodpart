@@ -10,6 +10,17 @@ function generateCode() {
   return crypto.randomBytes(4).toString('hex')
 }
 
+/**
+ * @openapi
+ * /api/referral/code:
+ *   get:
+ *     tags: [Referral]
+ *     summary: Get current user referral code
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Referral code }
+ */
 router.get('/api/referral/code', auth, async (req, res) => {
   try {
     const [[user]] = await pool.query('SELECT referral_code FROM users WHERE id = ?', [req.userId])
@@ -28,6 +39,15 @@ router.get('/api/referral/code', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/referral/apply:
+ *   post:
+ *     tags: [Referral]
+ *     summary: Validate a referral code
+ *     responses:
+ *       200: { description: Referral code valid with referrer id }
+ */
 router.post('/api/referral/apply', async (req, res) => {
   const { code } = req.body
   if (!code) return res.status(400).json({ message: 'Referral code required' })
@@ -43,6 +63,17 @@ router.post('/api/referral/apply', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/referral/stats:
+ *   get:
+ *     tags: [Referral]
+ *     summary: Get referral statistics
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Referral counts }
+ */
 router.get('/api/referral/stats', auth, async (req, res) => {
   try {
     const [[{ count }]] = await pool.query(

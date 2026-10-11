@@ -19,6 +19,17 @@ export async function trackEvent(eventType, userId, metadata = {}) {
 }
 
 // GET /api/experiments/:key — stable A/B variant assignment (50/50 by hash)
+/**
+ * @openapi
+ * /api/experiments/{key}:
+ *   get:
+ *     tags: [Experiments]
+ *     summary: Get A/B experiment variant assignment
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Assigned variant for the experiment }
+ */
 router.get('/api/experiments/:key', auth, async (req, res) => {
   try {
     const key = String(req.params.key).slice(0, 64)
@@ -50,6 +61,17 @@ router.get('/api/experiments/:key', auth, async (req, res) => {
 })
 
 // POST /api/analytics/track — product analytics event
+/**
+ * @openapi
+ * /api/analytics/track:
+ *   post:
+ *     tags: [Experiments]
+ *     summary: Track a product analytics event
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Event tracked }
+ */
 router.post('/api/analytics/track', auth, async (req, res) => {
   try {
     const { event_type: eventType, metadata } = req.body
@@ -65,6 +87,17 @@ router.post('/api/analytics/track', auth, async (req, res) => {
 })
 
 // ─── Admin ────────────────────────────────────────────────────
+/**
+ * @openapi
+ * /api/admin/experiments:
+ *   get:
+ *     tags: [Experiments]
+ *     summary: List experiments with variant counts
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of experiments }
+ */
 router.get('/api/admin/experiments', adminAuth, async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -80,6 +113,17 @@ router.get('/api/admin/experiments', adminAuth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/experiments:
+ *   post:
+ *     tags: [Experiments]
+ *     summary: Create an experiment
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Created experiment id }
+ */
 router.post('/api/admin/experiments', adminAuth, async (req, res) => {
   try {
     const { name, experiment_key: key, description } = req.body
@@ -95,6 +139,17 @@ router.post('/api/admin/experiments', adminAuth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/experiments/{id}:
+ *   put:
+ *     tags: [Experiments]
+ *     summary: Toggle experiment enabled state
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Experiment updated }
+ */
 router.put('/api/admin/experiments/:id', adminAuth, async (req, res) => {
   try {
     const { enabled } = req.body
@@ -109,6 +164,17 @@ router.put('/api/admin/experiments/:id', adminAuth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/experiments/{id}:
+ *   delete:
+ *     tags: [Experiments]
+ *     summary: Delete an experiment
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Experiment deleted }
+ */
 router.delete('/api/admin/experiments/:id', adminAuth, async (req, res) => {
   try {
     const [[row]] = await pool.query('SELECT experiment_key FROM experiments WHERE id = ?', [req.params.id])

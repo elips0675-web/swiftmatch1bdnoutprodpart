@@ -40,6 +40,17 @@ const openaiBreaker = createBreaker(
 
 // POST /api/icebreakers/suggest — personalized conversation starters
 // body: { chat_user_id, language?: 'ru'|'en' }
+/**
+ * @openapi
+ * /api/icebreakers/suggest:
+ *   post:
+ *     tags: [Icebreakers]
+ *     summary: Suggest personalized icebreakers for a chat
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of icebreaker suggestions }
+ */
 router.post('/api/icebreakers/suggest', auth, async (req, res) => {
   try {
     const { chat_user_id, language = 'ru' } = req.body

@@ -175,6 +175,15 @@ router.post('/api/premium/cancel', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/premium/webhook:
+ *   post:
+ *     tags: [Premium]
+ *     summary: Stripe webhook receiver
+ *     responses:
+ *       200: { description: OK }
+ */
 router.post('/api/premium/webhook', async (req, res) => {
   const stripeKey = process.env.STRIPE_SECRET_KEY
   if (!stripeKey) return res.status(200).json({ received: true })

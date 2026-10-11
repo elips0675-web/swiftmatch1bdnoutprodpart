@@ -22,6 +22,17 @@ async function getContentConfig() {
   }
 }
 
+/**
+ * @openapi
+ * /api/admin/content:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get content configuration
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Content configuration }
+ */
 router.get('/content', async (req, res) => {
   try {
     const config = await getContentConfig()
@@ -42,6 +53,17 @@ router.get('/content', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/content/{section}:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Update a content section
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Section updated }
+ */
 router.put('/content/:section', async (req, res) => {
   const { section } = req.params
   const allowed = ['interests', 'dating_goals', 'education', 'banned_words', 'cities']

@@ -6,6 +6,17 @@ import logger from '../../logger.js'
 
 const router = Router()
 
+/**
+ * @openapi
+ * /api/admin/campaigns:
+ *   get:
+ *     tags: [Admin]
+ *     summary: List messaging campaigns
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: List of campaigns }
+ */
 router.get('/campaigns', async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -22,6 +33,17 @@ router.get('/campaigns', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/campaigns:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Create and send a messaging campaign
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Campaign created }
+ */
 router.post('/campaigns', async (req, res) => {
   const { title, body, target, channel } = req.body
   if (!title || !body) {

@@ -5,6 +5,17 @@ import logger from '../logger.js'
 
 const router = Router()
 
+/**
+ * @openapi
+ * /api/checkin/contacts:
+ *   get:
+ *     tags: [Checkin]
+ *     summary: List emergency contacts
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of emergency contacts }
+ */
 router.get('/contacts', auth, async (req, res) => {
   try {
     const [rows] = await pool.execute(
@@ -18,6 +29,17 @@ router.get('/contacts', auth, async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/checkin/contacts:
+ *   post:
+ *     tags: [Checkin]
+ *     summary: Create an emergency contact
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Contact created with id }
+ */
 router.post('/contacts', auth, async (req, res) => {
   try {
     const { name, phone, email, relation } = req.body;
@@ -36,6 +58,17 @@ router.post('/contacts', auth, async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/checkin/contacts/{id}:
+ *   delete:
+ *     tags: [Checkin]
+ *     summary: Delete an emergency contact
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Contact deleted }
+ */
 router.delete('/contacts/:id', auth, async (req, res) => {
   try {
     const [result] = await pool.execute(
@@ -50,6 +83,17 @@ router.delete('/contacts/:id', auth, async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/checkin/start:
+ *   post:
+ *     tags: [Checkin]
+ *     summary: Start a safety check-in
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Check-in scheduled }
+ */
 router.post('/start', auth, async (req, res) => {
   try {
     const { schedule_id, contact_id, checkin_minutes, message } = req.body;
@@ -70,6 +114,17 @@ router.post('/start', auth, async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/checkin/{id}/checkin:
+ *   post:
+ *     tags: [Checkin]
+ *     summary: Confirm a check-in
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Check-in confirmed }
+ */
 router.post('/:id/checkin', auth, async (req, res) => {
   try {
     const [rows] = await pool.execute(
@@ -90,6 +145,17 @@ router.post('/:id/checkin', auth, async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/checkin/{id}/cancel:
+ *   post:
+ *     tags: [Checkin]
+ *     summary: Cancel an active check-in
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Check-in cancelled }
+ */
 router.post('/:id/cancel', auth, async (req, res) => {
   try {
     const [result] = await pool.execute(
@@ -104,6 +170,17 @@ router.post('/:id/cancel', auth, async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/checkin/active:
+ *   get:
+ *     tags: [Checkin]
+ *     summary: List active check-ins
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of active check-ins }
+ */
 router.get('/active', auth, async (req, res) => {
   try {
     const [rows] = await pool.execute(

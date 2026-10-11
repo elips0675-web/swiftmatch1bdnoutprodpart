@@ -10,6 +10,17 @@ const SEVERE_REASONS = ['nudity', 'violence', 'hate_speech', 'sexual', 'harassme
 const SOFT_BAN_THRESHOLD = 3
 const PERMA_BAN_THRESHOLD = 5
 
+/**
+ * @openapi
+ * /api/reports:
+ *   post:
+ *     tags: [Report]
+ *     summary: Submit a user report
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Report submitted with resulting action }
+ */
 router.post('/api/reports', auth, async (req, res) => {
   const { reported_id, reason, description } = req.body
   if (!reported_id || !reason) {

@@ -5,6 +5,17 @@ import logger from '../logger.js'
 
 const router = Router()
 
+/**
+ * @openapi
+ * /api/push/fcm/register:
+ *   post:
+ *     tags: [Push]
+ *     summary: Register an FCM token
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: FCM token registered }
+ */
 router.post('/api/push/fcm/register', auth, async (req, res) => {
   const { token, platform } = req.body
   if (!token) {
@@ -27,6 +38,17 @@ router.post('/api/push/fcm/register', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/push/fcm/register:
+ *   delete:
+ *     tags: [Push]
+ *     summary: Unregister an FCM token
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: FCM token unregistered }
+ */
 router.delete('/api/push/fcm/register', auth, async (req, res) => {
   const { token } = req.body
 
@@ -46,6 +68,17 @@ router.delete('/api/push/fcm/register', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/push/fcm/status:
+ *   get:
+ *     tags: [Push]
+ *     summary: Get FCM registration status
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: FCM registration status and tokens }
+ */
 router.get('/api/push/fcm/status', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(

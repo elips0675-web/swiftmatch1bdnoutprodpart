@@ -108,6 +108,17 @@ async function updateModeration(photoId, modResult) {
   }
 }
 
+/**
+ * @openapi
+ * /api/upload:
+ *   post:
+ *     tags: [Upload]
+ *     summary: Upload a user photo
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Uploaded photo details }
+ */
 router.post('/api/upload', auth, async (req, res) => {
   try {
     const single = await getUpload()
@@ -203,6 +214,17 @@ async function s3KeyFromUrl(url) {
   return url.replace(/^\/uploads\//, 'uploads/')
 }
 
+/**
+ * @openapi
+ * /api/photos/{id}:
+ *   delete:
+ *     tags: [Upload]
+ *     summary: Delete a user photo
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Photo deleted }
+ */
 router.delete('/api/photos/:id', auth, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT url FROM user_photos WHERE id = ? AND user_id = ?', [req.params.id, req.userId])
@@ -226,6 +248,17 @@ router.delete('/api/photos/:id', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/photos/{userId}:
+ *   get:
+ *     tags: [Upload]
+ *     summary: List approved photos of a user
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of approved photos }
+ */
 router.get('/api/photos/:userId', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(

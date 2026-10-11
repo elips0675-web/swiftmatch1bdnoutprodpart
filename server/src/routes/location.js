@@ -5,6 +5,17 @@ import logger from '../logger.js'
 
 const router = Router()
 
+/**
+ * @openapi
+ * /api/location:
+ *   put:
+ *     tags: [Location]
+ *     summary: Update current user location
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Location updated }
+ */
 router.put('/api/location', auth, async (req, res) => {
   const { lat, lng } = req.body
 
@@ -34,6 +45,17 @@ router.put('/api/location', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/location:
+ *   get:
+ *     tags: [Location]
+ *     summary: Get current user location
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Stored location coordinates }
+ */
 router.get('/api/location', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(

@@ -7,6 +7,17 @@ import { listBackups, createBackup, createFileBackup, resolveBackupPath } from '
 
 const router = Router()
 
+/**
+ * @openapi
+ * /api/admin/backup:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Create a database backup
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Backup created }
+ */
 router.post('/backup', async (req, res) => {
   try {
     const backup = await createBackup()
@@ -18,6 +29,17 @@ router.post('/backup', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/backup/files:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Create a file backup
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: File backup created }
+ */
 router.post('/backup/files', async (req, res) => {
   try {
     const backup = await createFileBackup()
@@ -28,6 +50,17 @@ router.post('/backup/files', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/backup:
+ *   get:
+ *     tags: [Admin]
+ *     summary: List all backups
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: List of backups }
+ */
 router.get('/backup', async (req, res) => {
   try {
     const backups = await listBackups()
@@ -38,6 +71,17 @@ router.get('/backup', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/backup/{name}/download:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Download a backup by name
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Backup file stream }
+ */
 router.get('/backup/:name/download', async (req, res) => {
   const full = resolveBackupPath(req.params.name)
   if (!full) {

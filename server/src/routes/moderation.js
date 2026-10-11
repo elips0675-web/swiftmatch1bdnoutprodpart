@@ -8,6 +8,17 @@ import { moderateText, moderateImage, reviewProfile, isAIModerationConfigured } 
 const router = Router()
 
 // POST /api/moderation/check-text — moderate a text fragment
+/**
+ * @openapi
+ * /api/moderation/check-text:
+ *   post:
+ *     tags: [Moderation]
+ *     summary: Moderate a text fragment
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Moderation verdict for the text }
+ */
 router.post('/api/moderation/check-text', auth, async (req, res) => {
   try {
     const { text } = req.body
@@ -23,6 +34,17 @@ router.post('/api/moderation/check-text', auth, async (req, res) => {
 })
 
 // POST /api/moderation/check-image — moderate an uploaded image (by path)
+/**
+ * @openapi
+ * /api/moderation/check-image:
+ *   post:
+ *     tags: [Moderation]
+ *     summary: Moderate an uploaded image by path
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Moderation verdict for the image }
+ */
 router.post('/api/moderation/check-image', auth, async (req, res) => {
   try {
     const { filePath } = req.body
@@ -38,6 +60,17 @@ router.post('/api/moderation/check-image', auth, async (req, res) => {
 })
 
 // POST /api/moderation/review-profile — run AI review on a user profile
+/**
+ * @openapi
+ * /api/moderation/review-profile:
+ *   post:
+ *     tags: [Moderation]
+ *     summary: Run AI review on a user profile
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: AI review result for the profile }
+ */
 router.post('/api/moderation/review-profile', adminAuth, async (req, res) => {
   try {
     const { userId } = req.body
@@ -66,6 +99,17 @@ router.post('/api/moderation/review-profile', adminAuth, async (req, res) => {
 })
 
 // GET /api/moderation/status — check if AI moderation is configured
+/**
+ * @openapi
+ * /api/moderation/status:
+ *   get:
+ *     tags: [Moderation]
+ *     summary: Check if AI moderation is configured
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Moderation configuration status }
+ */
 router.get('/api/moderation/status', auth, async (req, res) => {
   res.json({
     configured: isAIModerationConfigured(),

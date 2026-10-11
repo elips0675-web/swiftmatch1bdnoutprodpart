@@ -13,6 +13,17 @@ const router = Router()
  * Текущие настройки уведомлений: полная матрица 9 событий x 2 канала.
  * Отсутствие строки в БД = всё включено (fail-open), ответ всё равно полный.
  */
+/**
+ * @openapi
+ * /api/notifications/preferences:
+ *   get:
+ *     tags: [Notifications]
+ *     summary: Get notification preferences matrix
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Notification preferences and matrix }
+ */
 router.get('/api/notifications/preferences', auth, async (req, res) => {
   try {
     const stored = await getPrefs(req.userId)
@@ -30,6 +41,17 @@ router.get('/api/notifications/preferences', auth, async (req, res) => {
  * поэтому частичный PATCH здесь означал бы тихое обнуление остальных настроек.
  * Неизвестные события и нереализованные каналы игнорируются; значения не boolean
  * отклоняются с 400 и перечисляются списком — иначе опечатка затирала бы настройки.
+ */
+/**
+ * @openapi
+ * /api/notifications/preferences:
+ *   put:
+ *     tags: [Notifications]
+ *     summary: Replace notification preferences matrix
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Updated notification preferences }
  */
 router.put('/api/notifications/preferences', auth, async (req, res) => {
   const input = req.body?.prefs !== undefined ? req.body.prefs : req.body
@@ -53,6 +75,17 @@ router.put('/api/notifications/preferences', auth, async (req, res) => {
  * GET /api/notifications
  * Список последних уведомлений текущего пользователя + счётчик непрочитанных.
  * payload (JSON) обогащается именами автора и встречи для отображения.
+ */
+/**
+ * @openapi
+ * /api/notifications:
+ *   get:
+ *     tags: [Notifications]
+ *     summary: List recent notifications with unread count
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Notification items and unread count }
  */
 router.get('/api/notifications', auth, async (req, res) => {
   try {
@@ -90,6 +123,17 @@ function safeParse(value) {
   try { return JSON.parse(value) } catch { return {} }
 }
 
+/**
+ * @openapi
+ * /api/notifications/read-all:
+ *   put:
+ *     tags: [Notifications]
+ *     summary: Mark all notifications as read
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: All notifications marked as read }
+ */
 router.put('/api/notifications/read-all', auth, async (req, res) => {
   try {
     await pool.query(
@@ -103,6 +147,17 @@ router.put('/api/notifications/read-all', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/notifications/{id}/read:
+ *   put:
+ *     tags: [Notifications]
+ *     summary: Mark a single notification as read
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Notification marked as read }
+ */
 router.put('/api/notifications/:id/read', auth, async (req, res) => {
   const { id } = req.params
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })

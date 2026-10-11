@@ -110,6 +110,17 @@ function sanitizeProfileText(profile) {
   return profile
 }
 
+/**
+ * @openapi
+ * /api/profile/me:
+ *   get:
+ *     tags: [Profile]
+ *     summary: Get own profile
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Own profile with photos and interests }
+ */
 router.get('/api/profile/me', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -149,6 +160,17 @@ router.get('/api/profile/me', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/profile/score:
+ *   put:
+ *     tags: [Profile]
+ *     summary: Recalculate own profile completeness score
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Score and counts }
+ */
 router.put('/api/profile/score', auth, async (req, res) => {
   try {
     const [[profile]] = await pool.query(
@@ -209,6 +231,17 @@ router.delete('/api/profile/me', auth, async (req, res) => {
 })
 
 // ─── Privacy settings ───────────────────────────────────────────
+/**
+ * @openapi
+ * /api/settings/privacy:
+ *   get:
+ *     tags: [Profile]
+ *     summary: Get privacy settings
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Privacy settings }
+ */
 router.get('/api/settings/privacy', auth, async (req, res) => {
   try {
     const [[profile]] = await pool.query(
@@ -229,6 +262,17 @@ router.get('/api/settings/privacy', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/settings/privacy:
+ *   put:
+ *     tags: [Profile]
+ *     summary: Update privacy settings (premium for incognito/passport)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Privacy settings updated }
+ */
 router.put('/api/settings/privacy', auth, async (req, res) => {
   try {
     const { incognito, passport_mode, passport_city, passport_lat, passport_lng } = req.body
@@ -288,6 +332,17 @@ router.put('/api/settings/privacy', auth, async (req, res) => {
 
 // ─── Aliases (псевдонимы) ────────────────────────────────────
 
+/**
+ * @openapi
+ * /api/profile/aliases:
+ *   get:
+ *     tags: [Profile]
+ *     summary: List own profile aliases
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of aliases }
+ */
 router.get('/api/profile/aliases', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -301,6 +356,17 @@ router.get('/api/profile/aliases', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/profile/aliases:
+ *   post:
+ *     tags: [Profile]
+ *     summary: Create a new profile alias
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Alias created }
+ */
 router.post('/api/profile/aliases', auth, async (req, res) => {
   const { alias } = req.body || {}
   const trimmed = String(alias || '').trim()
@@ -333,6 +399,17 @@ router.post('/api/profile/aliases', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/profile/aliases/{aliasId}/primary:
+ *   put:
+ *     tags: [Profile]
+ *     summary: Set an alias as the primary one
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Primary alias updated }
+ */
 router.put('/api/profile/aliases/:aliasId/primary', auth, async (req, res) => {
   const { aliasId } = req.params
   if (!/^\d+$/.test(aliasId)) return res.status(400).json({ message: 'Invalid alias id' })
@@ -350,6 +427,17 @@ router.put('/api/profile/aliases/:aliasId/primary', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/profile/aliases/{aliasId}:
+ *   delete:
+ *     tags: [Profile]
+ *     summary: Delete an own alias
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Alias deleted }
+ */
 router.delete('/api/profile/aliases/:aliasId', auth, async (req, res) => {
   const { aliasId } = req.params
   if (!/^\d+$/.test(aliasId)) return res.status(400).json({ message: 'Invalid alias id' })
@@ -377,6 +465,17 @@ router.delete('/api/profile/aliases/:aliasId', auth, async (req, res) => {
 })
 
 // ─── Photo verification (anti-cat) ────────────────────────────
+/**
+ * @openapi
+ * /api/profile/verification:
+ *   get:
+ *     tags: [Profile]
+ *     summary: Get photo verification status and submissions
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Verification status }
+ */
 router.get('/api/profile/verification', auth, async (req, res) => {
   try {
     const [[profile]] = await pool.query('SELECT photo_verified FROM user_profiles WHERE id = ?', [req.userId])
@@ -391,6 +490,17 @@ router.get('/api/profile/verification', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/profile/verification:
+ *   post:
+ *     tags: [Profile]
+ *     summary: Submit a photo for verification
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Verification submitted }
+ */
 router.post('/api/profile/verification', auth, async (req, res) => {
   const { photo_url } = req.body || {}
   if (!photo_url) return res.status(400).json({ message: 'photo_url is required' })
@@ -415,6 +525,17 @@ router.post('/api/profile/verification', auth, async (req, res) => {
 // ─── Activity (история изменений профиля из audit_log) ────────
 // Статический путь обязан быть ДО `/api/profile/:id` — иначе "activity"
 // уйдёт в :id как значение id и вернёт 404 профиля (как было с aliases).
+/**
+ * @openapi
+ * /api/profile/activity:
+ *   get:
+ *     tags: [Profile]
+ *     summary: Profile change history from audit log
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of activity entries }
+ */
 router.get('/api/profile/activity', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(

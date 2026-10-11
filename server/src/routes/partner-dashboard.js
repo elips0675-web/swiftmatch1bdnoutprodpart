@@ -33,6 +33,17 @@ function requirePartner(handler) {
 }
 
 // ─── Registration ─────────────────────────────────────────────
+/**
+ * @openapi
+ * /api/partner/register:
+ *   post:
+ *     tags: [Partner]
+ *     summary: Register as a partner
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Partner registration with credentials }
+ */
 router.post('/api/partner/register', auth, async (req, res) => {
   const { name, type, description, contact_email, contact_phone } = req.body || {}
   const trimmed = String(name || '').trim()
@@ -61,6 +72,17 @@ router.post('/api/partner/register', auth, async (req, res) => {
 })
 
 // ─── Dashboard ────────────────────────────────────────────────
+/**
+ * @openapi
+ * /api/partner/dashboard:
+ *   get:
+ *     tags: [Partner]
+ *     summary: Partner dashboard stats and subscription
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Dashboard data }
+ */
 router.get('/api/partner/dashboard', auth, requirePartner(async (req, res) => {
   try {
     const partnerId = req.partner.id
@@ -90,6 +112,17 @@ router.get('/api/partner/dashboard', auth, requirePartner(async (req, res) => {
 }))
 
 // ─── Own offers CRUD ──────────────────────────────────────────
+/**
+ * @openapi
+ * /api/partner/offers:
+ *   get:
+ *     tags: [Partner]
+ *     summary: List own partner offers
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of offers }
+ */
 router.get('/api/partner/offers', auth, requirePartner(async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -106,6 +139,17 @@ router.get('/api/partner/offers', auth, requirePartner(async (req, res) => {
   }
 }))
 
+/**
+ * @openapi
+ * /api/partner/offers:
+ *   post:
+ *     tags: [Partner]
+ *     summary: Create a new partner offer
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Offer created }
+ */
 router.post('/api/partner/offers', auth, requirePartner(async (req, res) => {
   const { category, title, description, deeplink, price, city, placement, event_start: eventStart, event_end: eventEnd, location, poster_url: posterUrl, event_url: eventUrl, capacity } = req.body || {}
   if (!category || !OFFER_CATEGORIES.includes(category)) {
@@ -153,6 +197,17 @@ router.post('/api/partner/offers', auth, requirePartner(async (req, res) => {
   }
 }))
 
+/**
+ * @openapi
+ * /api/partner/offers/{offerId}:
+ *   put:
+ *     tags: [Partner]
+ *     summary: Update own partner offer
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Offer updated }
+ */
 router.put('/api/partner/offers/:offerId', auth, requirePartner(async (req, res) => {
   const { offerId } = req.params
   if (!/^\d+$/.test(offerId)) return res.status(400).json({ message: 'Invalid offer id' })
@@ -193,6 +248,17 @@ router.put('/api/partner/offers/:offerId', auth, requirePartner(async (req, res)
   }
 }))
 
+/**
+ * @openapi
+ * /api/partner/offers/{offerId}:
+ *   delete:
+ *     tags: [Partner]
+ *     summary: Delete own partner offer
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Offer deleted }
+ */
 router.delete('/api/partner/offers/:offerId', auth, requirePartner(async (req, res) => {
   const { offerId } = req.params
   if (!/^\d+$/.test(offerId)) return res.status(400).json({ message: 'Invalid offer id' })
@@ -208,6 +274,17 @@ router.delete('/api/partner/offers/:offerId', auth, requirePartner(async (req, r
 }))
 
 // ─── Conversions (own) ────────────────────────────────────────
+/**
+ * @openapi
+ * /api/partner/conversions:
+ *   get:
+ *     tags: [Partner]
+ *     summary: List own partner conversions
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of conversions }
+ */
 router.get('/api/partner/conversions', auth, requirePartner(async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -227,6 +304,17 @@ router.get('/api/partner/conversions', auth, requirePartner(async (req, res) => 
 }))
 
 // ─── Subscription ─────────────────────────────────────────────
+/**
+ * @openapi
+ * /api/partner/subscription:
+ *   get:
+ *     tags: [Partner]
+ *     summary: Get subscription status
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Subscription info }
+ */
 router.get('/api/partner/subscription', auth, requirePartner(async (req, res) => {
   try {
     const [[sub]] = await pool.query(
@@ -245,6 +333,17 @@ const PARTNER_TIERS = {
   pro: { name: 'Pro', price: 2990, maxOffers: 50, commissionRate: 15 },
 }
 
+/**
+ * @openapi
+ * /api/partner/subscribe:
+ *   post:
+ *     tags: [Partner]
+ *     summary: Subscribe to a partner plan (Stripe checkout or mock)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Checkout URL or activated plan }
+ */
 router.post('/api/partner/subscribe', auth, requirePartner(async (req, res) => {
   const { tier } = req.body || {}
   if (!tier || !PARTNER_TIERS[tier]) {

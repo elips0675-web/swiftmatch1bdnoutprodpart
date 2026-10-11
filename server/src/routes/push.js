@@ -15,10 +15,30 @@ if (vapidPublic && vapidPrivate) {
   webpush.setVapidDetails('mailto:admin@swiftmatch.app', vapidPublic, vapidPrivate)
 }
 
+/**
+ * @openapi
+ * /api/push/vapid-public-key:
+ *   get:
+ *     tags: [Push]
+ *     summary: Get VAPID public key for web push
+ *     responses:
+ *       200: { description: VAPID public key }
+ */
 router.get('/api/push/vapid-public-key', (req, res) => {
   res.json({ publicKey: vapidPublic || '' })
 })
 
+/**
+ * @openapi
+ * /api/push/subscribe:
+ *   post:
+ *     tags: [Push]
+ *     summary: Subscribe to web push notifications
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Subscribed to push notifications }
+ */
 router.post('/api/push/subscribe', auth, async (req, res) => {
   const { endpoint, p256dh, auth: authKey, platform } = req.body
   if (!endpoint) {
@@ -51,6 +71,17 @@ router.post('/api/push/subscribe', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/push/subscribe:
+ *   delete:
+ *     tags: [Push]
+ *     summary: Unsubscribe from web push notifications
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Unsubscribed from push notifications }
+ */
 router.delete('/api/push/subscribe', auth, async (req, res) => {
   const { endpoint } = req.body
   try {

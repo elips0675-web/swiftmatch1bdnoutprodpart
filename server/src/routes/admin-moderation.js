@@ -4,6 +4,17 @@ import logger from '../logger.js'
 
 const router = Router()
 
+/**
+ * @openapi
+ * /api/admin/photos:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get all photos
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: List of photos }
+ */
 router.get('/photos', async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -21,6 +32,17 @@ router.get('/photos', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/photos/pending:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get photos pending moderation
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: List of pending photos }
+ */
 router.get('/photos/pending', async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -39,6 +61,17 @@ router.get('/photos/pending', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/photos/{id}/approve:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Approve photo by id
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Photo approved }
+ */
 router.post('/photos/:id/approve', async (req, res) => {
   try {
     const [result] = await pool.query(
@@ -55,6 +88,17 @@ router.post('/photos/:id/approve', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/photos/{id}/reject:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Reject photo by id
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Photo rejected }
+ */
 router.post('/photos/:id/reject', async (req, res) => {
   const { reason } = req.body
   try {

@@ -4,6 +4,17 @@ import logger from '../../logger.js'
 
 const router = Router()
 
+/**
+ * @openapi
+ * /api/admin/features:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get feature flags
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Feature flags }
+ */
 router.get('/features', async (req, res) => {
   try {
     const [[row]] = await pool.query('SELECT * FROM feature_flags WHERE id = 1')
@@ -32,6 +43,17 @@ router.get('/features', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/features:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Update feature flags
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Feature flags updated }
+ */
 router.put('/features', async (req, res) => {
   try {
     const flags = req.body

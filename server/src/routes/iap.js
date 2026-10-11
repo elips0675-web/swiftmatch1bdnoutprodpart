@@ -35,6 +35,15 @@ const IAP_PRODUCTS = IAP_TIERS.flatMap((tier) =>
 )
 
 // POST /api/iap/webhook — RevenueCat webhook
+/**
+ * @openapi
+ * /api/iap/webhook:
+ *   post:
+ *     tags: [IAP]
+ *     summary: Handle RevenueCat webhook
+ *     responses:
+ *       200: { description: Webhook acknowledged }
+ */
 router.post('/api/iap/webhook', async (req, res) => {
   if (!REVENUECAT_WEBHOOK_SECRET) {
     return res.status(503).json({ message: 'RevenueCat webhook not configured' })
@@ -102,11 +111,31 @@ router.post('/api/iap/webhook', async (req, res) => {
 })
 
 // GET /api/iap/products — available IAP products (ids = RevenueCat product ids, см. src/lib/iap.ts productIdFor)
+/**
+ * @openapi
+ * /api/iap/products:
+ *   get:
+ *     tags: [IAP]
+ *     summary: List available IAP products
+ *     responses:
+ *       200: { description: Array of IAP products }
+ */
 router.get('/api/iap/products', (req, res) => {
   res.json(IAP_PRODUCTS.map(({ id, name, price, period }) => ({ id, name, price, period })))
 })
 
 // GET /api/iap/status — check IAP subscription status
+/**
+ * @openapi
+ * /api/iap/status:
+ *   get:
+ *     tags: [IAP]
+ *     summary: Get IAP subscription status
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Subscription status }
+ */
 router.get('/api/iap/status', auth, async (req, res) => {
   try {
     const userId = req.userId

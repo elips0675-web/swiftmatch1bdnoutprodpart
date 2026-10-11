@@ -13,6 +13,17 @@ function wrap(fn) {
   }
 }
 
+/**
+ * @openapi
+ * /api/admin/analytics/overview:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get analytics overview
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Analytics overview }
+ */
 router.get('/analytics/overview', wrap(async (req, res) => {
   const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM users')
   const [[{ premium }]] = await pool.query(
@@ -27,6 +38,17 @@ router.get('/analytics/overview', wrap(async (req, res) => {
   })
 }))
 
+/**
+ * @openapi
+ * /api/admin/analytics/retention:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get user retention analytics
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Retention data }
+ */
 router.get('/analytics/retention', wrap(async (req, res) => {
   const [rows] = await pool.query(
     `SELECT DATEDIFF(NOW(), u.created_at) as day, 
@@ -42,6 +64,17 @@ router.get('/analytics/retention', wrap(async (req, res) => {
   res.json(rows.map(r => ({ day: `Day ${r.day+1}`, rate: Math.round(r.rate || 0) })))
 }))
 
+/**
+ * @openapi
+ * /api/admin/analytics/revenue-mix:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get revenue mix by subscription tier
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Revenue mix data }
+ */
 router.get('/analytics/revenue-mix', wrap(async (req, res) => {
   const [rows] = await pool.query(
     `SELECT tier, COUNT(*) as cnt FROM subscriptions WHERE is_active = 1 GROUP BY tier`,
@@ -56,6 +89,17 @@ router.get('/analytics/revenue-mix', wrap(async (req, res) => {
   })))
 }))
 
+/**
+ * @openapi
+ * /api/admin/analytics/registrations:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get daily registrations over the last 14 days
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Registrations data }
+ */
 router.get('/analytics/registrations', wrap(async (req, res) => {
   const [rows] = await pool.query(
     `SELECT DATE(created_at) as day, COUNT(*) as users

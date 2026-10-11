@@ -7,6 +7,17 @@ import { dateOnly } from '../date-only.js'
 
 const router = Router()
 
+/**
+ * @openapi
+ * /api/data/export:
+ *   get:
+ *     tags: [GDPR]
+ *     summary: Export all user data
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Full user data export }
+ */
 router.get('/api/data/export', auth, async (req, res) => {
   try {
     const [[user]] = await pool.query('SELECT id, email, is_active, created_at FROM users WHERE id = ?', [req.userId])
@@ -52,6 +63,17 @@ router.get('/api/data/export', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/data/erase/request:
+ *   post:
+ *     tags: [GDPR]
+ *     summary: Request account erasure
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Erase request created with confirmation token }
+ */
 router.post('/api/data/erase/request', auth, async (req, res) => {
   try {
     const token = crypto.randomBytes(32).toString('hex')
@@ -70,6 +92,17 @@ router.post('/api/data/erase/request', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/data/erase/confirm:
+ *   post:
+ *     tags: [GDPR]
+ *     summary: Confirm and execute account erasure
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Account erased successfully }
+ */
 router.post('/api/data/erase/confirm', auth, async (req, res) => {
   const { token } = req.body
   if (!token) return res.status(400).json({ message: 'Token is required' })
@@ -112,6 +145,17 @@ router.post('/api/data/erase/confirm', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/consent:
+ *   post:
+ *     tags: [GDPR]
+ *     summary: Record a consent choice
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Consent recorded }
+ */
 router.post('/api/consent', auth, async (req, res) => {
   const { consent_type, granted } = req.body
   if (!consent_type || granted === undefined) {
@@ -130,6 +174,17 @@ router.post('/api/consent', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/consent/history:
+ *   get:
+ *     tags: [GDPR]
+ *     summary: List consent history
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of consent records }
+ */
 router.get('/api/consent/history', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(

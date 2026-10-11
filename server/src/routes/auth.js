@@ -264,6 +264,15 @@ router.post('/api/auth/reset-password', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/auth/resend-verification:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Resend verification email
+ *     responses:
+ *       200: { description: OK }
+ */
 router.post('/api/auth/resend-verification', async (req, res) => {
   const { email } = req.body
   if (!email) return res.status(400).json({ message: 'Email required' })
@@ -314,6 +323,15 @@ router.post('/api/auth/verify-email', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/auth/refresh:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Refresh access token
+ *     responses:
+ *       200: { description: OK }
+ */
 router.post('/api/auth/refresh', async (req, res) => {
   const refresh_token = req.body?.refresh_token || req.cookies?.[REFRESH_COOKIE]
   if (!refresh_token) return res.status(400).json({ message: 'Refresh token required' })
@@ -354,6 +372,17 @@ router.post('/api/auth/refresh', async (req, res) => {
 })
 
 // Инвалидировать все сессии пользователя (смена пароля вручную, подозрение на взлом)
+/**
+ * @openapi
+ * /api/auth/logout-all:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Revoke all sessions
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.post('/api/auth/logout-all', auth, async (req, res) => {
   try {
     await pool.query('UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ? AND revoked = 0', [req.userId])
@@ -374,6 +403,17 @@ router.post('/api/auth/logout-all', auth, async (req, res) => {
 // Одна строка на семейство — токен с максимальным id (он же самый свежий, его
 // fingerprint/ip/user_agent и показываем). Текущая сессия определяется сравнением
 // fingerprint с fingerprint текущего запроса.
+/**
+ * @openapi
+ * /api/auth/sessions:
+ *   get:
+ *     tags: [Auth]
+ *     summary: List active sessions
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.get('/api/auth/sessions', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -406,6 +446,17 @@ router.get('/api/auth/sessions', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/auth/sessions/{familyId}:
+ *   delete:
+ *     tags: [Auth]
+ *     summary: Revoke a session
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.delete('/api/auth/sessions/:familyId', auth, async (req, res) => {
   const { familyId } = req.params
   if (!/^[0-9a-fA-F-]{36}$/.test(familyId)) {
@@ -433,6 +484,15 @@ router.delete('/api/auth/sessions/:familyId', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/auth/me:
+ *   get:
+ *     tags: [Auth]
+ *     summary: Get current session info
+ *     responses:
+ *       200: { description: OK }
+ */
 router.get('/api/auth/me', async (req, res) => {
   const token = req.headers.authorization?.startsWith('Bearer ')
     ? req.headers.authorization.split(' ')[1]

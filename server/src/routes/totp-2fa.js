@@ -9,6 +9,17 @@ import { generateTotpSecret, verifyTotpToken } from '../totp.js'
 const router = Router()
 
 // Генерация секрета + otpauth URL для приложения-аутентификатора
+/**
+ * @openapi
+ * /api/auth/2fa/setup:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Set up TOTP 2FA for admin
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: otpauth URL and secret }
+ */
 router.post('/api/auth/2fa/setup', adminAuth, async (req, res) => {
   try {
     const { secret, otpauthUrl } = generateTotpSecret(req.admin.email || 'admin')
@@ -21,6 +32,17 @@ router.post('/api/auth/2fa/setup', adminAuth, async (req, res) => {
 })
 
 // Подтверждение кодом из аутентификатора -> включение 2FA
+/**
+ * @openapi
+ * /api/auth/2fa/enable:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Enable TOTP 2FA for admin
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: 2FA enabled }
+ */
 router.post('/api/auth/2fa/enable', adminAuth, async (req, res) => {
   try {
     const code = String(req.body?.code || '').trim()
@@ -38,6 +60,17 @@ router.post('/api/auth/2fa/enable', adminAuth, async (req, res) => {
 })
 
 // Выключение 2FA: требуется валидный текущий код
+/**
+ * @openapi
+ * /api/auth/2fa/disable:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Disable TOTP 2FA for admin
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: 2FA disabled }
+ */
 router.post('/api/auth/2fa/disable', adminAuth, async (req, res) => {
   try {
     const code = String(req.body?.code || '').trim()

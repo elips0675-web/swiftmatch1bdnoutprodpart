@@ -4,6 +4,17 @@ import logger from '../../logger.js'
 
 const router = Router()
 
+/**
+ * @openapi
+ * /api/admin/monetization/pricing:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get subscription pricing
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Pricing data }
+ */
 router.get('/monetization/pricing', async (req, res) => {
   try {
     const tiers = [
@@ -37,6 +48,17 @@ router.get('/monetization/pricing', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/monetization/revenue:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get monetization revenue over the last 12 months
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Revenue data }
+ */
 router.get('/monetization/revenue', async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -55,6 +77,17 @@ router.get('/monetization/revenue', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/monetization/pricing:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Save subscription pricing
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Pricing saved }
+ */
 router.put('/monetization/pricing', async (req, res) => {
   const { tiers } = req.body
   if (!Array.isArray(tiers)) return res.status(400).json({ message: 'tiers array required' })
@@ -71,6 +104,17 @@ router.put('/monetization/pricing', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/monetization/ads:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get ad configuration
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Ad configuration }
+ */
 router.get('/monetization/ads', async (req, res) => {
   try {
     const [[row]] = await pool.query("SELECT config_value FROM config WHERE config_key = 'ads' LIMIT 1")
@@ -85,6 +129,17 @@ router.get('/monetization/ads', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/monetization/ads:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Save ad configuration
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Ad config saved }
+ */
 router.put('/monetization/ads', async (req, res) => {
   const { google, yandex, googleId, yandexId } = req.body
   try {
@@ -100,6 +155,17 @@ router.put('/monetization/ads', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/monetization/funnel:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get monetization funnel
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Funnel data }
+ */
 router.get('/monetization/funnel', async (req, res) => {
   try {
     const visitors = 0

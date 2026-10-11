@@ -4,6 +4,17 @@ import logger from '../../logger.js'
 
 const router = Router()
 
+/**
+ * @openapi
+ * /api/admin/stats:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get dashboard stats
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Dashboard stats }
+ */
 router.get('/stats', async (req, res) => {
   try {
     const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM users')
@@ -35,6 +46,17 @@ router.get('/stats', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/revenue-by-month:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get revenue by month
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Revenue by month data }
+ */
 router.get('/revenue-by-month', async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -52,6 +74,17 @@ router.get('/revenue-by-month', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/registration-trend:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get user registration trend
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Registration trend data }
+ */
 router.get('/registration-trend', async (req, res) => {
   const days = Math.min(Math.max(Number(req.query.period) || 7, 1), 90)
   try {
@@ -70,6 +103,17 @@ router.get('/registration-trend', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/city-distribution:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get user city distribution
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: City distribution data }
+ */
 router.get('/city-distribution', async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -87,6 +131,17 @@ router.get('/city-distribution', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/recent-activity:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get recent user activity
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Recent activity data }
+ */
 router.get('/recent-activity', async (req, res) => {
   try {
     const [rows] = await pool.query(

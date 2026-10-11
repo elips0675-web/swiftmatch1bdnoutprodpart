@@ -35,7 +35,7 @@ export const JUSTIFIED = [
   },
   {
     file: 'routes/push.js',
-    lines: [148, 174],
+    lines: [179, 205],
     expect: 'DELETE',
     reason: 'то же: чистка подписок по 410/404, а не по каждой подписке',
   },

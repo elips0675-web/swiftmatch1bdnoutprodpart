@@ -6,6 +6,17 @@ import { activeUser } from '../active-user.js'
 
 const router = Router()
 
+/**
+ * @openapi
+ * /api/schedule:
+ *   get:
+ *     tags: [Schedule]
+ *     summary: List date schedules
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of date schedules }
+ */
 router.get('/api/schedule', auth, async (req, res) => {
   try {
     const { status } = req.query
@@ -27,6 +38,17 @@ router.get('/api/schedule', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/schedule:
+ *   post:
+ *     tags: [Schedule]
+ *     summary: Create a date schedule
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Created date schedule }
+ */
 router.post('/api/schedule', auth, async (req, res) => {
   try {
     const { chat_id, scheduled_at, duration_minutes, message } = req.body
@@ -80,6 +102,17 @@ router.post('/api/schedule', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/schedule/{id}/accept:
+ *   put:
+ *     tags: [Schedule]
+ *     summary: Accept a date schedule as invitee
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Accepted schedule }
+ */
 router.put('/api/schedule/:id/accept', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -106,6 +139,17 @@ router.put('/api/schedule/:id/accept', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/schedule/{id}/decline:
+ *   put:
+ *     tags: [Schedule]
+ *     summary: Decline a date schedule as invitee
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Declined schedule }
+ */
 router.put('/api/schedule/:id/decline', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -132,6 +176,17 @@ router.put('/api/schedule/:id/decline', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/schedule/{id}/cancel:
+ *   put:
+ *     tags: [Schedule]
+ *     summary: Cancel a date schedule as proposer
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Cancelled schedule }
+ */
 router.put('/api/schedule/:id/cancel', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(

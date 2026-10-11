@@ -283,6 +283,17 @@ router.get('/api/hangouts', optionalAuth, async (req, res) => {
 })
 
 // ─── My listings / my responses (before :id routes) ────────────
+/**
+ * @openapi
+ * /api/hangouts/my:
+ *   get:
+ *     tags: [Hangouts]
+ *     summary: List hangouts created by the current user
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of own hangouts }
+ */
 router.get('/api/hangouts/my', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -301,6 +312,17 @@ router.get('/api/hangouts/my', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/hangouts/responses/my:
+ *   get:
+ *     tags: [Hangouts]
+ *     summary: List my responses to hangouts
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of responses }
+ */
 router.get('/api/hangouts/responses/my', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -407,6 +429,17 @@ router.get('/api/hangouts/:id', optionalAuth, async (req, res) => {
 })
 
 // ─── Create ────────────────────────────────────────────────────
+/**
+ * @openapi
+ * /api/hangouts:
+ *   post:
+ *     tags: [Hangouts]
+ *     summary: Create a new hangout
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Hangout created }
+ */
 router.post('/api/hangouts', auth, createLimiter, async (req, res) => {
   const { category, title, description, place_name, place_address, city, lat, lng, event_date, max_companions, partner_offer_id, hangout_type, price, capacity } = req.body
   if (!category || !title || !event_date) {
@@ -528,6 +561,17 @@ router.post('/api/hangouts', auth, createLimiter, async (req, res) => {
 })
 
 // ─── Update (author only, active only) ─────────────────────────
+/**
+ * @openapi
+ * /api/hangouts/{id}:
+ *   put:
+ *     tags: [Hangouts]
+ *     summary: Update own hangout (author only)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Hangout updated }
+ */
 router.put('/api/hangouts/:id', auth, async (req, res) => {
   const { id } = req.params
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
@@ -624,6 +668,17 @@ router.put('/api/hangouts/:id', auth, async (req, res) => {
 })
 
 // ─── Soft delete (cancel) ──────────────────────────────────────
+/**
+ * @openapi
+ * /api/hangouts/{id}:
+ *   delete:
+ *     tags: [Hangouts]
+ *     summary: Cancel (soft-delete) own hangout
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Hangout cancelled }
+ */
 router.delete('/api/hangouts/:id', auth, async (req, res) => {
   const { id } = req.params
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
@@ -685,6 +740,17 @@ router.delete('/api/hangouts/:id', auth, async (req, res) => {
 })
 
 // ─── Respond («Пойдем») ────────────────────────────────────────
+/**
+ * @openapi
+ * /api/hangouts/{id}/respond:
+ *   post:
+ *     tags: [Hangouts]
+ *     summary: Respond to a hangout
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Response sent }
+ */
 router.post('/api/hangouts/:id/respond', auth, respondLimiter, async (req, res) => {
   const { id } = req.params
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
@@ -785,6 +851,17 @@ router.post('/api/hangouts/:id/respond', auth, respondLimiter, async (req, res) 
 })
 
 // ─── Cancel own response ───────────────────────────────────────
+/**
+ * @openapi
+ * /api/hangouts/{id}/respond:
+ *   delete:
+ *     tags: [Hangouts]
+ *     summary: Cancel own response to a hangout
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Response cancelled }
+ */
 router.delete('/api/hangouts/:id/respond', auth, async (req, res) => {
   const { id } = req.params
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
@@ -803,6 +880,17 @@ router.delete('/api/hangouts/:id/respond', auth, async (req, res) => {
 })
 
 // ─── Responses list (author only) ──────────────────────────────
+/**
+ * @openapi
+ * /api/hangouts/{id}/responses:
+ *   get:
+ *     tags: [Hangouts]
+ *     summary: List responses to own hangout (author only)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of responses }
+ */
 router.get('/api/hangouts/:id/responses', auth, async (req, res) => {
   const { id } = req.params
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
@@ -829,6 +917,17 @@ router.get('/api/hangouts/:id/responses', auth, async (req, res) => {
 })
 
 // ─── Accept / decline response (author only) ───────────────────
+/**
+ * @openapi
+ * /api/hangouts/{id}/responses/{responseId}:
+ *   put:
+ *     tags: [Hangouts]
+ *     summary: Accept or decline a response (author only)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Response accepted or declined }
+ */
 router.put('/api/hangouts/:id/responses/:responseId', auth, async (req, res) => {
   const { id, responseId } = req.params
   if (!/^\d+$/.test(id) || !/^\d+$/.test(responseId)) return res.status(400).json({ message: 'Invalid id' })
@@ -944,6 +1043,17 @@ router.put('/api/hangouts/:id/responses/:responseId', auth, async (req, res) => 
 })
 
 // ─── Hangout context for a chat (deep-link banner) ─────────────
+/**
+ * @openapi
+ * /api/hangouts/by-chat/{chatId}:
+ *   get:
+ *     tags: [Hangouts]
+ *     summary: Hangout context for a chat (deep-link banner)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Hangout or null }
+ */
 router.get('/api/hangouts/by-chat/:chatId', auth, async (req, res) => {
   const { chatId } = req.params
   if (!/^\d+$/.test(chatId)) return res.status(400).json({ message: 'Invalid id' })
@@ -991,6 +1101,17 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
 }
 
 // ─── Like (date flow) ──────────────────────────────────────────
+/**
+ * @openapi
+ * /api/hangouts/{id}/like:
+ *   post:
+ *     tags: [Hangouts]
+ *     summary: Like a date-type hangout (may create a mutual chat)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Like status and mutual chat id }
+ */
 router.post('/api/hangouts/:id/like', auth, likeLimiter, async (req, res) => {
   const { id } = req.params
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
@@ -1075,6 +1196,17 @@ router.post('/api/hangouts/:id/like', auth, likeLimiter, async (req, res) => {
 })
 
 // ─── Skip (date flow) ──────────────────────────────────────────
+/**
+ * @openapi
+ * /api/hangouts/{id}/skip:
+ *   post:
+ *     tags: [Hangouts]
+ *     summary: Skip a date-type hangout
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Skip recorded }
+ */
 router.post('/api/hangouts/:id/skip', auth, likeLimiter, async (req, res) => {
   const { id } = req.params
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
@@ -1096,6 +1228,17 @@ router.post('/api/hangouts/:id/skip', auth, likeLimiter, async (req, res) => {
 })
 
 // ─── Join (company flow) ───────────────────────────────────────
+/**
+ * @openapi
+ * /api/hangouts/{id}/join:
+ *   post:
+ *     tags: [Hangouts]
+ *     summary: Join a company-type hangout
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Joined the hangout }
+ */
 router.post('/api/hangouts/:id/join', auth, joinLimiter, async (req, res) => {
   const { id } = req.params
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
@@ -1204,6 +1347,17 @@ router.post('/api/hangouts/:id/join', auth, joinLimiter, async (req, res) => {
 })
 
 // ─── Leave (company flow) ──────────────────────────────────────
+/**
+ * @openapi
+ * /api/hangouts/{id}/join:
+ *   delete:
+ *     tags: [Hangouts]
+ *     summary: Leave a company-type hangout
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Left the hangout }
+ */
 router.delete('/api/hangouts/:id/join', auth, async (req, res) => {
   const { id } = req.params
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
@@ -1229,6 +1383,17 @@ router.delete('/api/hangouts/:id/join', auth, async (req, res) => {
 })
 
 // ─── Check-in ──────────────────────────────────────────────────
+/**
+ * @openapi
+ * /api/hangouts/{id}/checkin:
+ *   post:
+ *     tags: [Hangouts]
+ *     summary: Check in at a hangout location (participant only)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Checked in }
+ */
 router.post('/api/hangouts/:id/checkin', auth, checkinLimiter, async (req, res) => {
   const { id } = req.params
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
@@ -1288,6 +1453,17 @@ router.post('/api/hangouts/:id/checkin', auth, checkinLimiter, async (req, res) 
 })
 
 // ─── Review ────────────────────────────────────────────────────
+/**
+ * @openapi
+ * /api/hangouts/{id}/review:
+ *   post:
+ *     tags: [Hangouts]
+ *     summary: Review a hangout participant
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Review submitted }
+ */
 router.post('/api/hangouts/:id/review', auth, reviewLimiter, async (req, res) => {
   const { id } = req.params
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
@@ -1332,6 +1508,17 @@ router.post('/api/hangouts/:id/review', auth, reviewLimiter, async (req, res) =>
 
 const hangoutTicketLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: 100, message: { message: 'Too many ticket requests' } })
 
+/**
+ * @openapi
+ * /api/hangouts/{id}/purchase:
+ *   post:
+ *     tags: [Hangouts]
+ *     summary: Purchase a ticket for a paid hangout (Stripe checkout)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Checkout URL or mock paid ticket }
+ */
 router.post('/api/hangouts/:id/purchase', auth, hangoutTicketLimiter, async (req, res) => {
   const { id } = req.params
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
@@ -1414,6 +1601,17 @@ const boostLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, m
 // ─── Boost / Unboost own hangout (premium perk, author only) ───
 // Продвижение поднимает свою встречу в начало ленты (boosted=1, без срока).
 // Перк для premium: free — 403 PREMIUM_REQUIRED; лимит 1 активное на автора.
+/**
+ * @openapi
+ * /api/hangouts/{id}/boost:
+ *   post:
+ *     tags: [Hangouts]
+ *     summary: Boost own hangout (premium perk)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Hangout boosted }
+ */
 router.post('/api/hangouts/:id/boost', auth, boostLimiter, async (req, res) => {
   const { id } = req.params
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
@@ -1446,6 +1644,17 @@ router.post('/api/hangouts/:id/boost', auth, boostLimiter, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/hangouts/{id}/unboost:
+ *   post:
+ *     tags: [Hangouts]
+ *     summary: Remove boost from own hangout
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Hangout unboosted }
+ */
 router.post('/api/hangouts/:id/unboost', auth, boostLimiter, async (req, res) => {
   const { id } = req.params
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
@@ -1506,6 +1715,17 @@ const STATIC_SUGGESTIONS = [
   { title: 'Мастер-класс для двоих', category: 'other', place: 'Творческая студия', description: 'Совместный результат и командная работа — сближает быстрее обычного свидания.' },
 ]
 
+/**
+ * @openapi
+ * /api/hangouts/suggest:
+ *   post:
+ *     tags: [Hangouts]
+ *     summary: AI-powered date/hangout suggestions (premium perk)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of suggestions }
+ */
 router.post('/api/hangouts/suggest', auth, suggestLimiter, async (req, res) => {
   try {
     const { user_id: userId, language = 'ru' } = req.body || {}
@@ -1573,6 +1793,15 @@ router.post('/api/hangouts/suggest', auth, suggestLimiter, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/hangouts/order/webhook:
+ *   post:
+ *     tags: [Hangouts]
+ *     summary: Stripe webhook for hangout ticket payments
+ *     responses:
+ *       200: { description: Webhook received }
+ */
 router.post('/api/hangouts/order/webhook', async (req, res) => {
   const stripeKey = process.env.STRIPE_SECRET_KEY
   if (!stripeKey) return res.status(200).json({ received: true })

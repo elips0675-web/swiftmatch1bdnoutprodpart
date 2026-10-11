@@ -26,6 +26,17 @@ const REPLAY_HANDLERS = {
 
 const ALLOWED_STATUS = new Set(['received', 'processed', 'failed'])
 
+/**
+ * @openapi
+ * /api/admin/webhooks:
+ *   get:
+ *     tags: [Admin]
+ *     summary: List webhook deliveries
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: List of webhook deliveries }
+ */
 router.get('/webhooks', async (req, res) => {
   try {
     const { provider, status, limit, offset } = req.query
@@ -40,6 +51,17 @@ router.get('/webhooks', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/webhooks/{id}/replay:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Replay a webhook delivery by id
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Delivery replayed }
+ */
 router.post('/webhooks/:id/replay', async (req, res) => {
   let row
   try {

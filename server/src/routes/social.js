@@ -142,6 +142,17 @@ const likeLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, ma
 const router = Router()
 
 // ─── Search / Discovery ────────────────────────────────────────
+/**
+ * @openapi
+ * /api/users/search:
+ *   get:
+ *     tags: [Social]
+ *     summary: Search users with filters
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.get('/api/users/search', auth, async (req, res) => {
   const { gender, looking_for, age_min, age_max, city, interest, lat, lng, radius } = req.query
   try {
@@ -307,6 +318,17 @@ router.post('/api/likes', auth, likeLimiter, async (req, res) => {
 })
 
 // ─── Matches ───────────────────────────────────────────────────
+/**
+ * @openapi
+ * /api/matches:
+ *   get:
+ *     tags: [Matches]
+ *     summary: List matches
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.get('/api/matches', auth, cacheRoutePerUser(30), async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -327,6 +349,17 @@ router.get('/api/matches', auth, cacheRoutePerUser(30), async (req, res) => {
 // ─── Invites ───────────────────────────────────────────────────
 const INVITE_TYPES = ['coffee', 'cinema', 'walk', 'dinner', 'other']
 
+/**
+ * @openapi
+ * /api/invites:
+ *   post:
+ *     tags: [Social]
+ *     summary: Send an invite
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.post('/api/invites', auth, async (req, res) => {
   const { invitee_id, type, message } = req.body
   if (!invitee_id || !type) return res.status(400).json({ message: 'invitee_id and type are required' })
@@ -357,6 +390,17 @@ router.post('/api/invites', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/invites:
+ *   get:
+ *     tags: [Social]
+ *     summary: List received invites
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.get('/api/invites', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -375,6 +419,17 @@ router.get('/api/invites', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/invites/{id}/status:
+ *   put:
+ *     tags: [Social]
+ *     summary: Update invite status
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.put('/api/invites/:id/status', auth, async (req, res) => {
   const { status } = req.body
   if (!['accepted', 'declined', 'cancelled'].includes(status)) return res.status(400).json({ message: 'Invalid status' })
@@ -392,6 +447,17 @@ router.put('/api/invites/:id/status', auth, async (req, res) => {
 })
 
 // ─── Groups ────────────────────────────────────────────────────
+/**
+ * @openapi
+ * /api/groups/{groupId}:
+ *   get:
+ *     tags: [Groups]
+ *     summary: Get group details
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.get('/api/groups/:groupId', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -408,6 +474,17 @@ router.get('/api/groups/:groupId', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/groups/{groupId}/chat:
+ *   get:
+ *     tags: [Groups]
+ *     summary: Get or create group chat
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.get('/api/groups/:groupId/chat', auth, async (req, res) => {
   try {
     const [existing] = await pool.query(
@@ -450,6 +527,17 @@ router.get('/api/groups/:groupId/chat', auth, async (req, res) => {
 })
 
 // ─── Group Posts ───────────────────────────────────────────────
+/**
+ * @openapi
+ * /api/groups/{groupId}/posts:
+ *   get:
+ *     tags: [Groups]
+ *     summary: List group posts
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.get('/api/groups/:groupId/posts', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -517,6 +605,17 @@ router.get('/api/groups/:groupId/posts', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/groups/{groupId}/posts:
+ *   post:
+ *     tags: [Groups]
+ *     summary: Create a group post
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.post('/api/groups/:groupId/posts', auth, async (req, res) => {
   const { text, images } = req.body
   if (!text && (!images || images.length === 0)) {
@@ -547,6 +646,17 @@ router.post('/api/groups/:groupId/posts', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/groups/{groupId}/posts/{postId}/like:
+ *   post:
+ *     tags: [Groups]
+ *     summary: Toggle like on a group post
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.post('/api/groups/:groupId/posts/:postId/like', auth, async (req, res) => {
   try {
     const [existing] = await pool.query(
@@ -565,6 +675,17 @@ router.post('/api/groups/:groupId/posts/:postId/like', auth, async (req, res) =>
   }
 })
 
+/**
+ * @openapi
+ * /api/groups/{groupId}/posts/{postId}/comments:
+ *   post:
+ *     tags: [Groups]
+ *     summary: Add a comment to a group post
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.post('/api/groups/:groupId/posts/:postId/comments', auth, async (req, res) => {
   const { text, image_url } = req.body
   if (!text && !image_url) return res.status(400).json({ message: 'Text or image required' })
@@ -615,6 +736,17 @@ router.get('/api/chats', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/chats/{chatId}:
+ *   get:
+ *     tags: [Chats]
+ *     summary: Get chat details
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.get('/api/chats/:chatId', auth, async (req, res) => {
   try {
     const [[row]] = await pool.query(
@@ -651,6 +783,17 @@ router.put('/api/chats/:chatId/read', auth, async (req, res) => {  try {
   }
 })
 
+/**
+ * @openapi
+ * /api/chats:
+ *   post:
+ *     tags: [Chats]
+ *     summary: Create or get a direct chat
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.post('/api/chats', auth, async (req, res) => {
   const { participant_id } = req.body
   if (!participant_id) return res.status(400).json({ message: 'participant_id is required' })
@@ -768,6 +911,17 @@ router.get('/api/chats/:chatId/messages', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/chats/{chatId}/messages:
+ *   post:
+ *     tags: [Chats]
+ *     summary: Send a message
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.post('/api/chats/:chatId/messages', auth, async (req, res) => {
   const { text, image_url, ttl_seconds } = req.body
   if (!text && !image_url) return res.status(400).json({ message: 'Text or image is required' })
@@ -863,6 +1017,17 @@ router.post('/api/chats/:chatId/messages', auth, async (req, res) => {
 })
 
 // ─── Delete message ────────────────────────────────────────────
+/**
+ * @openapi
+ * /api/chats/{chatId}/messages/{msgId}:
+ *   delete:
+ *     tags: [Chats]
+ *     summary: Delete a message
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.delete('/api/chats/:chatId/messages/:msgId', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -884,6 +1049,17 @@ router.delete('/api/chats/:chatId/messages/:msgId', auth, async (req, res) => {
 // Редактированный текст пересматривается на banned words, как и новый.
 const MESSAGE_EDIT_WINDOW_MS = 15 * 60 * 1000
 
+/**
+ * @openapi
+ * /api/chats/{chatId}/messages/{msgId}:
+ *   put:
+ *     tags: [Chats]
+ *     summary: Edit a message
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.put('/api/chats/:chatId/messages/:msgId', auth, async (req, res) => {
   const { text } = req.body
   if (!text || !String(text).trim()) {
@@ -1003,6 +1179,17 @@ router.post('/api/chats/:chatId/messages/:msgId/reactions', auth, async (req, re
 
 // ─── Block / Unblock ──────────────────────────────────────────
 // ─── Activity feed ──────────────────────────────────────────────
+/**
+ * @openapi
+ * /api/activity:
+ *   get:
+ *     tags: [Social]
+ *     summary: Get activity feed
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.get('/api/activity', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -1022,6 +1209,17 @@ router.get('/api/activity', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/block:
+ *   post:
+ *     tags: [Social]
+ *     summary: Block a user
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.post('/api/block', auth, async (req, res) => {
   const { blocked_id } = req.body
   if (!blocked_id) return res.status(400).json({ message: 'blocked_id is required' })
@@ -1037,6 +1235,17 @@ router.post('/api/block', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/block/{blocked_id}:
+ *   delete:
+ *     tags: [Social]
+ *     summary: Unblock a user
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.delete('/api/block/:blocked_id', auth, async (req, res) => {
   try {
     await pool.query('DELETE FROM user_blocks WHERE blocker_id = ? AND blocked_id = ?', [req.userId, req.params.blocked_id])
@@ -1047,6 +1256,17 @@ router.delete('/api/block/:blocked_id', auth, async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/block/list:
+ *   get:
+ *     tags: [Social]
+ *     summary: List blocked users
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: OK }
+ */
 router.get('/api/block/list', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(

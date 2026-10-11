@@ -4,6 +4,17 @@ import logger from '../../logger.js'
 
 const router = Router()
 
+/**
+ * @openapi
+ * /api/admin/reports:
+ *   get:
+ *     tags: [Admin]
+ *     summary: List user reports
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: List of reports }
+ */
 router.get('/reports', async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -24,6 +35,17 @@ router.get('/reports', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/reports/{id}/status:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Update report status by id
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Report status updated }
+ */
 router.post('/reports/:id/status', async (req, res) => {
   const { status } = req.body
   const allowed = ['reviewed', 'dismissed', 'action_taken']
@@ -50,6 +72,17 @@ router.post('/reports/:id/status', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/moderation-log:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get moderation log
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Moderation log entries }
+ */
 router.get('/moderation-log', async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -70,6 +103,17 @@ router.get('/moderation-log', async (req, res) => {
 })
 
 // ─── Photo verification (anti-cat) ────────────────────────────
+/**
+ * @openapi
+ * /api/admin/verifications:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get pending photo verifications
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: List of pending verifications }
+ */
 router.get('/verifications', async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -88,6 +132,17 @@ router.get('/verifications', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/verifications/{id}:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Review a photo verification by id
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Verification updated }
+ */
 router.put('/verifications/:id', async (req, res) => {
   const { id } = req.params
   const { status, admin_note } = req.body || {}

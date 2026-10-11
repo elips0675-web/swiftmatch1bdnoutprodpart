@@ -34,6 +34,17 @@ function checkSmsRate(userId) {
 }
 
 // POST /api/sms/send-code — send verification code
+/**
+ * @openapi
+ * /api/sms/send-code:
+ *   post:
+ *     tags: [SMS]
+ *     summary: Send an SMS verification code
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Verification code sent }
+ */
 router.post('/api/sms/send-code', auth, async (req, res) => {
   try {
     const { phone } = req.body
@@ -72,6 +83,17 @@ router.post('/api/sms/send-code', auth, async (req, res) => {
 })
 
 // POST /api/sms/verify — verify code
+/**
+ * @openapi
+ * /api/sms/verify:
+ *   post:
+ *     tags: [SMS]
+ *     summary: Verify an SMS code
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Phone verified }
+ */
 router.post('/api/sms/verify', auth, async (req, res) => {
   try {
     const { phone, code } = req.body
@@ -117,6 +139,17 @@ router.post('/api/sms/verify', auth, async (req, res) => {
 })
 
 // GET /api/sms/status — check verification status
+/**
+ * @openapi
+ * /api/sms/status:
+ *   get:
+ *     tags: [SMS]
+ *     summary: Get SMS verification status
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Phone verification status }
+ */
 router.get('/api/sms/status', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(

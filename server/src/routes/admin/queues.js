@@ -4,6 +4,17 @@ import { queueNames, queueStats, retryFailed } from '../../queue-monitor.js'
 
 const router = Router()
 
+/**
+ * @openapi
+ * /api/admin/queues:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get queue stats
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Queue stats }
+ */
 router.get('/queues', async (req, res) => {
   try {
     const queues = await queueStats()
@@ -14,6 +25,17 @@ router.get('/queues', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/queues/{name}/retry:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Retry failed jobs in a queue
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Retry result }
+ */
 router.post('/queues/:name/retry', async (req, res) => {
   const { name } = req.params
   if (!queueNames().includes(name)) {

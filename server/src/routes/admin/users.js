@@ -28,6 +28,17 @@ function notifyBanned(userId) {
   }
 }
 
+/**
+ * @openapi
+ * /api/admin/users:
+ *   get:
+ *     tags: [Admin]
+ *     summary: List users with filters and pagination
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Users list with total count }
+ */
 router.get('/users', async (req, res) => {
   try {
     const { search, status, city, premium, sort = 'joined', dir = 'desc', page = '1' } = req.query
@@ -94,6 +105,17 @@ router.get('/users', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/users/{id}:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get user by id
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: User details }
+ */
 router.get('/users/:id', async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -119,6 +141,17 @@ router.get('/users/:id', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/users/{id}/ban:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Ban user by id
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: User banned }
+ */
 router.post('/users/:id/ban', async (req, res) => {
   try {
     await pool.query('UPDATE users SET is_active = 0 WHERE id = ?', [req.params.id])
@@ -134,6 +167,17 @@ router.post('/users/:id/ban', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/users/{id}/unban:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Unban user by id
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: User unbanned }
+ */
 router.post('/users/:id/unban', async (req, res) => {
   try {
     await pool.query('UPDATE users SET is_active = 1 WHERE id = ?', [req.params.id])
@@ -144,6 +188,17 @@ router.post('/users/:id/unban', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/users/{id}:
+ *   delete:
+ *     tags: [Admin]
+ *     summary: Soft delete user by id
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: User deleted }
+ */
 router.delete('/users/:id', async (req, res) => {
   try {
     await softDelete('users', req.params.id, req.admin?.id, req.ip)
@@ -155,6 +210,17 @@ router.delete('/users/:id', async (req, res) => {
   }
 })
 
+/**
+ * @openapi
+ * /api/admin/users/bulk:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Perform bulk action on users
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Bulk action completed }
+ */
 router.post('/users/bulk', async (req, res) => {
   const { ids, action } = req.body
   if (!Array.isArray(ids) || ids.length === 0) {
@@ -181,6 +247,17 @@ router.post('/users/bulk', async (req, res) => {
 
 const IMPERSONATION_TTL_SECONDS = 3600
 
+/**
+ * @openapi
+ * /api/admin/impersonate/{userId}:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Impersonate a user by id
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Impersonation token }
+ */
 router.post('/impersonate/:userId', async (req, res) => {
   const targetId = Number(req.params.userId)
   if (!Number.isInteger(targetId) || targetId <= 0) {
