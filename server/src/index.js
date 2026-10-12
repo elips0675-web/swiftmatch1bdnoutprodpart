@@ -14,7 +14,7 @@ import { initIO, startMessageCleanup, startCheckinCleanup, stopWsTimers } from '
 import { createLogger, rootLogger } from './logger.js'
 import { idempotency } from './middleware/idempotency.js'
 import { csrf, csrfRouter } from './middleware/csrf.js'
-import { startRefreshTokenCleanup } from './cleanup.js'
+import { startRefreshTokenCleanup, startNotificationCleanup, stopCleanup } from './cleanup.js'
 import { isLocked, recordFailure, recordSuccess } from './lockout.js'
 import twoFaRoutes from './routes/totp-2fa.js'
 import { verifyTotpToken } from './totp.js'
@@ -22,6 +22,7 @@ import { adminAuth } from './middleware/adminAuth.js'
 import { initSentry, registerSentryErrorHandler } from './sentry.js'
 import { getRedis, disconnectRedis } from './redis.js'
 import { initQueues, closeQueues } from './queue.js'
+import { startQueueBackpressureMonitor, stopQueueBackpressureMonitor } from './queue-monitor.js'
 import { createGracefulShutdown } from './shutdown.js'
 import { healthHandler, liveHandler, readyHandler } from './health.js'
 
@@ -336,6 +337,8 @@ await initIO(httpServer)
 startMessageCleanup()
 startCheckinCleanup()
 startRefreshTokenCleanup()
+startNotificationCleanup()
+startQueueBackpressureMonitor()
 initQueues()
 httpServer.listen(PORT, () => {
   rootLogger.info(`SwiftMatch API running on port ${PORT}`)
@@ -344,7 +347,11 @@ httpServer.listen(PORT, () => {
 
 const shutdown = createGracefulShutdown({
   httpServer,
-  stopWsTimers,
+  stopWsTimers: () => {
+    stopWsTimers()
+    stopCleanup()
+    stopQueueBackpressureMonitor()
+  },
   closeQueues,
   disconnectRedis,
   closePool: () => pool.end().catch(() => {}),

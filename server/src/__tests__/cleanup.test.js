@@ -1,5 +1,6 @@
 // Этап 42 (аудит kimi 1.3): purge revoked refresh-токенов старше 30 дней
-import { describe, it, expect, vi } from 'vitest'
+// P2 #21: purge уведомлений >90 дней + безопасная остановка фоновых таймеров
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('../db.js', () => ({ default: { query: vi.fn() } }))
 vi.mock('../logger.js', () => ({
@@ -8,11 +9,30 @@ vi.mock('../logger.js', () => ({
   rootLogger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }))
 
-import { purgeRevokedRefreshTokens, startRefreshTokenCleanup } from '../cleanup.js'
+import {
+  purgeRevokedRefreshTokens,
+  purgeOldNotifications,
+  startRefreshTokenCleanup,
+  startNotificationCleanup,
+  stopCleanup,
+  NOTIFICATION_RETENTION_DAYS,
+} from '../cleanup.js'
 import pool from '../db.js'
 
-describe('purgeRevokedRefreshTokens', () => {
-  it('удаляет только revoked-токены старше 30 дней и возвращает affectedRows', async () => {
+describe('cleanup', () => {
+  beforeEach(() => {
+    stopCleanup()
+    vi.clearAllMocks()
+    pool.query.mockReset()
+    pool.query.mockResolvedValue([{ affectedRows: 0 }, []])
+  })
+
+  afterEach(() => {
+    stopCleanup()
+    vi.useRealTimers()
+  })
+
+  it('purgeRevokedRefreshTokens удаляет только revoked-токены старше 30 дней', async () => {
     pool.query.mockResolvedValueOnce([{ affectedRows: 7 }, []])
     const n = await purgeRevokedRefreshTokens()
     expect(n).toBe(7)
@@ -23,14 +43,60 @@ describe('purgeRevokedRefreshTokens', () => {
     expect(sql).not.toMatch(/updated_at/)
   })
 
-  it('когда удалять нечего — возвращает 0', async () => {
-    pool.query.mockResolvedValueOnce([{ affectedRows: 0 }, []])
+  it('purgeRevokedRefreshTokens когда удалять нечего — возвращает 0', async () => {
     expect(await purgeRevokedRefreshTokens()).toBe(0)
+  })
+
+  it('purgeOldNotifications удаляет уведомления старше 90 дней', async () => {
+    pool.query.mockResolvedValueOnce([{ affectedRows: 12 }, []])
+    const n = await purgeOldNotifications()
+    expect(n).toBe(12)
+    const [sql, params] = pool.query.mock.calls[0]
+    expect(String(sql)).toMatch(/DELETE FROM notifications/i)
+    expect(String(sql)).toMatch(/INTERVAL \? DAY/)
+    expect(params).toEqual([90])
+  })
+
+  it('NOTIFICATION_RETENTION_DAYS = 90', () => {
+    expect(NOTIFICATION_RETENTION_DAYS).toBe(90)
+  })
+
+  it('purgeOldNotifications позволяет переопределить срок хранения', async () => {
+    pool.query.mockResolvedValueOnce([{ affectedRows: 1 }, []])
+    await purgeOldNotifications(pool, 7)
+    expect(pool.query.mock.calls[0][1]).toEqual([7])
+  })
+
+  it('purgeOldNotifications когда удалять нечего — возвращает 0', async () => {
+    expect(await purgeOldNotifications()).toBe(0)
   })
 
   it('startRefreshTokenCleanup ставит interval и unref не роняет процесс', () => {
     const t = startRefreshTokenCleanup(60_000)
     expect(typeof t.unref).toBe('function')
-    clearInterval(t)
+  })
+
+  it('startNotificationCleanup ставит interval и unref не роняет процесс', () => {
+    const t = startNotificationCleanup(60_000)
+    expect(typeof t.unref).toBe('function')
+  })
+
+  it('stopCleanup без предварительного запуска не падает', () => {
+    stopCleanup()
+    expect(() => stopCleanup()).not.toThrow()
+  })
+
+  it('stopCleanup останавливает оба таймера (interval больше не срабатывает)', async () => {
+    vi.useFakeTimers()
+    startRefreshTokenCleanup(1000)
+    startNotificationCleanup(1000)
+
+    await vi.advanceTimersByTimeAsync(1000)
+    const afterTick = pool.query.mock.calls.length
+    expect(afterTick).toBe(2)
+
+    stopCleanup()
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(pool.query.mock.calls.length).toBe(afterTick)
   })
 })
