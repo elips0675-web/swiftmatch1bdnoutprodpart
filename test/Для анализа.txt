@@ -34,7 +34,7 @@ Node.js/Express + MySQL (mysql2) бэкенд, Socket.IO real-time, Capacitor An
 
 ## Статус проверок (12.10.2026, всё зелёное)
 
-- Тесты **1667/1667**: сервер 979/979 (70 файлов), фронт 688/688 (55 файлов: 229 в `src/` + 459 тестов гейтов в 19 файлах `scripts/`), E2E 152 в 19 спеках (статический счёт `playwright test --list`). Гейты: все зелёные — 23 джобы `ci.yml` + 7 `deploy.yml` (на 12.10.2026) + локальные `check:console`/`check:bundle`.
+- Тесты **1670/1670**: сервер 979/979 (70 файлов), фронт 691/691 (55 файлов: 229 в `src/` + 459 тестов гейтов в 19 файлах `scripts/`), E2E 152 в 19 спеках (статический счёт `playwright test --list`). Гейты: все зелёные — 23 джобы `ci.yml` + 7 `deploy.yml` (на 12.10.2026) + локальные `check:console`/`check:bundle`.
 - vite build ✅, tsc --noEmit 0 ошибок, eslint 0 errors (194 warnings — стилевые), Swagger ✅
 - E2E: Playwright, storageState из global-setup (.auth/*.json), аудит console-errors на каждой странице, screenshot/video/trace на падение; независимая очистка БД `scripts/e2e-cleanup.mjs` шагом с `if: always()`.
 - Pre-flight: `npm run check:ports`, `node scripts/schema-drift-audit.mjs --offline`, `npm run check:docs`, `npm run check:enum-constraints`, `npm run check:prod-mock`, `npm run check:headers`, `node scripts/test-counter-audit.mjs`.

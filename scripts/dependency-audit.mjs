@@ -35,6 +35,12 @@
  * или вычеркнут из манифеста) — тоже замечание: иначе allowlist становится свалкой,
  * где любое имя глушит любое будущее замечание.
  *
+ *  3. Второй lock-файл в корне. `npm ci` (Dockerfile, CI) читает только
+ *     `package-lock.json`, поэтому лежащий рядом `bun.lockb`/`yarn.lock` — не
+ *     страховка, а вторая «истина» о зависимостях, расходящаяся с npm молча.
+ *     Найдено в аудите 12.10.2026: `bun.lockb` (285 КБ) жил в корне с этапа 31
+ *     и никем не читался.
+ *
  * Область импорта определяется расположением файла: под `server/` — сверка с
  * server/package.json, остальное — с корневым. Ошибка «взял зависимость соседней
  * половины» на чистой машине означает ENOENT.
@@ -47,6 +53,7 @@ import ts from 'typescript'
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const ALLOWLIST_REL = 'scripts/dependency-audit.allow.json'
+const FOREIGN_LOCKFILES = ['bun.lockb', 'bun.lock', 'yarn.lock', 'pnpm-lock.yaml']
 
 const BUILTIN = new Set(
   builtinModules.flatMap((m) => [m, `node:${m}`, m.replace(/^node:/, '')]),
@@ -327,11 +334,20 @@ export function readAllowlistFile(root) {
   return JSON.parse(fs.readFileSync(file, 'utf8'))
 }
 
+/**
+ * Чужие lock-файлы в корне: рядом с `package-lock.json` они дают вторую «истину»
+ * о зависимостях, а `npm ci` (Dockerfile, CI) читает только npm-лок — расхождение
+ * молчит. Возвращает имена найденных файлов.
+ */
+export function foreignLockfiles(root = ROOT) {
+  return FOREIGN_LOCKFILES.filter((name) => fs.existsSync(path.join(root, name)))
+}
+
 export function auditRepository(root = ROOT) {
   const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8')
   const toFiles = (rels) => rels.map((file) => ({ file, text: read(file) }))
 
-  return auditDependencies({
+  const findings = auditDependencies({
     allowlistRaw: readAllowlistFile(root),
     scopes: [
       {
@@ -348,6 +364,15 @@ export function auditRepository(root = ROOT) {
       },
     ],
   })
+
+  for (const name of foreignLockfiles(root)) {
+    findings.push({
+      type: 'foreign-lockfile',
+      detail: `корень: рядом с package-lock.json лежит ${name} — npm ci (Dockerfile, CI) читает только package-lock.json, поэтому второй lock-файл не защищает, а молча расходится с npm. Оставь один lock-файл.`,
+    })
+  }
+
+  return findings
 }
 
 function main() {

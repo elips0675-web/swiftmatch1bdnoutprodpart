@@ -1,6 +1,7 @@
 /**
  * Тесты гейта `scripts/dependency-audit.mjs` — обе дыры (объявлено, но не
- * используется / используется, но не объявлено) плюс гигиена allowlist.
+ * используется / используется, но не объявлено), гигиена allowlist и чужой
+ * lock-файл в корне.
  *
  * Фикстуры намеренно держат импорты внутри строк и комментариев: гейт берёт
  * спецификаторы из AST, поэтому «пакет, упомянутый в JSDoc или в строковом
@@ -9,12 +10,14 @@
  */
 import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import {
   ROOT,
   auditDependencies,
   auditRepository,
   findSpecifiers,
+  foreignLockfiles,
   packageNameOf,
   parseAllowlist,
 } from './dependency-audit.mjs'
@@ -303,6 +306,46 @@ describe('живой репозиторий', () => {
     expect(
       findings.map((f) => `[${f.type}] ${f.detail}`),
     ).toEqual([])
+  })
+})
+
+describe('чужой lock-файл в корне', () => {
+  const withTemp = (files, fn) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dep-audit-'))
+    try {
+      for (const [name, text] of Object.entries(files)) {
+        fs.writeFileSync(path.join(dir, name), text)
+      }
+      return fn(dir)
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  it('находит bun.lockb рядом с package-lock.json', () => {
+    withTemp({ 'package-lock.json': '{}', 'bun.lockb': '' }, (dir) => {
+      expect(foreignLockfiles(dir)).toEqual(['bun.lockb'])
+    })
+  })
+
+  it('на чистом дереве пусто', () => {
+    withTemp({ 'package-lock.json': '{}' }, (dir) => {
+      expect(foreignLockfiles(dir)).toEqual([])
+    })
+  })
+
+  it('ловятся все четыре чужих lock-файла', () => {
+    withTemp(
+      { 'bun.lockb': '', 'bun.lock': '', 'yarn.lock': '', 'pnpm-lock.yaml': '' },
+      (dir) => {
+        expect(foreignLockfiles(dir)).toEqual([
+          'bun.lockb',
+          'bun.lock',
+          'yarn.lock',
+          'pnpm-lock.yaml',
+        ])
+      },
+    )
   })
 })
 

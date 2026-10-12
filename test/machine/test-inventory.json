@@ -1,15 +1,15 @@
 {
-  "generated": "2026-10-12T12:08:20.067Z",
+  "generated": "2026-10-12T13:19:21.915Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
     "files": 55,
-    "tests": 688,
-    "passed": 688,
+    "tests": 691,
+    "passed": 691,
     "failed": 0,
     "gate": {
       "files": 19,
-      "tests": 459
+      "tests": 462
     },
     "product": {
       "files": 36,
@@ -38,7 +38,7 @@
       },
       {
         "file": "scripts/dependency-audit.test.mjs",
-        "tests": 26
+        "tests": 29
       },
       {
         "file": "scripts/docs-canon-audit.test.mjs",
@@ -626,6 +626,6 @@
   },
   "total": {
     "files": 125,
-    "tests": 1667
+    "tests": 1670
   }
 }
