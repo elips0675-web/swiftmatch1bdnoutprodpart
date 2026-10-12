@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-11T09:23:56.062Z",
+  "generated": "2026-10-12T06:15:27.703Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -223,17 +223,17 @@
     ]
   },
   "server": {
-    "files": 67,
-    "tests": 927,
-    "passed": 927,
+    "files": 69,
+    "tests": 946,
+    "passed": 946,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 118
     },
     "product": {
-      "files": 62,
-      "tests": 809
+      "files": 64,
+      "tests": 828
     },
     "perFile": [
       {
@@ -317,6 +317,10 @@
         "tests": 6
       },
       {
+        "file": "server/src/__tests__/date-checkin.test.js",
+        "tests": 3
+      },
+      {
         "file": "server/src/__tests__/date-only.test.js",
         "tests": 6
       },
@@ -342,7 +346,7 @@
       },
       {
         "file": "server/src/__tests__/hangouts.test.js",
-        "tests": 63
+        "tests": 65
       },
       {
         "file": "server/src/__tests__/iap-webhook.test.js",
@@ -405,6 +409,10 @@
         "tests": 30
       },
       {
+        "file": "server/src/__tests__/partner-dashboard.test.js",
+        "tests": 12
+      },
+      {
         "file": "server/src/__tests__/partner-webhook.test.js",
         "tests": 6
       },
@@ -418,7 +426,7 @@
       },
       {
         "file": "server/src/__tests__/premium.test.js",
-        "tests": 11
+        "tests": 13
       },
       {
         "file": "server/src/__tests__/prod-mock-payments.test.js",
@@ -597,7 +605,7 @@
     ]
   },
   "total": {
-    "files": 118,
-    "tests": 1587
+    "files": 120,
+    "tests": 1606
   }
 }

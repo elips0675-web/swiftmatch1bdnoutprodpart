@@ -6,11 +6,21 @@ import logger from '../logger.js'
 import { invalidate } from '../cache.js'
 import { refuseMockPayment } from '../runtime.js'
 import { logWebhookDelivery, markWebhookProcessed, markWebhookFailed, WEBHOOK_PROVIDERS } from '../webhooks.js'
+import { FieldError, enumField, intField, numField, textField } from '../profile-fields.js'
 
 const router = Router()
 
 const OFFER_CATEGORIES = ['cinema', 'restaurant', 'flowers', 'taxi', 'hotel', 'spa', 'photo', 'gift', 'event', 'experience']
 const PLACEMENTS = ['hangout', 'chat', 'profile', 'passport', 'attachment_result']
+const PARTNER_TYPES = ['api', 'deeplink', 'saas']
+
+function dateTimeValue(value, field) {
+  if (value === undefined || value === null || value === '') return null
+  const s = typeof value === 'string' ? value.trim() : String(value)
+  const dt = new Date(s)
+  if (Number.isNaN(dt.getTime())) throw new FieldError(field, `${field} must be a valid datetime`)
+  return dt
+}
 
 async function getPartnerByUserId(userId) {
   const [[row]] = await pool.query('SELECT * FROM partners WHERE user_id = ? LIMIT 1', [userId])
@@ -46,11 +56,16 @@ function requirePartner(handler) {
  */
 router.post('/api/partner/register', auth, async (req, res) => {
   const { name, type, description, contact_email, contact_phone } = req.body || {}
-  const trimmed = String(name || '').trim()
-  if (!trimmed || trimmed.length < 2) {
-    return res.status(400).json({ message: 'Partner name is required (min 2 chars)' })
-  }
   try {
+    const trimmed = (textField(name, 100) || '').trim()
+    if (!trimmed || trimmed.length < 2) {
+      return res.status(400).json({ message: 'Partner name is required (min 2 chars)' })
+    }
+    const normType = enumField(type, 'type', PARTNER_TYPES) || 'deeplink'
+    const normDesc = textField(description, 16000) || null
+    const normEmail = textField(contact_email, 255) || null
+    const normPhone = textField(contact_phone, 30) || null
+
     const existing = await getPartnerByUserId(req.userId)
     if (existing) return res.status(409).json({ message: 'Already registered as partner' })
 
@@ -62,10 +77,11 @@ router.post('/api/partner/register', auth, async (req, res) => {
     const [result] = await pool.query(
       `INSERT INTO partners (user_id, name, type, description, contact_email, contact_phone, affiliate_token, hmac_secret, commission_rate)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 10)`,
-      [req.userId, trimmed, type || 'deeplink', description || null, contact_email || null, contact_phone || null, affiliateToken, hmacSecret],
+      [req.userId, trimmed, normType, normDesc, normEmail, normPhone, affiliateToken, hmacSecret],
     )
     res.status(201).json({ id: result.insertId, name: trimmed, hmac_secret: hmacSecret, affiliate_token: affiliateToken })
   } catch (err) {
+    if (err instanceof FieldError) return res.status(400).json({ message: err.message })
     logger.error('Partner register error:', err)
     res.status(500).json({ message: 'Failed to register partner' })
   }
@@ -155,17 +171,29 @@ router.post('/api/partner/offers', auth, requirePartner(async (req, res) => {
   if (!category || !OFFER_CATEGORIES.includes(category)) {
     return res.status(400).json({ message: `category must be one of: ${OFFER_CATEGORIES.join(', ')}` })
   }
-  if (!title || String(title).trim().length < 3) {
-    return res.status(400).json({ message: 'title is required (min 3 chars)' })
-  }
-  if (!deeplink) {
-    return res.status(400).json({ message: 'deeplink is required' })
-  }
   const isEvent = category === 'event' || category === 'experience'
-  if (isEvent && (!eventStart || isNaN(Date.parse(eventStart)))) {
-    return res.status(400).json({ message: 'event_start is required for events (YYYY-MM-DD HH:mm)' })
-  }
   try {
+    const normTitle = textField(title, 255)
+    if (!normTitle || normTitle.trim().length < 3) {
+      return res.status(400).json({ message: 'title is required (min 3 chars)' })
+    }
+    const normDeeplink = textField(deeplink, 500)
+    if (!normDeeplink) {
+      return res.status(400).json({ message: 'deeplink is required' })
+    }
+    if (isEvent && !eventStart) {
+      return res.status(400).json({ message: 'event_start is required for events (YYYY-MM-DD HH:mm)' })
+    }
+    const normDesc = textField(description, 16000) || null
+    const normCity = textField(city, 100) || null
+    const normLocation = textField(location, 255) || null
+    const normPoster = textField(posterUrl, 500) || null
+    const normEventUrl = textField(eventUrl, 500) || null
+    const normPrice = numField(price, 'price', { min: 0, max: 99999999 })
+    const normCapacity = intField(capacity, 'capacity', { min: 0, max: 4294967295 })
+    const startDate = dateTimeValue(eventStart, 'event_start')
+    const endDate = dateTimeValue(eventEnd, 'event_end')
+
     const placements = String(placement || 'chat').split(',').map((p) => p.trim()).filter((p) => PLACEMENTS.includes(p))
     if (placements.length === 0) placements.push('chat')
 
@@ -183,15 +211,16 @@ router.post('/api/partner/offers', auth, requirePartner(async (req, res) => {
     const [result] = await pool.query(
       `INSERT INTO partner_offers (partner_id, category, title, description, deeplink, price, city, placement, status, event_start, event_end, location, poster_url, event_url, capacity)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)`,
-      [req.partner.id, category, String(title).trim(), description || null, deeplink, price || null, city || null, placements.join(','), eventStart ? new Date(eventStart) : null, eventEnd ? new Date(eventEnd) : null, location || null, posterUrl || null, eventUrl || null, capacity ? Number(capacity) : null],
+      [req.partner.id, category, normTitle.trim(), normDesc, normDeeplink, normPrice, normCity, placements.join(','), startDate, endDate, normLocation, normPoster, normEventUrl, normCapacity],
     )
     await pool.query(
       `UPDATE partner_offers SET event_start = ?, event_end = ?, location = ?, poster_url = ?, event_url = ?, capacity = ? WHERE id = ?`,
-      [eventStart ? new Date(eventStart) : null, eventEnd ? new Date(eventEnd) : null, location || null, posterUrl || null, eventUrl || null, capacity ? Number(capacity) : null, result.insertId],
+      [startDate, endDate, normLocation, normPoster, normEventUrl, normCapacity, result.insertId],
     )
     invalidate('partner:offers:*').catch(() => {})
     res.status(201).json({ id: result.insertId })
   } catch (err) {
+    if (err instanceof FieldError) return res.status(400).json({ message: err.message })
     logger.error('Partner offer create error:', err)
     res.status(500).json({ message: 'Failed to create offer' })
   }
@@ -218,24 +247,26 @@ router.put('/api/partner/offers/:offerId', auth, requirePartner(async (req, res)
     const { title, description, deeplink, price, city, placement, status, event_start: eventStart, event_end: eventEnd, location, poster_url: posterUrl, event_url: eventUrl, capacity } = req.body || {}
     const updates = []
     const params = []
-    if (title !== undefined) { updates.push('title = ?'); params.push(String(title).trim()) }
-    if (description !== undefined) { updates.push('description = ?'); params.push(description) }
-    if (deeplink !== undefined) { updates.push('deeplink = ?'); params.push(deeplink) }
-    if (price !== undefined) { updates.push('price = ?'); params.push(price) }
-    if (city !== undefined) { updates.push('city = ?'); params.push(city) }
+    if (title !== undefined) { updates.push('title = ?'); params.push((textField(title, 255) || '').trim()) }
+    if (description !== undefined) { updates.push('description = ?'); params.push(textField(description, 16000) || null) }
+    if (deeplink !== undefined) { updates.push('deeplink = ?'); params.push(textField(deeplink, 500)) }
+    if (price !== undefined) { updates.push('price = ?'); params.push(numField(price, 'price', { min: 0, max: 99999999 })) }
+    if (city !== undefined) { updates.push('city = ?'); params.push(textField(city, 100) || null) }
     if (placement !== undefined) {
       const placements = String(placement).split(',').map((p) => p.trim()).filter((p) => PLACEMENTS.includes(p))
-      updates.push('placement = ?'); params.push(placements.join(','))
+      if (placements.length > 0) {
+        updates.push('placement = ?'); params.push(placements.join(','))
+      }
     }
     if (status !== undefined && ['active', 'paused'].includes(status)) {
       updates.push('status = ?'); params.push(status)
     }
-    if (eventStart !== undefined) { updates.push('event_start = ?'); params.push(eventStart ? new Date(eventStart) : null) }
-    if (eventEnd !== undefined) { updates.push('event_end = ?'); params.push(eventEnd ? new Date(eventEnd) : null) }
-    if (location !== undefined) { updates.push('location = ?'); params.push(location) }
-    if (posterUrl !== undefined) { updates.push('poster_url = ?'); params.push(posterUrl) }
-    if (eventUrl !== undefined) { updates.push('event_url = ?'); params.push(eventUrl) }
-    if (capacity !== undefined) { updates.push('capacity = ?'); params.push(capacity === null ? null : Number(capacity)) }
+    if (eventStart !== undefined) { updates.push('event_start = ?'); params.push(dateTimeValue(eventStart, 'event_start')) }
+    if (eventEnd !== undefined) { updates.push('event_end = ?'); params.push(dateTimeValue(eventEnd, 'event_end')) }
+    if (location !== undefined) { updates.push('location = ?'); params.push(textField(location, 255) || null) }
+    if (posterUrl !== undefined) { updates.push('poster_url = ?'); params.push(textField(posterUrl, 500) || null) }
+    if (eventUrl !== undefined) { updates.push('event_url = ?'); params.push(textField(eventUrl, 500) || null) }
+    if (capacity !== undefined) { updates.push('capacity = ?'); params.push(capacity === null ? null : intField(capacity, 'capacity', { min: 0, max: 4294967295 })) }
     if (updates.length === 0) return res.status(400).json({ message: 'No fields to update' })
 
     params.push(offerId)
@@ -243,6 +274,7 @@ router.put('/api/partner/offers/:offerId', auth, requirePartner(async (req, res)
     invalidate('partner:offers:*').catch(() => {})
     res.json({ message: 'Offer updated' })
   } catch (err) {
+    if (err instanceof FieldError) return res.status(400).json({ message: err.message })
     logger.error('Partner offer update error:', err)
     res.status(500).json({ message: 'Failed to update offer' })
   }

@@ -635,6 +635,32 @@ describe('POST /api/hangouts/:id/purchase (ticket checkout)', () => {
   })
 })
 
+describe('POST /api/hangouts/:id/review', () => {
+  it('rejects a non-numeric reviewee_id before touching the DB', async () => {
+    const res = await request(createApp(hangoutsRoutes))
+      .post('/api/hangouts/5/review')
+      .set('Authorization', `Bearer ${authToken(1)}`)
+      .send({ reviewee_id: 'abc', rating: 5 })
+    expect(res.status).toBe(400)
+    expect(pool.query).not.toHaveBeenCalled()
+  })
+
+  it('submits a valid review with a numeric reviewee_id', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 5, user_id: 10, status: 'completed' }], []])
+      .mockResolvedValueOnce([[undefined], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await request(createApp(hangoutsRoutes))
+      .post('/api/hangouts/5/review')
+      .set('Authorization', `Bearer ${authToken(1)}`)
+      .send({ reviewee_id: 5, rating: 5 })
+    expect(res.status).toBe(201)
+    const insertCall = pool.query.mock.calls.find(([sql]) => sql.includes('INSERT INTO hangout_reviews'))
+    expect(insertCall).toBeTruthy()
+    expect(insertCall[1]).toEqual(['5', 1, 5, 5, null])
+  })
+})
+
 describe('GET /api/hangouts/:id/responses', () => {
   it('forbids responses list for non-author', async () => {
     pool.query.mockResolvedValueOnce([[{ user_id: 42 }], []])

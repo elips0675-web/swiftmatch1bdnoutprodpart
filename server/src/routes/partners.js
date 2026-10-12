@@ -8,6 +8,7 @@ import { getCached, setCached } from '../cache.js'
 import { parseRadiusKm } from '../geo.js'
 import { refuseMockPayment } from '../runtime.js'
 import { logWebhookDelivery, markWebhookProcessed, markWebhookFailed, WEBHOOK_PROVIDERS } from '../webhooks.js'
+import { textField } from '../profile-fields.js'
 
 const router = Router()
 
@@ -452,6 +453,9 @@ router.post('/api/partners/order', auth, async (req, res) => {
   if (!offerId || !/^\d+$/.test(String(offerId))) {
     return res.status(400).json({ message: 'offer_id is required' })
   }
+  const normRecipient = textField(recipientName, 200) || null
+  const normAddress = textField(recipientAddress, 16000) || null
+  const normGift = textField(giftMessage, 16000) || null
   try {
     const [[offer]] = await pool.query(
       `SELECT o.id, o.partner_id, o.title, o.price, o.deeplink, p.name AS partner_name, p.commission_rate, p.status AS partner_status
@@ -492,9 +496,9 @@ router.post('/api/partners/order', auth, async (req, res) => {
             userId: String(req.userId),
             offer_id: String(offerId),
             partner_id: String(offer.partner_id),
-            recipient_name: recipientName || '',
-            recipient_address: recipientAddress || '',
-            gift_message: giftMessage || '',
+            recipient_name: normRecipient || '',
+            recipient_address: normAddress || '',
+            gift_message: normGift || '',
           },
         })
 
@@ -502,7 +506,7 @@ router.post('/api/partners/order', auth, async (req, res) => {
           `INSERT INTO partner_orders (partner_id, offer_id, user_id, stripe_session_id, amount, commission, recipient_name, recipient_address, gift_message, status)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
           [offer.partner_id, offerId, req.userId, session.id, amount, commission,
-           recipientName || null, recipientAddress || null, giftMessage || null],
+           normRecipient, normAddress, normGift],
         )
 
         return res.json({ url: session.url, sessionId: session.id })
@@ -521,7 +525,7 @@ router.post('/api/partners/order', auth, async (req, res) => {
       `INSERT INTO partner_orders (partner_id, offer_id, user_id, stripe_session_id, amount, commission, recipient_name, recipient_address, gift_message, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid')`,
       [offer.partner_id, offerId, req.userId, orderId, amount, commission,
-       recipientName || null, recipientAddress || null, giftMessage || null],
+       normRecipient, normAddress, normGift],
     )
     await pool.query(
       `INSERT INTO partner_conversions (partner_id, offer_id, user_id, conversion_type, amount, commission, external_order_id, stripe_session_id, status)

@@ -1469,7 +1469,7 @@ router.post('/api/hangouts/:id/review', auth, reviewLimiter, async (req, res) =>
   if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
   const { reviewee_id, rating, tag } = req.body
   const parsedRating = Number(rating)
-  if (!reviewee_id || !Number.isFinite(parsedRating) || parsedRating < 1 || parsedRating > 5) {
+  if (!/^\d+$/.test(String(reviewee_id || '')) || !Number.isFinite(parsedRating) || parsedRating < 1 || parsedRating > 5) {
     return res.status(400).json({ message: 'reviewee_id and rating (1-5) are required' })
   }
   const validTags = ['punctual', 'fun', 'reliable', 'no_show']

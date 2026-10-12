@@ -2,6 +2,7 @@ import { Router } from 'express'
 import pool from '../db.js'
 import { auth } from '../middleware.js'
 import logger from '../logger.js'
+import { FieldError, textField } from '../profile-fields.js'
 
 const router = Router()
 
@@ -43,16 +44,22 @@ router.get('/contacts', auth, async (req, res) => {
 router.post('/contacts', auth, async (req, res) => {
   try {
     const { name, phone, email, relation } = req.body;
-    if (!name || name.trim().length < 2) {
+    const normName = textField(name, 255);
+    if (!normName || normName.trim().length < 2) {
       return res.status(400).json({ error: 'Name is required (min 2 chars)' });
     }
+    const safeName = normName.trim();
+    const normPhone = textField(phone, 20) || null;
+    const normEmail = textField(email, 255) || null;
+    const normRelation = textField(relation, 100) || null;
 
     const [result] = await pool.execute(
       'INSERT INTO emergency_contacts (user_id, name, phone, email, relation) VALUES (?, ?, ?, ?, ?)',
-      [req.userId, name.trim(), phone || null, email || null, relation || null]
+      [req.userId, safeName, normPhone, normEmail, normRelation]
     );
-    res.status(201).json({ id: result.insertId, name: name.trim() });
+    res.status(201).json({ id: result.insertId, name: safeName });
   } catch (err) {
+    if (err instanceof FieldError) return res.status(400).json({ error: err.message });
     logger.error('Emergency contact POST error', { error: err.message, userId: req.userId });
     res.status(500).json({ error: 'Failed to create contact' });
   }

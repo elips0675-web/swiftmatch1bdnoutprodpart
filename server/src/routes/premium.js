@@ -6,6 +6,7 @@ import { trackEvent } from './experiments.js'
 import { createBreaker } from '../circuit-breaker.js'
 import { refuseMockPayment } from '../runtime.js'
 import { logWebhookDelivery, markWebhookProcessed, markWebhookFailed, WEBHOOK_PROVIDERS } from '../webhooks.js'
+import { FieldError, intField } from '../profile-fields.js'
 
 const router = Router()
 
@@ -97,6 +98,14 @@ router.post('/api/premium/create-checkout', auth, async (req, res) => {
   const tierConfig = TIERS.find(t => t.id === tier)
   if (!tierConfig) return res.status(400).json({ message: 'Invalid tier' })
 
+  let months
+  try {
+    months = intField(duration_months, 'duration_months', { min: 1, max: 120 })
+  } catch (err) {
+    if (err instanceof FieldError) return res.status(400).json({ message: err.message })
+    throw err
+  }
+
   const stripeKey = process.env.STRIPE_SECRET_KEY
   const isLive = process.env.STRIPE_LIVE === 'true'
   if (stripeKey || isLive) {
@@ -105,7 +114,7 @@ router.post('/api/premium/create-checkout', auth, async (req, res) => {
       const { default: Stripe } = await import('stripe')
       const stripe = new Stripe(stripeKey)
 
-      const unitAmount = Math.round(tierConfig.price * duration_months * 100)
+      const unitAmount = Math.round(tierConfig.price * months * 100)
       const session = await createBreaker(
         (params) => stripe.checkout.sessions.create(params),
         'stripe-checkout',
@@ -115,7 +124,7 @@ router.post('/api/premium/create-checkout', auth, async (req, res) => {
         line_items: [{
           price_data: {
             currency: 'rub',
-            product_data: { name: `${tierConfig.name} (${duration_months} мес.)` },
+            product_data: { name: `${tierConfig.name} (${months} мес.)` },
             unit_amount: unitAmount,
           },
           quantity: 1,
@@ -123,7 +132,7 @@ router.post('/api/premium/create-checkout', auth, async (req, res) => {
         mode: 'payment',
         success_url: `${req.headers.origin}/premium/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${req.headers.origin}/premium/cancel`,
-        metadata: { userId: String(req.userId), tier, duration_months: String(duration_months) },
+        metadata: { userId: String(req.userId), tier, duration_months: String(months) },
       })
 
       return res.json({ url: session.url, sessionId: session.id })
@@ -137,7 +146,7 @@ router.post('/api/premium/create-checkout', auth, async (req, res) => {
 
   if (refuseMockPayment(res)) return
 
-  const price = tierConfig.price * duration_months
+  const price = tierConfig.price * months
   const conn = await pool.getConnection()
   try {
     await conn.beginTransaction()
@@ -148,7 +157,7 @@ router.post('/api/premium/create-checkout', auth, async (req, res) => {
     await conn.query(
       `INSERT INTO subscriptions (user_id, tier, duration_months, price, expires_at, is_active)
        VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MONTH), 1)`,
-      [req.userId, tier, duration_months, price, duration_months],
+      [req.userId, tier, months, price, months],
     )
     await conn.commit()
   } catch (err) {
@@ -157,7 +166,7 @@ router.post('/api/premium/create-checkout', auth, async (req, res) => {
   } finally {
     conn.release()
   }
-  trackEvent('premium_purchase', req.userId, { tier, duration_months, price, mode: 'mock' })
+  trackEvent('premium_purchase', req.userId, { tier, duration_months: months, price, mode: 'mock' })
   res.status(201).json({ message: 'Subscription activated (mock)', tier, expires_at: null })
 })
 

@@ -4,6 +4,7 @@ import pool from '../db.js'
 import { auth } from '../middleware.js'
 import logger from '../logger.js'
 import { dateOnly } from '../date-only.js'
+import { textField } from '../profile-fields.js'
 
 const router = Router()
 
@@ -158,14 +159,15 @@ router.post('/api/data/erase/confirm', auth, async (req, res) => {
  */
 router.post('/api/consent', auth, async (req, res) => {
   const { consent_type, granted } = req.body
-  if (!consent_type || granted === undefined) {
+  const safeType = (textField(consent_type, 100) || '').trim()
+  if (!safeType || granted === undefined) {
     return res.status(400).json({ message: 'consent_type and granted are required' })
   }
 
   try {
     await pool.query(
       'INSERT INTO consent_log (user_id, consent_type, granted, ip_address) VALUES (?, ?, ?, ?)',
-      [req.userId, consent_type, granted ? 1 : 0, req.ip],
+      [req.userId, safeType, granted ? 1 : 0, req.ip],
     )
     res.status(201).json({ message: 'Consent recorded' })
   } catch (err) {

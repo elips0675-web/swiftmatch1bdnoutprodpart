@@ -96,6 +96,23 @@ describe('POST /api/premium/create-checkout', () => {
     expect(res.body.message).toMatch(/invalid tier/i)
   })
 
+  it('rejects invalid duration_months value', async () => {
+    const res = await request(app)
+      .post('/api/premium/create-checkout')
+      .set('Authorization', `Bearer ${authToken()}`)
+      .send({ tier: 'plus', duration_months: 'abc' })
+    expect(res.status).toBe(400)
+    expect(res.body.message).toMatch(/duration_months/)
+  })
+
+  it('rejects zero duration_months', async () => {
+    const res = await request(app)
+      .post('/api/premium/create-checkout')
+      .set('Authorization', `Bearer ${authToken()}`)
+      .send({ tier: 'plus', duration_months: 0 })
+    expect(res.status).toBe(400)
+  })
+
   it('creates mock subscription without Stripe', async () => {
     pool.query.mockResolvedValue([[], []])
     mockTransaction()
