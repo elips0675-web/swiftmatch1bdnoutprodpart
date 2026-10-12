@@ -101,5 +101,19 @@ describe('PAIRS', () => {
     expect(dsts).toContain('test/Что сделано.txt')
     expect(dsts).toContain('test/Что доделать.txt')
     expect(dsts).toContain('test/AGENTS-pitfalls.md')
+    for (const name of [
+      'AGENTS-system-prompt.md',
+      'AGENTS-workflow.md',
+      'AGENTS-i18n.md',
+      'AGENTS-admin-auth.md',
+      'AGENTS-startup.md',
+      'AGENTS-production.md',
+      'AGENTS-security.md',
+      'AGENTS-deployment.md',
+      'architecture.md',
+      'past-mistakes.md',
+    ]) {
+      expect(dsts).toContain(`test/${name}`)
+    }
   })
 })

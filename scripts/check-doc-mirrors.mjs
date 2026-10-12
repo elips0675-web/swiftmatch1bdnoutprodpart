@@ -1,7 +1,7 @@
 /**
  * Гейт «зеркала `test/` совпадают с корнем побайтово» (`npm run check:mirrors`).
  *
- * Каталог `test/` — копия ключевых доков для внешнего анализа. Все 9 пар
+ * Каталог `test/` — копия ключевых доков для внешнего анализа. Все 19 пар
  * трекаются в git (добавляются `git add -f`, т.к. каталог в `.gitignore`),
  * поэтому гейт вызывается и из CI, и отсутствие зеркала или расхождение —
  * это падение (exit 1), а не пропуск: скип-на-отсутствии давал зелёный гейт
@@ -11,7 +11,10 @@
  *
  * Сверка — sha256 по явным парам (не обход каталога): только эти файлы обязаны
  * совпадать, `test/СВОДКА.md`, `test/ИНВЕНТАРЬ-ТЕСТОВ.md` и `test/Для анализа.txt`
- * живут только в `test/` и пары не имеют.
+ * живут только в `test/` и пары не имеют. В пары входят все девять модулей
+ * `docs/AGENTS-*.md` плюс `docs/architecture.md` и `docs/past-mistakes.md`:
+ * зеркало `test/AGENTS.md` ссылается на них, и внешний аудит без этих копий
+ * читал бы ссылки в пустоту.
  *
  * Флаги: `--fix` — приводит зеркало к корню (создать/перезаписать).
  * Счётчики тестов внутри зеркал сверяет `node scripts/test-counter-audit.mjs`,
@@ -30,8 +33,18 @@ export const PAIRS = [
   ['AGENTS.md', 'test/AGENTS.md'],
   ['CONTRIBUTING.md', 'test/CONTRIBUTING.md'],
   ['Промты.txt', 'test/Промты.txt'],
+  ['docs/AGENTS-system-prompt.md', 'test/AGENTS-system-prompt.md'],
   ['docs/AGENTS-pitfalls.md', 'test/AGENTS-pitfalls.md'],
+  ['docs/AGENTS-workflow.md', 'test/AGENTS-workflow.md'],
+  ['docs/AGENTS-i18n.md', 'test/AGENTS-i18n.md'],
+  ['docs/AGENTS-admin-auth.md', 'test/AGENTS-admin-auth.md'],
+  ['docs/AGENTS-startup.md', 'test/AGENTS-startup.md'],
+  ['docs/AGENTS-production.md', 'test/AGENTS-production.md'],
+  ['docs/AGENTS-security.md', 'test/AGENTS-security.md'],
+  ['docs/AGENTS-deployment.md', 'test/AGENTS-deployment.md'],
   ['docs/product-roadmap.md', 'test/product-roadmap.md'],
+  ['docs/architecture.md', 'test/architecture.md'],
+  ['docs/past-mistakes.md', 'test/past-mistakes.md'],
 ]
 
 export function sha256Of(file) {
