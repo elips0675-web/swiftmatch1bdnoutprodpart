@@ -4,8 +4,9 @@
 
 Run `запуск-всего.bat` to start everything:
 1. MySQL via Laragon `mysqld.exe` (always check `mysql_upgrade` warnings before assuming it's broken)
-2. API: `node server/src/index.js` (port 3002 — NOT 3001)
-3. Frontend: `npx vite build && npx vite preview --port 8081 --host` (production preview, port 8081)
+2. Migrations: `node database/migrations/migrate.js` — иначе созданная раньше БД молча отстаёт от кода, и живые роуты дают 500 на новых колонках (грабля №99)
+3. API: `node server/src/index.js` (port 3002 — NOT 3001)
+4. Frontend: `npx vite build && npx vite preview --port 8081 --host` (production preview, port 8081)
 
 **Production-режим фронта (требование пользователя, сент 2026):** dev-server с HMR убран из запуска — холодная компиляция модулей делала первый заход в админку ~2.6 с («тупит приложение»). `запуск-всего.bat`/`запуск.bat` собирают `build` и поднимают `vite preview`. `vite.config.ts` содержит `preview.proxy` для `/api` и `/socket.io` (иначе preview отдаёт 404 на API). Для HMR-разработки фронт запускать вручную: `npx vite --port 8081 --host`. После любой правки `src/` нужен перезапуск `npx vite build` + рестарт preview (dist-папка кэшируется процессами).
 
