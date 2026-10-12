@@ -390,11 +390,11 @@ const INVENTORY_FILE = 'test/ИНВЕНТАРЬ-ТЕСТОВ.md'
  * перегенерирует. В `--skip-e2e`/`--no-per-file` артефакты не трогаются:
  * частичный прогон записал бы нули вместо E2E.
  */
-const INVENTORY_JSON = 'test/test-inventory.json'
+const INVENTORY_JSON = 'test/machine/test-inventory.json'
 const INVENTORY_TXT = [
-  { id: 'front', file: 'test/frontend-tests.txt', title: 'Фронт (Vitest)', runner: 'vitest --reporter=json' },
-  { id: 'server', file: 'test/server-tests.txt', title: 'Сервер (Vitest)', runner: 'vitest --reporter=json' },
-  { id: 'e2e', file: 'test/e2e-tests.txt', title: 'E2E (Playwright)', runner: 'playwright test --list' },
+  { id: 'front', file: 'test/machine/frontend-tests.txt', title: 'Фронт (Vitest)', runner: 'vitest --reporter=json' },
+  { id: 'server', file: 'test/machine/server-tests.txt', title: 'Сервер (Vitest)', runner: 'vitest --reporter=json' },
+  { id: 'e2e', file: 'test/machine/e2e-tests.txt', title: 'E2E (Playwright)', runner: 'playwright test --list' },
 ]
 /**
  * Средняя ячейка — `(?:\\\||[^|])*`, а не `[^|]*`: описание вида
@@ -851,6 +851,7 @@ export function checkPerFileTxt(relPath, spec, text, countData) {
 export function writeInventoryArtifacts(root, counts, generated) {
   const changed = []
   const jsonAbs = path.join(root, INVENTORY_JSON)
+  fs.mkdirSync(path.dirname(jsonAbs), { recursive: true })
   const inventory = buildInventory(counts, generated)
   let keep = false
   if (fs.existsSync(jsonAbs)) {
@@ -866,6 +867,7 @@ export function writeInventoryArtifacts(root, counts, generated) {
   }
   for (const spec of INVENTORY_TXT) {
     const abs = path.join(root, spec.file)
+    fs.mkdirSync(path.dirname(abs), { recursive: true })
     const next = renderPerFileTxt(spec, counts[spec.id])
     if (fs.existsSync(abs) && fs.readFileSync(abs, 'utf8') === next) continue
     fs.writeFileSync(abs, next)

@@ -222,7 +222,7 @@ jobs:
   # project-context и test/ИНВЕНТАРЬ-ТЕСТОВ.md хранят числа, и они устаревают
   # каждый раз, когда добавлен тест. Отдельная джоба (нужны root и server
   # node_modules), в needs деплоя — иначе расхождение всплывёт уже на VPS.
-  # Окружение обязано совпадать с тем, в котором снят test/test-inventory.json:
+  # Окружение обязано совпадать с тем, в котором снят test/machine/test-inventory.json:
   # `passed` сверяет pushSuiteDiff, а без сервиса mysql молча пропускаются 6
   # тестов race.mysql.test.js, без живого API на 3002 — ещё 7 тестов
   # security.headers.test.js (describe.skipIf(!serverUp)), и прогон даёт 972/973

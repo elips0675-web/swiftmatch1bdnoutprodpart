@@ -221,7 +221,7 @@ jobs:
   # падает на расхождении. Нужен отдельный job: `lint-and-typecheck`-подобные
   # джобы делают только root `npm ci`, а без `server/node_modules` измерить
   # серверные тесты нечем. E2E считается статически (--list). Окружение обязано
-  # совпадать с тем, в котором снят test/test-inventory.json: `passed` сверяет
+  # совпадать с тем, в котором снят test/machine/test-inventory.json: `passed` сверяет
   # pushSuiteDiff, а без сервиса mysql молча пропускаются 6 тестов
   # race.mysql.test.js, без живого API на 3002 — ещё 7 тестов
   # security.headers.test.js (describe.skipIf(!serverUp)), и прогон даёт 972/973

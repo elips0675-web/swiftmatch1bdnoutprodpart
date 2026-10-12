@@ -463,20 +463,20 @@ describe("машинный инвентарь (test-inventory.json / *-tests.txt
 
   it("checkInventoryJson молчит на совпадающем файле", () => {
     const text = renderInventoryJson(buildInventory(counts, "2026-10-09T00:00:00.000Z"));
-    expect(checkInventoryJson("test/test-inventory.json", text, counts)).toEqual([]);
+    expect(checkInventoryJson("test/machine/test-inventory.json", text, counts)).toEqual([]);
   });
 
   it("checkInventoryJson краснеет на устаревшем числе", () => {
     const inv = buildInventory(counts, "2026-10-09T00:00:00.000Z");
     inv.frontend.tests = 2;
-    const problems = checkInventoryJson("test/test-inventory.json", JSON.stringify(inv), counts);
+    const problems = checkInventoryJson("test/machine/test-inventory.json", JSON.stringify(inv), counts);
     expect(problems.map((p) => p.message)).toContain(
       "frontend.tests: в прогоне 3, в инвентаре 2"
     );
   });
 
   it("checkInventoryJson краснеет на битом JSON", () => {
-    expect(checkInventoryJson("test/test-inventory.json", "{", counts)[0].message).toMatch(
+    expect(checkInventoryJson("test/machine/test-inventory.json", "{", counts)[0].message).toMatch(
       /не парсится/
     );
   });
@@ -484,7 +484,7 @@ describe("машинный инвентарь (test-inventory.json / *-tests.txt
   it("txt-инвентарь совпадает с прогоном и ловит недостающий файл", () => {
     const spec = {
       id: "front",
-      file: "test/frontend-tests.txt",
+      file: "test/machine/frontend-tests.txt",
       title: "Фронт (Vitest)",
       runner: "vitest --reporter=json",
     };
@@ -547,7 +547,7 @@ describe("разбивка product / gate", () => {
   it("checkInventoryJson краснеет на разошедшейся разбивке", () => {
     const inv = buildInventory(counts, "2026-10-09T00:00:00.000Z");
     inv.frontend.gate = { files: 0, tests: 0 };
-    const problems = checkInventoryJson("test/test-inventory.json", JSON.stringify(inv), counts);
+    const problems = checkInventoryJson("test/machine/test-inventory.json", JSON.stringify(inv), counts);
     expect(problems.map((p) => p.message)).toContain(
       "frontend.gate.tests: в прогоне 2, в инвентаре 0"
     );

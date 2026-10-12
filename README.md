@@ -16,7 +16,7 @@ Supabase), с портами 3002/8081, чтобы не мешать основ�
 Версии — из `package.json`, `server/package.json`, `docker-compose.yml`,
 `Dockerfile` и обоих workflow. Числа тестов проверяет гейт
 `scripts/test-counter-audit.mjs` (перезапускает vitest, сверяет с документацией и
-перегенерирует машинный инвентарь `test/test-inventory.json` + `test/*-tests.txt`),
+перегенерирует машинный инвентарь `test/machine/test-inventory.json` + `test/machine/*-tests.txt`),
 поэтому расхождение с прогоном ловится в CI, а не «глазами».
 
 ### Фронтенд — `src/`
@@ -153,7 +153,7 @@ cd server && npm test            # серверные тесты
 | Секреты | `node scripts/secrets-leak-audit.mjs` | четыре независимых канала: `.dockerignore` пропускает `server/.env`/`.jwt-dev-secret`; rsync без `--exclude .env` стирает прод-`.env`; **rsync исключает не все классы файлов-секретов, которые гейт сам признаёт секретами** (`server/.jwt-dev-secret`, `.env.*`, `*.pfx`, `id_rsa` ехали на VPS при зелёном гейте — этап 35); **значение секрета, вписанное в отслеживаемый файл** (был VAPID-ключ в `README.md`) |
 | Персистентность деплоя | `node scripts/deploy-persistence-audit.mjs` | каталог записи фото не смонтирован volume'ом → `docker compose up --build` удаляет все фото; сверяет путь из кода с compose. Гейт читает S3-переключатель (`S3_BUCKET`+`AWS_ACCESS_KEY_ID` в env сервиса `app`): при S3 фото на диск не пишутся, дисковые проверки пропускаются **с явной пометкой**, а ключи без S3-ветки в `upload.js` — FAIL |
 | Заголовки безопасности на периметре | `npm run check:headers` | SPA и статику отдаёт **nginx**, а не Express — `helmet()` (`server/src/index.js`) покрывает только ответы API, и в образ едущий `nginx/swiftmatch.http.conf` не было ни одного security-заголовка (этап 38); **наследование `add_header`**: в `location` с собственным `add_header` (например `Cache-Control`) верхнеуровневые заголовки не действуют; три nginx-конфига, `vercel.json`, `index.html`, порядок `helmet()`/`express.static` |
-| Счётчики тестов | `node scripts/test-counter-audit.mjs` (`--fix` переписывает и перегенерирует) | числа тестов в `README.md`, `project-context.md`, `test/README.md`, `test/project-context.md`, `test/ИНВЕНТАРЬ-ТЕСТОВ.md` разошлись с прогоном; машинный инвентарь `test/test-inventory.json` + `test/frontend-tests.txt`/`server-tests.txt`/`e2e-tests.txt` устарел; разбивка `product`/`gate` в инвентаре и строке «Продукт/гейты» (`scripts/**` и `*-audit`/`schema-drift`/`prod-mock`-тесты сервера — гейты, остальное — продукт; новый `*-audit.test.js` без записи в `SERVER_GATE_TESTS` — красный), иначе вывеска прячет мета-тесты |
+| Счётчики тестов | `node scripts/test-counter-audit.mjs` (`--fix` переписывает и перегенерирует) | числа тестов в `README.md`, `project-context.md`, `test/README.md`, `test/project-context.md`, `test/ИНВЕНТАРЬ-ТЕСТОВ.md` разошлись с прогоном; машинный инвентарь `test/machine/test-inventory.json` + `test/machine/frontend-tests.txt`/`server-tests.txt`/`e2e-tests.txt` устарел; разбивка `product`/`gate` в инвентаре и строке «Продукт/гейты» (`scripts/**` и `*-audit`/`schema-drift`/`prod-mock`-тесты сервера — гейты, остальное — продукт; новый `*-audit.test.js` без записи в `SERVER_GATE_TESTS` — красный), иначе вывеска прячет мета-тесты |
 | Уязвимости prod-зависимостей | `npm run audit:prod` (корень и в `server/`) | `npm audit --omit=dev --audit-level=high` по обоим lock-файлам: в образ едет только прод-часть |
 | Порты и ключи | `npm run check:ports` | порты vite/proxy/`.env`/`CORS_ORIGIN` + `console.log` в `server/src` (осознанные progress-логи CLI-сида `server/src/seed.js` исключены — список `CONSOLE_LOG_EXEMPT_FILES`, число пропущенных печатается) |
 | Конфиг Android | `node scripts/check-native-config.mjs` | cleartext для native-сборок |
@@ -171,7 +171,7 @@ cd server && npm test            # серверные тесты
 | Mock-платежи не утекают в прод | `npm run check:prod-mock` | `refuseMockPayment` стоит в пяти точках, но новая mock-ветка в PR отдаст товар бесплатно: в `server/src/routes/*.js` каждый хендлер с платным стоком (`mock: true`, `'paid'`, `INSERT INTO … subscriptions`, `commission_rate = 15`) обязан закрываться fail-closed отказом; вебхуки (`received: true`) — контракт Stripe, вне проверки; не-Stripe выдача подписки (RevenueCat) не считается (N9-tail, после этапа 39) |
 | Смоук живого UI | `npm run check:console` | console-ошибки, pageerror и ответы 5xx на статических страницах preview (8081 + API 3002), пустая страница, страница без русского текста (сырой ключ i18n), админ-роут, куда не попали из-за редиректа; фильтры известного шума — как в `e2e/helpers/audit.ts`. **Локально, в CI не подключён** — CI закрыт полным Playwright E2E; требует живых серверов (`запуск-всего.bat`). Перенос из Service Desk |
 | Бюджет бандла | `npm run check:bundle` | gzip initial JS/CSS — все ассеты, на которые ссылается `dist/index.html` (в т.ч. `vendor-*`, который мимо паттерна `index-*` не виден), выше бюджета 500 / 40 KB при базовой линии 371.7 / 20.3 KB на 08.10.2026 — подтянутая крупная зависимость или раздувшийся entry. **Локально, в CI не подключён**: требует собранный `npx vite build` |
-| Зеркала документации `test/` | `npm run check:mirrors` | каталог `test/` — ручная копия ключевых доков; расхождение sha256 с корнем (оба журнала, `README.md`, `project-context.md`, `AGENTS.md`, `CONTRIBUTING.md`, `Промты.txt`, все девять модулей `docs/AGENTS-*.md`, `docs/product-roadmap.md`, `docs/architecture.md`, `docs/past-mistakes.md`) или пропавшее зеркало. Все 19 пар трекаются в git (`git add -f`, каталог в `.gitignore`), гейт в CI (джоба `mirrors` в `ci.yml` + шаг в `lint-and-typecheck` `deploy.yml`), отсутствие зеркала или расхождение — exit 1. Починить: `node scripts/check-doc-mirrors.mjs --fix` |
+| Зеркала документации `test/` | `npm run check:mirrors` | каталог `test/` — компактный набор для внешнего AI-анализа; расхождение sha256 с корнем (набор «правила + состояние»: `Что доделать.txt`, `README.md`, `project-context.md`, `AGENTS.md`, `docs/AGENTS-pitfalls.md`, `docs/AGENTS-workflow.md`, `docs/AGENTS-production.md`, `docs/AGENTS-security.md`) или пропавшее зеркало. Все 8 пар трекаются в git (`git add -f`, каталог в `.gitignore`), гейт в CI (джоба `mirrors` в `ci.yml` + шаг в `lint-and-typecheck` `deploy.yml`), отсутствие зеркала или расхождение — exit 1. Починить: `node scripts/check-doc-mirrors.mjs --fix` |
 
 Каждый гейт обязан падать на сломанном входе — иначе это декорация
 (см. `docs/AGENTS-pitfalls.md`).
@@ -444,7 +444,10 @@ cd server && npm test            # серверные тесты
 | `docs/STATUS.md` | Не существует; ссылки на него помечены «файл не создан» | — |
 
 Правило: числа тестов сначала измеряются гейтом, потом вписываются в документы.
-`test/` — локальное зеркало этих же файлов (в `.gitignore`).
+`test/` — компактный набор для внешнего AI-анализа (10 документов + подпапка
+`machine/`): 8 побайтовых зеркал правил и состояния, `ИНВЕНТАРЬ-ТЕСТОВ.md`
+(покрытие тестами) и `Для анализа.txt` (самодостаточный вход для аудита).
+Каталог в `.gitignore`, файлы — `git add -f`.
 
 Раскладка (этап 32, проверяется `npm run check:docs`): **правила** — только
 `AGENTS.md` и `docs/AGENTS-*.md`; **продуктовые идеи** — `docs/product-roadmap.md`;
