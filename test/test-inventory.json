@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-12T06:15:27.703Z",
+  "generated": "2026-10-12T06:42:04.776Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 51,
-    "tests": 660,
-    "passed": 660,
+    "files": 53,
+    "tests": 670,
+    "passed": 670,
     "failed": 0,
     "gate": {
       "files": 19,
       "tests": 450
     },
     "product": {
-      "files": 32,
-      "tests": 210
+      "files": 34,
+      "tests": 220
     },
     "perFile": [
       {
@@ -101,6 +101,10 @@
         "tests": 3
       },
       {
+        "file": "src/test/admin-features.test.tsx",
+        "tests": 2
+      },
+      {
         "file": "src/test/admin-users-merge.test.tsx",
         "tests": 3
       },
@@ -134,7 +138,7 @@
       },
       {
         "file": "src/test/feature-flags-context.test.tsx",
-        "tests": 3
+        "tests": 5
       },
       {
         "file": "src/test/flower-order-dialog.test.tsx",
@@ -201,6 +205,10 @@
         "tests": 3
       },
       {
+        "file": "src/test/rollout.test.ts",
+        "tests": 6
+      },
+      {
         "file": "src/test/sessions-section.test.tsx",
         "tests": 17
       },
@@ -224,8 +232,8 @@
   },
   "server": {
     "files": 69,
-    "tests": 946,
-    "passed": 946,
+    "tests": 951,
+    "passed": 951,
     "failed": 0,
     "gate": {
       "files": 5,
@@ -233,7 +241,7 @@
     },
     "product": {
       "files": 64,
-      "tests": 828
+      "tests": 833
     },
     "perFile": [
       {
@@ -278,7 +286,7 @@
       },
       {
         "file": "server/src/__tests__/admin.test.js",
-        "tests": 35
+        "tests": 40
       },
       {
         "file": "server/src/__tests__/affiliate.test.js",
@@ -605,7 +613,7 @@
     ]
   },
   "total": {
-    "files": 120,
-    "tests": 1606
+    "files": 122,
+    "tests": 1621
   }
 }

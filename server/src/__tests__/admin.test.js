@@ -176,6 +176,25 @@ describe('GET /api/admin/features', () => {
       .set('Authorization', `Bearer ${adminToken()}`)
     expect(res.status).toBe(200)
     expect(res.body.videoCalls).toBe(true)
+    expect(res.body.rolloutPercent).toBe(100)
+  })
+
+  it('rolloutPercent трактуется как 100, если колонки ещё нет (миграция не применена)', async () => {
+    pool.query.mockResolvedValue([[{ id: 1, video_calls_enabled: 1 }], []])
+    const res = await request(app)
+      .get('/api/admin/features')
+      .set('Authorization', `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body.rolloutPercent).toBe(100)
+  })
+
+  it('rolloutPercent отражает колонку rollout_percent', async () => {
+    pool.query.mockResolvedValue([[{ id: 1, rollout_percent: 30 }], []])
+    const res = await request(app)
+      .get('/api/admin/features')
+      .set('Authorization', `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body.rolloutPercent).toBe(30)
   })
 
   it('handles database error', async () => {
@@ -218,6 +237,49 @@ describe('PUT /api/admin/features', () => {
     const updateCall = pool.query.mock.calls.find(([sql]) => /profile_activity_enabled/.test(sql))
     expect(updateCall).toBeTruthy()
     expect(updateCall[1][9]).toBe(false)
+  })
+
+  it('пишет rollout_percent при rolloutPercent', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    const res = await request(app)
+      .put('/api/admin/features')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ rolloutPercent: 30 })
+    expect(res.status).toBe(200)
+    const updateCall = pool.query.mock.calls.find(([sql]) => /rollout_percent/.test(sql))
+    expect(updateCall).toBeTruthy()
+    expect(updateCall[1][10]).toBe(30)
+  })
+
+  it('без rolloutPercent пишет 100 (весь выкат)', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    const res = await request(app)
+      .put('/api/admin/features')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ videoCalls: true })
+    expect(res.status).toBe(200)
+    const updateCall = pool.query.mock.calls.find(([sql]) => /rollout_percent/.test(sql))
+    expect(updateCall[1][10]).toBe(100)
+  })
+
+  it('rolloutPercent 101/мусор → 400, а не 500 от TINYINT', async () => {
+    const res = await request(app)
+      .put('/api/admin/features')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ rolloutPercent: 101 })
+    expect(res.status).toBe(400)
+
+    const res2 = await request(app)
+      .put('/api/admin/features')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ rolloutPercent: 'abc' })
+    expect(res2.status).toBe(400)
+
+    const res3 = await request(app)
+      .put('/api/admin/features')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ rolloutPercent: -1 })
+    expect(res3.status).toBe(400)
   })
 })
 

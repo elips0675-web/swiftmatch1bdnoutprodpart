@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Save, RotateCcw, SlidersHorizontal, Loader2 } from 'lucide-react';
@@ -22,6 +23,8 @@ export default function FeatureFlagsPage() {
 
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
   const [savedFlags, setSavedFlags] = useState<FeatureFlag[]>([]);
+  const [rolloutPercent, setRolloutPercent] = useState(100);
+  const [savedRolloutPercent, setSavedRolloutPercent] = useState(100);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -33,7 +36,8 @@ export default function FeatureFlagsPage() {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (!res.ok) throw new Error('Failed to fetch');
-        const data: Record<string, boolean> = await res.json();
+        const data: Record<string, boolean | number> = await res.json();
+        const rolloutValue = typeof data.rolloutPercent === 'number' ? data.rolloutPercent : 100;
         const mapped: FeatureFlag[] = [
           { key: 'videoCalls', label: t('admin.features.video_calls'), description: t('admin.features.video_calls_desc'), enabled: data.videoCalls ?? true, affectedUsers: 12480 },
           { key: 'aiIcebreakers', label: t('admin.features.ai_icebreakers'), description: t('admin.features.ai_icebreakers_desc'), enabled: data.aiIcebreakers ?? true, affectedUsers: 12480 },
@@ -49,6 +53,8 @@ export default function FeatureFlagsPage() {
         ];
         setFlags(mapped);
         setSavedFlags(mapped);
+        setRolloutPercent(rolloutValue);
+        setSavedRolloutPercent(rolloutValue);
       } catch {
         toast.error(t('admin.error.load'));
       } finally {
@@ -62,13 +68,14 @@ export default function FeatureFlagsPage() {
     setFlags(prev => prev.map(f => f.key === key ? { ...f, enabled: !f.enabled } : f));
   };
 
-  const hasChanges = JSON.stringify(flags.map(f => ({ key: f.key, enabled: f.enabled }))) !== JSON.stringify(savedFlags.map(f => ({ key: f.key, enabled: f.enabled })));
+  const hasChanges = JSON.stringify(flags.map(f => ({ key: f.key, enabled: f.enabled }))) !== JSON.stringify(savedFlags.map(f => ({ key: f.key, enabled: f.enabled }))) || rolloutPercent !== savedRolloutPercent;
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const payload: Record<string, boolean> = {};
+      const payload: Record<string, boolean | number> = {};
       flags.forEach(f => { payload[f.key] = f.enabled; });
+      payload.rolloutPercent = rolloutPercent;
       const token = getToken();
       await fetch('/api/admin/features', {
         method: 'PUT',
@@ -76,6 +83,7 @@ export default function FeatureFlagsPage() {
         body: JSON.stringify(payload),
       });
       setSavedFlags([...flags]);
+      setSavedRolloutPercent(rolloutPercent);
       toast.success(t('admin.features.saved'));
     } catch {
       toast.error(t('admin.error.save'));
@@ -86,6 +94,7 @@ export default function FeatureFlagsPage() {
 
   const handleReset = () => {
     setFlags([...savedFlags]);
+    setRolloutPercent(savedRolloutPercent);
     toast.info(t('admin.features.reset'));
   };
 
@@ -102,12 +111,29 @@ export default function FeatureFlagsPage() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        <div className="flex items-center justify-between gap-4 p-4 rounded-2xl border bg-background">
+          <div className="space-y-1 flex-1">
+            <Label htmlFor="rolloutPercent" className="text-sm font-bold cursor-pointer">{t('admin.features.rollout')}</Label>
+            <p className="text-xs text-muted-foreground">{t('admin.features.rollout_desc')}</p>
+            <p className="text-xs text-muted-foreground">{rolloutPercent}% users</p>
+          </div>
+          <Input
+            data-testid="rollout-percent"
+            id="rolloutPercent"
+            type="number"
+            min={0}
+            max={100}
+            value={rolloutPercent}
+            onChange={e => setRolloutPercent(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+            className="w-24 text-right"
+          />
+        </div>
         {flags.map(flag => (
           <div key={flag.key} className="flex items-center justify-between gap-4 p-4 rounded-2xl border bg-background hover:bg-muted/5 transition-colors">
             <div className="space-y-1 flex-1">
               <div className="flex items-center gap-2">
                 <Label htmlFor={flag.key} className="text-sm font-bold cursor-pointer">{flag.label}</Label>
-                <Badge variant="outline" className="text-[9px]">{flag.affectedUsers.toLocaleString()} users</Badge>
+                <Badge variant="outline" className="text-[9px]">{Math.round(flag.affectedUsers * rolloutPercent / 100).toLocaleString()} users</Badge>
               </div>
               <p className="text-xs text-muted-foreground">{flag.description}</p>
             </div>

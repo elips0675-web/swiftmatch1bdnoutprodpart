@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import pool from '../../db.js'
 import logger from '../../logger.js'
+import { FieldError, intField } from '../../profile-fields.js'
 
 const router = Router()
 
@@ -23,6 +24,7 @@ router.get('/features', async (req, res) => {
         videoCalls: true, aiIcebreakers: true, aiCompatibility: true,
         groupsPage: true, contest: true, showAds: false, autosearch: true,
         hangouts: true, partnerOffers: false, profileActivity: true,
+        rolloutPercent: 100,
       })
     }
     res.json({
@@ -36,6 +38,7 @@ router.get('/features', async (req, res) => {
       hangouts: Boolean(row.hangouts_enabled),
       partnerOffers: Boolean(row.partner_offers_enabled),
       profileActivity: Boolean(row.profile_activity_enabled ?? true),
+      rolloutPercent: Number(row.rollout_percent ?? 100),
     })
   } catch (err) {
     logger.error('Features fetch error:', err)
@@ -57,28 +60,34 @@ router.get('/features', async (req, res) => {
 router.put('/features', async (req, res) => {
   try {
     const flags = req.body
-    const knownKeys = ['videoCalls', 'aiIcebreakers', 'aiCompatibility', 'groupsPage', 'contest', 'showAds', 'autosearch', 'hangouts', 'partnerOffers', 'profileActivity']
+    const knownKeys = ['videoCalls', 'aiIcebreakers', 'aiCompatibility', 'groupsPage', 'contest', 'showAds', 'autosearch', 'hangouts', 'partnerOffers', 'profileActivity', 'rolloutPercent']
     if (!flags || Object.keys(flags).length === 0 || !knownKeys.some(k => k in flags)) {
       return res.status(400).json({ message: 'At least one known flag key required' })
     }
+    const rolloutValue = (flags.rolloutPercent === undefined || flags.rolloutPercent === null || flags.rolloutPercent === '')
+      ? 100
+      : intField(flags.rolloutPercent, 'rolloutPercent', { min: 0, max: 100 })
     await pool.query(
       `UPDATE feature_flags SET
         video_calls_enabled = ?, ai_icebreakers_enabled = ?,
         ai_compatibility_enabled = ?, groups_page_enabled = ?,
         contest_enabled = ?, show_ads = ?, autosearch_enabled = ?,
         hangouts_enabled = ?, partner_offers_enabled = ?,
-        profile_activity_enabled = ?
+        profile_activity_enabled = ?, rollout_percent = ?
        WHERE id = 1`,
       [
         Boolean(flags.videoCalls), Boolean(flags.aiIcebreakers),
         Boolean(flags.aiCompatibility), Boolean(flags.groupsPage),
         Boolean(flags.contest), Boolean(flags.showAds), Boolean(flags.autosearch),
         Boolean(flags.hangouts), Boolean(flags.partnerOffers),
-        Boolean(flags.profileActivity),
+        Boolean(flags.profileActivity), rolloutValue,
       ],
     )
     res.json({ message: 'Feature flags updated' })
   } catch (err) {
+    if (err instanceof FieldError) {
+      return res.status(400).json({ message: err.message })
+    }
     logger.error('Features update error:', err)
     res.status(500).json({ message: 'Failed to update features' })
   }

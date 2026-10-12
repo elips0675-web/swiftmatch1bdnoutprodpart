@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useMemo, useEffect, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import { getToken } from '@/lib/token';
+import { getRolloutBucket, tokenUserId } from '@/lib/rollout';
 
 export interface FeatureFlags {
   videoCallsEnabled: boolean;
@@ -11,6 +12,7 @@ export interface FeatureFlags {
   hangoutsEnabled: boolean;
   partnerOffersEnabled: boolean;
   profileActivityEnabled: boolean;
+  rolloutEnabled: boolean;
 }
 
 const defaultFlags: FeatureFlags = {
@@ -22,6 +24,7 @@ const defaultFlags: FeatureFlags = {
   hangoutsEnabled: true,
   partnerOffersEnabled: false,
   profileActivityEnabled: true,
+  rolloutEnabled: true,
 };
 
 const mapApiFlags = (data: Record<string, boolean>): FeatureFlags => ({
@@ -33,7 +36,25 @@ const mapApiFlags = (data: Record<string, boolean>): FeatureFlags => ({
   hangoutsEnabled: data.hangouts ?? true,
   partnerOffersEnabled: data.partnerOffers ?? false,
   profileActivityEnabled: data.profileActivity ?? true,
+  rolloutEnabled: true,
 });
+
+const applyRollout = (data: Record<string, unknown>): FeatureFlags => {
+  const raw = mapApiFlags(data as Record<string, boolean>)
+  const rolloutPercent = typeof data.rolloutPercent === 'number' ? data.rolloutPercent : 100
+  const rolloutEnabled = rolloutPercent >= 100 || getRolloutBucket(tokenUserId()) < rolloutPercent
+  return {
+    videoCallsEnabled: raw.videoCallsEnabled && rolloutEnabled,
+    aiIcebreakersEnabled: raw.aiIcebreakersEnabled && rolloutEnabled,
+    aiCompatibilityEnabled: raw.aiCompatibilityEnabled && rolloutEnabled,
+    groupsPageEnabled: raw.groupsPageEnabled && rolloutEnabled,
+    showAdsEnabled: raw.showAdsEnabled && rolloutEnabled,
+    hangoutsEnabled: raw.hangoutsEnabled && rolloutEnabled,
+    partnerOffersEnabled: raw.partnerOffersEnabled && rolloutEnabled,
+    profileActivityEnabled: raw.profileActivityEnabled && rolloutEnabled,
+    rolloutEnabled,
+  }
+}
 
 const FeatureFlagsContext = createContext<FeatureFlags>(defaultFlags);
 
@@ -61,7 +82,7 @@ export const FeatureFlagsProvider: React.FC<{ children: React.ReactNode }> = ({ 
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
         .then(r => { if (!r.ok) throw new Error(); return r.json() })
-        .then(data => setFlags(mapApiFlags(data)))
+        .then(data => setFlags(applyRollout(data)))
         .catch(() => {})
     }
   }, [])
