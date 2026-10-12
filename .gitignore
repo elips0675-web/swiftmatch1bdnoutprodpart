@@ -53,3 +53,7 @@ test-results.json
 /test/
 
 *.tsbuildinfo
+
+# Redis RDB snapshot (может нести payload'ы очереди — не трекать)
+dump.rdb
+*.rdb
