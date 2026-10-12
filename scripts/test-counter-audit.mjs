@@ -372,6 +372,33 @@ const JOURNAL_TODO_COUNTERS = {
 const JOURNAL_DONE_CLAIMS = [JOURNAL_DONE_TOTAL]
 const JOURNAL_TODO_CLAIMS = [JOURNAL_TODO_COUNTERS]
 
+/**
+ * Шапка `test/Для анализа.txt` — самодостаточный вход для внешних AI-аудитов.
+ * До 12.10.2026 файл не трекался в git и не сверялся ни одним гейтом, поэтому
+ * числа в нём разъезжались с зеркалами `test/` молча. Слоты без `word`: текст
+ * пишет «152 в 19 спеках», а не «152 теста», а описание фронта идёт в скобках
+ * с двоеточием (`55 файлов: 229 в ...`), поэтому хвост скобки не проверяется.
+ */
+const ANALYZE_COUNTERS = {
+  id: 'analyze-counters',
+  suite: 'all',
+  re: /- Тесты \*\*(\d+)\/(\d+)\*\*: сервер (\d+)\/(\d+) \((\d+) файл[а-яё]*\), фронт (\d+)\/(\d+) \((\d+) файл[а-яё]*:[^)]*\), E2E (\d+) в (\d+) спек/m,
+  slots: [
+    slot('totalTests', 1),
+    slot('totalTests', 2),
+    slot('serverTests', 3),
+    slot('serverTests', 4),
+    slot('serverFiles', 5),
+    slot('frontTests', 6),
+    slot('frontTests', 7),
+    slot('frontFiles', 8),
+    slot('e2eTests', 9),
+    slot('e2eFiles', 10),
+  ],
+}
+
+const ANALYZE_CLAIMS = [ANALYZE_COUNTERS]
+
 const DOCS = new Map([
   ['README.md', README_CLAIMS],
   ['project-context.md', SNAPSHOT_CLAIMS],
@@ -380,6 +407,7 @@ const DOCS = new Map([
   ['test/ИНВЕНТАРЬ-ТЕСТОВ.md', INVENTORY_CLAIMS],
   ['Что сделано.txt', JOURNAL_DONE_CLAIMS],
   ['Что доделать.txt', JOURNAL_TODO_CLAIMS],
+  ['test/Для анализа.txt', ANALYZE_CLAIMS],
 ])
 
 const INVENTORY_FILE = 'test/ИНВЕНТАРЬ-ТЕСТОВ.md'
