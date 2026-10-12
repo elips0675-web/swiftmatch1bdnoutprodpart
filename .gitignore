@@ -15,6 +15,14 @@ dist-ssr
 .env.development
 .env.production
 
+# Lock-файлы: канон — package-lock.json (его читают `npm ci` в Dockerfile и CI).
+# Второй lock-файл рядом — вторая «истина» о зависимостях, расходится с npm молча;
+# `bun.lockb` лежал в репозитории и удалён 12.10.2026.
+bun.lockb
+bun.lock
+yarn.lock
+pnpm-lock.yaml
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
