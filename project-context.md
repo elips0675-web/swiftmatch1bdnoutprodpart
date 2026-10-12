@@ -295,7 +295,7 @@ UI: зелёный badge ≥80, жёлтый ≥50, красный <50; спис
 
 `server/src/metrics.js` использует prom-client: counters (http_requests_total, db_queries_total, ws_events_total) + histograms (http_request_duration_ms, db_query_duration_ms).
 
-## Актуальный статус (август 2026, этапы 27–52)
+## Срез на август 2026 (этапы 27–59) — исторический, не текущее состояние
 
 > Детали: «Что сделано.txt» (этапы 30–53), «Что доделать.txt», AGENTS.md (грабли #27–53).
 
