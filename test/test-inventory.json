@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-12T06:42:04.776Z",
+  "generated": "2026-10-12T07:17:48.076Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 53,
-    "tests": 670,
-    "passed": 670,
+    "files": 54,
+    "tests": 673,
+    "passed": 673,
     "failed": 0,
     "gate": {
       "files": 19,
       "tests": 450
     },
     "product": {
-      "files": 34,
-      "tests": 220
+      "files": 35,
+      "tests": 223
     },
     "perFile": [
       {
@@ -103,6 +103,10 @@
       {
         "file": "src/test/admin-features.test.tsx",
         "tests": 2
+      },
+      {
+        "file": "src/test/admin-health.test.tsx",
+        "tests": 3
       },
       {
         "file": "src/test/admin-users-merge.test.tsx",
@@ -231,17 +235,17 @@
     ]
   },
   "server": {
-    "files": 69,
-    "tests": 951,
-    "passed": 951,
+    "files": 70,
+    "tests": 959,
+    "passed": 959,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 118
     },
     "product": {
-      "files": 64,
-      "tests": 833
+      "files": 65,
+      "tests": 841
     },
     "perFile": [
       {
@@ -255,6 +259,10 @@
       {
         "file": "server/src/__tests__/admin-backup.test.js",
         "tests": 10
+      },
+      {
+        "file": "server/src/__tests__/admin-health.test.js",
+        "tests": 8
       },
       {
         "file": "server/src/__tests__/admin-impersonate.test.js",
@@ -613,7 +621,7 @@
     ]
   },
   "total": {
-    "files": 122,
-    "tests": 1621
+    "files": 124,
+    "tests": 1632
   }
 }

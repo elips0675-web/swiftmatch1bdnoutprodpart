@@ -1,5 +1,5 @@
 ===== Фронт (Vitest) =====
-670 тестов в 53 файлах (зелёных 670) (vitest --reporter=json)
+673 тестов в 54 файлах (зелёных 673) (vitest --reporter=json)
 
 # файл | тестов
 scripts/check-doc-mirrors.test.mjs | 10
@@ -24,6 +24,7 @@ scripts/test-counter-audit.test.mjs | 44
 src/hooks/__tests__/use-fcm-token.test.tsx | 3
 src/test/activity-list.test.tsx | 3
 src/test/admin-features.test.tsx | 2
+src/test/admin-health.test.tsx | 3
 src/test/admin-users-merge.test.tsx | 3
 src/test/admin-webhooks.test.tsx | 2
 src/test/api.test.ts | 5

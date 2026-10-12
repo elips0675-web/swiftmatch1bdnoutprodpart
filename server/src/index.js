@@ -23,7 +23,7 @@ import { initSentry, registerSentryErrorHandler } from './sentry.js'
 import { getRedis, disconnectRedis } from './redis.js'
 import { initQueues, closeQueues } from './queue.js'
 import { createGracefulShutdown } from './shutdown.js'
-import { healthHandler } from './health.js'
+import { healthHandler, liveHandler, readyHandler } from './health.js'
 
 import adminDashboard from './routes/admin/dashboard.js'
 import adminUsers from './routes/admin/users.js'
@@ -62,6 +62,7 @@ import adminBackup from './routes/admin/backup.js'
 import adminQueues from './routes/admin/queues.js'
 import adminLogs from './routes/admin/logs.js'
 import adminWebhooks from './routes/admin/webhooks.js'
+import adminHealth from './routes/admin/health.js'
 import notificationsRoutes from './routes/notifications.js'
 import { metricsMiddleware, metricsRoute } from './metrics.js'
 import { JWT_SECRET, verifyToken } from './middleware.js'
@@ -303,6 +304,7 @@ app.use('/api/admin', adminBackup)
 app.use('/api/admin', adminQueues)
 app.use('/api/admin', adminLogs)
 app.use('/api/admin', adminWebhooks)
+app.use('/api/admin', adminHealth)
 app.use(gdprRoutes)
 app.use(referralRoutes)
 app.use('/api/checkin', dateCheckinRoutes)
@@ -316,6 +318,8 @@ app.use(affiliateRoutes)
 app.use(notificationsRoutes)
 
 app.get('/health', healthHandler)
+app.get('/health/live', liveHandler)
+app.get('/health/ready', readyHandler)
 
 // Error middleware order matters: Sentry errorHandler must be registered
 // before the generic 500 handler above to catch route errors.

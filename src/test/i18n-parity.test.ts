@@ -39,6 +39,11 @@ const LATIN_ONLY_OK = [
   "settings.security.status",
   "sessions.ip",
   "verification.photo_placeholder",
+  "admin.health.mode.live",
+  "admin.health.mode.mock",
+  "admin.health.service.fcm",
+  "admin.health.service.redis",
+  "admin.health.service.stripe",
 ]
 
 const ENDONYMS_OK = ["app.lang.en", "app.lang.ru"]

@@ -53,6 +53,7 @@ function getPageTitle(pathname: string, t: (k: string) => string): string {
     "/admin/monetization": t('nav.admin_monetization'),
     "/admin/reports": t('nav.admin_reports'),
     "/admin/webhooks": t('admin.webhooks'),
+    "/admin/health": t('admin.health'),
   };
   if (titles[pathname]) return titles[pathname];
   if (pathname.startsWith("/chats/")) return t('nav.chat');
