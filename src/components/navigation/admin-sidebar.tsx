@@ -7,7 +7,7 @@ import {
   SidebarContent,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, Users, Flag, Chrome as Home, Shield, LogOut, ChevronsLeft, ChevronsRight, SlidersHorizontal, DollarSign, Package, Mail, Image, ChartBar as BarChart3, Languages, Check, FlaskConical, CalendarDays, Handshake, DatabaseBackup, Webhook, Activity } from 'lucide-react';
+import { LayoutDashboard, Users, Flag, Chrome as Home, Shield, LogOut, ChevronsLeft, ChevronsRight, SlidersHorizontal, DollarSign, Package, Mail, Image, ChartBar as BarChart3, Languages, Check, FlaskConical, CalendarDays, Handshake, DatabaseBackup, Webhook, Activity, Layers } from 'lucide-react';
 import { NavLink, useLocation, Link } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -35,6 +35,7 @@ export function AdminSidebar() {
     { title: t('admin.backup'), path: '/admin/backup', icon: DatabaseBackup },
     { title: t('admin.webhooks'), path: '/admin/webhooks', icon: Webhook },
     { title: t('admin.health'), path: '/admin/health', icon: Activity },
+    { title: t('admin.queues'), path: '/admin/queues', icon: Layers },
   ];
 
   const isActive = (path: string, exact?: boolean) => exact ? pathname === path : pathname === path;

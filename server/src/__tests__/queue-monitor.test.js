@@ -6,7 +6,7 @@ vi.mock('../logger.js', () => ({
   rootLogger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }))
 
-import { QUEUE_NAMES, resolveQueues, queueStats, retryFailed } from '../queue-monitor.js'
+import { QUEUE_NAMES, resolveQueues, queueStats, retryFailed, redisConfigured } from '../queue-monitor.js'
 
 function fakeQueue({ counts = { waiting: 0, active: 0, completed: 0, failed: 0 }, failed = [] } = {}) {
   return {
@@ -52,14 +52,27 @@ describe('queue-monitor (N6)', () => {
     expect(stats).toEqual([
       {
         name: 'email',
+        enabled: true,
         counts: { waiting: 2, failed: 1 },
         failed: [{ id: '1', name: 'send-email', attemptsMade: 3, failedReason: 'SMTP timeout', data: { to: 'a@b.c' } }],
       },
+      { name: 'push', enabled: false, counts: null, failed: [] },
+      { name: 'image', enabled: false, counts: null, failed: [] },
     ])
   })
 
-  it('queueStats без активных очередей возвращает пусто (Redis недоступен)', async () => {
-    expect(await queueStats({ emailQueue: null })).toEqual([])
+  it('queueStats показывает отключённые очереди (Redis недоступен), а не пустой список', async () => {
+    expect(await queueStats({ emailQueue: null })).toEqual([
+      { name: 'email', enabled: false, counts: null, failed: [] },
+      { name: 'push', enabled: false, counts: null, failed: [] },
+      { name: 'image', enabled: false, counts: null, failed: [] },
+    ])
+  })
+
+  it('redisConfigured сообщает, задан ли REDIS_URL', () => {
+    expect(redisConfigured({ redisConfigured: true })).toBe(true)
+    expect(redisConfigured({})).toBe(false)
+    expect(redisConfigured()).toBe(false)
   })
 
   it('retryFailed повторяет каждую упавшую джобу', async () => {

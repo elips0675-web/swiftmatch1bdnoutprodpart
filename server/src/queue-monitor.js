@@ -22,13 +22,23 @@ function serializeFailed(job) {
 }
 
 export async function queueStats(source = live) {
+  const active = new Map(resolveQueues(source).map((entry) => [entry.name, entry.queue]))
   const stats = []
-  for (const { name, queue } of resolveQueues(source)) {
+  for (const name of QUEUE_NAMES) {
+    const queue = active.get(name)
+    if (!queue) {
+      stats.push({ name, enabled: false, counts: null, failed: [] })
+      continue
+    }
     const counts = await queue.getJobCounts()
     const failed = await queue.getFailed(0, FAILED_PAGE - 1)
-    stats.push({ name, counts, failed: failed.map(serializeFailed) })
+    stats.push({ name, enabled: true, counts, failed: failed.map(serializeFailed) })
   }
   return stats
+}
+
+export function redisConfigured(source = live) {
+  return Boolean(source.redisConfigured)
 }
 
 export async function retryFailed(name, source = live) {

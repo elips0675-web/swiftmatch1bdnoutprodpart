@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   queueNames: vi.fn(() => ['email', 'push', 'image']),
   queueStats: vi.fn(),
   retryFailed: vi.fn(),
+  redisConfigured: vi.fn(() => false),
 }))
 
 vi.mock('../queue-monitor.js', () => mocks)
@@ -29,11 +30,30 @@ describe('N6: GET /api/admin/queues', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('отдаёт статистику очередей', async () => {
-    mocks.queueStats.mockResolvedValue([{ name: 'email', counts: { failed: 1 }, failed: [] }])
+    mocks.queueStats.mockResolvedValue([
+      { name: 'email', enabled: true, counts: { failed: 1 }, failed: [] },
+      { name: 'push', enabled: false, counts: null, failed: [] },
+    ])
+    mocks.redisConfigured.mockReturnValue(true)
     const res = await request(createApp()).get('/api/admin/queues')
     expect(res.status).toBe(200)
-    expect(res.body.queues).toHaveLength(1)
+    expect(res.body.queues).toHaveLength(2)
     expect(res.body.available).toEqual(['email'])
+    expect(res.body.redisConfigured).toBe(true)
+  })
+
+  it('показывает отключённые очереди, когда Redis недоступен (P2 #19)', async () => {
+    mocks.queueStats.mockResolvedValue([
+      { name: 'email', enabled: false, counts: null, failed: [] },
+      { name: 'push', enabled: false, counts: null, failed: [] },
+      { name: 'image', enabled: false, counts: null, failed: [] },
+    ])
+    mocks.redisConfigured.mockReturnValue(false)
+    const res = await request(createApp()).get('/api/admin/queues')
+    expect(res.status).toBe(200)
+    expect(res.body.queues.map((q) => q.enabled)).toEqual([false, false, false])
+    expect(res.body.available).toEqual([])
+    expect(res.body.redisConfigured).toBe(false)
   })
 
   it('ошибка статистики — 500, а не падение', async () => {

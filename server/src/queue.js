@@ -11,6 +11,8 @@ export let emailQueue = null
 export let pushQueue = null
 export let imageQueue = null
 
+export const redisConfigured = Boolean(REDIS_URL)
+
 const queues = []
 
 function createQueue(name) {

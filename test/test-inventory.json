@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-12T07:17:48.076Z",
+  "generated": "2026-10-12T07:29:23.037Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 54,
-    "tests": 673,
-    "passed": 673,
+    "files": 55,
+    "tests": 677,
+    "passed": 677,
     "failed": 0,
     "gate": {
       "files": 19,
       "tests": 450
     },
     "product": {
-      "files": 35,
-      "tests": 223
+      "files": 36,
+      "tests": 227
     },
     "perFile": [
       {
@@ -107,6 +107,10 @@
       {
         "file": "src/test/admin-health.test.tsx",
         "tests": 3
+      },
+      {
+        "file": "src/test/admin-queues.test.tsx",
+        "tests": 4
       },
       {
         "file": "src/test/admin-users-merge.test.tsx",
@@ -236,8 +240,8 @@
   },
   "server": {
     "files": 70,
-    "tests": 959,
-    "passed": 959,
+    "tests": 961,
+    "passed": 961,
     "failed": 0,
     "gate": {
       "files": 5,
@@ -245,7 +249,7 @@
     },
     "product": {
       "files": 65,
-      "tests": 841
+      "tests": 843
     },
     "perFile": [
       {
@@ -278,7 +282,7 @@
       },
       {
         "file": "server/src/__tests__/admin-queues.test.js",
-        "tests": 6
+        "tests": 7
       },
       {
         "file": "server/src/__tests__/admin-users-ban.test.js",
@@ -462,7 +466,7 @@
       },
       {
         "file": "server/src/__tests__/queue-monitor.test.js",
-        "tests": 7
+        "tests": 8
       },
       {
         "file": "server/src/__tests__/race.mysql.test.js",
@@ -621,7 +625,7 @@
     ]
   },
   "total": {
-    "files": 124,
-    "tests": 1632
+    "files": 125,
+    "tests": 1638
   }
 }

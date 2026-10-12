@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import logger from '../../logger.js'
-import { queueNames, queueStats, retryFailed } from '../../queue-monitor.js'
+import { queueNames, queueStats, retryFailed, redisConfigured } from '../../queue-monitor.js'
 
 const router = Router()
 
@@ -18,7 +18,11 @@ const router = Router()
 router.get('/queues', async (req, res) => {
   try {
     const queues = await queueStats()
-    res.json({ queues, available: queues.map((q) => q.name) })
+    res.json({
+      queues,
+      available: queues.filter((queue) => queue.enabled).map((queue) => queue.name),
+      redisConfigured: redisConfigured(),
+    })
   } catch (err) {
     logger.error('Queue stats error:', err)
     res.status(500).json({ message: 'Failed to fetch queue stats' })
