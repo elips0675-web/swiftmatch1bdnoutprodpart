@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, waitFor, fireEvent, act } from "@testing-library/react"
 import React from "react"
+import fs from "fs"
+import path from "path"
 import { MemoryRouter } from "react-router-dom"
 import { __resetFeedCache } from "@/pages/hangouts"
 
@@ -809,6 +811,41 @@ describe("HangoutsPage", () => {
 
     await waitFor(() => expect(screen.getByTestId("hangout-card-1")).toBeTruthy())
     expect(screen.queryByTestId("hangout-offer-embed-1")).toBeNull()
+  })
+
+  // P2 #22 (virtual scroll): лента пагинирована — при выдаче 1000+ встреч в DOM
+  // живёт ровно одна страница, а не весь результат. «Оконный рендер» отложен
+  // движку: каждая карточка обязана нести класс .hangout-virt.
+  it("keeps the DOM bounded to one page when the feed has 1000+ hangouts (P2 #22)", async () => {
+    const baseItem = sampleHangouts[0]
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url)
+      if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers: [] }) })
+      const page = Number(new URLSearchParams(u.split("?")[1] || "").get("page") || 1)
+      const items = Array.from({ length: 20 }, (_, i) => ({ ...baseItem, id: (page - 1) * 100 + (i + 1) }))
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ items, total: 1200 }) })
+    })
+    const HangoutsPage = (await import("@/pages/hangouts")).default
+    const { container } = renderPage(<HangoutsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hangout-page-counter").textContent).toContain("1 / 60")
+    })
+
+    const cards = container.querySelectorAll('[data-testid^="hangout-card-"]')
+    expect(cards.length).toBe(20)
+    expect(cards.length).toBeLessThan(1200)
+    cards.forEach((card) => expect((card as HTMLElement).className).toContain("hangout-virt"))
+  })
+
+  // Механизм отложенного layout — это CSS, а не срезание DOM: если правило
+  // .hangout-virt исчезнет, виртуализация молча выключится (этап 101).
+  it("keeps the .hangout-virt content-visibility rule (P2 #22)", () => {
+    const css = fs.readFileSync(path.resolve(__dirname, "../index.css"), "utf8")
+    const rule = css.match(/\.hangout-virt\s*\{[^}]*\}/)
+    expect(rule).toBeTruthy()
+    expect(rule![0]).toContain("content-visibility: auto")
+    expect(rule![0]).toContain("contain-intrinsic-size")
   })
 })
 

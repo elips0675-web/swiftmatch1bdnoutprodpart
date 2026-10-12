@@ -336,6 +336,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Сервис `app` объявляет `env_file: - .env` (docker-compose.yml:83-84), а
+      # `.env` в git нет — на свежем checkout `docker compose config` падает
+      # (`env file …/.env not found`) ещё до сборки образов. Bootstrap как в
+      # deploy-джобе (:498): шаблон → рабочий `.env`.
+      - name: Prepare root .env (compose env_file)
+        run: test -f .env || cp .env.example .env
       - name: Validate docker-compose.yml
         run: docker compose config --quiet
       # Раньше здесь был `docker build ... | tail -5`: в GH Actions шаг идёт через

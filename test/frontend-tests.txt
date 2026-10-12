@@ -1,5 +1,5 @@
 ===== Фронт (Vitest) =====
-677 тестов в 55 файлах (зелёных 677) (vitest --reporter=json)
+679 тестов в 55 файлах (зелёных 679) (vitest --reporter=json)
 
 # файл | тестов
 scripts/check-doc-mirrors.test.mjs | 10
@@ -39,7 +39,7 @@ src/test/flower-order-dialog.test.tsx | 4
 src/test/hangout-create.test.tsx | 3
 src/test/hangout-detail.test.tsx | 2
 src/test/hangout-edit.test.tsx | 4
-src/test/hangouts.test.tsx | 33
+src/test/hangouts.test.tsx | 35
 src/test/home-hangouts.test.tsx | 2
 src/test/i18n-parity.test.ts | 11
 src/test/impersonation-banner.test.tsx | 2
