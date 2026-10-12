@@ -387,6 +387,29 @@ describe('wait-for-url', () => {
     expect(args).toEqual({ url: 'http://x/health', timeoutMs: 5000, intervalMs: 100, status: 200 })
   })
 
+  it('читает флаги и через пробел — так они записаны в workflow', () => {
+    const args = parseArgs(['http://x/health', '--status', '200', '--timeout', '120000'])
+    expect(args).toEqual({ url: 'http://x/health', timeoutMs: 120000, intervalMs: 250, status: 200 })
+  })
+
+  it('разбирает реальные вызовы из обоих workflow в верный url, код и таймаут', () => {
+    for (const file of ['.github/workflows/ci.yml', '.github/workflows/deploy.yml']) {
+      const text = fs.readFileSync(path.join(process.cwd(), file), 'utf8')
+      const calls = [...text.matchAll(/node scripts\/wait-for-url\.mjs ([^\n]+)/g)].map((m) => m[1].trim())
+      expect(calls.length).toBeGreaterThan(0)
+      for (const call of calls) {
+        const args = parseArgs(call.split(/\s+/))
+        expect({ call, ...args }).toEqual({
+          call,
+          url: expect.stringMatching(/^http:\/\/127\.0\.0\.1:\d+(\/\S*)?$/),
+          timeoutMs: 120000,
+          intervalMs: 250,
+          status: call.includes('/health') ? 200 : null,
+        })
+      }
+    }
+  })
+
   it('возвращается, как только сервис ответил', async () => {
     let calls = 0
     const fetchImpl = async () => {

@@ -154,8 +154,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: server/package-lock.json
-      - run: npm ci
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+      - name: Install root deps (database/scripts use mysql2)
+        run: npm ci
+      - name: Install server deps
+        run: npm ci
         working-directory: server
       - name: Init test DB schema
         run: mysql -h127.0.0.1 -uroot -pswiftmatch_test swiftmatch_test < database/mysql_schema.sql
@@ -217,9 +222,32 @@ jobs:
   # project-context и test/ИНВЕНТАРЬ-ТЕСТОВ.md хранят числа, и они устаревают
   # каждый раз, когда добавлен тест. Отдельная джоба (нужны root и server
   # node_modules), в needs деплоя — иначе расхождение всплывёт уже на VPS.
+  # Окружение обязано совпадать с тем, в котором снят test/test-inventory.json:
+  # `passed` сверяет pushSuiteDiff, а без сервиса mysql молча пропускаются 6
+  # тестов race.mysql.test.js, без живого API на 3002 — ещё 7 тестов
+  # security.headers.test.js (describe.skipIf(!serverUp)), и прогон даёт 972/973
+  # против 979 в инвентаре.
   test-counters:
     name: Test counters vs docs
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: swiftmatch_test
+          MYSQL_DATABASE: swiftmatch_test
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+        ports:
+          - 3306:3306
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASSWORD: swiftmatch_test
+      DB_NAME: swiftmatch_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -231,7 +259,16 @@ jobs:
             server/package-lock.json
       - run: npm ci
       - run: npm ci --prefix server
+      - name: Start server (живой API для теста заголовков)
+        run: |
+          PORT=3002 JWT_SECRET=ci-counters-jwt-secret node server/src/index.js &
+          echo "SERVER_PID=$!" >> $GITHUB_ENV
+      - name: Wait for API
+        run: node scripts/wait-for-url.mjs http://127.0.0.1:3002/health --status 200 --timeout 120000
       - run: node scripts/test-counter-audit.mjs
+      - name: Stop server
+        if: always()
+        run: kill $SERVER_PID 2>/dev/null || true
 
   e2e-test:
     name: E2E Tests (Playwright)
@@ -334,6 +371,14 @@ jobs:
   docker-config-check:
     name: Docker Compose Config Validation
     runs-on: ubuntu-latest
+    env:
+      # Дефолтный timeout Trivy — 5m0s, и часть его уходит на загрузку базы
+      # уязвимостей: action кэширует её по дате (cache-trivy-<дата>), то есть раз
+      # в сутки 127 МБ качаются заново. Локальный замер: 4 м 34 с при ~1.2 MB/s,
+      # после чего скан падал с «context deadline exceeded». Переменную читает
+      # сам Trivy; вход `timeout` у action пуст, поэтому значение не перетирается
+      # и действует на все шаги сканирования в этой джобе.
+      TRIVY_TIMEOUT: 15m0s
     steps:
       - uses: actions/checkout@v4
       # Сервис `app` объявляет `env_file: - .env` (docker-compose.yml:83-84), а

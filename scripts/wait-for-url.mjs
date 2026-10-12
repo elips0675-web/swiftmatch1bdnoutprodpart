@@ -22,13 +22,31 @@
 const DEFAULT_TIMEOUT_MS = 60000
 const DEFAULT_INTERVAL_MS = 250
 
+// Значение флага читается и из `--status=200`, и из `--status 200`: в workflow
+// вызовы записаны через пробел, а разбор только через «=» оставлял `200` и
+// `120000` без флага — они попадали в `url`, и шаг опрашивал «120000»
+// («Failed to parse URL from 120000») уже после того, как сервис поднялся.
 export function parseArgs(argv) {
   const args = { url: '', timeoutMs: DEFAULT_TIMEOUT_MS, intervalMs: DEFAULT_INTERVAL_MS, status: null }
-  for (const arg of argv) {
-    if (arg.startsWith('--timeout=')) args.timeoutMs = Number(arg.slice('--timeout='.length))
-    else if (arg.startsWith('--interval=')) args.intervalMs = Number(arg.slice('--interval='.length))
-    else if (arg.startsWith('--status=')) args.status = Number(arg.slice('--status='.length))
-    else if (!arg.startsWith('--')) args.url = arg
+  const setValue = {
+    '--timeout': (v) => { args.timeoutMs = Number(v) },
+    '--interval': (v) => { args.intervalMs = Number(v) },
+    '--status': (v) => { args.status = Number(v) },
+  }
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i]
+    const eq = arg.indexOf('=')
+    const set = setValue[eq === -1 ? arg : arg.slice(0, eq)]
+    if (!set) {
+      if (!arg.startsWith('--')) args.url = arg
+      continue
+    }
+    let value = eq === -1 ? null : arg.slice(eq + 1)
+    if (value === null && i + 1 < argv.length && !argv[i + 1].startsWith('--')) {
+      value = argv[i + 1]
+      i += 1
+    }
+    if (value !== null) set(value)
   }
   return args
 }

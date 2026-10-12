@@ -9,10 +9,15 @@ FROM node:22-alpine AS server
 RUN apk add --no-cache curl
 WORKDIR /app
 COPY server/package*.json ./server/
-RUN cd server && npm ci --omit=dev
+# Кэш npm чистится в том же слое, что и установка: `npm ci` пишет
+# /root/.npm/_cacache (в образе это +72 МБ: 196.9 → 124.3 МБ) и /root/.npm/_logs,
+# а Trivy обходит слои образа — отдельный `RUN rm` оставил бы файлы в нижнем
+# слое, и скан уязвимостей падал именно на них
+# («failed to analyze root/.npm/_cacache/…: context deadline exceeded»).
+RUN cd server && npm ci --omit=dev && rm -rf /root/.npm
 # database/migrations/migrate.js резолвит mysql2 вверх от корня /app (Workdir),
 # а npm ci шёл в server/ — ставим mysql2 отдельно в /app (без package.json, --no-save).
-RUN npm install --no-save --omit=dev mysql2@^3.11.0
+RUN npm install --no-save --omit=dev mysql2@^3.11.0 && rm -rf /root/.npm
 COPY server/ ./server/
 COPY --from=frontend /app/dist ./dist
 COPY database/ ./database/

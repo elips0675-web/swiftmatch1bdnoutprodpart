@@ -69,7 +69,7 @@ jobs:
       - run: npm ci
       - run: npm ci --prefix server
       - name: Init DB schema
-        run: mysql -h 127.0.0.1 -uroot -pswiftmatch_test < database/mysql_schema.sql
+        run: mysql -h127.0.0.1 -uroot -pswiftmatch_test swiftmatch_test < database/mysql_schema.sql
       - run: node scripts/seed-migrations.mjs
       - run: node database/migrations/migrate.js
       # Без сида демо-данных global-setup не сможет залогиниться за
@@ -220,9 +220,33 @@ jobs:
   # измеренные числа с README / project-context / test/ИНВЕНТАРЬ-ТЕСТОВ.md и
   # падает на расхождении. Нужен отдельный job: `lint-and-typecheck`-подобные
   # джобы делают только root `npm ci`, а без `server/node_modules` измерить
-  # серверные тесты нечем. E2E считается статически (--list), БД не нужна.
+  # серверные тесты нечем. E2E считается статически (--list). Окружение обязано
+  # совпадать с тем, в котором снят test/test-inventory.json: `passed` сверяет
+  # pushSuiteDiff, а без сервиса mysql молча пропускаются 6 тестов
+  # race.mysql.test.js, без живого API на 3002 — ещё 7 тестов
+  # security.headers.test.js (describe.skipIf(!serverUp)), и прогон даёт 972/973
+  # против 979 в инвентаре. Сервис mysql и живой сервер ниже — тот же паттерн,
+  # что в джобе e2e-test.
   test-counters:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: swiftmatch_test
+          MYSQL_DATABASE: swiftmatch_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASSWORD: swiftmatch_test
+      DB_NAME: swiftmatch_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -230,7 +254,16 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm ci --prefix server
+      - name: Start server (живой API для теста заголовков)
+        run: |
+          PORT=3002 JWT_SECRET=ci-counters-jwt-secret node server/src/index.js &
+          echo "SERVER_PID=$!" >> $GITHUB_ENV
+      - name: Wait for API
+        run: node scripts/wait-for-url.mjs http://127.0.0.1:3002/health --status 200 --timeout 120000
       - run: node scripts/test-counter-audit.mjs
+      - name: Stop server
+        if: always()
+        run: kill $SERVER_PID 2>/dev/null || true
 
   # Данные на диске переживают пересоздание контейнера (этап 21, P0 #37).
   # `docker compose up -d --build` пересоздаёт контейнер, и всё, что не

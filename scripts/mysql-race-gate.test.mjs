@@ -18,6 +18,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { getJobSection } from "./e2e-gate-audit.mjs";
 import { audit, auditRaceTestSource, auditTestServerJob } from "./mysql-race-gate.mjs";
 
 /** Минимальная джоба `test-server` требуемого вида — все куски опциональны. */
@@ -88,7 +89,12 @@ describe("mysql-race-gate: настоящий репозиторий", () => {
       path.join(process.cwd(), "server/src/__tests__/race.mysql.test.js"),
       "utf8",
     );
-    expect(auditTestServerJob(ci.slice(ci.indexOf("  test-server:")))).toEqual([]);
+    // Секция берётся тем же экстрактором, что и в гейте. Прежний
+    // `ci.slice(ci.indexOf("  test-server:"))` уходил до конца файла, и `|| true`
+    // из любой более поздней джобы (`kill $SERVER_PID 2>/dev/null || true` в
+    // `test-counters`) давал ложную находку «джоба зеленеет при провале» на
+    // чужом шаге — тест падал на верном `ci.yml`.
+    expect(auditTestServerJob(getJobSection(ci, "test-server"))).toEqual([]);
     expect(auditRaceTestSource(test)).toEqual([]);
   });
 });
