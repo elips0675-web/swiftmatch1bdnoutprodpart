@@ -154,7 +154,7 @@ Drag-and-drop календаря (опционально, skip) — если с�
 Стек проекта:
 - Frontend: React 18 + TypeScript + Vite + Tailwind CSS 3 + shadcn/ui + TanStack Query
 - Backend: Express 4 + mysql2 (MySQL 8) + Socket.io + Bull/ioredis
-- Роутинг: React Router 6 через шим `@/shims/next-navigation` (useRouter, usePathname, useParams)
+- Роутинг: React Router 7 через шим `@/shims/next-navigation` (useRouter, usePathname, useParams)
 - i18n: собственный контекст src/context/language-context.tsx, доступ через t()
 
 Требования к коду:

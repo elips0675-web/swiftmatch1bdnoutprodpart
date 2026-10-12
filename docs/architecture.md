@@ -142,7 +142,7 @@ swiftmatch1bddomadm/
 │   │   ├── ui/                   # shadcn/ui primitives (через CLI)
 │   │   ├── layout/               # Header, AppShell, BottomNav
 │   │   ├── shared/               # ErrorBoundary, AdminGuard, PremiumGuard
-│   │   └── forms/                # RHF + Zod формы
+│   │   └── forms/                # RHF формы
 │   ├── pages/
 │   │   ├── admin/                # Админка (8 страниц)
 │   │   └── *.tsx                 # User-facing страницы

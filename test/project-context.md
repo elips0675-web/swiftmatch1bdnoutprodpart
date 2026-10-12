@@ -8,7 +8,7 @@
 | Vite | 8 | ESM, HMR, proxy `/api→localhost:3002` |
 | TypeScript | 5 | strict mode |
 | Tailwind CSS | 3 | `tailwind.config.ts` + `tailwindcss-animate` |
-| React Router | 6 | `react-router-dom` |
+| React Router | 7 | `react-router-dom` |
 | TanStack Query | 5 | `@tanstack/react-query` |
 | React Hook Form | 7 | только `src/components/ui/form.tsx`; валидации на `zod` нет — пакет удалён 04.10.2026 (этап 31) как мёртвая зависимость |
 | Framer Motion | 12 | анимации |
@@ -83,7 +83,7 @@ import { cn } from "@/lib/utils"
 
 - **Серверное состояние**: TanStack Query (React Query v5)
 - **Клиентское состояние**: React Context (custom `LanguageContext`, `FeatureFlagsProvider`)
-- **Формы**: React Hook Form + Zod
+- **Формы**: React Hook Form (без `zod` — удалён 04.10.2026, этап 31)
 - **Локальное**: `useState`, `useReducer`
 
 ## Routing
@@ -279,12 +279,11 @@ UI: зелёный badge ≥80, жёлтый ≥50, красный <50; спис
 
 ## CI/CD Pipeline
 
-`.github/workflows/deploy.yml`:
-1. **lint** — eslint + prettier check
-2. **frontend test** — `npx vitest run` (81 tests)
-3. **server test** — `cd server && npm test` с MySQL-сервисом (299 tests)
-4. **E2E** — `npx playwright test` с webServer (55 tests)
-5. **deploy** — SCP + pm2 на продакшен (только main)
+Два GitHub Actions workflow, оба на Node 22; актуальный список джоб — в `README.md` (раздел CI/CD).
+
+- `.github/workflows/ci.yml` — на любой push и PR: линт фронта и сервера, фронт- и сервер-тесты, обязательный E2E (MySQL-сервис → схема → миграции → сид → API 3002 + `vite preview` 8081) и отдельные джобы-гейты (раскладка документации, схема, секреты, ENUM, заголовки, аудит зависимостей и т.д.).
+- `.github/workflows/deploy.yml` — push в `main`/`develop`, PR в `main`: блокирующая джоба `lint-and-typecheck` (все гейты), затем `frontend-test`, `server-test` на живой MySQL, `test-counters`, `e2e-test` и `docker-config-check`.
+- **Деплой (только `main`)** — Docker: rsync файлов → `docker compose up -d --build` → `migrate.js` → `schema-validate.mjs`. Не pm2 и не SCP-only.
 
 ## Monitoring
 
@@ -332,8 +331,8 @@ UI: зелёный badge ≥80, жёлтый ≥50, красный <50; спис
 
 > ⚠️ Лог выше обрывается на этапе 59 и счётчиках 388/388 — это состояние на конец первой серии этапов.
 > **Дальше** история идёт в `Что сделано.txt` (секции «Этап 15…18», нумерация отдельная) и в
-> `Что доделать.txt`. Актуальный срез на 12.10.2026: **1660/1660** тестов
-> (сервер 979/979 в 70 файлах, фронт 681/681 в 55 файле), E2E 19 спеков / 152 `test()`
+> `Что доделать.txt`. Актуальный срез на 12.10.2026: **1667/1667** тестов
+> (сервер 979/979 в 70 файлах, фронт 688/688 в 55 файле), E2E 19 спеков / 152 `test()`
 > (живой прогон выполнен на этапе 30 — см. ниже), `npm audit --omit=dev`: 0 high / 0 critical.
 >
 > **Этапы 20–24 (сентябрь 2026, отдельная серия) — то, что появилось позже этого среза:**

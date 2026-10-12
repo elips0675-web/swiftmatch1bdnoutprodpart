@@ -28,9 +28,9 @@ Supabase), с портами 3002/8081, чтобы не мешать основ�
 | Язык | TypeScript (strict, без `any`) | 5.9.3 |
 | Стили | Tailwind CSS + shadcn/ui (Radix UI) | 3.4.19 |
 | Серверное состояние | TanStack Query | 5.101.0 |
-| Роутинг | react-router-dom | 6.30.4 |
+| Роутинг | react-router-dom | 7.18.4 |
 | Real-time | socket.io-client | 4.8.4 |
-| Формы | React Hook Form + resolvers | 7.78.0 |
+| Формы | React Hook Form | 7.78.0 |
 | Анимации | framer-motion | 12.40.0 |
 | Графики | recharts | 3.8.1 |
 | Мониторинг | @sentry/react | 9.14.0 |
@@ -161,7 +161,7 @@ cd server && npm test            # серверные тесты
 | Мохибейк | `node scripts/scan-mojibake.mjs` | сломанная кодировка в текстах (локально, в CI не подключён) |
 | Обязательность E2E | `npm run check:e2e` | джобы `e2e` в `ci.yml` нет / у неё `continue-on-error` или `if:` / триггер ограничен ветками / `deploy` не зависит от `e2e-test`; рецепт без сида демо-данных, без миграций, без `vite preview --strictPort`, с `sleep` вместо `wait-for-url.mjs`, без `upload-artifact`, без независимой очистки E2E-данных (`node scripts/e2e-cleanup.mjs` с `if: always()`); команды Playwright в двух workflow разошлись |
 | Целостность зависимостей | `npm run check:deps` | необъявленный импорт (в т.ч. `import()`) или мёртвая runtime-зависимость в `package.json` |
-| Раскладка документации | `npm run check:docs` | `Промты.txt` снова стал источником правил (шапка пропала, вернулись разделы 0–20 или 21–34); битая ссылка в таблице канона; `docs/product-roadmap.md` потерял один из 14 разделов идей, похудел или набрал чужих правил; запрещённые формулировки (правила `admin-auth-passive` и `zod-version-claim`, буквальные примеры — в `hint` гейта) в отслеживаемых `.md`/`.txt`; архив `context.txt` без пометки «ИСТОРИЧЕСКИЙ СРЕЗ», без даты среза и без ссылки на канон; гейт не вызывается из `ci.yml`/`deploy.yml`, джоба переименована или помечена `continue-on-error`/`if: false` |
+| Раскладка документации | `npm run check:docs` | `Промты.txt` снова стал источником правил (шапка пропала, вернулись разделы 0–20 или 21–34); битая ссылка в таблице канона; `docs/product-roadmap.md` потерял один из 14 разделов идей, похудел или набрал чужих правил; запрещённые формулировки (правила `admin-auth-passive` и `zod-version-claim`, буквальные примеры — в `hint` гейта) в отслеживаемых `.md`/`.txt`; версия пакета в стековой таблице (`README.md`, `project-context.md`, `docs/AGENTS-system-prompt.md`, `docs/AGENTS-workflow.md`) не совпала с `package.json` или ряд стека пропал; в каноне снова написано «React Hook Form + Zod», хотя `zod` удалён 04.10.2026; архив `context.txt` без пометки «ИСТОРИЧЕСКИЙ СРЕЗ», без даты среза и без ссылки на канон; гейт не вызывается из `ci.yml`/`deploy.yml`, джоба переименована или помечена `continue-on-error`/`if: false` |
 | SQL внутри цикла | `npm run check:n-plus-one` | `pool.query`/`conn.execute` в теле цикла по коллекции → 51 запрос вместо 2 (рассылка уведомлений об отмене встречи делала по два запроса на участника, профиль — по INSERT на интерес); **протухшее оправдание** из `JUSTIFIED` (номер строки разошёлся с кодом, якорь `expect` не найден); оправдание без якоря; гейт не вызван из `ci.yml`/`deploy.yml` (этап 33) |
 | Живой тест на MySQL | `npm run check:mysql-race` | у джобы `test-server` нет сервиса БД (или у сервиса нет health-check, или он с чужим образом); не задан `REQUIRE_MYSQL: '1'` или `DB_HOST`/`DB_USER`/`DB_PASSWORD`; джоба может зеленеть при провале (`continue-on-error`, `npm test \|\| true`); тест-файл читает флаг не строго как `'1'`, условие пропуска его не учитывает, остался `skipIf(!admin)` или нет теста, падающего при `admin === null` (этап 36, N1) |
 | CHECK/ENUM схемы ↔ валидаторы кода | `npm run check:enum-constraints` | код-валидатор `intField` шире CHECK схемы (клиент проходит код и получает 500 от MySQL); диапазонный CHECK не проверяется ни в одном файле, который пишет в таблицу; белый список кода разрешает значение, которого нет в ENUM (`OFFER_CATEGORIES = […,'bar']`); литерал в `INSERT`/`UPDATE` в ENUM-колонку, которого нет в ENUM; список объявлен и нигде не используется (мёртвая переменная = незакрытая функция) (этап 37, N4) |
@@ -178,7 +178,7 @@ cd server && npm test            # серверные тесты
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 681 тест, 55 файлов — **0 failures**
+- **Фронтенд (Vitest):** 688 тестов, 55 файлов — **0 failures**
 - **Сервер (Vitest):** 979 тестов, 70 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 152 теста, 19 spec-файлов — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
@@ -187,9 +187,9 @@ cd server && npm test            # серверные тесты
 `npm run audit:prod` = `npm audit --omit=dev --audit-level=high`. Флаги
 обязательны: без `--omit=dev` считается dev-дерево, которого в проде нет, без
 `--audit-level=high` гейт краснеет на moderate/low, которые чинятся только
-мажорными обновлениями. Сейчас: **0 critical, 0 high** (корень — 2 moderate,
-`server/` — 25 moderate; остаток: `@sentry/node`, `firebase-admin`, `bull`/`uuid`,
-`react-router-dom` 6 → 7). Аудить надо **оба** lock-файла: в контейнер едут обе
+мажорными обновлениями. Сейчас: **0 critical, 0 high** (корень — 0 уязвимостей,
+`server/` — 28 moderate: `@opentelemetry/instrumentation-tedious` и `uuid` через
+`bull`/`gaxios`/`google-gax`/`firebase-admin`). Аудить надо **оба** lock-файла: в контейнер едут обе
 половины.
 
 ---
@@ -213,7 +213,7 @@ cd server && npm test            # серверные тесты
 | `test-counters` | `test-counter-audit.mjs` (нужны оба `node_modules`) |
 | `deploy-persistence` | `deploy-persistence-audit.mjs` |
 | `dependency-audit` | `npm run audit:prod` в корне и в `server/` (без `npm ci` — аудиту нужен только lock-файл) |
-| `docs-canon` | `npm run check:docs` — раскладка документации: правила только в `docs/AGENTS-*.md`, идеи 21–34 в `docs/product-roadmap.md`, архив помечен, запрещённых формулировок в отслеживаемых `.md`/`.txt` нет (этап 32) |
+| `docs-canon` | `npm run check:docs` — раскладка документации: правила только в `docs/AGENTS-*.md`, идеи 21–34 в `docs/product-roadmap.md`, архив помечен, запрещённых формулировок в отслеживаемых `.md`/`.txt` нет, версии стека в таблицах сверены с `package.json`, упоминаний удалённого `zod` нет (этап 32) |
 | `n-plus-one` | `npm run check:n-plus-one` — SQL внутри цикла по коллекции (2N запросов вместо 2) + протухшие оправдания `JUSTIFIED` (этап 33, N5) |
 | `mysql-race` | `npm run check:mysql-race` — джоба `test-server` обязана объявлять сервис БД, `REQUIRE_MYSQL=1` и не иметь права зеленеть при провале; живой тест на MySQL обязан превращать пропуск в падение (этап 36, N1) |
 | `enum-constraints` | `npm run check:enum-constraints` — CHECK/ENUM из `database/mysql_schema.sql` против валидаторов кода: код-валидатор шире CHECK, диапазонный CHECK не покрыт в пишущем файле, белый список кода разрешает значение вне ENUM, литерал в `INSERT`/`UPDATE` вне ENUM (этап 37, N4) |
@@ -322,7 +322,10 @@ cd server && npm test            # серверные тесты
 - **Audit log:** `softDelete` и массовый `softDeleteWhere` пишут `audit_log` (кто, что, когда)
 
 ### 🏥 Health Checks
-- `GET /health` (`server/src/index.js:307`) — единственный health-эндпоинт: `SELECT 1` → `200 {status:'ok', db:'connected'}`, при ошибке БД → `503 {status:'error', db:'disconnected'}`. Отдельных `/health/live` и `/health/ready` в проекте **нет**
+- `GET /health` (`server/src/health.js:4`) — `SELECT 1` → `200 {status:'ok', db:'connected', integrations}`, при ошибке БД → `503 {status:'error', db:'disconnected'}`
+- `GET /health/live` (`server/src/health.js:13`) — liveness: сервер отвечает, всегда `200 {status:'ok'}`
+- `GET /health/ready` (`server/src/health.js:17`) — readiness: `SELECT 1` → `200 {status:'ready'}`, при недоступной БД → `503 {status:'unavailable'}`
+- `GET /api/admin/health` (`server/src/routes/admin/health.js:18`) — дашборд интеграций (MySQL/Redis/SMTP/Stripe/OpenAI/FCM) в админке, под `adminAuth`
 - Graceful shutdown по `SIGTERM` (`index.js:337`): `closeQueues()` → `disconnectRedis()` → `pool.end()` → `httpServer.close()`. `SIGINT` и сторожевой таймаут **не** обрабатываются — см. бэклог
 - В контейнере у nginx есть `location = /healthz` (`nginx/swiftmatch.http.conf:24`) — это балансировщик/healthcheck, не API
 

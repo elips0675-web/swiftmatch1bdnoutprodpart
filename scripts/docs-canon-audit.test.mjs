@@ -38,6 +38,8 @@ import {
   MOVED_SECTIONS,
   ROADMAP_MIN_TOTAL_LINES,
   FILE_LINK_RE,
+  STACK_VERSION_ROWS,
+  STACK_ABSENCES,
   TODO_JOURNAL,
   DONE_JOURNAL,
   AGENDA_ARCHIVE,
@@ -47,6 +49,7 @@ import {
   collectRoadmapFindings,
   collectForbiddenFindings,
   collectArchiveFindings,
+  collectStackFindings,
   collectBacklogFindings,
   collectAgendaFindings,
   collectChangelogFindings,
@@ -246,6 +249,56 @@ describe('запрещённые формулировки в отслежива�
     const { docs } = collectTrackedDocs(ROOT)
     expect(docs.length).toBeGreaterThan(0)
     expect(docs.every(d => fs.existsSync(path.join(ROOT, d.path)))).toBe(true)
+  })
+})
+
+describe('версии стека сверяются с package.json', () => {
+  const versions = () => {
+    const pkg = JSON.parse(read('package.json'))
+    return { ...pkg.dependencies, ...pkg.devDependencies }
+  }
+  const doc = (rel, text) => [{ path: rel, text }]
+
+  it('текущие документы чисты', () => {
+    const { docs } = collectTrackedDocs(ROOT)
+    expect(collectStackFindings(docs, versions())).toEqual([])
+  })
+
+  it('устаревшая версия в таблице README — находка с точной строкой', () => {
+    const text = read('README.md').replace('| Роутинг | react-router-dom | 7.18.4 |', '| Роутинг | react-router-dom | 6.30.4 |')
+    const hit = collectStackFindings(doc('README.md', text), versions()).find(f => f.id === 'stack-react-router')
+    expect(hit).toBeTruthy()
+    const expected = read('README.md').split('\n').findIndex(l => l.includes('| Роутинг | react-router-dom |')) + 1
+    expect(hit.line).toBe(expected)
+  })
+
+  it('исчезнувший ряд стека — находка, а не «версия совпала»', () => {
+    const text = read('project-context.md').replace(/^\| React Router \| 7 \|.*$/m, '')
+    expect(ids(collectStackFindings(doc('project-context.md', text), versions()))).toContain('stack-pc-react-router')
+  })
+
+  it('мажорное расхождение в project-context ловится', () => {
+    const bad = read('project-context.md').replace('| React | 18 |', '| React | 17 |')
+    expect(ids(collectStackFindings(doc('project-context.md', bad), versions()))).toContain('stack-pc-react')
+  })
+
+  it('возврат «React Hook Form + Zod» в прозу — находка', () => {
+    const pc = read('project-context.md').replace('(без `zod` — удалён 04.10.2026, этап 31)', '+ Zod')
+    expect(ids(collectStackFindings(doc('project-context.md', pc), versions()))).toContain('stack-zod-forms-pc')
+    const sp = read('docs/AGENTS-system-prompt.md').replace('| Forms | React Hook Form |', '| Forms | React Hook Form + Zod |')
+    expect(ids(collectStackFindings(doc('docs/AGENTS-system-prompt.md', sp), versions()))).toContain('stack-zod-forms-sp')
+  })
+
+  it('корректная формулировка «без zod» — не находка', () => {
+    expect(collectStackFindings([{ path: 'project-context.md', text: read('project-context.md') }], versions())).toEqual([])
+    expect(STACK_ABSENCES.length).toBeGreaterThan(0)
+  })
+
+  it('каждый ряд стека указывает на отслеживаемый файл', () => {
+    const { docs } = collectTrackedDocs(ROOT)
+    for (const row of STACK_VERSION_ROWS) {
+      expect(docs.some(d => d.path === row.file), row.file).toBe(true)
+    }
   })
 })
 

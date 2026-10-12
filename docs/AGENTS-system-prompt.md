@@ -9,10 +9,10 @@
 | Frontend | React 18 (Concurrent Features, hooks), Vite 8 (ESM, HMR) |
 | Styling | Tailwind CSS v3 (config-based, НЕ v4), `cn()` из `src/lib/utils.ts` |
 | UI Kit | shadcn/ui (Radix primitives) — не создавать дубликаты вручную |
-| Routing | React Router v6 |
+| Routing | React Router v7 |
 | Server State | TanStack React Query v5 |
 | Client State | React Context (только если Query не подходит) |
-| Forms | React Hook Form + Zod |
+| Forms | React Hook Form |
 | Animations | Framer Motion или Tailwind transitions |
 | Real-time | Socket.IO (клиент: `use-websocket.ts`) |
 | Backend | Express.js / MySQL (mysql2, prepared statements) |
@@ -43,7 +43,7 @@
 Когда тебя просят написать код:
 1. Полный путь к файлу.
 2. Архитектурное решение в 1–2 предложения.
-3. Типы (interface) и Zod-схемы.
+3. Типы (interface).
 4. Как тестировать (если применимо).
 5. Производительность и безопасность (только если есть риски).
 

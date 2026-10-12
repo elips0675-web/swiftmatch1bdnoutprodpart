@@ -19,7 +19,7 @@
  *     одному гейту: `docs/roadmap.md` оказался журналом этапов, а не списком
  *     идей, поэтому они перенесены в `docs/product-roadmap.md` дословно.
  *
- * Гейт проверяет шесть вещей, каждую — на обоих концах (и «плохо», и «хорошо»):
+ * Гейт проверяет семь вещей, каждую — на обоих концах (и «плохо», и «хорошо»):
  *
  *  1. **`Промты.txt` — указатель, а не источник правил.** Есть шапка со словами
  *     «больше не источник правил», нет разделов `## 0.`–`## 20.`, нет
@@ -44,6 +44,14 @@
  *  6. **Гейт реально запускается.** Скрипт `check:docs` есть в `package.json`,
  *     а `docs-canon-audit.mjs` упомянут в `.github/workflows/ci.yml` и
  *     `deploy.yml`. Гейт, который никто не зовёт, зелёный всегда (питфолл 56).
+ *  7. **Проза о версиях стека не врёт.** Ряды таблиц стека (`README.md`,
+ *     `project-context.md`, `docs/AGENTS-system-prompt.md`,
+ *     `docs/AGENTS-workflow.md`) сверяются с `dependencies`/`devDependencies`
+ *     `package.json` (точная версия либо только мажор), пропавший ряд — находка,
+ *     а возврат «React Hook Form + Zod»/«Zod-схемы»/«RHF + Zod» после удаления
+ *     `zod` — тоже. Класс тот же, что у счётчиков тестов (питфолл 93): число
+ *     в доке протухает молча и читается как факт — `react-router-dom` 6 → 7
+ *     закрыт 11.10.2026, а таблицы держали 6 сразу в четырёх файлах.
  *
  * Файлы берутся из `git ls-files`, а не обходом дерева: в рабочем дереве могут
  * лежать чужие удаления (отслеживаемый, но отсутствующий файл) и чужие
@@ -111,6 +119,51 @@ export const FORBIDDEN_EXEMPT_FILES = [
   'Что доделать.txt',
   'test/Что сделано.txt',
   'test/Что доделать.txt',
+]
+
+/**
+ * Версии стека в прозаических таблицах. `check:docs` ловил раскладку правил,
+ * `test-counter-audit` — числа тестов, но прозу о версиях не сверял никто:
+ * апгрейд `react-router-dom 6 → 7` (11.10.2026) закрыт, а таблицы стека
+ * остались на 6 — в четырёх файлах сразу (`README.md`, `project-context.md`,
+ * `docs/AGENTS-system-prompt.md`, `docs/AGENTS-workflow.md`). Класс тот же,
+ * что у счётчиков: число в доке протухает молча и читается как факт
+ * (питфолл 93). Источник истины — `package.json`, а не второй список.
+ *
+ * Каждая строка — якорь на конкретный ряд таблицы + имя пакета. `major`
+ * сверяет только мажор (в `project-context.md` версии усечены до мажора
+ * намеренно), иначе — версию целиком.
+ */
+export const STACK_VERSION_ROWS = [
+  { id: 'stack-react', file: 'README.md', pkg: 'react', re: /^\|\s*UI-библиотека\s*\|\s*React \/ React DOM\s*\|\s*([^\s|]+)\s*\|/m },
+  { id: 'stack-vite', file: 'README.md', pkg: 'vite', re: /^\|\s*Сборка\s*\|\s*Vite\s*\|\s*([^\s|]+)\s*\|/m },
+  { id: 'stack-react-router', file: 'README.md', pkg: 'react-router-dom', re: /^\|\s*Роутинг\s*\|\s*react-router-dom\s*\|\s*([^\s|]+)\s*\|/m },
+  { id: 'stack-react-hook-form', file: 'README.md', pkg: 'react-hook-form', re: /^\|\s*Формы\s*\|\s*React Hook Form\s*\|\s*([^\s|]+)\s*\|/m },
+  { id: 'stack-tanstack-query', file: 'README.md', pkg: '@tanstack/react-query', re: /^\|\s*Серверное состояние\s*\|\s*TanStack Query\s*\|\s*([^\s|]+)\s*\|/m },
+  { id: 'stack-pc-react', file: 'project-context.md', pkg: 'react', major: true, re: /^\|\s*React\s*\|\s*(\d+)/m },
+  { id: 'stack-pc-vite', file: 'project-context.md', pkg: 'vite', major: true, re: /^\|\s*Vite\s*\|\s*(\d+)/m },
+  { id: 'stack-pc-typescript', file: 'project-context.md', pkg: 'typescript', major: true, re: /^\|\s*TypeScript\s*\|\s*(\d+)/m },
+  { id: 'stack-pc-tailwind', file: 'project-context.md', pkg: 'tailwindcss', major: true, re: /^\|\s*Tailwind CSS\s*\|\s*(\d+)/m },
+  { id: 'stack-pc-react-router', file: 'project-context.md', pkg: 'react-router-dom', major: true, re: /^\|\s*React Router\s*\|\s*(\d+)/m },
+  { id: 'stack-pc-react-hook-form', file: 'project-context.md', pkg: 'react-hook-form', major: true, re: /^\|\s*React Hook Form\s*\|\s*(\d+)/m },
+  { id: 'stack-pc-framer-motion', file: 'project-context.md', pkg: 'framer-motion', major: true, re: /^\|\s*Framer Motion\s*\|\s*(\d+)/m },
+  { id: 'stack-pc-socketio', file: 'project-context.md', pkg: 'socket.io-client', major: true, re: /^\|\s*Socket\.IO\s*\|\s*(\d+)/m },
+  { id: 'stack-sp-react-router', file: 'docs/AGENTS-system-prompt.md', pkg: 'react-router-dom', major: true, re: /^\|\s*Routing\s*\|\s*React Router v(\d+)/m },
+  { id: 'stack-wf-react-router', file: 'docs/AGENTS-workflow.md', pkg: 'react-router-dom', major: true, re: /Роутинг: React Router (\d+)/ },
+]
+
+/**
+ * Формулировки об удалённой зависимости. `zod` и `@hookform/resolvers`
+ * удалены 04.10.2026 (этап 31), но строка «React Hook Form + Zod» пережила
+ * удаление в трёх файлах: `FORBIDDEN_PHRASES` ловит только «zod 4», а не сам
+ * факт использования. Тексты — канон, а не журнал, поэтому исключения
+ * `FORBIDDEN_EXEMPT_FILES` здесь не действуют.
+ */
+export const STACK_ABSENCES = [
+  { id: 'stack-zod-forms-pc', file: 'project-context.md', re: /^-\s*\*\*Формы\*\*:[^\n]*\+\s*`?zod\b/im, hint: 'zod удалён 04.10.2026 (этап 31) — в разделе State Management его быть не должно' },
+  { id: 'stack-zod-forms-sp', file: 'docs/AGENTS-system-prompt.md', re: /^\|\s*Forms\s*\|[^|\n]*\bzod\b/im, hint: 'zod удалён — строка Forms не должна его называть' },
+  { id: 'stack-zod-schemas-sp', file: 'docs/AGENTS-system-prompt.md', re: /\bZod-схемы\b/i, hint: 'zod удалён — Zod-схемы не пишем' },
+  { id: 'stack-zod-forms-arch', file: 'docs/architecture.md', re: /RHF \+ Zod/i, hint: 'zod удалён — формы на React Hook Form без Zod' },
 ]
 
 /**
@@ -226,6 +279,48 @@ export function collectForbiddenFindings(docs) {
       }
     })
   }
+  return findings
+}
+
+const semverMajor = v => (String(v).match(/\d+/) || [''])[0]
+const semverClean = v => String(v).replace(/^[\^~>=<\s]+/, '').replace(/\s+$/, '')
+const lineAt = (text, index) => text.slice(0, index).split('\n').length
+
+/**
+ * Сверка версий стека и формулировок об удалённом `zod`. На вход — те же
+ * отслеживаемые документы, что и у запрещённых формулировок, плюс карта
+ * «пакет → версия» из `package.json`.
+ * @param {Array<{path: string, text: string}>} docs
+ * @param {Record<string, string>} versions
+ */
+export function collectStackFindings(docs, versions) {
+  const byPath = new Map(docs.map(d => [d.path, d.text]))
+  const findings = []
+
+  for (const row of STACK_VERSION_ROWS) {
+    const text = byPath.get(row.file)
+    if (text === undefined) continue
+    const m = row.re.exec(text)
+    if (!m) {
+      findings.push({ id: row.id, file: row.file, line: 1, text: `не найден ряд стека для «${row.pkg}» — гейт перестал видеть таблицу, а не версия совпала` })
+      continue
+    }
+    const actual = versions[row.pkg]
+    if (!actual) continue
+    const docV = row.major ? semverMajor(m[1]) : semverClean(m[1])
+    const pkgV = row.major ? semverMajor(actual) : semverClean(actual)
+    if (docV !== pkgV) {
+      findings.push({ id: row.id, file: row.file, line: lineAt(text, m.index), text: `в доке ${row.pkg} — «${m[1]}», а в package.json «${actual}»` })
+    }
+  }
+
+  for (const rule of STACK_ABSENCES) {
+    const text = byPath.get(rule.file)
+    if (text === undefined) continue
+    const m = rule.re.exec(text)
+    if (m) findings.push({ id: rule.id, file: rule.file, line: lineAt(text, m.index), text: rule.hint })
+  }
+
   return findings
 }
 
@@ -610,6 +705,8 @@ export function audit(root) {
 
   let pkgJson = null
   try { pkgJson = JSON.parse(read('package.json') || 'null') } catch { pkgJson = null }
+  const pkgVersions = { ...(pkgJson && pkgJson.dependencies), ...(pkgJson && pkgJson.devDependencies) }
+  findings.push(...collectStackFindings(docs, pkgVersions))
   findings.push(...collectWiringFindings({ pkgJson, ciYaml: read(CI_WORKFLOW), deployYaml: read(DEPLOY_WORKFLOW) }))
 
   return { findings, docs, missing, source, promptsCheck, roadmapCheck }
@@ -622,6 +719,7 @@ function main() {
   console.log(`docs-canon audit: ${docs.length} отслеживаемых .md/.txt (список: ${source}${missing.length ? `, пропущено отсутствующих: ${missing.length}` : ''})`)
   for (const m of missing) console.log(`  [SKIP] ${m} — отслеживается в git, но отсутствует в дереве`)
   console.log(`Канон-указатель: ${PROMPTS_INDEX} (ссылок: ${promptsCheck.links.length}); идеи: ${ROADMAP_FILE} (${roadmapCheck.nonEmptyLines} непустых строк); архив: ${ARCHIVE_FILE}; бэклог: ${TODO_JOURNAL} (структура), хроника: ${DONE_JOURNAL}, архив срезов: ${AGENDA_ARCHIVE}`)
+  console.log(`Стек: ${STACK_VERSION_ROWS.length} версий сверяется с package.json, ${STACK_ABSENCES.length} запрета на удалённую зависимость`)
   console.log(`\nНаходок: ${findings.length}\n`)
 
   if (!findings.length) {
@@ -641,6 +739,7 @@ function main() {
   console.log('  4) запрещённые формулировки — переформулировать, а не цитировать как правило;')
   console.log(`  5) исключение для журналов задано в FORBIDDEN_EXEMPT_FILES (${FORBIDDEN_EXEMPT_FILES.join(', ')}) и проверяется тестом;`)
   console.log(`  6) структура бэклога (${TODO_JOURNAL}) — уникальные ID и заголовки, закрытие с хроникой в ${DONE_JOURNAL}, записи этапов — только там.`)
+  console.log('  7) версии стека и упоминания `zod` — привести к `package.json`: источник истины — зависимости, а не проза.')
   process.exit(1)
 }
 
