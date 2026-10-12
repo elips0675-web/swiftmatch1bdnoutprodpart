@@ -205,7 +205,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       mysql:
-        image: mysql:8.0
+        image: mysql:8.4
         env: { MYSQL_ROOT_PASSWORD: test, MYSQL_DATABASE: swiftmatch_test }
         options: --health-cmd="mysqladmin ping" --health-interval=10s
     steps:

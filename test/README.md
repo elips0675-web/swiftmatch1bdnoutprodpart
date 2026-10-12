@@ -44,7 +44,7 @@ Supabase), с портами 3002/8081, чтобы не мешать основ�
 | Runtime | Node.js | 22 (образ `node:22-alpine`) |
 | HTTP | Express | 4.21.0 |
 | Real-time | Socket.IO (+ Redis adapter) | 4.8.4 / 8.3.0 |
-| БД | MySQL через mysql2 | 8.x (образ `mysql:8`) / 3.11.0 |
+| БД | MySQL через mysql2 | 8.x (образ `mysql:8.4`) / 3.11.0 |
 | Кэш и очереди | ioredis + Bull | 5.11.1 / 4.16.5 |
 | Аутентификация | jsonwebtoken + otplib + bcryptjs | 9.0.2 / 13.5.0 / 2.4.3 |
 | Платежи | Stripe (Checkout + webhooks) | 22.3.0 |
@@ -59,14 +59,14 @@ Supabase), с портами 3002/8081, чтобы не мешать основ�
 
 | Слой | Что | Версия / порт |
 |------|-----|---------------|
-| MySQL | локально Laragon на **3306**, в compose образ `mysql:8` на **3307** | 8.x |
+| MySQL | локально Laragon на **3306**, в compose образ `mysql:8.4` на **3307** | 8.4 |
 | Redis | `redis:7-alpine` | 6379 |
-| Reverse proxy | nginx (в compose) | 1.27-alpine, хост-порт 8080 |
+| Reverse proxy | nginx (в compose) | 1.30-alpine, хост-порт 8080 |
 | Мониторинг | Prometheus / Grafana | 9090 / 3001 |
 | Пуш в Android | Capacitor 8 + камера/файлы/гео/преferences/push + AdMob + RevenueCat | 8.4.1 |
 | Нагрузочное тестирование | k6 (`k6/load-test.js`) | — |
 
-> `mysql:8` в compose слушает **3307**, чтобы не конфликтовать с локальным MySQL
+> `mysql:8.4` в compose слушает **3307**, чтобы не конфликтовать с локальным MySQL
 > Laragon на 3306. Локально фронт и API ходят на 3306 (Laragon), в контейнерах —
 > на 3307.
 
@@ -348,7 +348,7 @@ cd server && npm test            # серверные тесты
 - Миграция `005_add_spatial_location.sql`
 
 ### 🐳 DevOps
-- **Docker:** multi-stage (`node:22-alpine` → `nginx:1.27-alpine`), healthcheck, non-root, `.dockerignore`, `restart: unless-stopped`
+- **Docker:** multi-stage (`node:22-alpine` → `nginx:1.30-alpine`), healthcheck, non-root, `.dockerignore`, `restart: unless-stopped`
 - **Docker Compose:** app + nginx + MySQL + Redis + Prometheus + Grafana, именованные volume'ы
 - **Nginx в контейнере** (`nginx/swiftmatch.http.conf` — единственный, что копируется в образ, `Dockerfile:30`): `limit_req` 60r/s на `/api` и 10r/s на `/api/auth`, `client_max_body_size 20M`, WebSocket `proxy_read_timeout 86400s`, `location = /healthz`, SPA fallback
 - **Nginx на VPS** — файла два, и **они расходятся между собой**: `nginx/swiftmatch.conf` (TLS 443, редирект с 80, `limit_req` 30r/s/5r/s, 20M, 86400s) и корневой `nginx.conf` (TLS 443, редирект с 80, `proxy_read_timeout 60s`, **без** `limit_req` и без `client_max_body_size`). Ни один в образ не попадает; какой из двух применять на сервере — в бэклоге (P2)
