@@ -23,6 +23,7 @@ import { initSentry, registerSentryErrorHandler } from './sentry.js'
 import { getRedis, disconnectRedis } from './redis.js'
 import { initQueues, closeQueues } from './queue.js'
 import { startQueueBackpressureMonitor, stopQueueBackpressureMonitor } from './queue-monitor.js'
+import { startWeeklyReportMonitor, stopWeeklyReportMonitor } from './weekly-report.js'
 import { createGracefulShutdown } from './shutdown.js'
 import { healthHandler, liveHandler, readyHandler } from './health.js'
 
@@ -30,6 +31,7 @@ import adminDashboard from './routes/admin/dashboard.js'
 import adminUsers from './routes/admin/users.js'
 import adminAnalytics from './routes/admin/analytics.js'
 import adminReports from './routes/admin/reports.js'
+import adminWeeklyReport from './routes/admin/weekly-report.js'
 import adminContent from './routes/admin/content.js'
 import adminFeatures from './routes/admin/features.js'
 import adminMessaging from './routes/admin/messaging.js'
@@ -294,6 +296,7 @@ app.use('/api/admin', adminDashboard)
 app.use('/api/admin', adminUsers)
 app.use('/api/admin', adminAnalytics)
 app.use('/api/admin', adminReports)
+app.use('/api/admin', adminWeeklyReport)
 app.use('/api/admin', adminContent)
 app.use('/api/admin', adminFeatures)
 app.use('/api/admin', adminMessaging)
@@ -339,6 +342,7 @@ startCheckinCleanup()
 startRefreshTokenCleanup()
 startNotificationCleanup()
 startQueueBackpressureMonitor()
+startWeeklyReportMonitor()
 initQueues()
 httpServer.listen(PORT, () => {
   rootLogger.info(`SwiftMatch API running on port ${PORT}`)
@@ -351,6 +355,7 @@ const shutdown = createGracefulShutdown({
     stopWsTimers()
     stopCleanup()
     stopQueueBackpressureMonitor()
+    stopWeeklyReportMonitor()
   },
   closeQueues,
   disconnectRedis,
