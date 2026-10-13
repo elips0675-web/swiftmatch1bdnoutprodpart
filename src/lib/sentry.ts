@@ -48,7 +48,6 @@ export function captureTiming(name: string, ms: number) {
   if (!SENTRY_DSN || !Number.isFinite(ms)) return
   try {
     Sentry.addBreadcrumb({ category: 'performance', message: `${name}: ${Math.round(ms)}ms`, level: 'info' })
-    Sentry.metrics.addMeasurement(name, ms)
   } catch {
     /* метрики не критичны */
   }

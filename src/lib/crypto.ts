@@ -8,7 +8,7 @@ function getKeyMaterial(): string | null {
   return getToken();
 }
 
-function getSalt(): Uint8Array {
+function getSalt(): Uint8Array<ArrayBuffer> {
   const existing = sessionStorage.getItem('swiftchat_salt');
   if (existing) {
     const parts = existing.split(',');
@@ -19,7 +19,7 @@ function getSalt(): Uint8Array {
   return salt;
 }
 
-async function deriveKey(material: string, salt: Uint8Array): Promise<CryptoKey> {
+async function deriveKey(material: string, salt: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
   const enc = new TextEncoder();
   const keyData = await crypto.subtle.importKey(
     'raw', enc.encode(material), 'PBKDF2', false, ['deriveKey']

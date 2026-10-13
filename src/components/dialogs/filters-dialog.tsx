@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { POPULAR_CITIES, CIRCADIAN_RHYTHM_OPTIONS, ATTACHMENT_STYLE_OPTIONS } from "@/lib/constants";
 import { useContentConfig } from "@/lib/useContentConfig";
 import { cn } from "@/lib/utils";
-import { useUser } from "@/shims/firebase";
+import { usePremium } from "@/hooks/use-premium";
 import { PremiumDialog } from "./premium-dialog";
 import { Lock } from "lucide-react";
 import { useLanguage } from "@/context/language-context";
@@ -40,10 +40,9 @@ export function FiltersDialog({
   currentFilters,
   onApplyFilters,
 }: FiltersDialogProps) {
-  const { user } = useUser();
   const { t } = useLanguage();
   const { interests: dynamicInterests, dating_goals: dynamicGoals } = useContentConfig();
-  const isPro = user?.isPro;
+  const { isPremium: isPro } = usePremium();
 
   const [ageRange, setAgeRange] = useState(currentFilters.ageRange || [18, 40]);
   const [distance, setDistance] = useState(currentFilters.distance || [50]);

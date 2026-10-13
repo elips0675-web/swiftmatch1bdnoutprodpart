@@ -754,12 +754,6 @@ export const translations = {
     'pwa.install.dismissed': 'Вы можете установить приложение позже из меню браузера.',
     'pwa.install.ios_title': 'Установка на iOS',
     'pwa.install.ios_description': 'Чтобы установить SwiftMatch на ваш iPhone, нажмите кнопку «Поделиться» и выберите «На экран "Домой"».',
-    'pwa.install.menu_open': 'Откройте меню браузера ⋮',
-    'pwa.install.menu_install': 'Выберите «Установить приложение»',
-    'pwa.install.address_bar_install': 'Нажмите на иконку установки в адресной строке',
-    'pwa.install.guide_title': 'Как установить?',
-    'pwa.install.guide_desc': 'Нажмите на иконку установки в адресной строке или откройте меню ⋮ → «Установить приложение»',
-    'pwa.install.guide_button': 'Как установить?',
 
     // Groups
     'groups.tabs.find': 'Популярные',
@@ -2653,12 +2647,6 @@ export const translations = {
     'pwa.install.dismissed': 'You can install the app later from your browser menu.',
     'pwa.install.ios_title': 'Install on iOS',
     'pwa.install.ios_description': 'To install SwiftMatch on your iPhone, tap the "Share" icon and then "Add to Home Screen".',
-    'pwa.install.menu_open': 'Open browser menu ⋮',
-    'pwa.install.menu_install': 'Select "Install App"',
-    'pwa.install.address_bar_install': 'Click the install icon in the address bar',
-    'pwa.install.guide_title': 'How to install?',
-    'pwa.install.guide_desc': 'Click the install icon in the address bar or open menu ⋮ → "Install App"',
-    'pwa.install.guide_button': 'How to install?',
 
     // Groups
     'groups.tabs.find': 'Popular',

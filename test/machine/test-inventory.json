@@ -1,15 +1,15 @@
 {
-  "generated": "2026-10-13T11:19:18.282Z",
+  "generated": "2026-10-13T12:27:59.850Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 57,
-    "tests": 700,
-    "passed": 700,
+    "files": 58,
+    "tests": 717,
+    "passed": 717,
     "failed": 0,
     "gate": {
-      "files": 19,
-      "tests": 462
+      "files": 20,
+      "tests": 479
     },
     "product": {
       "files": 38,
@@ -91,6 +91,10 @@
       {
         "file": "scripts/test-counter-audit.test.mjs",
         "tests": 44
+      },
+      {
+        "file": "scripts/typecheck-gate-audit.test.mjs",
+        "tests": 17
       },
       {
         "file": "src/hooks/__tests__/use-fcm-token.test.tsx",
@@ -661,7 +665,7 @@
     ]
   },
   "total": {
-    "files": 132,
-    "tests": 1748
+    "files": 133,
+    "tests": 1765
   }
 }

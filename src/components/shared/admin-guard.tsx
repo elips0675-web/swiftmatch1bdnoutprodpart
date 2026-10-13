@@ -33,7 +33,7 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
       }
 
       const existing = getToken()
-      const headers = existing ? { Authorization: `Bearer ${existing}` } : {}
+      const headers: Record<string, string> = existing ? { Authorization: `Bearer ${existing}` } : {}
       try {
         const res = await fetch('/api/admin/me', { headers })
         if (res.ok) { setAuthorized(true); return }

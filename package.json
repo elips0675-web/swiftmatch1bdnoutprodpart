@@ -8,6 +8,8 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "build:native": "node scripts/check-native-config.mjs && set VITE_API_URL=https://swiftmatch.app && vite build && npx cap copy",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "check:typecheck": "node scripts/typecheck-gate-audit.mjs",
     "cap:android": "npx cap run android --livereload=http://localhost:8081 --open",
     "cap:sync": "npx cap sync",
     "lint": "eslint .",

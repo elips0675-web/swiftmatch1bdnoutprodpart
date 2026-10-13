@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderHook, waitFor, act } from "@testing-library/react"
 
-const mockGetToken = vi.fn(() => "test-token")
+const mockGetToken = vi.fn((): string | null => "test-token")
 vi.mock("@/lib/token", () => ({
-  getToken: (...args: unknown[]) => mockGetToken(...args),
+  getToken: () => mockGetToken(),
 }))
 
 const mockFetch = vi.fn()

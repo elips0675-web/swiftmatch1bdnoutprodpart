@@ -39,18 +39,18 @@ export default function FeatureFlagsPage() {
         const data: Record<string, boolean | number> = await res.json();
         const rolloutValue = typeof data.rolloutPercent === 'number' ? data.rolloutPercent : 100;
         const mapped: FeatureFlag[] = [
-          { key: 'videoCalls', label: t('admin.features.video_calls'), description: t('admin.features.video_calls_desc'), enabled: data.videoCalls ?? true, affectedUsers: 12480 },
-          { key: 'aiIcebreakers', label: t('admin.features.ai_icebreakers'), description: t('admin.features.ai_icebreakers_desc'), enabled: data.aiIcebreakers ?? true, affectedUsers: 12480 },
+          { key: 'videoCalls', label: t('admin.features.video_calls'), description: t('admin.features.video_calls_desc'), enabled: Boolean(data.videoCalls ?? true), affectedUsers: 12480 },
+          { key: 'aiIcebreakers', label: t('admin.features.ai_icebreakers'), description: t('admin.features.ai_icebreakers_desc'), enabled: Boolean(data.aiIcebreakers ?? true), affectedUsers: 12480 },
           { key: 'aiBioGeneration', label: t('admin.features.ai_bio'), description: t('admin.features.ai_bio_desc'), enabled: false, affectedUsers: 0 },
-          { key: 'aiCompatibility', label: t('admin.features.ai_compatibility'), description: t('admin.features.ai_compatibility_desc'), enabled: data.aiCompatibility ?? true, affectedUsers: 8200 },
-          { key: 'groupsPage', label: t('admin.features.groups_page'), description: t('admin.features.groups_page_desc'), enabled: data.groupsPage ?? true, affectedUsers: 12480 },
-          { key: 'contests', label: t('admin.features.contests'), description: t('admin.features.contests_desc'), enabled: data.contest ?? true, affectedUsers: 6500 },
+          { key: 'aiCompatibility', label: t('admin.features.ai_compatibility'), description: t('admin.features.ai_compatibility_desc'), enabled: Boolean(data.aiCompatibility ?? true), affectedUsers: 8200 },
+          { key: 'groupsPage', label: t('admin.features.groups_page'), description: t('admin.features.groups_page_desc'), enabled: Boolean(data.groupsPage ?? true), affectedUsers: 12480 },
+          { key: 'contests', label: t('admin.features.contests'), description: t('admin.features.contests_desc'), enabled: Boolean(data.contest ?? true), affectedUsers: 6500 },
           { key: 'premiumTiers', label: t('admin.features.premium_tiers'), description: t('admin.features.premium_tiers_desc'), enabled: true, affectedUsers: 2100 },
-          { key: 'showAds', label: t('admin.features.show_ads'), description: t('admin.features.show_ads_desc'), enabled: data.showAds ?? false, affectedUsers: 12480 },
-          { key: 'hangouts', label: t('admin.features.hangouts'), description: t('admin.features.hangouts_desc'), enabled: data.hangouts ?? false, affectedUsers: 12480 },
-          { key: 'partnerOffers', label: t('admin.features.partner_offers'), description: t('admin.features.partner_offers_desc'), enabled: data.partnerOffers ?? false, affectedUsers: 12480 },
-          { key: 'profileActivity', label: t('admin.features.profile_activity'), description: t('admin.features.profile_activity_desc'), enabled: data.profileActivity ?? true, affectedUsers: 12480 },
-          { key: 'openingLines', label: t('admin.features.opening_lines'), description: t('admin.features.opening_lines_desc'), enabled: data.openingLines ?? true, affectedUsers: 12480 },
+          { key: 'showAds', label: t('admin.features.show_ads'), description: t('admin.features.show_ads_desc'), enabled: Boolean(data.showAds ?? false), affectedUsers: 12480 },
+          { key: 'hangouts', label: t('admin.features.hangouts'), description: t('admin.features.hangouts_desc'), enabled: Boolean(data.hangouts ?? false), affectedUsers: 12480 },
+          { key: 'partnerOffers', label: t('admin.features.partner_offers'), description: t('admin.features.partner_offers_desc'), enabled: Boolean(data.partnerOffers ?? false), affectedUsers: 12480 },
+          { key: 'profileActivity', label: t('admin.features.profile_activity'), description: t('admin.features.profile_activity_desc'), enabled: Boolean(data.profileActivity ?? true), affectedUsers: 12480 },
+          { key: 'openingLines', label: t('admin.features.opening_lines'), description: t('admin.features.opening_lines_desc'), enabled: Boolean(data.openingLines ?? true), affectedUsers: 12480 },
         ];
         setFlags(mapped);
         setSavedFlags(mapped);

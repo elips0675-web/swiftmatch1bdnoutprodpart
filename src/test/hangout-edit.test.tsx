@@ -116,7 +116,7 @@ describe("HangoutEditPage", () => {
 
     await waitFor(() => {
       const putCall = mockFetch.mock.calls.find(([url, opts]) => String(url) === "/api/hangouts/7" && opts?.method === "PUT");
-      expect(putCall).toBeTruthy();
+      if (!putCall) throw new Error("PUT call not found");
       const body = JSON.parse(putCall[1].body);
       expect(body.title).toBe("Новое название");
       expect(body.max_companions).toBe(3);

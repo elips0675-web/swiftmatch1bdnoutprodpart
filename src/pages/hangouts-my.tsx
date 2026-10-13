@@ -226,7 +226,7 @@ export default function HangoutsMyPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      <AppHeader title={t("nav.hangouts")} />
+      <AppHeader />
       <main className="px-4 pb-24 pt-4 max-w-2xl mx-auto space-y-4">
         <Button data-testid="create-hangout-my" onClick={() => navigate("/hangouts/create")} className="w-full rounded-full font-bold">
           <PlusCircle size={16} className="mr-2" /> {t("hangout.action.create")}

@@ -275,7 +275,7 @@ export default function HangoutDetailPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-        <AppHeader title={t("hangout.title")} />
+        <AppHeader />
         <div className="flex items-center justify-center py-24">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
@@ -286,7 +286,7 @@ export default function HangoutDetailPage() {
   if (notFound || !hangout) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-        <AppHeader title={t("hangout.title")} />
+        <AppHeader />
         <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
           <Compass size={48} className="mb-4 opacity-30" />
           <p>{t("hangout.empty")}</p>
@@ -319,7 +319,7 @@ export default function HangoutDetailPage() {
         type="article"
       />
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      <AppHeader title={t("hangout.title")} />
+      <AppHeader />
       <main className="px-4 pb-24 pt-4 max-w-2xl mx-auto space-y-4">
         <Button variant="ghost" size="sm" className="rounded-full -ml-2" data-testid="hangout-detail-back" onClick={() => navigate("/hangouts")}>
           <ArrowLeft size={16} className="mr-1" /> {t("hangout.action.back")}

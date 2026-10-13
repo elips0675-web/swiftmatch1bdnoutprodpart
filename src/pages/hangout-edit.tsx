@@ -130,7 +130,7 @@ export default function HangoutEditPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      <AppHeader title={t("hangout.action.edit")} />
+      <AppHeader />
       <main className="px-4 pb-24 pt-4 max-w-2xl mx-auto">
         {loading && <Loader2 size={24} data-testid="edit-loading" className="mx-auto animate-spin text-muted-foreground" />}
         {!loading && notEditable && (

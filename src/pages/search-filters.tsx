@@ -26,7 +26,7 @@ export default function FiltersPage() {
   const allInterests = useMemo(() => {
     const interests = new Set<string>();
     ALL_DEMO_USERS.forEach(user => {
-      user.interests.forEach(interest => interests.add(interest));
+      user.interests.forEach((interest: string) => interests.add(interest));
     });
     return Array.from(interests);
   }, []);

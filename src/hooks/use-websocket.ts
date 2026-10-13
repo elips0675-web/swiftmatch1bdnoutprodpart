@@ -85,7 +85,8 @@ export function useWebSocket() {
       refreshAuthToken().then((newToken) => {
         refreshing = false
         if (!newToken) return
-        if (socket.auth?.token === newToken) return
+        const currentAuth = socket.auth
+        if (typeof currentAuth === 'object' && currentAuth !== null && currentAuth.token === newToken) return
         socket.auth = { token: newToken }
         socket.disconnect()
         socket.connect()

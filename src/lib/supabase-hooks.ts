@@ -15,6 +15,11 @@ export function useRealtimeMessages(chatId: string | undefined) {
     }
 
     const supabase = getSupabase()
+    if (!supabase) {
+      setMessages([])
+      setLoading(false)
+      return
+    }
 
     supabase
       .from('messages')
@@ -52,6 +57,7 @@ export function useRealtimeMessages(chatId: string | undefined) {
     async (text: string, senderId: string, replyTo?: string) => {
       if (!chatId || !text.trim()) return
       const supabase = getSupabase()
+      if (!supabase) return
       await supabase.from('messages').insert({
         chat_id: chatId,
         sender_id: senderId,
@@ -76,6 +82,10 @@ export function useProfile(id: string | undefined) {
     }
 
     const supabase = getSupabase()
+    if (!supabase) {
+      setLoading(false)
+      return
+    }
     let cancelled = false
 
     supabase
@@ -107,6 +117,11 @@ export function useNearbyProfiles(options?: {
 
   useEffect(() => {
     const supabase = getSupabase()
+    if (!supabase) {
+      setProfiles([])
+      setLoading(false)
+      return
+    }
     let query = supabase.from('user_search').select('*')
 
     if (options?.city) query = query.eq('city', options.city)

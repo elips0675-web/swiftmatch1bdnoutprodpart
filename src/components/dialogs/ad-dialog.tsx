@@ -28,7 +28,7 @@ export function AdDialog({ open, onOpenChange }: { open: boolean, onOpenChange: 
     if (isNative()) {
       try {
         const { AdMob } = await import('@capacitor-community/admob');
-        await AdMob.showRewardedVideoAd();
+        await AdMob.showRewardVideoAd();
       } catch (err) {
         if (import.meta.env.DEV) console.warn('[AdMob] SDK not available, using timer fallback:', err);
         await new Promise(resolve => setTimeout(resolve, 3000));

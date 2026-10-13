@@ -99,7 +99,7 @@ export default function EventsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      <AppHeader title={t("events.title")} />
+      <AppHeader />
       <main className="px-4 pb-24 pt-4 max-w-2xl mx-auto space-y-4">
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />

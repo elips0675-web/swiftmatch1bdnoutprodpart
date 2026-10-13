@@ -26,7 +26,14 @@ jobs:
       # покрывает server/src, но шаг остаётся явным — иначе сужение `lint` до
       # фронта снова отключит проверку бэкенда молча, ровно как это было.
       - run: npm run lint:server
-      - run: npx tsc --noEmit
+      # Реальный типчек обоих проектов (P3 #37): голый `npx tsc --noEmit`
+      # проверял корневой tsconfig.json с "files": [] — ноль файлов.
+      - run: npm run typecheck
+      # Структурный гейт того же: scripts.typecheck собирает tsconfig.app.json +
+      # tsconfig.node.json с -p/--noEmit, workflow не вызывают голый tsc, include
+      # проектов покрывают реальные файлы (иначе typecheck снова проверяет пустое
+      # множество). Зависимости не нужны: гейт читает файлы.
+      - run: npm run check:typecheck
       # Блокирующий гейт перед любым деплоем (этап 20, P0-C). Проверяет, что
       # .dockerignore и rsync-строка ниже не пропускают секреты: иначе прод
       # стартует с публичным JWT_SECRET, а node_modules с хоста (dev-зависимости

@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Search, ChevronLeft, Send, MoveVertical as MoreVertical, Smile, Heart, Laugh, Zap, Flame, Star, Ghost, Rocket, Crown, Music, Phone, Video, Flag, Info, ChevronRight, Trash2, ThumbsUp, PartyPopper, Eye, Frown, Award, Compass, Coffee, MessageSquareQuote, PawPrint, Globe, Film, BookOpen, Baby, Sun, Timer, Clock, Calendar, CornerUpLeft, X } from "lucide-react";
+import { Search, ChevronLeft, Send, MoveVertical as MoreVertical, Smile, Heart, Laugh, Zap, Flame, Star, Ghost, Rocket, Crown, Music, Phone, Video, Flag, Info, ChevronRight, Trash2, ThumbsUp, PartyPopper, Eye, Frown, Award, Compass, Coffee, MessageSquareQuote, PawPrint, Globe, Film, BookOpen, Baby, Sun, Timer, Clock, Calendar, CornerUpLeft, Loader2, X } from "lucide-react";
 import Image from "@/shims/next-image";
 import { useSearchParams, useRouter } from "@/shims/next-navigation";
 import dynamic from "@/shims/next-dynamic";
@@ -421,7 +421,7 @@ function ChatsContent() {
   useEffect(() => {
     if (!wsSocket) return;
     const handler = (event: { chatId: number; message: any }) => {
-      setSelectedChat(prev => {
+      setSelectedChat((prev: { id: number } | null) => {
         if (prev && Number(prev.id) === event.chatId) {
           setMessages(prevMsgs => {
             if (prevMsgs.some(m => m.id === event.message.id)) return prevMsgs;
@@ -566,12 +566,14 @@ function ChatsContent() {
       .then(r => (r.ok ? r.json() : null))
       .then(d => setPartnerCommonInterest(d ? (d.common_interest ?? null) : null))
       .catch(() => setPartnerCommonInterest(null));
-    fetchMessagePage(chat.id, authToken).then(page => {
-      if (!page) return;
-      applyFirstPage(page.messages, user?.id);
-      setHasMoreHistory(page.has_more);
-      setHistoryCursor(page.next_before);
-    });
+    if (authToken) {
+      fetchMessagePage(chat.id, authToken).then(page => {
+        if (!page) return;
+        applyFirstPage(page.messages, user?.id);
+        setHasMoreHistory(page.has_more);
+        setHistoryCursor(page.next_before);
+      });
+    }
     fetch(`/api/chats/${chat.id}/read`, { method: 'PUT', headers: authH }).catch(() => {});
   };
 

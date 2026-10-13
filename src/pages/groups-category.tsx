@@ -168,7 +168,7 @@ function SubGroupsContent() {
 
                         {/* Subgroups List */}
                         <div className="space-y-3">
-                            {paginatedSubgroups.map(subgroup => (
+                            {paginatedSubgroups.map((subgroup: { id: number; name_ru: string; name_en: string; members: number; online?: number }) => (
                                 <Link href={`/chats?groupId=${subgroup.id}`} key={subgroup.id} className="flex items-center justify-between p-4 bg-white rounded-xl app-shadow hover:bg-muted/30 transition-all cursor-pointer group border border-white">
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
                                         <div className="flex-1 min-w-0">

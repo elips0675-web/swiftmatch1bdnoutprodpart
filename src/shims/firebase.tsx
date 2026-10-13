@@ -43,7 +43,7 @@ export function useAuth(): { user: FirebaseUser | null; loading: boolean } {
   return {
     user: {
       uid: supabaseUser.id,
-      email: supabaseUser.email,
+      email: supabaseUser.email ?? null,
       displayName: supabaseUser.user_metadata?.name ?? null,
       photoURL: supabaseUser.user_metadata?.avatar_url ?? null,
     },
@@ -58,6 +58,7 @@ export function useStorage() {
 export async function uploadProfilePhoto(file: File): Promise<string | null> {
   try {
     const supabase = getSupabase()
+    if (!supabase) return null
     const ext = file.name.split('.').pop()
     const path = `profiles/${crypto.randomUUID()}.${ext}`
     const { error } = await supabase.storage.from('photos').upload(path, file)
@@ -70,12 +71,12 @@ export async function uploadProfilePhoto(file: File): Promise<string | null> {
 }
 
 export function useUser(): DocState<FirebaseUser> {
-  const { supabaseUser, isLoading } = useAuth()
+  const { supabaseUser, isLoading } = useAuthContext()
   if (!supabaseUser) return { data: null, loading: isLoading, error: null }
   return {
     data: {
       uid: supabaseUser.id,
-      email: supabaseUser.email,
+      email: supabaseUser.email ?? null,
       displayName: supabaseUser.user_metadata?.name ?? null,
       photoURL: supabaseUser.user_metadata?.avatar_url ?? null,
     },
@@ -94,10 +95,14 @@ export function useDoc<T = ProfileRow>(collection: string, id?: string): DocStat
     }
 
     const supabase = getSupabase()
+    if (!supabase) {
+      setState({ data: null, loading: false, error: null })
+      return
+    }
     let cancelled = false
 
     supabase
-      .from(collection)
+      .from(collection as 'profiles')
       .select('*')
       .eq('id', id)
       .single()
@@ -118,10 +123,14 @@ export function useCollection<T = ProfileRow>(collection: string): CollectionSta
 
   useEffect(() => {
     const supabase = getSupabase()
+    if (!supabase) {
+      setState({ data: [], loading: false, error: null })
+      return
+    }
     let cancelled = false
 
     supabase
-      .from(collection)
+      .from(collection as 'profiles')
       .select('*')
       .limit(50)
       .then(({ data, error }) => {

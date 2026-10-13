@@ -348,7 +348,7 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
       time: tr(post.timeRu, post.timeEn),
       text: tr(post.textRu, post.textEn),
       avatar: normalizeUrl(post.avatar, post.id),
-      images: post.images.map((img, i) => normalizeUrl(img, i + post.id)),
+      images: post.images.map((img: string, i: number) => normalizeUrl(img, i + post.id)),
       comments: post.comments.map((c: any, i: number) => ({
         ...c,
         avatar: normalizeUrl(c.avatar, i + post.id),

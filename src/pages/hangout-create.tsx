@@ -218,7 +218,7 @@ export default function HangoutCreatePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      <AppHeader title={t("hangout.action.create")} />
+      <AppHeader />
       <main className="px-4 pb-24 pt-4 max-w-2xl mx-auto">
         {dailyLimitHit && (
           <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 p-4" data-testid="hangout-daily-limit">

@@ -49,7 +49,21 @@ const CHAT_ID = '7'
 
 const partner = { id: 7, user_id: 8, name: 'Аня', avatar: '/a.png' }
 
-function msg(id: number, text: string) {
+function msg(id: number, text: string): {
+  id: number
+  sender_id: number
+  text: string
+  image_url: string | null
+  reply_to: number | null
+  reply_text?: string | null
+  reply_sender_name?: string | null
+  reply_image_url?: string | null
+  ttl_seconds: number | null
+  created_at: string
+  sender_name: string
+  seen: boolean
+  reactions: unknown[]
+} {
   return {
     id,
     sender_id: 8,

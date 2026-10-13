@@ -76,7 +76,9 @@ export function useContentConfig(): ContentConfig {
 
   useEffect(() => {
     listeners.add(forceRefresh)
-    return () => listeners.delete(forceRefresh)
+    return () => {
+      listeners.delete(forceRefresh)
+    }
   }, [forceRefresh])
 
   return config

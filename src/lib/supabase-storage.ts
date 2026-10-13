@@ -6,6 +6,7 @@ export async function uploadPhoto(
   file: File,
 ): Promise<string | null> {
   const supabase = getSupabase()
+  if (!supabase) return null
   const { error } = await supabase.storage.from(bucket).upload(path, file, {
     cacheControl: '3600',
     upsert: false,
@@ -41,6 +42,7 @@ export async function uploadMessagePhoto(file: File): Promise<string | null> {
 
 export async function deletePhoto(path: string): Promise<boolean> {
   const supabase = getSupabase()
+  if (!supabase) return false
   const { error } = await supabase.storage.from('photos').remove([path])
   return !error
 }

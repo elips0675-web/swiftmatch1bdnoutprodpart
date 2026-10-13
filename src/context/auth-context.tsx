@@ -224,7 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const supabaseUser = state.user
-    ? ({ id: String(state.user.id), email: state.user.email, user_metadata: { name: state.user.name, avatar_url: state.user.avatar } } as User)
+    ? ({ id: String(state.user.id), email: state.user.email, user_metadata: { name: state.user.name, avatar_url: state.user.avatar } } as unknown as User)
     : null
 
   return (

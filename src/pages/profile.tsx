@@ -50,7 +50,7 @@ import { ActivityList } from "@/components/profile/activity-list";
 const interestIconsMap: Record<string, any> = {
   "Photography": Camera, "Travel": Globe, "Sports": Dumbbell, "Art": Palette, "Movies": Film, "Yoga": Flower2, "Business": Briefcase, "Gaming": Gamepad2, "Cats": Dog,
   "interest.photography": Camera, "interest.travel": Globe, "interest.coffee": Coffee, "interest.music": Music, "interest.sport": Dumbbell, "interest.art": Palette, "interest.movies": Film, "interest.yoga": Flower2, "interest.games": Gamepad2, "interest.animals": Dog, "interest.books": Heart, "interest.cooking": Coffee, "interest.design": Palette, "interest.nature": Flower2, "interest.fashion": Briefcase, "interest.dance": Music, "interest.tech": Briefcase, "interest.volunteering": Heart, "interest.politics": Briefcase, "interest.psychology": Heart, "interest.philosophy": Heart, "interest.meditation": Flower2, "interest.gardening": Flower2, "interest.cars": Briefcase, "interest.science": Briefcase, "interest.history": Heart, "interest.architecture": Briefcase,
-  "interest.coffee": Coffee, "interest.diy": Dumbbell, "interest.extreme": Rocket, "interest.films": Film, "interest.food": Coffee, "interest.hiking": Globe, "interest.martial_arts": Dumbbell, "interest.podcasts": Video,
+  "interest.diy": Dumbbell, "interest.extreme": Rocket, "interest.films": Film, "interest.food": Coffee, "interest.hiking": Globe, "interest.martial_arts": Dumbbell, "interest.podcasts": Video,
   "interest.gaming": Gamepad2, "interest.dancing": Music, "interest.reading": Heart, "interest.technology": Briefcase, "interest.astronomy": Star, "interest.board_games": Gamepad2,
 };
 
@@ -87,6 +87,21 @@ export default function ProfilePage() {
 
 type InterestInput = string | { name_ru?: string; name_en?: string };
 
+interface ProfileStateFragment {
+  displayName?: string
+  age?: number
+  birthDate?: string
+  city?: string
+  height?: number
+  gender?: string
+  lookingFor?: string
+  datingGoal?: string
+  zodiac?: string
+  bio?: string
+  interests?: unknown[]
+  [key: string]: unknown
+}
+
 function toLocalDate(value?: string): string {
   if (!value) return ''
   const d = new Date(value)
@@ -102,7 +117,7 @@ function toLocalDate(value?: string): string {
 function normalizeInterests(interests: InterestInput[]): string[] {
   if (!Array.isArray(interests)) return []
   if (interests.length === 0) return []
-  if (typeof interests[0] === 'string') return [...new Set(interests.map((i: string) => i === 'interest.technology' ? 'interest.tech' : i))].filter((i: string) => !BANNED_WORDS.includes(i))
+  if (typeof interests[0] === 'string') return [...new Set((interests as string[]).map((i: string) => i === 'interest.technology' ? 'interest.tech' : i))].filter((i: string) => !BANNED_WORDS.includes(i))
   const nameToKey: Record<string, string> = {
     'Спорт': 'interest.sport', 'Музыка': 'interest.music', 'Фотография': 'interest.photography',
     'Путешествия': 'interest.travel', 'Кофе': 'interest.coffee', 'Искусство': 'interest.art',
@@ -132,7 +147,7 @@ function normalizeInterests(interests: InterestInput[]): string[] {
     'Podcasts': 'interest.podcasts',
     'Astronomy': 'interest.astronomy', 'Board Games': 'interest.board_games',
     'Sport': 'interest.sport', 'Животные': 'interest.animals',
-    'Питомцы': 'interest.pets', 'Pets': 'interest.pets',
+    'Pets': 'interest.pets',
   }
   return interests.map((i: InterestInput) => {
     if (typeof i === 'string') return i
@@ -191,7 +206,7 @@ function normalizeInterests(interests: InterestInput[]): string[] {
             ? data.photos.map((p: { url: string }) => p.url).filter(Boolean)
             : []
           const apiInterests = normalizeInterests(data.interests)
-          setProfile(prev => {
+          setProfile((prev: ProfileStateFragment | null) => {
             const updated = {
               displayName: data.display_name || prev?.displayName || t('profile.someone'),
               age: data.age || prev?.age || 24,
@@ -663,9 +678,9 @@ function normalizeInterests(interests: InterestInput[]): string[] {
                         <div className="p-4 bg-purple-50/50 rounded-xl border border-purple-100 space-y-3">
                             <Label className="text-[10px] font-black uppercase tracking-widest text-purple-800 ml-1 flex items-center gap-1.5"><Heart size={12} /> {t('profile.attachment_test')}</Label>
                             <div className="flex items-center gap-3 bg-white p-3 rounded-lg shadow-sm">
-                                <div className="text-2xl">{ATTACHMENT_STYLE_INFO[profile.attachmentStyle].emoji}</div>
+                                <div className="text-2xl">{ATTACHMENT_STYLE_INFO[profile.attachmentStyle as keyof typeof ATTACHMENT_STYLE_INFO].emoji}</div>
                                 <div>
-                                    <div className="font-bold">{t(ATTACHMENT_STYLE_INFO[profile.attachmentStyle].labelKey)}</div>
+                                    <div className="font-bold">{t(ATTACHMENT_STYLE_INFO[profile.attachmentStyle as keyof typeof ATTACHMENT_STYLE_INFO].labelKey)}</div>
                                     <p className="text-xs text-muted-foreground">{t('profile.retake_test_desc')}</p>
                                 </div>
                             </div>
@@ -844,7 +859,7 @@ function normalizeInterests(interests: InterestInput[]): string[] {
                   <p className="text-xs text-muted-foreground text-center py-8 font-medium">{t('chats.no_groups')}</p>
                 ) : (
                   <div className="space-y-2">
-                    {GROUP_CATEGORIES.flatMap(cat =>
+                    {GROUP_CATEGORIES.flatMap((cat: { subgroups: Array<{ id: number; name_ru: string; name_en: string; members: number; online?: number }> }) =>
                       cat.subgroups
                         .filter(sub => joinedGroupNames.includes(sub.name_ru) || joinedGroupNames.includes(sub.name_en))
                         .map(sub => (

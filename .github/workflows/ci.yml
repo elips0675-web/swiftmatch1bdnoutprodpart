@@ -11,9 +11,25 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - run: npx tsc --noEmit
+      - run: npm run typecheck
       - run: npx eslint src/
       - run: npx vite build
+
+  # Гейт «typecheck реально проверяет код» (P3 #37). До этого джоба lint
+  # запускала голый `npx tsc --noEmit`, а корневой tsconfig.json — solution-
+  # конфиг со ссылками и `"files": []`: компилятор без `-p` проверял ноль
+  # файлов, и гейт был зелёным на любом коде. Теперь типчек собирает оба
+  # проекта (`npm run typecheck`: tsconfig.app.json + tsconfig.node.json), а
+  # этот шаг доказывает, что скрипт и workflow не вернулись к проверке
+  # пустого множества. Зависимости не нужны: гейт читает файлы.
+  typecheck-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm run check:typecheck
 
   # Линтинг бэкенда (этап 29, B1). До этого конфиг ESLint покрывал только
   # `**/*.{ts,tsx}` — 131 файл server/src не проверялся линтером вообще.

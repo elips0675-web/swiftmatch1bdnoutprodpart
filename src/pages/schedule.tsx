@@ -52,7 +52,7 @@ export default function SchedulePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      <AppHeader title={t("schedule.title")} />
+      <AppHeader />
       <main className="px-4 pb-24 pt-4 max-w-2xl mx-auto">
         {loading ? (
           <div className="flex items-center justify-center py-20">

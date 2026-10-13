@@ -108,7 +108,7 @@ export default function AdminPartnersPage() {
     setLoading(true);
     try {
       const token = getToken();
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
       const [pRes, oRes, cRes, ptRes, dsRes] = await Promise.all([
         fetch('/api/admin/partners', { headers }),
         fetch('/api/admin/offers', { headers }),

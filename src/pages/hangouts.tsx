@@ -897,12 +897,13 @@ export default function HangoutsPage() {
     fetch(`/api/hangouts?${cacheKey}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
-      .then((r) => (r.ok ? r.json() : {}))
+      .then((r): Promise<Hangout[] | { items?: Hangout[]; total?: number } | null> => (r.ok ? r.json() : Promise.resolve(null)))
       .then((data) => {
         if (cancelled) return;
         // API возвращает { items, total }; legacy-ответ (массив) поддерживается для тестов/старых клиентов.
-        const raw = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
-        const total = Array.isArray(data) ? 0 : Math.max(0, Number(data?.total || 0));
+        const isList = Array.isArray(data);
+        const raw = isList ? data : data && Array.isArray(data.items) ? data.items : [];
+        const total = isList || !data ? 0 : Math.max(0, Number(data.total || 0));
         if (page === 1) {
           feedCache.set(cacheKey, { data: raw, total, time: Date.now() });
           captureTiming("hangout.feed.load", Date.now() - startedAt);
@@ -1018,7 +1019,7 @@ export default function HangoutsPage() {
       onTouchEnd={handlePtrTouchEnd}
       onTouchCancel={handlePtrTouchEnd}
     >
-      <AppHeader title={t("hangout.title")} />
+      <AppHeader />
       <main className="px-4 pb-24 pt-3 max-w-2xl mx-auto space-y-3">
         <div
           data-testid="hangout-ptr"

@@ -391,7 +391,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                       <div className="truncate">{msg.reply_text || (msg.reply_image_url ? '📷' : t('chats.reply_unavailable'))}</div>
                     </div>
                   )}
-                  {editingMsg?.id === msg.id ? (
+                  {editingMsg && editingMsg.id === msg.id ? (
                     <div className="mb-1">
                       <Input data-testid="message-edit-input" value={editingMsg.text} onChange={(e) => setEditingMsg({ id: msg.id, text: e.target.value })} autoFocus
                         onKeyDown={(e) => { if (e.key === 'Enter') { handleEditMessage(msg.id, editingMsg.text); setEditingMsg(null); } }} className="h-8 text-sm" />

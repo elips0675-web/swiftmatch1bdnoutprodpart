@@ -70,10 +70,12 @@ export const FeatureFlagsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const url = import.meta.env.VITE_SUPABASE_URL
 
     if (supabase && url && !url.includes('your-project.supabase.co')) {
-      supabase
-        .from('feature_flags')
-        .select('*')
-        .maybeSingle()
+      Promise.resolve(
+        supabase
+          .from('feature_flags')
+          .select('*')
+          .maybeSingle(),
+      )
         .then(({ data }) => {
           if (data) {
             setFlags(prev => ({ ...prev, ...data }))
