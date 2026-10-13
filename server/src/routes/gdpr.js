@@ -3,8 +3,8 @@ import crypto from 'crypto'
 import pool from '../db.js'
 import { auth } from '../middleware.js'
 import logger from '../logger.js'
-import { dateOnly } from '../date-only.js'
 import { textField } from '../profile-fields.js'
+import { buildExportPayload, buildExportArchive } from '../gdpr-export.js'
 
 const router = Router()
 
@@ -13,51 +13,29 @@ const router = Router()
  * /api/data/export:
  *   get:
  *     tags: [GDPR]
- *     summary: Export all user data
+ *     summary: Export all user data (JSON, or ZIP archive with ?format=zip)
  *     security:
  *       - bearerAuth: []
  *     responses:
- *       200: { description: Full user data export }
+ *       200: { description: Full user data export (JSON) or ZIP archive }
  */
 router.get('/api/data/export', auth, async (req, res) => {
+  const wantsZip =
+    String(req.query.format || '').toLowerCase() === 'zip' ||
+    String(req.headers.accept || '').includes('application/zip')
+
   try {
-    const [[user]] = await pool.query('SELECT id, email, is_active, created_at FROM users WHERE id = ?', [req.userId])
-    if (!user) return res.status(404).json({ message: 'User not found' })
+    if (wantsZip) {
+      const archive = await buildExportArchive({ db: pool, userId: req.userId })
+      if (!archive) return res.status(404).json({ message: 'User not found' })
+      res.setHeader('Content-Type', 'application/zip')
+      res.setHeader('Content-Disposition', `attachment; filename="${archive.filename}"`)
+      return res.send(archive.buffer)
+    }
 
-    const [[profileRow]] = await pool.query('SELECT * FROM user_profiles WHERE id = ?', [req.userId])
-    const profile = profileRow ? { ...profileRow, birth_date: dateOnly(profileRow.birth_date) } : undefined
-    const [photos] = await pool.query('SELECT id, url, sort_order, is_avatar, created_at FROM user_photos WHERE user_id = ?', [req.userId])
-    const [likes] = await pool.query('SELECT id, from_user_id, to_user_id, type, created_at FROM likes WHERE from_user_id = ? OR to_user_id = ?', [req.userId, req.userId])
-    const [matches] = await pool.query('SELECT id, user1_id, user2_id, created_at FROM matches WHERE user1_id = ? OR user2_id = ?', [req.userId, req.userId])
-    const [chats] = await pool.query(
-      `SELECT c.id, c.created_at FROM chats c
-       JOIN chat_participants cp ON cp.chat_id = c.id
-       WHERE cp.user_id = ?`,
-      [req.userId],
-    )
-    const [messages] = await pool.query(
-      `SELECT m.id, m.chat_id, m.text, m.created_at FROM messages m
-       JOIN chat_participants cp ON cp.chat_id = m.chat_id AND cp.user_id = ?
-       WHERE m.sender_id = ?`,
-      [req.userId, req.userId],
-    )
-    const [subscriptions] = await pool.query('SELECT id, tier, duration_months, price, started_at, expires_at, is_active FROM subscriptions WHERE user_id = ?', [req.userId])
-    const [consents] = await pool.query('SELECT id, consent_type, granted, ip_address, created_at FROM consent_log WHERE user_id = ?', [req.userId])
-    const [activity] = await pool.query('SELECT id, action_type, target_id, created_at FROM activity_log WHERE user_id = ?', [req.userId])
-
-    res.json({
-      exported_at: new Date().toISOString(),
-      user: { id: user.id, email: user.email, registered_at: user.created_at },
-      profile,
-      photos,
-      likes,
-      matches,
-      chats,
-      messages,
-      subscriptions,
-      consents,
-      activity,
-    })
+    const payload = await buildExportPayload(pool, req.userId)
+    if (!payload) return res.status(404).json({ message: 'User not found' })
+    res.json(payload)
   } catch (err) {
     logger.error('Data export error:', err)
     res.status(500).json({ message: 'Failed to export data' })

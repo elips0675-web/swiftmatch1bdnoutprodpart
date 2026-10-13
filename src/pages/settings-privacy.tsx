@@ -96,13 +96,15 @@ export default function SettingsPrivacy() {
   }
 
   const handleExportData = () => {
-    fetch('/api/data/export')
-      .then(r => r.json())
-      .then(data => {
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    fetch('/api/data/export?format=zip')
+      .then(r => {
+        if (!r.ok) throw new Error('export failed')
+        return r.blob()
+      })
+      .then(blob => {
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
-        a.href = url; a.download = `swiftmatch-data-${Date.now()}.json`; a.click()
+        a.href = url; a.download = `swiftmatch-data-${Date.now()}.zip`; a.click()
         URL.revokeObjectURL(url)
         toast.success(t('settings.data_export.success'))
       })
