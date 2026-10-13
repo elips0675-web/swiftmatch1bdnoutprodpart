@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-13T09:08:53.211Z",
+  "generated": "2026-10-13T11:19:18.282Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -563,15 +563,15 @@
     ]
   },
   "e2e": {
-    "files": 20,
-    "tests": 154,
+    "files": 21,
+    "tests": 195,
     "gate": {
       "files": 0,
       "tests": 0
     },
     "product": {
-      "files": 20,
-      "tests": 154
+      "files": 21,
+      "tests": 195
     },
     "perFile": [
       {
@@ -629,6 +629,10 @@
       {
         "file": "e2e/login.spec.ts",
         "tests": 5
+      },
+      {
+        "file": "e2e/pages-smoke.spec.ts",
+        "tests": 41
       },
       {
         "file": "e2e/partner-b2b.spec.ts",

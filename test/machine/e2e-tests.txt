@@ -1,5 +1,5 @@
 ===== E2E (Playwright) =====
-154 тестов в 20 файлах (playwright test --list)
+195 тестов в 21 файлах (playwright test --list)
 
 # файл | тестов
 e2e/admin-content.spec.ts | 15
@@ -16,6 +16,7 @@ e2e/hangouts.spec.ts | 4
 e2e/hangouts2.spec.ts | 6
 e2e/interests.spec.ts | 10
 e2e/login.spec.ts | 5
+e2e/pages-smoke.spec.ts | 41
 e2e/partner-b2b.spec.ts | 3
 e2e/partners.spec.ts | 4
 e2e/premium.spec.ts | 7
