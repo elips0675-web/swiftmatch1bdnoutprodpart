@@ -32,9 +32,9 @@ Node.js/Express + MySQL (mysql2) бэкенд, Socket.IO real-time, Capacitor An
 Локальная тестовая копия с реальной БД (50 демо-юзеров). Порты: фронт 8081
 (vite proxy /api→3002), API+WS 3002, MySQL 3306, Redis 6379.
 
-## Статус проверок (12.10.2026, всё зелёное)
+## Статус проверок (13.10.2026, всё зелёное)
 
-- Тесты **1697/1697**: сервер 1006/1006 (73 файлов), фронт 691/691 (55 файлов: 229 в `src/` + 459 тестов гейтов в 19 файлах `scripts/`), E2E 154 в 20 спеках (статический счёт `playwright test --list`). Гейты: все зелёные — 23 джобы `ci.yml` + 7 `deploy.yml` (на 12.10.2026) + локальные `check:console`/`check:bundle`.
+- Тесты **1697/1697**: сервер 1006/1006 (73 файлов), фронт 691/691 (55 файлов: 229 в `src/` + 462 тестов гейтов в 19 файлах `scripts/`), E2E 154 в 20 спеках (статический счёт `playwright test --list`). Гейты: все зелёные — 23 джобы `ci.yml` + 7 `deploy.yml` (на 12.10.2026) + локальные `check:console`/`check:bundle`.
 - vite build ✅, tsc --noEmit 0 ошибок, eslint 0 errors (194 warnings — стилевые), Swagger ✅
 - E2E: Playwright, storageState из global-setup (.auth/*.json), аудит console-errors на каждой странице, screenshot/video/trace на падение; независимая очистка БД `scripts/e2e-cleanup.mjs` шагом с `if: always()`.
 - Pre-flight: `npm run check:ports`, `node scripts/schema-drift-audit.mjs --offline`, `npm run check:docs`, `npm run check:enum-constraints`, `npm run check:prod-mock`, `npm run check:headers`, `node scripts/test-counter-audit.mjs`.
@@ -75,7 +75,7 @@ Node.js/Express + MySQL (mysql2) бэкенд, Socket.IO real-time, Capacitor An
   деплой Docker: `appleboy/ssh-action` → `docker compose up -d --build` → миграции, `schema-validate` и `schema-drift` В КОНТЕЙНЕРЕ (`docker compose exec -T app …`).
 - Redis: кэш (profile 60s, matches 30s), Bull Queue (email/push/image), Socket.IO adapter; graceful fallback.
 - Мониторинг: Prometheus :9090 + Grafana :3001 (7 панелей), prom-client метрики HTTP/DB/WS/cache.
-- Docker Compose: app + nginx + Prometheus + Grafana (YAML валиден; Docker 29.8.2 + Compose v5.5.1 есть, образы `--target server`/`--target web` собираются локально).
+- Docker Compose: app + nginx + Prometheus + Grafana (YAML валиден; Docker Desktop 29.8.2 + Compose v5.5.1 стоял на 12.10.2026, но откат Windows 13.10.2026 его снял — локальная сборка/прогон образов сейчас недоступны).
 - Nginx conf: rate-limit, WS 86400s, SSL, SPA fallback. Бэкапы MySQL: скрипты PS/sh + Task Scheduler 03:00, retention 7d.
 - k6: лайт-прогон 10 VU ок (p95 ≤ 232ms, 57% «ошибок» = rate-limit by design); полный 100 VU — на staging.
 

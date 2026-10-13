@@ -204,7 +204,7 @@ cd server && npm test            # серверные тесты
 |-------|-----------|
 | `lint` | `tsc --noEmit` → `eslint src/` → `vite build` |
 | `lint-server` | `eslint` по `server/src` (этап 29) |
-| `e2e` | **обязательный E2E на любом push/PR** (этап 30): MySQL 8.0 сервис → схема → `seed-migrations` → `migrate.js` → **`server/src/seed.js`** → API 3002 + `vite preview --strictPort` 8081 → `wait-for-url` → `npm run test:e2e` → `upload-artifact` при `always()` |
+| `e2e` | **обязательный E2E на любом push/PR** (этап 30): MySQL 8.4 сервис → схема → `seed-migrations` → `migrate.js` → **`server/src/seed.js`** → API 3002 + `vite preview --strictPort` 8081 → `wait-for-url` → `npm run test:e2e` → `upload-artifact` при `always()` |
 | `e2e-gate` | `npm run check:e2e` — E2E-джоба обязательна, рецепт способен стать зелёным, команды Playwright в двух workflow совпадают |
 | `test` | фронт-тесты (vitest) |
 | `test-server` | серверные тесты (vitest, без БД) |
@@ -229,7 +229,7 @@ cd server && npm test            # серверные тесты
 |-------|-----------|
 | `lint-and-typecheck` | `check:ports` → `lint` → `lint:server` → `tsc` → **`secrets-leak`**, **`deploy-persistence`**, **`audit:prod` ×2**, **`check:e2e`**, **`check:docs`**, **`check:headers`**, **`check:n-plus-one`**, **`check:mysql-race`**, **`check:enum-constraints`**, **`check:env`**, **`check:env-parity`**, **`check:swagger-coverage`**, **`check:prod-mock`** (блокируют деплой) |
 | `frontend-test` | витест + `check-native-config` + `vite build` |
-| `server-test` | MySQL 8.0 сервис: схема → `seed-migrations` → `migrate.js` → `schema-validate` → **live `schema-drift-audit`** → `sql-explain-audit` → `verify-backup` → витест с живой БД |
+| `server-test` | MySQL 8.4 сервис: схема → `seed-migrations` → `migrate.js` → `schema-validate` → **live `schema-drift-audit`** → `sql-explain-audit` → `verify-backup` → витест с живой БД |
 | `test-counters` | сверка чисел с прогоном |
 | `e2e-test` | Playwright на поднятом стеке (needs: lint, frontend, server) + выгрузка отчёта; с этапа 30 рецепт идентичен `e2e` в `ci.yml` (сид демо-данных, `wait-for-url` вместо `sleep`, `vite preview --strictPort`) |
 | `docker-config-check` | `docker compose config` + сборка образов `server`/`web` + Trivy (сейчас `exit-code: 0`, режим baseline) |

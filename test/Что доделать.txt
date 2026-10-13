@@ -23,6 +23,7 @@
 **Среда (блокер разработчика):**
 - Диск `E:` недоступен — зеркало `E:\swiftmatch-backup.git` и облачный бэкап (bundle, zip, дамп MySQL) не обновлены.
 - `server/.env` отсутствует — `check:keys` выходит 1.
+- **Docker не установлен** (Docker Desktop стоял 12.10.2026, снят откатом Windows 13.10.2026): `docker` нет в `PATH`, нет каталога `C:\Program Files\Docker Desktop`, поиск `docker.exe` по `C:`/`D:` пуст. Локальная сборка образов и интеграционный прогон против `docker-compose` недоступны; in-container проверки nginx 1.30 / MySQL 8.4 сверить нечем.
 - Стенд 3002/8081 поднят — живой E2E прогоняется (154 теста в 20 спеках); 13.10.2026 P2 #23 прогнан на Laragon 2/2 (см. `Что сделано.txt`).
 - Живая проверка заголовков на staging и решение по CSP — за владельцем (остаток этапа 38, пункты 5–6).
 - **L1 (VAPID):** скомпрометированный приватный ключ (коммит `e8b26bf`) — решение владельца: **только регенерация на VPS**, история не переписывается (`npx web-push generate-vapid-keys`, заменить пару в `/app/swiftmatch/.env`, при нежелании терять подписки — сначала сохранить старый `VAPID_PUBLIC_KEY`).
@@ -117,7 +118,7 @@
 - GDPR full erasure cascade E2E (юзер → активность → erase → 404 везде)
 - RevenueCat webhook E2E с моком событий (дипсик)
 - Backup/restore smoke в CI (restore → smoke-тесты)
-- Интеграционный прогон против docker-compose на CI-раннере: `server/src/index.js` + `mysql:8.4` + `redis:7-alpine` + SMTP-webhook через `maildev` (не E2E, не смоук статики — живой API против реальных сервисов; Stripe/RevenueCat/FCM остаются в 503-fail-closed — они и так fail-closed, ключи не нужны; redis в CI-сервисах сейчас нет — есть только `mysql:8.4` в `deploy.yml:140,242`) — из разбора «Оценка дипсик1.txt» 11.10.2026. Docker на машине уже стоит (Docker Desktop 29.8.2, 12.10.2026) — прежний блокер среды снят
+- Интеграционный прогон против docker-compose на CI-раннере: `server/src/index.js` + `mysql:8.4` + `redis:7-alpine` + SMTP-webhook через `maildev` (не E2E, не смоук статики — живой API против реальных сервисов; Stripe/RevenueCat/FCM остаются в 503-fail-closed — они и так fail-closed, ключи не нужны; redis в CI-сервисах сейчас нет — есть только `mysql:8.4` в `deploy.yml:140,242`) — из разбора «Оценка дипсик1.txt» 11.10.2026. **Docker Desktop был установлен 12.10.2026, но откат Windows 13.10.2026 снял его** (проверено: `docker` нет в `PATH`, нет каталога `C:\Program Files\Docker Desktop`, поиск `docker.exe` по `C:`/`D:` пуст) — прогон снова заблокирован средой
 - Cross-browser: projects [chromium, firefox, webkit] в playwright.config.ts
 - IAP sandbox-тест покупок после публикации в Google Play (дипсик)
 
