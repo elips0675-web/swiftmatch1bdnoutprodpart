@@ -33,9 +33,23 @@ router.post('/api/reports', auth, async (req, res) => {
   }
 
   try {
+    // Round-robin по активным командам модерации (P3 #31): берём команду с
+    // наименьшим числом неразобранных жалоб, при равенстве — с меньшим id.
+    // Команд нет → team_id = NULL (супер-админы видят такие жалобы).
+    const [[team]] = await pool.query(
+      `SELECT t.id AS team_id
+       FROM moderation_teams t
+       LEFT JOIN reports r ON r.team_id = t.id AND r.status = 'pending'
+       WHERE t.is_active = 1
+       GROUP BY t.id
+       ORDER BY COUNT(r.id) ASC, t.id ASC
+       LIMIT 1`,
+    )
+    const teamId = team ? team.team_id : null
+
     await pool.query(
-      'INSERT INTO reports (reporter_id, reported_id, reason, description, status) VALUES (?, ?, ?, ?, ?)',
-      [req.userId, reported_id, reason, description || null, 'pending'],
+      'INSERT INTO reports (reporter_id, reported_id, reason, description, status, team_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [req.userId, reported_id, reason, description || null, 'pending', teamId],
     )
 
     // Count total reports against this user

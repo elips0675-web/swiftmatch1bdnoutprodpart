@@ -31,7 +31,18 @@ export async function adminAuth(req, res, next) {
     if (rows.length === 0) {
       return res.status(403).json({ message: 'ADMIN_REQUIRED' })
     }
-    req.admin = rows[0]
+    // Скоуп модератора (P3 #31): админ с командой видит только её жалобы,
+    // админ без команды — супер-админ. Просмотр членства не должен ронять
+    // админку при дрейфе схемы (нет таблицы) — деградируем к «видит всё»
+    // и пишем warn, а не 500 на каждом /api/admin.
+    let teams = []
+    try {
+      const [memberRows] = await pool.query('SELECT team_id FROM moderation_team_members WHERE user_id = ?', [rows[0].id])
+      teams = (memberRows || []).map((m) => m.team_id)
+    } catch (err) {
+      rootLogger.warn('adminAuth teams lookup failed, scoping disabled:', err)
+    }
+    req.admin = { ...rows[0], teams }
     next()
   } catch (err) {
     rootLogger.error('adminAuth DB error:', err)

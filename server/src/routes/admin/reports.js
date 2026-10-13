@@ -17,16 +17,22 @@ const router = Router()
  */
 router.get('/reports', async (req, res) => {
   try {
+    const teams = Array.isArray(req.admin?.teams) ? req.admin.teams : []
+    const scoped = teams.length > 0
     const [rows] = await pool.query(
       `SELECT r.id, r.reason, r.description, r.status,
                DATE_FORMAT(r.created_at, '%Y-%m-%d') as date,
                reporter.display_name as reporterName,
                reported.display_name as reportedUserName,
-               NULL as evidence
+               NULL as evidence,
+               t.name as teamName
        FROM reports r
        LEFT JOIN user_profiles reporter ON r.reporter_id = reporter.id
        LEFT JOIN user_profiles reported ON r.reported_id = reported.id
+       LEFT JOIN moderation_teams t ON t.id = r.team_id
+       ${scoped ? 'WHERE r.team_id IN (?)' : ''}
        ORDER BY r.created_at DESC`,
+      scoped ? [teams] : [],
     )
     res.json(rows)
   } catch (err) {
@@ -53,6 +59,17 @@ router.post('/reports/:id/status', async (req, res) => {
     return res.status(400).json({ message: 'Invalid status' })
   }
   try {
+    // Скоуп модератора (P3 #31): нельзя поменять статус жалобы вне своих
+    // команд — иначе скоуп обходится прямым запросом по id (IDOR).
+    const teams = Array.isArray(req.admin?.teams) ? req.admin.teams : []
+    if (teams.length > 0) {
+      const [[existing]] = await pool.query('SELECT team_id FROM reports WHERE id = ?', [req.params.id])
+      if (!existing) return res.status(404).json({ message: 'Report not found' })
+      if (existing.team_id == null || !teams.includes(existing.team_id)) {
+        return res.status(403).json({ message: 'REPORT_OUT_OF_SCOPE' })
+      }
+    }
+
     await pool.query('UPDATE reports SET status = ? WHERE id = ?', [status, req.params.id])
 
     if (status === 'action_taken') {
