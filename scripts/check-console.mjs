@@ -29,6 +29,7 @@ const PAGES = [
   '/faq', '/about', '/safety', '/login', '/register',
   '/admin', '/admin/users', '/admin/content', '/admin/features',
   '/admin/analytics', '/admin/hangouts', '/admin/partners',
+  '/admin/reports', '/admin/teams',
 ]
 
 const BASE = process.env.BASE_URL || 'http://localhost:8081'

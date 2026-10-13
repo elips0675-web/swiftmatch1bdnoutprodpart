@@ -31,6 +31,7 @@ import adminDashboard from './routes/admin/dashboard.js'
 import adminUsers from './routes/admin/users.js'
 import adminAnalytics from './routes/admin/analytics.js'
 import adminReports from './routes/admin/reports.js'
+import adminTeams from './routes/admin/teams.js'
 import adminWeeklyReport from './routes/admin/weekly-report.js'
 import adminContent from './routes/admin/content.js'
 import adminFeatures from './routes/admin/features.js'
@@ -286,7 +287,8 @@ app.get('/api/admin/me', async (req, res) => {
       [decoded.userId],
     )
     if (rows.length === 0) return res.status(401).json({ message: 'User not found' })
-    res.json(rows[0])
+    const teams = Array.isArray(req.admin?.teams) ? req.admin.teams : []
+    res.json({ ...rows[0], teams })
   } catch {
     res.status(401).json({ message: 'Invalid token' })
   }
@@ -296,6 +298,7 @@ app.use('/api/admin', adminDashboard)
 app.use('/api/admin', adminUsers)
 app.use('/api/admin', adminAnalytics)
 app.use('/api/admin', adminReports)
+app.use('/api/admin', adminTeams)
 app.use('/api/admin', adminWeeklyReport)
 app.use('/api/admin', adminContent)
 app.use('/api/admin', adminFeatures)

@@ -31,6 +31,7 @@ const AdminFeatures = lazy(() => import("./pages/admin-features"))
 const AdminMessaging = lazy(() => import("./pages/admin-messaging"))
 const AdminMonetization = lazy(() => import("./pages/admin-monetization"))
 const AdminReports = lazy(() => import("./pages/admin-reports"))
+const AdminTeams = lazy(() => import("./pages/admin-teams"))
 const AdminPhotos = lazy(() => import("./pages/admin-photos"))
 const AdminUsers = lazy(() => import("./pages/admin-users"))
 const AdminExperiments = lazy(() => import("./pages/admin-experiments"))
@@ -121,6 +122,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/admin/messaging": "Рассылки — SwiftMatch",
   "/admin/monetization": "Монетизация — SwiftMatch",
   "/admin/reports": "Жалобы — SwiftMatch",
+  "/admin/teams": "Команды модерации — SwiftMatch",
   "/premium/success": "Оплата успешна — SwiftMatch",
   "/premium/cancel": "Оплата отменена — SwiftMatch",
   "/partner-order/success": "Заказ оформлен — SwiftMatch",
@@ -192,6 +194,7 @@ const App = () => (
                     <Route path="/admin/messaging" element={<AdminGuard><AdminLayout><SuspenseWrapper><AdminMessaging /></SuspenseWrapper></AdminLayout></AdminGuard>} />
                     <Route path="/admin/monetization" element={<AdminGuard><AdminLayout><SuspenseWrapper><AdminMonetization /></SuspenseWrapper></AdminLayout></AdminGuard>} />
                     <Route path="/admin/reports" element={<AdminGuard><AdminLayout><SuspenseWrapper><AdminReports /></SuspenseWrapper></AdminLayout></AdminGuard>} />
+                    <Route path="/admin/teams" element={<AdminGuard><AdminLayout><SuspenseWrapper><AdminTeams /></SuspenseWrapper></AdminLayout></AdminGuard>} />
                     <Route path="/admin/photos" element={<AdminGuard><AdminLayout><SuspenseWrapper><AdminPhotos /></SuspenseWrapper></AdminLayout></AdminGuard>} />
                     <Route path="/admin/hangouts" element={<AdminGuard><AdminLayout><SuspenseWrapper><AdminHangouts /></SuspenseWrapper></AdminLayout></AdminGuard>} />
                     <Route path="/admin/partners" element={<AdminGuard><AdminLayout><SuspenseWrapper><AdminPartners /></SuspenseWrapper></AdminLayout></AdminGuard>} />

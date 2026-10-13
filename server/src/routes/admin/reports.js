@@ -20,7 +20,7 @@ router.get('/reports', async (req, res) => {
     const teams = Array.isArray(req.admin?.teams) ? req.admin.teams : []
     const scoped = teams.length > 0
     const [rows] = await pool.query(
-      `SELECT r.id, r.reason, r.description, r.status,
+      `SELECT r.id, r.reason, r.description, r.status, r.team_id as teamId,
                DATE_FORMAT(r.created_at, '%Y-%m-%d') as date,
                reporter.display_name as reporterName,
                reported.display_name as reportedUserName,

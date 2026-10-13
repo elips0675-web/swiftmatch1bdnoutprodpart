@@ -25,6 +25,7 @@ export function AdminSidebar() {
     { title: t('admin.experiments'), path: '/admin/experiments', icon: FlaskConical },
     { title: t('admin.users'), path: '/admin/users', icon: Users },
     { title: t('admin.reports'), path: '/admin/reports', icon: Flag },
+    { title: t('admin.teams'), path: '/admin/teams', icon: Users },
     { title: t('admin.features'), path: '/admin/features', icon: SlidersHorizontal },
     { title: t('admin.monetization'), path: '/admin/monetization', icon: DollarSign },
     { title: t('admin.content'), path: '/admin/content', icon: Package },
