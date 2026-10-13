@@ -124,13 +124,30 @@
 
 ### Остатки, подтверждённые сверкой двух аудитов 13.10.2026
 
-- **35 заглушек «⚠️ требует описания» в `test/ИНВЕНТАРЬ-ТЕСТОВ.md`** (19 сервер, 10 фронт, 5 гейт, 1 E2E) — заполнить руками: гейт их пропускает, потому что наполнение по описанию не сверяет.
+- **37 заглушек «⚠️ требует описания» в `test/ИНВЕНТАРЬ-ТЕСТОВ.md`** (21 сервер, 10 фронт, 5 скриптов, 1 E2E) — заполнить руками: гейт их пропускает, потому что наполнение по описанию не сверяет.
 - **Страницы фронта без собственного юнит-теста** (сверка `src/pages/*.tsx` ↔ `src/test/*.test.tsx`): `matches`, `search`, `search-filters`, `groups`, `groups-category`, `contest`, `events`, `onboarding`, `settings`, `settings-privacy`, `safety`, `schedule`, `support-chat`, `user`, `verify-email`, `about`, `faq`, `premium` и `premium-*`, `partner-*` — у части есть покрытие секций, но не страницы целиком. **Частично закрыто 13.10.2026:** E2E-смоук на эти пути заведён (`e2e/pages-smoke.spec.ts`, 24 страницы — открытие, заголовок, 5xx/console-error), собственного юнита у страниц по-прежнему нет — пункт открыт в части юнитов.
 - ~~**Админ-страницы без E2E** (сквозной путь есть только у `admin-content`/`admin-features`/`admin-messaging`/`admin-users`)~~ ✅ **ЗАКРЫТО 13.10.2026:** 12 страниц (`admin-analytics`, `admin-backup`, `admin-experiments`, `admin-hangouts`, `admin-monetization`, `admin-partners`, `admin-photos`, `admin-reports`, `admin-teams`, `admin-health`, `admin-queues`, `admin-webhooks`) открываются без 5xx/console-error — `e2e/pages-smoke.spec.ts`. Разбор в `Что сделано.txt`.
 - **Пагинации нет:** `GET /api/matches` (`server/src/routes/social.js:332`) отдаёт весь список, `GET /api/notifications` (`server/src/routes/notifications.js:103`) — жёсткий `LIMIT 30` без offset/курсора.
 - **`audit_log` не пишется на UPDATE профиля/фото:** чтение есть (`GET /api/profile/activity`, `server/src/routes/profile.js:539-542`), `INSERT INTO audit_log` вызывается только из `server/src/audit.js:15` при массовом soft-delete.
 - **Живые внешние контуры не проверяются:** SMTP/RevenueCat/FCM/Twilio/S3/OpenAI/Rekognition — только мок/fallback (`server/src/mail.js:36`, `server/src/circuit-breaker.js:38`, `server/src/ai-moderation.js:16,29`).
 - **Порогов coverage нет:** `vitest.config.ts` и `server/vitest.config.js` без `coverage.thresholds` (то же, что P3 #32).
+
+### Остатки из тест-ориентированного свода (дипсик), 13.10.2026
+
+Сверено по коду; полный разбор — `Финальная оценка проекта SwiftMatch.txt` §4.2 (что подтвердилось) и §5.2 (что опровергнуто и потому в бэклог не попало).
+
+- **Деплой без zero-downtime:** `docker compose up -d --build` пересоздаёт контейнер без health-wait и rollback — `.github/workflows/deploy.yml:553`.
+- **Алертинга нет:** в `monitoring/` только `prometheus.yml` и `grafana-*`, файла правил алертинга нет — дашборды без оповещений.
+- **Нет выделенных лимитеров на чат и AI:** только общие — `server/src/middleware/limiters.js` (auth 1000/мин, api 600/мин, like 30/мин); чат и AI идут под `app.use('/api/', limiter)` (`server/src/index.js:135`).
+- **`trust proxy` не задан:** за nginx лимитер видит IP прокси, а не клиента — в `server/src` совпадений нет.
+- **Нет сверки платежей и жизненного цикла подписки** (истечение/даунгрейд/возврат): `reconcile`/`downgrade`/`refund`/`cron` по `server/src/routes` не встречаются.
+- **Нет автообновления зависимостей:** `.github/dependabot.yml` отсутствует (Dependabot/Renovate не настроены).
+- **`SIGINT` и сторожевой таймаут shutdown не обрабатываются** — `README.md:329` сам отсылает в бэклог, а пункта не было.
+- **Нет unsubscribe в рассылках:** `server/src/routes/admin/messaging.js` (кампании) без отписки.
+- **Нет тестов на `referral`/`contest`/`schedule`/`attachment`/`profile-score`:** файлов в `src/test` и `server/src/__tests__` нет.
+- **Нет native/WebView E2E (Capacitor):** в `e2e/` нет `native*`/`capacitor*` спека.
+- **a11y системно не проверяется:** `aria-*` есть точечно (напр. `src/components/chat/chat-partner-actions.tsx:121`), смоук-теста нет.
+- **Нет quiet hours / DND:** `quiet`/`DND`/«не беспокоить» по `src` не встречаются.
 
 ### Инструментарий рутины этапа + структурный гейт бэклога (перенесено из внешних разборов «Оценка доделать5/6», P2) — ЗАКРЫТО 11.10.2026
 
