@@ -26,6 +26,8 @@ import { useAntiScreenshot } from "@/hooks/useAntiScreenshot";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { useWebRTC } from "@/hooks/use-webrtc";
 import { aiChatIcebreakerSuggestions } from "@/shims/ai-flows";
+import { OpeningLinesPicker } from "@/components/opening-lines-picker";
+import { firstNameOf } from "@/lib/opening-lines";
 
 const VideoCallDialog = dynamic(() => import('@/components/video-call').then(mod => mod.VideoCallDialog), { ssr: false });
 const VoiceCallDialog = dynamic(() => import('@/components/voice-call').then(mod => mod.VoiceCallDialog), { ssr: false });
@@ -233,6 +235,7 @@ function ChatsContent() {
   const [reactions, setReactions] = useState<Record<number, any[]>>({});
   const [reactionMsgId, setReactionMsgId] = useState<number | null>(null);
   const [replyTo, setReplyTo] = useState<{ id: number; name: string; text: string } | null>(null);
+  const [partnerCommonInterest, setPartnerCommonInterest] = useState<string | null>(null);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
@@ -558,6 +561,11 @@ function ChatsContent() {
     setSelectedChat(chat);
     setReactions({});
     const authH = { Authorization: `Bearer ${authToken}` };
+    setPartnerCommonInterest(null);
+    fetch(`/api/chats/${chat.id}?lang=${language === 'EN' ? 'en' : 'ru'}`, { headers: authH })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => setPartnerCommonInterest(d ? (d.common_interest ?? null) : null))
+      .catch(() => setPartnerCommonInterest(null));
     fetchMessagePage(chat.id, authToken).then(page => {
       if (!page) return;
       applyFirstPage(page.messages, user?.id);
@@ -761,6 +769,7 @@ function ChatsContent() {
             <div className="flex-1 relative">
               <Input data-testid="message-input" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onFocus={() => setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "auto" }), 300)} onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} placeholder={t('chats.placeholder')} className="pr-20 h-11 bg-muted/50 border-0 rounded-2xl font-medium px-5 text-sm" />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {!selectedChat?.isGroup && <OpeningLinesPicker firstName={firstNameOf(selectedChat?.name)} commonInterest={partnerCommonInterest} onPick={(text) => setInputValue(text)} />}
                 <Popover>
                   <PopoverTrigger asChild><button className={cn("text-muted-foreground hover:text-primary transition-colors", selectedTtl && "text-primary")}><Timer size={16} /></button></PopoverTrigger>
                   <PopoverContent className="w-40 p-1.5 rounded-2xl border-0 shadow-2xl bg-white" side="top" align="end">

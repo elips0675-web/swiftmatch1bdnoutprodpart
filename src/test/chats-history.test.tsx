@@ -82,7 +82,7 @@ function installFetch() {
     if (u.startsWith(`/api/chats/${CHAT_ID}/messages`)) {
       return Promise.resolve(jsonResponse(jsonBefore(u) ? olderPage : firstPage))
     }
-    if (u === `/api/chats/${CHAT_ID}`) return Promise.resolve(jsonResponse(partner))
+    if (u.split('?')[0] === `/api/chats/${CHAT_ID}`) return Promise.resolve(jsonResponse(partner))
     if (u.includes('/api/hangouts/by-chat/')) return Promise.resolve(jsonResponse({}, 404))
     if (u.includes('/read')) return Promise.resolve(jsonResponse({}))
     return Promise.resolve(jsonResponse({}, 404))
@@ -163,7 +163,7 @@ describe('История чата: страницы вместо «первых 
         const page = u.includes('before=50') ? midPage : u.includes('before=48') ? deepPage : FIRST_PAGE
         return Promise.resolve(jsonResponse(page))
       }
-      if (u === `/api/chats/${CHAT_ID}`) return Promise.resolve(jsonResponse(partner))
+      if (u.split('?')[0] === `/api/chats/${CHAT_ID}`) return Promise.resolve(jsonResponse(partner))
       if (u.includes('/api/hangouts/by-chat/')) return Promise.resolve(jsonResponse({}, 404))
       if (u.includes('/read')) return Promise.resolve(jsonResponse({}))
       return Promise.resolve(jsonResponse({}, 404))
@@ -214,7 +214,7 @@ describe('История чата: страницы вместо «первых 
       if (u.startsWith(`/api/chats/${CHAT_ID}/messages`)) {
         return jsonBefore(u) ? Promise.resolve(jsonResponse({}, 500)) : Promise.resolve(jsonResponse(FIRST_PAGE))
       }
-      if (u === `/api/chats/${CHAT_ID}`) return Promise.resolve(jsonResponse(partner))
+      if (u.split('?')[0] === `/api/chats/${CHAT_ID}`) return Promise.resolve(jsonResponse(partner))
       if (u.includes('/api/hangouts/by-chat/')) return Promise.resolve(jsonResponse({}, 404))
       if (u.includes('/read')) return Promise.resolve(jsonResponse({}))
       return Promise.resolve(jsonResponse({}, 404))
@@ -338,7 +338,7 @@ describe('Редактирование сообщения (P1 #9)', () => {
           : firstPage
         return Promise.resolve(jsonResponse(page))
       }
-      if (u === `/api/chats/${CHAT_ID}`) return Promise.resolve(jsonResponse(partner))
+      if (u.split('?')[0] === `/api/chats/${CHAT_ID}`) return Promise.resolve(jsonResponse(partner))
       if (u.includes('/api/hangouts/by-chat/')) return Promise.resolve(jsonResponse({}, 404))
       if (u.includes('/read')) return Promise.resolve(jsonResponse({}))
       return Promise.resolve(jsonResponse({}, 404))

@@ -764,7 +764,20 @@ router.get('/api/chats/:chatId', auth, async (req, res) => {
       [req.userId, req.userId, req.params.chatId],
     )
     if (!row) return res.status(404).json({ message: 'Chat not found or not a participant' })
-    res.json(row)
+    const lang = req.query.lang === 'en' ? 'en' : 'ru'
+    const [[common]] = await pool.query(
+      `SELECT i.name_ru, i.name_en
+       FROM interests i
+       JOIN user_interests ui_me ON ui_me.interest_id = i.id AND ui_me.user_id = ?
+       JOIN user_interests ui_other ON ui_other.interest_id = i.id AND ui_other.user_id = ?
+       ORDER BY i.id
+       LIMIT 1`,
+      [req.userId, row.user_id],
+    )
+    res.json({
+      ...row,
+      common_interest: common ? (lang === 'en' ? common.name_en : common.name_ru) : null,
+    })
   } catch (err) {
     logger.error('Chat detail error:', err)
     res.status(500).json({ message: 'Failed to fetch chat' })

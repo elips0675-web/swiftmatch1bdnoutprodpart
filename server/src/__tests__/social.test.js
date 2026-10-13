@@ -79,6 +79,37 @@ describe('PUT /api/chats/:chatId/read', () => {
   })
 })
 
+describe('GET /api/chats/:chatId', () => {
+  it('отдаёт общий интерес пары с локализацией по ?lang', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 1, user_id: 2, name: 'Аня', avatar: null, online: 1 }], []])
+      .mockResolvedValueOnce([[{ name_ru: 'Кино', name_en: 'Movies' }], []])
+    const app = createApp()
+    const res = await request(app).get('/api/chats/1?lang=en').set('Authorization', `Bearer ${authToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body.name).toBe('Аня')
+    expect(res.body.common_interest).toBe('Movies')
+  })
+
+  it('common_interest = null, когда общих интересов нет', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 1, user_id: 2, name: 'Аня' }], []])
+      .mockResolvedValueOnce([[], []])
+    const app = createApp()
+    const res = await request(app).get('/api/chats/1').set('Authorization', `Bearer ${authToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body.common_interest).toBeNull()
+  })
+
+  it('не-участник → 404, второй запрос (общий интерес) не уходит', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    const app = createApp()
+    const res = await request(app).get('/api/chats/12').set('Authorization', `Bearer ${authToken()}`)
+    expect(res.status).toBe(404)
+    expect(pool.query).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('GET /api/chats/:chatId/messages', () => {
   // `desc(...ids)` — строки в том порядке, в котором их вернул бы DESC-запрос:
   // первым идёт самое новое. Наружу страница обязана уйти хронологически.

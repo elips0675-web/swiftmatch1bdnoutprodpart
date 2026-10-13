@@ -169,6 +169,24 @@ describe('GET /api/admin/features', () => {
     expect(res.body.profileActivity).toBe(false)
   })
 
+  it('openingLines трактуется как «включено», если колонки ещё нет (миграция не применена)', async () => {
+    pool.query.mockResolvedValue([[{ id: 1, video_calls_enabled: 1 }], []])
+    const res = await request(app)
+      .get('/api/admin/features')
+      .set('Authorization', `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body.openingLines).toBe(true)
+  })
+
+  it('openingLines отражает колонку opening_lines_enabled', async () => {
+    pool.query.mockResolvedValue([[{ id: 1, opening_lines_enabled: 0 }], []])
+    const res = await request(app)
+      .get('/api/admin/features')
+      .set('Authorization', `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body.openingLines).toBe(false)
+  })
+
   it('returns defaults when no row', async () => {
     pool.query.mockResolvedValue([[], []])
     const res = await request(app)
@@ -237,6 +255,18 @@ describe('PUT /api/admin/features', () => {
     const updateCall = pool.query.mock.calls.find(([sql]) => /profile_activity_enabled/.test(sql))
     expect(updateCall).toBeTruthy()
     expect(updateCall[1][9]).toBe(false)
+  })
+
+  it('принимает openingLines и пишет opening_lines_enabled', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    const res = await request(app)
+      .put('/api/admin/features')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ openingLines: false })
+    expect(res.status).toBe(200)
+    const updateCall = pool.query.mock.calls.find(([sql]) => /opening_lines_enabled/.test(sql))
+    expect(updateCall).toBeTruthy()
+    expect(updateCall[1][11]).toBe(false)
   })
 
   it('пишет rollout_percent при rolloutPercent', async () => {

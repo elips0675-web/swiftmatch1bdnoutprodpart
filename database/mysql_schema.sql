@@ -392,6 +392,7 @@ CREATE TABLE `feature_flags` (
   `partner_offers_enabled` tinyint(1) NOT NULL DEFAULT '0',
   `profile_activity_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `b2b_marketplace_enabled` tinyint(1) NOT NULL DEFAULT '0',
+  `opening_lines_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `rollout_percent` tinyint unsigned NOT NULL DEFAULT '100',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

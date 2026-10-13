@@ -28,6 +28,8 @@ import { CalendarHeart } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useFeatureFlags } from "@/context/feature-flags-context";
 import { ChatPartnerActions } from "@/components/chat/chat-partner-actions";
+import { OpeningLinesPicker } from "@/components/opening-lines-picker";
+import { firstNameOf } from "@/lib/opening-lines";
 
 const MESSAGES_PAGE_SIZE = 50;
 const MESSAGE_EDIT_WINDOW_MS = 15 * 60 * 1000;
@@ -81,7 +83,7 @@ function ChatRoomSkeleton() {
 
 export default function ChatPage({ params }: { params: { chatId: string } }) {
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { user, isLoading: isAuthLoading } = useAuth();
   const { socket } = useWebSocket();
   const { partnerOffersEnabled } = useFeatureFlags();
@@ -148,7 +150,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   // первый запрос (`before` первой страницы) и сообщения добавились бы дважды.
   const historyCursor = olderMessages.length > 0 ? olderMessages[0].id : messagePage?.next_before ?? null;
   const { data: chatPartner, loading: partnerLoading, error: partnerError } = useApi<any>(
-    `/api/chats/${params.chatId}`
+    `/api/chats/${params.chatId}?lang=${language === 'EN' ? 'en' : 'ru'}`
   );
   const [hangoutCtx, setHangoutCtx] = useState<{ id: number; title: string; event_date: string; category: string; status: string } | null>(null);
 
@@ -467,6 +469,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           <div className="flex-1 relative">
             <Input data-testid="message-input" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onFocus={() => setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "auto" }), 300)} onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} placeholder={t('chats.placeholder')} className="pr-24 h-11 bg-muted/50 border-0 rounded-xl" />
             <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              <OpeningLinesPicker firstName={firstNameOf(chatPartner?.name)} commonInterest={chatPartner?.common_interest ?? null} onPick={(text) => setInputValue(text)} />
               <Popover>
                 <PopoverTrigger asChild><button className={cn("text-muted-foreground hover:text-primary transition-colors", selectedTtl && "text-primary")}><Timer size={16} /></button></PopoverTrigger>
                 <PopoverContent side="top" align="end" className="w-40 p-1.5 rounded-2xl border-0 shadow-2xl bg-white">

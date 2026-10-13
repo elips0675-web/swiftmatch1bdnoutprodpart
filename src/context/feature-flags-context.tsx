@@ -12,6 +12,7 @@ export interface FeatureFlags {
   hangoutsEnabled: boolean;
   partnerOffersEnabled: boolean;
   profileActivityEnabled: boolean;
+  openingLinesEnabled: boolean;
   rolloutEnabled: boolean;
 }
 
@@ -24,6 +25,7 @@ const defaultFlags: FeatureFlags = {
   hangoutsEnabled: true,
   partnerOffersEnabled: false,
   profileActivityEnabled: true,
+  openingLinesEnabled: true,
   rolloutEnabled: true,
 };
 
@@ -36,6 +38,7 @@ const mapApiFlags = (data: Record<string, boolean>): FeatureFlags => ({
   hangoutsEnabled: data.hangouts ?? true,
   partnerOffersEnabled: data.partnerOffers ?? false,
   profileActivityEnabled: data.profileActivity ?? true,
+  openingLinesEnabled: data.openingLines ?? true,
   rolloutEnabled: true,
 });
 
@@ -52,6 +55,7 @@ const applyRollout = (data: Record<string, unknown>): FeatureFlags => {
     hangoutsEnabled: raw.hangoutsEnabled && rolloutEnabled,
     partnerOffersEnabled: raw.partnerOffersEnabled && rolloutEnabled,
     profileActivityEnabled: raw.profileActivityEnabled && rolloutEnabled,
+    openingLinesEnabled: raw.openingLinesEnabled && rolloutEnabled,
     rolloutEnabled,
   }
 }

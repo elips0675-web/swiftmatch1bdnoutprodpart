@@ -24,6 +24,7 @@ router.get('/features', async (req, res) => {
         videoCalls: true, aiIcebreakers: true, aiCompatibility: true,
         groupsPage: true, contest: true, showAds: false, autosearch: true,
         hangouts: true, partnerOffers: false, profileActivity: true,
+        openingLines: true,
         rolloutPercent: 100,
       })
     }
@@ -38,6 +39,7 @@ router.get('/features', async (req, res) => {
       hangouts: Boolean(row.hangouts_enabled),
       partnerOffers: Boolean(row.partner_offers_enabled),
       profileActivity: Boolean(row.profile_activity_enabled ?? true),
+      openingLines: Boolean(row.opening_lines_enabled ?? true),
       rolloutPercent: Number(row.rollout_percent ?? 100),
     })
   } catch (err) {
@@ -60,7 +62,7 @@ router.get('/features', async (req, res) => {
 router.put('/features', async (req, res) => {
   try {
     const flags = req.body
-    const knownKeys = ['videoCalls', 'aiIcebreakers', 'aiCompatibility', 'groupsPage', 'contest', 'showAds', 'autosearch', 'hangouts', 'partnerOffers', 'profileActivity', 'rolloutPercent']
+    const knownKeys = ['videoCalls', 'aiIcebreakers', 'aiCompatibility', 'groupsPage', 'contest', 'showAds', 'autosearch', 'hangouts', 'partnerOffers', 'profileActivity', 'openingLines', 'rolloutPercent']
     if (!flags || Object.keys(flags).length === 0 || !knownKeys.some(k => k in flags)) {
       return res.status(400).json({ message: 'At least one known flag key required' })
     }
@@ -73,7 +75,8 @@ router.put('/features', async (req, res) => {
         ai_compatibility_enabled = ?, groups_page_enabled = ?,
         contest_enabled = ?, show_ads = ?, autosearch_enabled = ?,
         hangouts_enabled = ?, partner_offers_enabled = ?,
-        profile_activity_enabled = ?, rollout_percent = ?
+        profile_activity_enabled = ?, rollout_percent = ?,
+        opening_lines_enabled = ?
        WHERE id = 1`,
       [
         Boolean(flags.videoCalls), Boolean(flags.aiIcebreakers),
@@ -81,6 +84,7 @@ router.put('/features', async (req, res) => {
         Boolean(flags.contest), Boolean(flags.showAds), Boolean(flags.autosearch),
         Boolean(flags.hangouts), Boolean(flags.partnerOffers),
         Boolean(flags.profileActivity), rolloutValue,
+        Boolean(flags.openingLines),
       ],
     )
     res.json({ message: 'Feature flags updated' })
