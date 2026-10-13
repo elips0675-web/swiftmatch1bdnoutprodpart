@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T13:19:21.915Z",
+  "generated": "2026-10-13T06:02:26.427Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -535,15 +535,15 @@
     ]
   },
   "e2e": {
-    "files": 19,
-    "tests": 152,
+    "files": 20,
+    "tests": 154,
     "gate": {
       "files": 0,
       "tests": 0
     },
     "product": {
-      "files": 19,
-      "tests": 152
+      "files": 20,
+      "tests": 154
     },
     "perFile": [
       {
@@ -577,6 +577,10 @@
       {
         "file": "e2e/chats-groups.spec.ts",
         "tests": 11
+      },
+      {
+        "file": "e2e/dating-lifecycle.spec.ts",
+        "tests": 2
       },
       {
         "file": "e2e/features.spec.ts",
