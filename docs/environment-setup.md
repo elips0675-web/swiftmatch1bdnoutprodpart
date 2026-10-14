@@ -10,7 +10,7 @@
 ## 0. Что уже готово в коде (не нужно делать заново)
 
 - `docker-compose.yml` — db (MySQL 8 на хост-порту 3307) + redis + app + nginx + Prometheus + Grafana, именованные volume'ы `db_data`/`redis_data`/`uploads_data`/`prometheus_data`/`grafana_data` (валиден, но НЕ прогонялся end-to-end)
-- `nginx/swiftmatch.http.conf` — конфиг, который реально едет в образ (`Dockerfile:30`): WS timeout `proxy_read_timeout 86400s`, `client_max_body_size 20M`, `limit_req` 60r/s (`/api`) и 10r/s (`/api/auth`). `nginx/swiftmatch.conf` и корневой `nginx.conf` — конфиги хостового nginx (TLS 443) и в образ не попадают; между собой они расходятся (`swiftmatch.conf` — 30r/s/5r/s, `nginx.conf` — без `limit_req`), см. бэклог
+- `nginx/swiftmatch.http.conf` — конфиг, который реально едет в образ (`Dockerfile`): WS timeout `proxy_read_timeout 86400s`, `client_max_body_size 20M`, `limit_req` 60r/s (`/api`) и 10r/s (`/api/auth`). Корневой `nginx.conf` (`127.0.0.1:3002`) — эталон хостового nginx на VPS (TLS 443); `nginx/swiftmatch.conf` (`app:3002`) — альтернатива с TLS-терминацией внутри контейнера. Ни один из них в образ не попадает. С этапа 44 все три согласованы по лимитам, `client_max_body_size` и WS-таймауту (проверка 6 в `npm run check:headers`)
 - `.github/workflows/deploy.yml` — CI: lint → test → build → migrate (на сервере) → restart; нужны только secrets
 - `scripts/backup-mysql.ps1` / `.sh` — бэкап, retention 30 дней; `verify-backup.mjs` — restore smoke
 - `server/.env.example`, `.env.example` — актуальные шаблоны всех ключей

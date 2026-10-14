@@ -33,11 +33,17 @@ import {
   auditHelmetOrder,
   auditIndexHtml,
   auditNginxFile,
+  auditNginxLimits,
   auditVercel,
+  CANONICAL_BODY_SIZE,
+  CANONICAL_LIMITS,
   documentLocations,
   effectiveHeaders,
   isRedirectOnlyServer,
+  MIN_WS_TIMEOUT_SEC,
+  parseBodySize,
   parseNginx,
+  parseTimeoutSeconds,
   servesTls,
   stripComments,
   tokenizeArgs,
@@ -590,5 +596,118 @@ describe('гейт на настоящем репозитории', () => {
       'utf8',
     )
     expect(audit(copy).problems.some((p) => p.includes('helmet'))).toBe(true)
+  })
+
+  it('красный, если limit_req_zone вернуть внутрь server (дефект L2)', () => {
+    const copy = copyRepoFiles(path.join(tmp, 'repo-zone-context'))
+    const target = path.join(copy, 'nginx/swiftmatch.conf')
+    fs.writeFileSync(
+      target,
+      fs
+        .readFileSync(target, 'utf8')
+        .replace(
+          '  client_max_body_size 20M;',
+          '  limit_req_zone $binary_remote_addr zone=bad:10m rate=1r/s;\n  client_max_body_size 20M;',
+        ),
+      'utf8',
+    )
+    expect(audit(copy).problems.some((p) => p.includes('limit_req_zone'))).toBe(true)
+  })
+
+  it('красный, если частота в одном конфиге разошлась с каноном (дефект L2)', () => {
+    const copy = copyRepoFiles(path.join(tmp, 'repo-rate-drift'))
+    const target = path.join(copy, 'nginx/swiftmatch.conf')
+    fs.writeFileSync(target, fs.readFileSync(target, 'utf8').replace('rate=60r/s', 'rate=30r/s'), 'utf8')
+    expect(audit(copy).problems.some((p) => p.includes('канон'))).toBe(true)
+  })
+})
+
+/* ------------------------------------------------------------------ */
+/* Проверка 6: лимиты и таймауты периметра                             */
+/* ------------------------------------------------------------------ */
+
+const LIMITS_VALID = [
+  'server_tokens off;',
+  'limit_req_zone $binary_remote_addr zone=api:10m rate=60r/s;',
+  'limit_req_zone $binary_remote_addr zone=auth:10m rate=10r/s;',
+  'server {',
+  '  listen 443 ssl;',
+  '  client_max_body_size 20M;',
+  '  location /api/auth/ { limit_req zone=auth burst=50 nodelay; proxy_pass http://api; }',
+  '  location /api/ { limit_req zone=api burst=120 nodelay; proxy_pass http://api; }',
+  '  location /socket.io/ { proxy_pass http://api; proxy_read_timeout 86400s; }',
+  '  location / { root /html; try_files $uri /index.html; }',
+  '}',
+].join('\n')
+
+const limits = (text) => auditNginxLimits({ file: 'x.conf', text })
+
+describe('auditNginxLimits: контекст, частоты, тело и таймауты', () => {
+  it('зелёный на согласованном конфиге и считает факты', () => {
+    const { problems, facts } = limits(LIMITS_VALID)
+    expect(problems).toEqual([])
+    expect(facts.zones).toEqual({ api: '60r/s', auth: '10r/s' })
+    expect(facts.apiLimited).toBe(2)
+    expect(facts.wsLocations).toBe(1)
+    expect(facts.bodySized).toBe(1)
+  })
+
+  it('красный: limit_req_zone внутри server — nginx такой конфиг не запускает', () => {
+    const broken = LIMITS_VALID.replace(
+      '  client_max_body_size 20M;',
+      '  limit_req_zone $binary_remote_addr zone=bad:10m rate=1r/s;\n  client_max_body_size 20M;',
+    )
+    expect(limits(broken).problems.some((p) => p.includes('limit_req_zone'))).toBe(true)
+  })
+
+  it('красный: частота расходится с каноном', () => {
+    const broken = LIMITS_VALID.replace('rate=60r/s', 'rate=30r/s')
+    expect(limits(broken).problems.some((p) => p.includes('канон'))).toBe(true)
+  })
+
+  it('красный: зона api не объявлена', () => {
+    const broken = LIMITS_VALID.replace('limit_req_zone $binary_remote_addr zone=api:10m rate=60r/s;\n', '')
+    expect(limits(broken).problems.some((p) => p.includes('zone=api'))).toBe(true)
+  })
+
+  it('красный: /api без limit_req (это и был риск L2)', () => {
+    const broken = LIMITS_VALID.replace('limit_req zone=api burst=120 nodelay; ', '')
+    expect(limits(broken).problems.some((p) => p.includes('/api/') && p.includes('без limit_req'))).toBe(true)
+  })
+
+  it('красный: сервер без client_max_body_size', () => {
+    const broken = LIMITS_VALID.replace('  client_max_body_size 20M;\n', '')
+    expect(limits(broken).problems.some((p) => p.includes('client_max_body_size'))).toBe(true)
+  })
+
+  it('красный: WS-таймаут меньше порога', () => {
+    const broken = LIMITS_VALID.replace('proxy_read_timeout 86400s', 'proxy_read_timeout 60s')
+    expect(limits(broken).problems.some((p) => p.includes('proxy_read_timeout'))).toBe(true)
+  })
+
+  it('красный: /socket.io/ без proxy_read_timeout', () => {
+    const broken = LIMITS_VALID.replace(' proxy_read_timeout 86400s;', '')
+    expect(limits(broken).problems.some((p) => p.includes('без proxy_read_timeout'))).toBe(true)
+  })
+
+  it('parseBodySize разбирает единицы', () => {
+    expect(parseBodySize('20M')).toBe(20 * 1024 ** 2)
+    expect(parseBodySize('1m')).toBe(1024 ** 2)
+    expect(parseBodySize('512k')).toBe(512 * 1024)
+    expect(parseBodySize('abc')).toBe(null)
+  })
+
+  it('parseTimeoutSeconds разбирает единицы', () => {
+    expect(parseTimeoutSeconds('86400s')).toBe(86400)
+    expect(parseTimeoutSeconds('1h')).toBe(3600)
+    expect(parseTimeoutSeconds('2m')).toBe(120)
+    expect(parseTimeoutSeconds('1d')).toBe(86400)
+    expect(parseTimeoutSeconds('плохо')).toBe(null)
+  })
+
+  it('каноны и порог — не декорация: у них ожидаемые значения', () => {
+    expect(CANONICAL_LIMITS).toEqual({ api: '60r/s', auth: '10r/s' })
+    expect(CANONICAL_BODY_SIZE).toBe('20M')
+    expect(MIN_WS_TIMEOUT_SEC).toBeGreaterThan(60)
   })
 })

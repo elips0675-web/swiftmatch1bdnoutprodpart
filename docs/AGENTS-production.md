@@ -7,7 +7,7 @@
 | Создано | Не значит «готово» |
 |---|---|
 | `Dockerfile` | Образ собирается, healthcheck отвечает, `docker-compose up` не падает |
-| `nginx/swiftmatch.http.conf` | `location /api` проксирует, WS не обрывается (`proxy_read_timeout 86400s`), `client_max_body_size 20M`, `limit_req` настроен. **Именно этот файл попадает в образ** (`Dockerfile:30`); корневой `nginx.conf` — конфиг хостового nginx на VPS (TLS 443, редирект с 80) и в образ не едет |
+| `nginx/swiftmatch.http.conf` | `location /api` проксирует, WS не обрывается (`proxy_read_timeout 86400s`), `client_max_body_size 20M`, `limit_req` настроен. **Именно этот файл попадает в образ** (`Dockerfile`); корневой `nginx.conf` — эталон хостового nginx на VPS (`127.0.0.1:3002`, TLS 443, редирект с 80), `nginx/swiftmatch.conf` (`app:3002`) — альтернатива с TLS внутри контейнера, в образ ни один не едет. С этапа 44 лимиты/тело/WS-таймаут согласованы во всех трёх (проверка 6 в `check:headers`) |
 | `sentry.ts` | DSN в `.env`, source maps генерируются, `beforeSend` фильтрует JWT/пароли |
 | `swagger.js` | Все новые роуты имеют JSDoc, авторизация через Bearer описана |
 | Тесты Vitest/Playwright | **0 failures** — «pre-existing» не оправдание. Упавший тест = баг или мок сломан |

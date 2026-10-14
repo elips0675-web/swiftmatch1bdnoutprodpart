@@ -56,6 +56,16 @@
  * среди проверенных, — иначе проверка «зелёная» относится к конфигу, который
  * никто не применяет.
  *
+ * Проверка 6 — **лимиты и таймауты периметра** (бэклог L2). Три nginx-файла
+ * годами держали разные `limit_req` (60/10 в образе против 30/5 в хостовом
+ * варианте) и разное поведение WS, а в `nginx/swiftmatch.conf` директива
+ * `limit_req_zone` вообще стояла внутри `server` — такой конфиг nginx не
+ * запускает («directive is not allowed here»), и этого не ловил ни один гейт.
+ * Гейт требует: `limit_req_zone` — только на http-уровне файла; канонические
+ * частоты (`api` 60r/s, `auth` 10r/s) одинаковы во всех конфигах;
+ * `client_max_body_size 20M` на каждом сервере; `limit_req` на `/api/` и
+ * `/api/auth/`; `/socket.io/` с `proxy_read_timeout` не меньше 300s.
+ *
  * Чего гейт не делает: не проверяет CSP по существу (не считает
  * `'unsafe-inline'`/`'unsafe-eval` в `script-src` находкой — это отдельная
  * работа с E2E-прогоном), не знает про CDN перед origin и не открывает сокеты.
@@ -592,6 +602,161 @@ export function auditDockerfile(text, knownFiles) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Лимиты и таймауты периметра (проверка 6)                            */
+/* ------------------------------------------------------------------ */
+
+/** Канонические частоты `limit_req` — одинаковые во всех nginx-конфигах. */
+export const CANONICAL_LIMITS = { api: '60r/s', auth: '10r/s' }
+
+/** Минимальный размер тела запроса: дефолт nginx — 1M, фото/аватары не пройдут. */
+export const CANONICAL_BODY_SIZE = '20M'
+
+/** Порог `proxy_read_timeout` для WebSocket: дефолт 60s рвёт соединение. */
+export const MIN_WS_TIMEOUT_SEC = 300
+
+/** `20M` → байты; `null`, если значение не разбирается. */
+export function parseBodySize(value) {
+  const m = /^(\d+)\s*([kmg])?$/i.exec(String(value).trim())
+  if (!m) return null
+  const unit = (m[2] || '').toLowerCase()
+  const mult = unit === 'k' ? 1024 : unit === 'm' ? 1024 ** 2 : unit === 'g' ? 1024 ** 3 : 1
+  return Number(m[1]) * mult
+}
+
+/** `86400s` / `1h` / `2m` / `1d` → секунды; `null`, если не разбирается. */
+export function parseTimeoutSeconds(value) {
+  const m = /^(\d+)\s*([smhd])?$/i.exec(String(value).trim())
+  if (!m) return null
+  const unit = (m[2] || 's').toLowerCase()
+  const mult = unit === 's' ? 1 : unit === 'm' ? 60 : unit === 'h' ? 3600 : 86400
+  return Number(m[1]) * mult
+}
+
+function directiveArg(d, prefix) {
+  const token = tokenizeArgs(d.args)
+    .map((t) => t.value)
+    .find((v) => v.startsWith(prefix))
+  return token ? token.slice(prefix.length) : null
+}
+
+/**
+ * Проверка 6: лимиты, размер тела и таймауты WS не расходятся между
+ * nginx-конфигами и не стоят в недопустимом контексте.
+ *
+ * @param {{file: string, text: string}} input
+ * @returns {{problems: string[], facts: object}}
+ */
+export function auditNginxLimits({ file, text }) {
+  const root = parseNginx(text)
+  const problems = []
+  const facts = { zones: {}, apiLimited: 0, wsLocations: 0, bodySized: 0 }
+
+  // (а) limit_req_zone — только http-уровень файла (не внутри server/location).
+  const walkBlocks = (block, depth) => {
+    for (const d of block.directives) {
+      if (d.name === 'limit_req_zone' && depth > 0) {
+        problems.push(
+          `${file}:${d.line}: limit_req_zone объявлен внутри блока "${block.type}" — nginx принимает директиву только на http-уровне файла, такой конфиг не запускается ("directive is not allowed here").`,
+        )
+      }
+    }
+    for (const child of block.children) walkBlocks(child, depth + 1)
+  }
+  walkBlocks(root, 0)
+
+  // (б) объявленные зоны обязаны совпадать с каноном.
+  for (const d of root.directives) {
+    if (d.name !== 'limit_req_zone') continue
+    const zoneSpec = directiveArg(d, 'zone=')
+    if (!zoneSpec) continue
+    const name = zoneSpec.split(':')[0]
+    const rate = directiveArg(d, 'rate=') ?? ''
+    facts.zones[name] = rate
+    const canon = CANONICAL_LIMITS[name]
+    if (canon && rate !== canon) {
+      problems.push(
+        `${file}:${d.line}: zone ${name} имеет rate=${rate}, а канон — ${canon}. Расхождение конфигов означает, что лимиты зависят от того, какой файл применили.`,
+      )
+    }
+  }
+  for (const [name, rate] of Object.entries(CANONICAL_LIMITS)) {
+    if (!(name in facts.zones)) {
+      problems.push(
+        `${file}: нет limit_req_zone для zone=${name} (канон rate=${rate}) — этот периметр не ограничивает запросы.`,
+      )
+    }
+  }
+
+  // (в) по каждому серверу: размер тела, limit_req на /api, таймаут WS.
+  for (const server of collectServers(root)) {
+    if (isRedirectOnlyServer(server)) continue
+
+    const body = server.directives.find((d) => d.name === 'client_max_body_size')
+    if (!body) {
+      problems.push(
+        `${file}:${server.line}: нет client_max_body_size — nginx применит дефолтный 1M, и загрузка фото/документов упадёт.`,
+      )
+    } else if (parseBodySize(body.args) !== parseBodySize(CANONICAL_BODY_SIZE)) {
+      problems.push(
+        `${file}:${body.line}: client_max_body_size ${body.args.trim()}, а канон ${CANONICAL_BODY_SIZE}.`,
+      )
+    } else {
+      facts.bodySized += 1
+    }
+
+    for (const loc of walkLocations(server)) {
+      const arg = loc.args.trim()
+      const expectedZone = /^\/api\/auth\/?$/.test(arg)
+        ? 'auth'
+        : /^\/api\/?$/.test(arg)
+          ? 'api'
+          : null
+      if (expectedZone) {
+        const limitReq = loc.directives.find((d) => d.name === 'limit_req')
+        if (!limitReq) {
+          problems.push(
+            `${file}:${loc.line}: location ${arg} без limit_req — запросы к этому пути не ограничены.`,
+          )
+        } else {
+          facts.apiLimited += 1
+          const zone = directiveArg(limitReq, 'zone=')
+          if (zone !== expectedZone) {
+            problems.push(
+              `${file}:${limitReq.line}: location ${arg} использует zone=${zone}, а ожидается zone=${expectedZone}.`,
+            )
+          } else if (!(zone in facts.zones)) {
+            problems.push(
+              `${file}:${limitReq.line}: location ${arg} ссылается на необъявленную zone=${zone}.`,
+            )
+          }
+        }
+      }
+
+      if (arg.includes('socket.io')) {
+        facts.wsLocations += 1
+        const timeout = loc.directives.find((d) => d.name === 'proxy_read_timeout')
+        if (!timeout) {
+          problems.push(
+            `${file}:${loc.line}: location ${arg} без proxy_read_timeout — WS оборвётся на дефолтных 60s.`,
+          )
+        } else {
+          const sec = parseTimeoutSeconds(timeout.args)
+          if (sec === null) {
+            problems.push(`${file}:${timeout.line}: proxy_read_timeout ${timeout.args} не разбирается.`)
+          } else if (sec < MIN_WS_TIMEOUT_SEC) {
+            problems.push(
+              `${file}:${timeout.line}: proxy_read_timeout ${timeout.args} на ${arg} меньше ${MIN_WS_TIMEOUT_SEC}s — WS оборвётся по таймауту.`,
+            )
+          }
+        }
+      }
+    }
+  }
+
+  return { problems, facts }
+}
+
+/* ------------------------------------------------------------------ */
 /* Сборка                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -613,6 +778,11 @@ export function audit(root = ROOT) {
     facts.nginxFiles += 1
     facts.documents += res.facts.documents
     facts.tlsServers += res.facts.tlsServers
+
+    const limits = auditNginxLimits({ file, text: read(file) })
+    problems.push(...limits.problems)
+    facts.apiLimited = (facts.apiLimited ?? 0) + limits.facts.apiLimited
+    facts.wsLocations = (facts.wsLocations ?? 0) + limits.facts.wsLocations
   }
 
   const docker = auditDockerfile(read('Dockerfile'), known)
