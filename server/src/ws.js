@@ -5,6 +5,7 @@ import { isRedisReady, getRedisPub, getRedisSub } from './redis.js'
 import { rootLogger } from './logger.js'
 import pool from './db.js'
 import { wsConnectionsGauge, wsRoomsGauge, trackWsMessage } from './metrics.js'
+import { registerSocket, unregisterSocket, markOnline, markOffline, touchLastSeen, onlineUserIds } from './presence.js'
 
 let io = null
 const CLEANUP_INTERVAL = 10000
@@ -14,6 +15,8 @@ const CLEANUP_INTERVAL = 10000
 // получать realtime-события неограниченно долго. Перепроверка раз в минуту.
 const TOKEN_REVERIFY_INTERVAL = 60000
 let reverifyTimer = null
+const PRESENCE_TOUCH_INTERVAL = 60000
+let presenceTimer = null
 
 export function reverifySockets() {
   if (!io) return 0
@@ -52,10 +55,26 @@ function startTokenReverify() {
   rootLogger.info(`[ws] Token re-verify started every ${TOKEN_REVERIFY_INTERVAL / 1000}s`)
 }
 
+function startPresenceTouch() {
+  if (presenceTimer) return
+  presenceTimer = setInterval(() => {
+    try {
+      touchLastSeen(onlineUserIds()).catch((err) => rootLogger.error('[ws] presence touch error:', err))
+    } catch (err) {
+      rootLogger.error('[ws] presence touch error:', err)
+    }
+  }, PRESENCE_TOUCH_INTERVAL)
+  rootLogger.info(`[ws] Presence heartbeat started every ${PRESENCE_TOUCH_INTERVAL / 1000}s`)
+}
+
 export function stopWsTimers() {
   if (reverifyTimer) {
     clearInterval(reverifyTimer)
     reverifyTimer = null
+  }
+  if (presenceTimer) {
+    clearInterval(presenceTimer)
+    presenceTimer = null
   }
 }
 
@@ -152,6 +171,10 @@ export async function initIO(httpServer) {
     wsRoomsGauge.set(io.sockets.adapter.rooms.size)
     rootLogger.info(`WS user:${userId} connected`)
 
+    if (registerSocket(userId, socket.id)) {
+      markOnline(userId).catch((err) => rootLogger.error('[ws] presence online error:', err))
+    }
+
     socket.onAny((event) => {
       trackWsMessage(event)
     })
@@ -168,6 +191,9 @@ export async function initIO(httpServer) {
       wsConnectionsGauge.dec()
       wsRoomsGauge.set(io.sockets.adapter.rooms.size)
       rootLogger.info(`WS user:${userId} disconnected`)
+      if (unregisterSocket(userId, socket.id)) {
+        markOffline(userId).catch((err) => rootLogger.error('[ws] presence offline error:', err))
+      }
       // Notify call partner if in a call
       if (socket.callPartnerId) {
         io.to(`user:${socket.callPartnerId}`).emit('webrtc:call-ended', {
@@ -239,6 +265,7 @@ export async function initIO(httpServer) {
   })
 
   startTokenReverify()
+  startPresenceTouch()
 
   return io
 }

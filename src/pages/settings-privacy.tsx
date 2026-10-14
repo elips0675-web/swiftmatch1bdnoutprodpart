@@ -7,16 +7,16 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { HotelBookingDialog } from "@/components/chat/hotel-booking-dialog"
 import type { PartnerOffer } from "@/components/chat/chat-partner-actions"
-import { ArrowLeft, EyeOff, Globe, ShieldCheck, Scale, Download, Trash2, Hotel } from "lucide-react"
+import { ArrowLeft, Eye, EyeOff, Globe, ShieldCheck, Scale, Clock, Download, Trash2, Hotel } from "lucide-react"
 import { toast } from 'sonner'
 import { getToken } from "@/lib/token"
 
 export default function SettingsPrivacy() {
   const { t } = useLanguage()
-  const { partnerOffersEnabled } = useFeatureFlags()
+  const { partnerOffersEnabled, activityPrivacyEnabled } = useFeatureFlags()
   const router = useRouter()
   const [isClient, setIsClient] = useState(false)
-  const [settings, setSettings] = useState({ incognito: false, passport_mode: false, passport_city: '', dataProcessingConsent: true })
+  const [settings, setSettings] = useState({ incognito: false, passport_mode: false, passport_city: '', dataProcessingConsent: true, show_online: true, show_last_seen: true })
   const [hotelOffers, setHotelOffers] = useState<PartnerOffer[]>([])
   const [hotelLoading, setHotelLoading] = useState(false)
   const [selectedHotel, setSelectedHotel] = useState<PartnerOffer | null>(null)
@@ -31,6 +31,8 @@ export default function SettingsPrivacy() {
           incognito: Boolean(data.incognito),
           passport_mode: Boolean(data.passport_mode),
           passport_city: data.passport_city || '',
+          show_online: Boolean(data.show_online ?? true),
+          show_last_seen: Boolean(data.show_last_seen ?? true),
         }))
         localStorage.setItem('incognito-mode', JSON.stringify(Boolean(data.incognito)))
       })
@@ -40,6 +42,8 @@ export default function SettingsPrivacy() {
           passport_mode: false,
           passport_city: '',
           dataProcessingConsent: JSON.parse(localStorage.getItem('data-processing-consent') || 'true'),
+          show_online: true,
+          show_last_seen: true,
         })
       })
     setSettings(prev => ({
@@ -77,6 +81,18 @@ export default function SettingsPrivacy() {
     localStorage.setItem('incognito-mode', JSON.stringify(val))
     savePrivacy({ incognito: val })
     toast.success(val ? t('settings.incognito.enabled_desc') : t('settings.incognito.disabled_desc'))
+  }
+
+  const handleShowOnlineChange = (val: boolean) => {
+    setSettings(prev => ({ ...prev, show_online: val }))
+    savePrivacy({ show_online: val })
+    toast.success(val ? t('settings.show_online.enabled_desc') : t('settings.show_online.disabled_desc'))
+  }
+
+  const handleShowLastSeenChange = (val: boolean) => {
+    setSettings(prev => ({ ...prev, show_last_seen: val }))
+    savePrivacy({ show_last_seen: val })
+    toast.success(val ? t('settings.show_last_seen.enabled_desc') : t('settings.show_last_seen.disabled_desc'))
   }
 
   const handlePassportModeChange = (val: boolean) => {
@@ -152,6 +168,36 @@ export default function SettingsPrivacy() {
           </div>
           <Switch data-testid="switch-incognito" checked={isClient ? settings.incognito : false} onCheckedChange={handleIncognitoChange} />
         </div>
+
+        {activityPrivacyEnabled && (
+          <div className="flex items-center justify-between py-3 border-b">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                <Eye size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-bold">{t('settings.show_online')}</p>
+                <p className="text-xs text-muted-foreground">{t('settings.show_online.desc')}</p>
+              </div>
+            </div>
+            <Switch data-testid="switch-show-online" checked={isClient ? settings.show_online : true} onCheckedChange={handleShowOnlineChange} />
+          </div>
+        )}
+
+        {activityPrivacyEnabled && (
+          <div className="flex items-center justify-between py-3 border-b">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                <Clock size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-bold">{t('settings.show_last_seen')}</p>
+                <p className="text-xs text-muted-foreground">{t('settings.show_last_seen.desc')}</p>
+              </div>
+            </div>
+            <Switch data-testid="switch-show-last-seen" checked={isClient ? settings.show_last_seen : true} onCheckedChange={handleShowLastSeenChange} />
+          </div>
+        )}
 
         <div className="flex items-center justify-between py-3 border-b">
           <div className="flex items-center gap-3">

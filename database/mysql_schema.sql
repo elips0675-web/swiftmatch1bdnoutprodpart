@@ -393,6 +393,7 @@ CREATE TABLE `feature_flags` (
   `profile_activity_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `b2b_marketplace_enabled` tinyint(1) NOT NULL DEFAULT '0',
   `opening_lines_enabled` tinyint(1) NOT NULL DEFAULT '1',
+  `activity_privacy_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `rollout_percent` tinyint unsigned NOT NULL DEFAULT '100',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -584,6 +585,20 @@ CREATE TABLE `hangout_reviews` (
   CONSTRAINT `hangout_reviews_chk_1` CHECK ((`rating` between 1 and 5))
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `hangout_series`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `hangout_series` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `title` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `created_by` int unsigned NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_hs_creator` (`created_by`),
+  CONSTRAINT `fk_hs_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `hangout_tickets`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -604,12 +619,26 @@ CREATE TABLE `hangout_tickets` (
   CONSTRAINT `fk_hangout_tickets_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `hangout_watchers`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `hangout_watchers` (
+  `hangout_id` int unsigned NOT NULL,
+  `user_id` int unsigned NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`hangout_id`,`user_id`),
+  KEY `idx_hw_user` (`user_id`),
+  CONSTRAINT `fk_hw_hangout` FOREIGN KEY (`hangout_id`) REFERENCES `hangouts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_hw_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `hangouts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `hangouts` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `user_id` int unsigned NOT NULL,
+  `series_id` int unsigned DEFAULT NULL,
   `category` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` text COLLATE utf8mb4_unicode_ci,
@@ -629,6 +658,8 @@ CREATE TABLE `hangouts` (
   `poster_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `event_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `status` enum('active','cancelled','completed','blocked') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `merged_into` int unsigned DEFAULT NULL,
+  `merged_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -638,7 +669,9 @@ CREATE TABLE `hangouts` (
   KEY `idx_hangouts_user` (`user_id`),
   KEY `fk_hangouts_partner_offer` (`partner_offer_id`),
   KEY `idx_hangouts_view_count` (`view_count`),
+  KEY `idx_hangouts_series` (`series_id`),
   CONSTRAINT `fk_hangouts_partner_offer` FOREIGN KEY (`partner_offer_id`) REFERENCES `partner_offers` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_hangouts_series` FOREIGN KEY (`series_id`) REFERENCES `hangout_series` (`id`) ON DELETE SET NULL,
   CONSTRAINT `hangouts_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=56 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1320,6 +1353,8 @@ CREATE TABLE `user_profiles` (
   `passport_lng` decimal(10,7) DEFAULT NULL,
   `online` tinyint(1) NOT NULL DEFAULT '0',
   `last_seen` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `show_online` tinyint(1) NOT NULL DEFAULT '1',
+  `show_last_seen` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -1383,6 +1418,19 @@ CREATE TABLE `user_verifications` (
   KEY `idx_uver_user` (`user_id`),
   KEY `idx_uver_status` (`status`),
   CONSTRAINT `user_verifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `user_watches`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `user_watches` (
+  `watcher_id` int unsigned NOT NULL,
+  `user_id` int unsigned NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`watcher_id`,`user_id`),
+  KEY `idx_uw_user` (`user_id`),
+  CONSTRAINT `fk_uw_watcher` FOREIGN KEY (`watcher_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_uw_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `users`;

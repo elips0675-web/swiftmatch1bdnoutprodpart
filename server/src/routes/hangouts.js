@@ -10,6 +10,7 @@ import logger from '../logger.js'
 import { stripHtml } from '../sanitize.js'
 import { parseRadiusKm, RADIUS_DEFAULT_KM } from '../geo.js'
 import { activeUser } from '../active-user.js'
+import { applyActivityPrivacy } from '../presence.js'
 import { notBlocked } from '../user-blocks.js'
 import { trackEvent } from './experiments.js'
 import { logWebhookDelivery, markWebhookProcessed, markWebhookFailed, WEBHOOK_PROVIDERS } from '../webhooks.js'
@@ -142,9 +143,9 @@ async function getCompanionsCap(userId) {
 const HANGOUT_LIST_SELECT = `
   SELECT h.id, h.user_id AS author_id, h.category, h.title, h.description,
          h.place_name, h.place_address, h.city, h.lat, h.lng, h.event_date,
-         h.max_companions, h.hangout_type, h.status, h.created_at,
+         h.max_companions, h.hangout_type, h.status, h.series_id, h.created_at,
          h.price, h.capacity, h.boosted, h.view_count,
-         up.display_name, up.avatar_url, up.age, up.online,
+         up.display_name, up.avatar_url, up.age, up.online, up.show_online,
          (SELECT COUNT(*) FROM hangout_tickets ht WHERE ht.hangout_id = h.id AND ht.status = 'paid') AS sold_tickets,
          po.id AS offer_id, po.title AS offer_title, po.price AS offer_price,
          po.image_url AS offer_image_url, po.deeplink AS offer_deeplink,
@@ -190,7 +191,7 @@ router.get('/api/hangouts', optionalAuth, async (req, res) => {
   const offset = (page - 1) * limit
 
   try {
-    const where = ["h.status IN ('active','completed')", activeUser('up')]
+    const where = ["h.status IN ('active','completed')", 'h.merged_into IS NULL', activeUser('up')]
     const params = []
 
     if (q && String(q).trim()) {
@@ -275,7 +276,7 @@ router.get('/api/hangouts', optionalAuth, async (req, res) => {
     const [countRows] = await pool.query(countSql, countParams)
     const total = Number(countRows[0]?.total || 0)
 
-    res.json({ items: rows[0].map(parseAttendees), total })
+    res.json({ items: applyActivityPrivacy(rows[0].map(parseAttendees), req.userId, (row) => row.author_id), total })
   } catch (err) {
     logger.error('Hangouts feed error:', err)
     res.status(500).json({ message: 'Failed to fetch hangouts' })
@@ -301,11 +302,11 @@ router.get('/api/hangouts/my', auth, async (req, res) => {
        FROM hangouts h
        JOIN user_profiles up ON up.id = h.user_id
        ${JOIN_PARTNER_OFFER}
-       WHERE h.user_id = ?
+       WHERE h.user_id = ? AND h.merged_into IS NULL
        ORDER BY h.event_date DESC`,
        [req.userId],
     )
-    res.json(rows.map(parseAttendees))
+    res.json(applyActivityPrivacy(rows.map(parseAttendees), req.userId, (row) => row.author_id))
   } catch (err) {
     logger.error('My hangouts error:', err)
     res.status(500).json({ message: 'Failed to fetch my hangouts' })
@@ -344,6 +345,173 @@ router.get('/api/hangouts/responses/my', auth, async (req, res) => {
   }
 })
 
+// ─── Series (объединение встреч в серию) ───────────────────────
+/**
+ * @openapi
+ * /api/hangouts/series:
+ *   post:
+ *     tags: [Hangouts]
+ *     summary: Create a hangout series the current user owns
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201: { description: Series created }
+ *       400: { description: title is required }
+ */
+router.post('/api/hangouts/series', auth, async (req, res) => {
+  const cleanTitle = stripHtml(String(req.body.title || '')).slice(0, 150).trim()
+  if (!cleanTitle) return res.status(400).json({ message: 'title is required' })
+  const description = req.body.description
+    ? stripHtml(String(req.body.description)).slice(0, 2000) || null
+    : null
+  try {
+    const [result] = await pool.query(
+      'INSERT INTO hangout_series (title, description, created_by) VALUES (?, ?, ?)',
+      [cleanTitle, description, req.userId],
+    )
+    res.status(201).json({ id: result.insertId, title: cleanTitle, description })
+  } catch (err) {
+    logger.error('Hangout series create error:', err)
+    res.status(500).json({ message: 'Failed to create series' })
+  }
+})
+
+/**
+ * @openapi
+ * /api/hangouts/{id}/series:
+ *   put:
+ *     tags: [Hangouts]
+ *     summary: Attach own hangout to own series or detach it (author only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               series_id: { type: integer, nullable: true }
+ *     responses:
+ *       200: { description: Series updated }
+ *       403: { description: Not the author }
+ *       404: { description: Hangout or series not found }
+ */
+router.put('/api/hangouts/:id/series', auth, async (req, res) => {
+  const { id } = req.params
+  if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
+  const raw = req.body.series_id
+  const seriesId = raw === null || raw === undefined || raw === '' ? null : Number(raw)
+  if (seriesId !== null && (!Number.isInteger(seriesId) || seriesId <= 0)) {
+    return res.status(400).json({ message: 'Invalid series_id' })
+  }
+  try {
+    const [rows] = await pool.query('SELECT user_id, merged_into FROM hangouts WHERE id = ?', [id])
+    if (rows.length === 0 || rows[0].merged_into) return res.status(404).json({ message: 'Hangout not found' })
+    if (rows[0].user_id !== req.userId) return res.status(403).json({ message: 'Not the author' })
+    if (seriesId !== null) {
+      const [series] = await pool.query(
+        'SELECT id FROM hangout_series WHERE id = ? AND created_by = ?',
+        [seriesId, req.userId],
+      )
+      if (series.length === 0) return res.status(404).json({ message: 'Series not found' })
+    }
+    await pool.query('UPDATE hangouts SET series_id = ? WHERE id = ?', [seriesId, id])
+    res.json({ series_id: seriesId })
+  } catch (err) {
+    logger.error('Hangout series assign error:', err)
+    res.status(500).json({ message: 'Failed to update series' })
+  }
+})
+
+// ─── Relations («похожие встречи» + «та же серия») ──────────────
+/**
+ * @openapi
+ * /api/hangouts/{id}/related:
+ *   get:
+ *     tags: [Hangouts]
+ *     summary: Similar hangouts plus other hangouts of the same series
+ *     security:
+ *       - bearerAuth: []
+ *       - {}
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200: { description: "{ sameSeries: [], similar: [] }" }
+ *       404: { description: Hangout not found }
+ */
+router.get('/api/hangouts/:id/related', optionalAuth, async (req, res) => {
+  const { id } = req.params
+  if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
+  try {
+    const [[base]] = await pool.query(
+      'SELECT id, category, city, series_id FROM hangouts WHERE id = ? AND merged_into IS NULL',
+      [id],
+    )
+    if (!base) return res.status(404).json({ message: 'Hangout not found' })
+
+    const blockFilter = notBlocked('up', req.userId || 0)
+
+    let sameSeries = []
+    if (base.series_id) {
+      const [rows] = await pool.query(
+        `${HANGOUT_LIST_SELECT}
+         FROM hangouts h
+         JOIN user_profiles up ON up.id = h.user_id
+         ${JOIN_PARTNER_OFFER}
+         WHERE h.series_id = ? AND h.id != ? AND h.status IN ('active','completed') AND h.merged_into IS NULL
+           AND ${activeUser('up')} AND ${blockFilter.sql}
+         ORDER BY h.event_date ASC, h.id ASC
+         LIMIT 10`,
+        [base.series_id, id, ...blockFilter.params],
+      )
+      sameSeries = applyActivityPrivacy(rows.map(parseAttendees), req.userId, (row) => row.author_id)
+    }
+
+    const similarWhere = [
+      "h.category = ?",
+      'h.id != ?',
+      "h.status = 'active'",
+      'h.merged_into IS NULL',
+      'h.event_date >= NOW()',
+      activeUser('up'),
+      blockFilter.sql,
+    ]
+    const similarParams = [base.category, id, ...blockFilter.params]
+    if (base.city) {
+      similarWhere.push('h.city = ?')
+      similarParams.push(base.city)
+    }
+    if (base.series_id) {
+      similarWhere.push('(h.series_id IS NULL OR h.series_id != ?)')
+      similarParams.push(base.series_id)
+    }
+    const [similarRows] = await pool.query(
+      `${HANGOUT_LIST_SELECT}
+       FROM hangouts h
+       JOIN user_profiles up ON up.id = h.user_id
+       ${JOIN_PARTNER_OFFER}
+       WHERE ${similarWhere.join(' AND ')}
+       ORDER BY h.event_date ASC, h.id ASC
+       LIMIT 10`,
+      similarParams,
+    )
+
+    res.json({ sameSeries, similar: applyActivityPrivacy(similarRows.map(parseAttendees), req.userId, (row) => row.author_id) })
+  } catch (err) {
+    logger.error('Hangout related error:', err)
+    res.status(500).json({ message: 'Failed to fetch related hangouts' })
+  }
+})
+
 // ─── Detail ────────────────────────────────────────────────────
 router.get('/api/hangouts/:id', optionalAuth, async (req, res) => {
   const { id } = req.params
@@ -356,15 +524,18 @@ router.get('/api/hangouts/:id', optionalAuth, async (req, res) => {
          (SELECT COUNT(*) FROM hangout_likes hl WHERE hl.hangout_id = h.id AND hl.status = 'like') AS like_count,
          (SELECT hl2.status FROM hangout_likes hl2 WHERE hl2.hangout_id = h.id AND hl2.user_id = ? LIMIT 1) AS my_like_status,
          (SELECT hp2.status FROM hangout_participants hp2 WHERE hp2.hangout_id = h.id AND hp2.user_id = ? LIMIT 1) AS my_participant_status,
-         (SELECT ht2.status FROM hangout_tickets ht2 WHERE ht2.hangout_id = h.id AND ht2.user_id = ? LIMIT 1) AS my_ticket_status
+         (SELECT ht2.status FROM hangout_tickets ht2 WHERE ht2.hangout_id = h.id AND ht2.user_id = ? LIMIT 1) AS my_ticket_status,
+         (SELECT COUNT(*) FROM hangout_watchers hw WHERE hw.hangout_id = h.id) AS watcher_count,
+         (SELECT COUNT(*) FROM hangout_watchers hw2 WHERE hw2.hangout_id = h.id AND hw2.user_id = ?) AS is_watching
      FROM hangouts h
      JOIN user_profiles up ON up.id = h.user_id
      ${JOIN_PARTNER_OFFER}
-     WHERE h.id = ? AND ${activeUser('up')}`
-    const [rows] = await pool.query(sql, [req.userId || 0, req.userId || 0, req.userId || 0, req.userId || 0, id])
+     WHERE h.id = ? AND h.merged_into IS NULL AND ${activeUser('up')}`
+    const [rows] = await pool.query(sql, [req.userId || 0, req.userId || 0, req.userId || 0, req.userId || 0, req.userId || 0, id])
     if (rows.length === 0) return res.status(404).json({ message: 'Hangout not found' })
 
-    const hangout = rows[0]
+    const hangout = applyActivityPrivacy(rows[0], req.userId, (row) => row.author_id)
+    hangout.is_watching = Boolean(hangout.is_watching)
     const isAuthor = req.userId === hangout.author_id
 
     // Счётчик просмотров (H2): инкрементируем при открытии детальной страницы.
@@ -374,7 +545,6 @@ router.get('/api/hangouts/:id', optionalAuth, async (req, res) => {
         logger.error('Hangout view_count increment error:', e)
       })
     }
-
     let responses = []
     let participants = []
     if (isAuthor) {
@@ -1854,6 +2024,73 @@ router.post('/api/hangouts/order/webhook', async (req, res) => {
   res.json({ received: true })
 })
 
+// ─── Watch (подписка на встречу без участия) ───────────────────
+/**
+ * @openapi
+ * /api/hangouts/{id}/watch:
+ *   post:
+ *     tags: [Hangouts]
+ *     summary: Subscribe to hangout updates without joining
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200: { description: "{ watching: true, watcher_count }" }
+ *       404: { description: Hangout not found }
+ */
+router.post('/api/hangouts/:id/watch', auth, async (req, res) => {
+  const { id } = req.params
+  if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
+  try {
+    const [rows] = await pool.query('SELECT id FROM hangouts WHERE id = ? AND merged_into IS NULL', [id])
+    if (rows.length === 0) return res.status(404).json({ message: 'Hangout not found' })
+    await pool.query('INSERT IGNORE INTO hangout_watchers (hangout_id, user_id) VALUES (?, ?)', [id, req.userId])
+    const [[{ watcher_count }]] = await pool.query(
+      'SELECT COUNT(*) AS watcher_count FROM hangout_watchers WHERE hangout_id = ?',
+      [id],
+    )
+    res.json({ watching: true, watcher_count })
+  } catch (err) {
+    logger.error('Hangout watch error:', err)
+    res.status(500).json({ message: 'Failed to watch' })
+  }
+})
+
+/**
+ * @openapi
+ * /api/hangouts/{id}/watch:
+ *   delete:
+ *     tags: [Hangouts]
+ *     summary: Unsubscribe from hangout updates
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200: { description: "{ watching: false, watcher_count }" }
+ */
+router.delete('/api/hangouts/:id/watch', auth, async (req, res) => {
+  const { id } = req.params
+  if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
+  try {
+    await pool.query('DELETE FROM hangout_watchers WHERE hangout_id = ? AND user_id = ?', [id, req.userId])
+    const [[{ watcher_count }]] = await pool.query(
+      'SELECT COUNT(*) AS watcher_count FROM hangout_watchers WHERE hangout_id = ?',
+      [id],
+    )
+    res.json({ watching: false, watcher_count })
+  } catch (err) {
+    logger.error('Hangout unwatch error:', err)
+    res.status(500).json({ message: 'Failed to unwatch' })
+  }
+})
 export async function applyHangoutTicket(event, conn) {
   const session = event.data.object
   const { hangout_id: hangoutId, user_id: userId } = session.metadata || {}

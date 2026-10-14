@@ -13,6 +13,7 @@ export interface FeatureFlags {
   partnerOffersEnabled: boolean;
   profileActivityEnabled: boolean;
   openingLinesEnabled: boolean;
+  activityPrivacyEnabled: boolean;
   rolloutEnabled: boolean;
 }
 
@@ -26,6 +27,7 @@ const defaultFlags: FeatureFlags = {
   partnerOffersEnabled: false,
   profileActivityEnabled: true,
   openingLinesEnabled: true,
+  activityPrivacyEnabled: true,
   rolloutEnabled: true,
 };
 
@@ -39,6 +41,7 @@ const mapApiFlags = (data: Record<string, boolean>): FeatureFlags => ({
   partnerOffersEnabled: data.partnerOffers ?? false,
   profileActivityEnabled: data.profileActivity ?? true,
   openingLinesEnabled: data.openingLines ?? true,
+  activityPrivacyEnabled: data.activityPrivacy ?? true,
   rolloutEnabled: true,
 });
 
@@ -56,6 +59,7 @@ const applyRollout = (data: Record<string, unknown>): FeatureFlags => {
     partnerOffersEnabled: raw.partnerOffersEnabled && rolloutEnabled,
     profileActivityEnabled: raw.profileActivityEnabled && rolloutEnabled,
     openingLinesEnabled: raw.openingLinesEnabled && rolloutEnabled,
+    activityPrivacyEnabled: raw.activityPrivacyEnabled && rolloutEnabled,
     rolloutEnabled,
   }
 }

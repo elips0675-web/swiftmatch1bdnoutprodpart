@@ -8,6 +8,7 @@ import { activeUser } from '../active-user.js'
 import { notBlocked } from '../user-blocks.js'
 import { dateOnly } from '../date-only.js'
 import { auditUpdate } from '../audit.js'
+import { applyActivityPrivacy } from '../presence.js'
 import { FieldError, blankToUndef, dateField, enumField, intField, numField, textField } from '../profile-fields.js'
 
 const GENDERS = ['male', 'female', 'other']
@@ -130,7 +131,8 @@ router.get('/api/profile/me', auth, async (req, res) => {
               up.zodiac, up.circadian, up.attachment_style, up.education,
               up.super_likes, up.boost_until, up.incognito, up.passport_mode,
               up.passport_city, up.passport_lat, up.passport_lng,
-              up.online, up.last_seen, up.created_at, up.updated_at,
+              up.online, up.last_seen, up.show_online, up.show_last_seen,
+              up.created_at, up.updated_at,
               u.email
        FROM user_profiles up
        JOIN users u ON u.id = up.id
@@ -152,6 +154,7 @@ router.get('/api/profile/me', auth, async (req, res) => {
     const canonical = await getCanonicalInterestIds()
     const canonicalInterests = interests.filter((i) => canonical.has(i.id))
 
+    applyActivityPrivacy(rows[0], req.userId)
     const { location, ...profile } = rows[0]
     res.json({ ...sanitizeProfileText({ ...profile, birth_date: dateOnly(profile.birth_date) }), photos, interests: canonicalInterests })
   } catch (err) {
@@ -245,7 +248,7 @@ router.delete('/api/profile/me', auth, async (req, res) => {
 router.get('/api/settings/privacy', auth, async (req, res) => {
   try {
     const [[profile]] = await pool.query(
-      'SELECT incognito, passport_mode, passport_city, passport_lat, passport_lng FROM user_profiles WHERE id = ?',
+      'SELECT incognito, passport_mode, passport_city, passport_lat, passport_lng, show_online, show_last_seen FROM user_profiles WHERE id = ?',
       [req.userId],
     )
     if (!profile) return res.status(404).json({ message: 'Profile not found' })
@@ -255,6 +258,8 @@ router.get('/api/settings/privacy', auth, async (req, res) => {
       passport_city: profile.passport_city,
       passport_lat: profile.passport_lat,
       passport_lng: profile.passport_lng,
+      show_online: profile.show_online == null ? true : Boolean(profile.show_online),
+      show_last_seen: profile.show_last_seen == null ? true : Boolean(profile.show_last_seen),
     })
   } catch (err) {
     logger.error('Privacy GET error:', err)
@@ -275,7 +280,7 @@ router.get('/api/settings/privacy', auth, async (req, res) => {
  */
 router.put('/api/settings/privacy', auth, async (req, res) => {
   try {
-    const { incognito, passport_mode, passport_city, passport_lat, passport_lng } = req.body
+    const { incognito, passport_mode, passport_city, passport_lat, passport_lng, show_online, show_last_seen } = req.body
 
     if (incognito || passport_mode) {
       const [subRows] = await pool.query(
@@ -288,7 +293,7 @@ router.put('/api/settings/privacy', auth, async (req, res) => {
     }
 
     const [[privacyBefore]] = await pool.query(
-      'SELECT incognito, passport_mode, passport_city, passport_lat, passport_lng FROM user_profiles WHERE id = ?',
+      'SELECT incognito, passport_mode, passport_city, passport_lat, passport_lng, show_online, show_last_seen FROM user_profiles WHERE id = ?',
       [req.userId],
     )
 
@@ -298,13 +303,18 @@ router.put('/api/settings/privacy', auth, async (req, res) => {
         passport_mode = COALESCE(?, passport_mode),
         passport_city = COALESCE(?, passport_city),
         passport_lat = COALESCE(?, passport_lat),
-        passport_lng = COALESCE(?, passport_lng)
+        passport_lng = COALESCE(?, passport_lng),
+        show_online = COALESCE(?, show_online),
+        show_last_seen = COALESCE(?, show_last_seen)
       WHERE id = ?`,
-      [incognito, passport_mode, passport_city, passport_lat, passport_lng, req.userId],
+      [incognito, passport_mode, passport_city, passport_lat, passport_lng, show_online, show_last_seen, req.userId],
     )
     // Префикс `user:*` — под ключ `cacheRoutePerUser`, и шире старого: приватность
     // меняет то, что видят ДРУГИЕ, поэтому сбрасываем кэш у всех, а не у владельца.
     invalidate(`user:*:/api/profile/${req.userId}*`).catch(() => {})
+    if (Object.prototype.hasOwnProperty.call(req.body, 'show_online') || Object.prototype.hasOwnProperty.call(req.body, 'show_last_seen')) {
+      invalidate('user:*:/api/matches*').catch(() => {})
+    }
 
     const privacySent = (key) => Object.prototype.hasOwnProperty.call(req.body, key)
     const privacyNewValues = {}
@@ -314,6 +324,8 @@ router.put('/api/settings/privacy', auth, async (req, res) => {
     if (privacySent('passport_city')) privacyNewValues.passport_city = passport_city
     if (privacySent('passport_lat')) privacyNewValues.passport_lat = passport_lat
     if (privacySent('passport_lng')) privacyNewValues.passport_lng = passport_lng
+    if (privacySent('show_online')) privacyNewValues.show_online = show_online ? 1 : 0
+    if (privacySent('show_last_seen')) privacyNewValues.show_last_seen = show_last_seen ? 1 : 0
     await auditUpdate({
       tableName: 'user_profiles',
       recordId: req.userId,
@@ -566,7 +578,7 @@ router.get('/api/profile/:id', auth, cacheRoutePerUser(60), async (req, res) => 
       `SELECT up.id, up.display_name, up.name, up.age, up.birth_date, up.bio, up.avatar_url,
               up.gender, up.looking_for, up.dating_goal, up.height, up.city, up.country,
               up.zodiac, up.circadian, up.attachment_style, up.education,
-              up.super_likes, up.boost_until, up.online, up.last_seen,
+              up.super_likes, up.boost_until, up.online, up.last_seen, up.show_online, up.show_last_seen,
               up.created_at, up.updated_at
        FROM user_profiles up
        WHERE up.id = ? AND ${activeUser('up')} AND ${blockFilter.sql}`,
@@ -587,7 +599,8 @@ router.get('/api/profile/:id', auth, cacheRoutePerUser(60), async (req, res) => 
     const canonical = await getCanonicalInterestIds()
     const canonicalInterests = interests.filter((i) => canonical.has(i.id))
 
-    res.json({ ...sanitizeProfileText({ ...rows[0], birth_date: dateOnly(rows[0].birth_date) }), photos, interests: canonicalInterests })
+    const profile = applyActivityPrivacy({ ...rows[0], birth_date: dateOnly(rows[0].birth_date) }, req.userId)
+    res.json({ ...sanitizeProfileText(profile), photos, interests: canonicalInterests })
   } catch (err) {
     logger.error('Profile GET error:', err)
     res.status(500).json({ message: 'Failed to fetch profile' })
@@ -750,4 +763,99 @@ router.put('/api/profile/:id', auth, async (req, res) => {
   }
 })
 
+// ─── User watches («Интересуют новые люди»: подписка на профиль) ─
+/**
+ * @openapi
+ * /api/users/{id}/watch:
+ *   post:
+ *     tags: [Profile]
+ *     summary: Watch another user's activity
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200: { description: "{ watching: true }" }
+ *       400: { description: Cannot watch yourself }
+ *       404: { description: User not found }
+ */
+router.post('/api/users/:id/watch', auth, async (req, res) => {
+  const { id } = req.params
+  if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
+  if (Number(id) === req.userId) return res.status(400).json({ message: 'Cannot watch yourself' })
+  try {
+    const [target] = await pool.query(
+      'SELECT id FROM users WHERE id = ? AND is_active = 1 AND deleted_at IS NULL',
+      [id],
+    )
+    if (target.length === 0) return res.status(404).json({ message: 'User not found' })
+    await pool.query('INSERT IGNORE INTO user_watches (watcher_id, user_id) VALUES (?, ?)', [req.userId, id])
+    res.json({ watching: true })
+  } catch (err) {
+    logger.error('User watch error:', err)
+    res.status(500).json({ message: 'Failed to watch' })
+  }
+})
+
+/**
+ * @openapi
+ * /api/users/{id}/watch:
+ *   delete:
+ *     tags: [Profile]
+ *     summary: Stop watching another user
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200: { description: "{ watching: false }" }
+ */
+router.delete('/api/users/:id/watch', auth, async (req, res) => {
+  const { id } = req.params
+  if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
+  try {
+    await pool.query('DELETE FROM user_watches WHERE watcher_id = ? AND user_id = ?', [req.userId, id])
+    res.json({ watching: false })
+  } catch (err) {
+    logger.error('User unwatch error:', err)
+    res.status(500).json({ message: 'Failed to unwatch' })
+  }
+})
+
+/**
+ * @openapi
+ * /api/users/watching:
+ *   get:
+ *     tags: [Profile]
+ *     summary: List users the current user watches
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of watched users }
+ */
+router.get('/api/users/watching', auth, async (req, res) => {
+  try {
+    const blockFilter = notBlocked('up', req.userId)
+    const [rows] = await pool.query(
+      `SELECT uw.user_id AS id, up.display_name, up.avatar_url, up.age, uw.created_at
+       FROM user_watches uw
+       JOIN user_profiles up ON up.id = uw.user_id
+       WHERE uw.watcher_id = ? AND ${activeUser('up')} AND ${blockFilter.sql}
+       ORDER BY uw.created_at DESC`,
+      [req.userId, ...blockFilter.params],
+    )
+    res.json(rows)
+  } catch (err) {
+    logger.error('Watching list error:', err)
+    res.status(500).json({ message: 'Failed to fetch watching list' })
+  }
+})
+
 export default router
+

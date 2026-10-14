@@ -51,6 +51,12 @@ export const JUSTIFIED = [
     expect: 'DELETE FROM',
     reason: 'то же: подчистка «с самим собой» по фиксированному списку парных колонок после переноса',
   },
+  {
+    file: 'routes/admin/hangouts.js',
+    lines: [165, 167],
+    expect: 'conn.query(',
+    reason: 'админ-мердж встреч: фиксированный список из 8 дочерних таблиц, один UPDATE IGNORE + один DELETE на таблицу, а не на строку данных (переносим все связи дубля разом)',
+  },
 ]
 
 export function collectFiles(dir) {

@@ -13,6 +13,7 @@ import { cacheRoutePerUser, invalidate } from '../cache.js'
 import { trackEvent } from './experiments.js'
 import { getPrefs, isAllowed, isAllowedIn } from '../notification-prefs.js'
 import { activeUser } from '../active-user.js'
+import { applyActivityPrivacy } from '../presence.js'
 
 const likeLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: 100, message: { message: 'Too many likes' } })
 
@@ -162,16 +163,17 @@ router.get('/api/users/search', auth, async (req, res) => {
     )
     const userStyle = self?.attachment_style
 
+    const presenceOrder = '(CASE WHEN up.show_online = 1 THEN up.online ELSE 0 END) DESC, (CASE WHEN up.show_last_seen = 1 THEN up.last_seen ELSE NULL END) DESC'
     let compJoin = ''
     let compSelect = ''
-    let orderBy = 'up.online DESC, up.last_seen DESC'
+    let orderBy = presenceOrder
     if (userStyle) {
       compJoin = ` LEFT JOIN compatibility_scores cs ON cs.style_a = ? AND cs.style_b = up.attachment_style`
       compSelect = ', COALESCE(cs.score, 0) AS compatibility_score'
-      orderBy = 'COALESCE(cs.score, 0) DESC, up.online DESC, up.last_seen DESC'
+      orderBy = `COALESCE(cs.score, 0) DESC, ${presenceOrder}`
     }
 
-    const baseSelect = `up.id, up.display_name, up.name, up.age, up.gender, up.city, up.country, up.avatar_url, up.online, up.last_seen, up.dating_goal${compSelect}`
+    const baseSelect = `up.id, up.display_name, up.name, up.age, up.gender, up.city, up.country, up.avatar_url, up.online, up.last_seen, up.show_online, up.show_last_seen, up.dating_goal${compSelect}`
 
     const userPassportMode = self?.passport_mode
     const userPassportLat = userPassportMode ? self?.passport_lat : null
@@ -233,7 +235,7 @@ router.get('/api/users/search', auth, async (req, res) => {
                  ORDER BY ${orderBy}, up.id DESC LIMIT 50`
 
     const [rows] = await pool.query(sql, params)
-    res.json(rows)
+    res.json(applyActivityPrivacy(rows, req.userId))
   } catch (err) {
     logger.error('Search error:', err)
     res.status(500).json({ message: 'Search failed' })
@@ -332,14 +334,14 @@ router.post('/api/likes', auth, likeLimiter, async (req, res) => {
 router.get('/api/matches', auth, cacheRoutePerUser(30), async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT m.id, m.created_at as matched_at, up.id as user_id, up.display_name, up.name, up.age, up.avatar_url, up.city, up.online
+      `SELECT m.id, m.created_at as matched_at, up.id as user_id, up.display_name, up.name, up.age, up.avatar_url, up.city, up.online, up.show_online
        FROM matches m
        JOIN user_profiles up ON up.id = CASE WHEN m.user1_id = ? THEN m.user2_id ELSE m.user1_id END
        WHERE m.matched = 1 AND (m.user1_id = ? OR m.user2_id = ?) AND ${activeUser('up')}
        ORDER BY m.created_at DESC`,
       [req.userId, req.userId, req.userId],
     )
-    res.json(rows)
+    res.json(applyActivityPrivacy(rows, req.userId, (row) => row.user_id))
   } catch (err) {
     logger.error('Matches error:', err)
     res.status(500).json({ message: 'Failed to fetch matches' })
@@ -718,7 +720,7 @@ router.get('/api/chats', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT c.id, c.last_message, c.last_sender_id, c.updated_at,
-              up.display_name, up.avatar_url, up.online, other.user_id AS other_user_id,
+              up.display_name, up.avatar_url, up.online, up.show_online, other.user_id AS other_user_id,
               cp.last_read_at,
               (SELECT COUNT(*) FROM messages m2 WHERE m2.chat_id = c.id AND (cp.last_read_at IS NULL OR m2.created_at > cp.last_read_at) AND m2.sender_id != ?) AS unread_count
        FROM chats c
@@ -729,7 +731,7 @@ router.get('/api/chats', auth, async (req, res) => {
        ORDER BY c.updated_at DESC`,
       [req.userId, req.userId, req.userId],
     )
-    res.json(rows)
+    res.json(applyActivityPrivacy(rows, req.userId, (row) => row.other_user_id))
   } catch (err) {
     logger.error('Chats error:', err)
     res.status(500).json({ message: 'Failed to fetch chats' })
@@ -754,7 +756,7 @@ router.get('/api/chats/:chatId', auth, async (req, res) => {
               up.id AS user_id,
               up.display_name AS name,
               up.avatar_url AS avatar,
-              up.online
+              up.online, up.show_online
        FROM chats c
        JOIN chat_participants cp ON cp.chat_id = c.id AND cp.user_id = ?
        JOIN chat_participants other ON other.chat_id = c.id AND other.user_id != ?
@@ -775,7 +777,7 @@ router.get('/api/chats/:chatId', auth, async (req, res) => {
       [req.userId, row.user_id],
     )
     res.json({
-      ...row,
+      ...applyActivityPrivacy(row, req.userId, (r) => r.user_id),
       common_interest: common ? (lang === 'en' ? common.name_en : common.name_ru) : null,
     })
   } catch (err) {

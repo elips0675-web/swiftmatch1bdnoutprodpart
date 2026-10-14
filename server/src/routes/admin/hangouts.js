@@ -101,4 +101,102 @@ router.put('/hangouts/:id', async (req, res) => {
   }
 })
 
+const MERGE_CHILD_TABLES = [
+  'hangout_chats',
+  'hangout_reviews',
+  'hangout_checkins',
+  'hangout_tickets',
+  'hangout_likes',
+  'hangout_participants',
+  'hangout_responses',
+  'hangout_watchers',
+]
+
+/**
+ * @openapi
+ * /api/admin/hangouts/{id}/merge:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Merge duplicate hangout into a survivor (duplicate becomes a hidden tombstone)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [mergeIntoId]
+ *             properties:
+ *               mergeIntoId: { type: integer, description: survivor hangout id }
+ *     responses:
+ *       200: { description: Hangouts merged }
+ *       400: { description: Invalid merge ids }
+ *       404: { description: Hangout not found }
+ *       409: { description: Hangout already merged }
+ *       500: { description: Failed to merge hangouts }
+ */
+router.post('/hangouts/:id/merge', async (req, res) => {
+  const dupId = Number(req.params.id)
+  const keepId = Number(req.body.mergeIntoId)
+  if (!Number.isInteger(dupId) || dupId <= 0 || !Number.isInteger(keepId) || keepId <= 0 || dupId === keepId) {
+    return res.status(400).json({ message: 'Invalid merge ids' })
+  }
+  let conn
+  try {
+    const [rows] = await pool.query('SELECT id, merged_into FROM hangouts WHERE id IN (?, ?)', [dupId, keepId])
+    const dup = rows.find((r) => r.id === dupId)
+    const keep = rows.find((r) => r.id === keepId)
+    if (!dup || !keep) return res.status(404).json({ message: 'Hangout not found' })
+    if (dup.merged_into || keep.merged_into) {
+      return res.status(409).json({ message: 'Hangout already merged' })
+    }
+
+    conn = await pool.getConnection()
+    await conn.beginTransaction()
+    try {
+      let movedRows = 0
+      for (const table of MERGE_CHILD_TABLES) {
+        const [result] = await conn.query(`UPDATE IGNORE \`${table}\` SET hangout_id = ? WHERE hangout_id = ?`, [keepId, dupId])
+        movedRows += result.affectedRows
+        await conn.query(`DELETE FROM \`${table}\` WHERE hangout_id = ?`, [dupId])
+      }
+
+      await conn.query(
+        'INSERT INTO audit_log (table_name, record_id, action, old_values, new_values, user_id, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          'hangouts',
+          dupId,
+          'merge',
+          JSON.stringify({ mergedInto: keepId }),
+          JSON.stringify({ movedRows }),
+          req.admin?.id ?? null,
+          req.ip ?? null,
+        ],
+      )
+      await conn.query(
+        "UPDATE hangouts SET status = 'cancelled', merged_into = ?, merged_at = NOW() WHERE id = ?",
+        [keepId, dupId],
+      )
+      await conn.commit()
+    } catch (err) {
+      await conn.rollback()
+      throw err
+    } finally {
+      conn.release()
+    }
+
+    req.log?.info?.(`admin ${req.admin?.id} merged hangout ${dupId} into ${keepId}`)
+    res.json({ message: 'Hangouts merged', mergedFrom: dupId, mergedInto: keepId })
+  } catch (err) {
+    logger.error('Admin hangout merge error:', err)
+    res.status(500).json({ message: 'Failed to merge hangouts' })
+  }
+})
+
 export default router
