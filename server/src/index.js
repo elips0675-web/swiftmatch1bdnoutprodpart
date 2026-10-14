@@ -25,6 +25,7 @@ import { initQueues, closeQueues } from './queue.js'
 import { startQueueBackpressureMonitor, stopQueueBackpressureMonitor } from './queue-monitor.js'
 import { startWeeklyReportMonitor, stopWeeklyReportMonitor } from './weekly-report.js'
 import { createGracefulShutdown } from './shutdown.js'
+import { resolveTrustProxy } from './trust-proxy.js'
 import { healthHandler, liveHandler, readyHandler } from './health.js'
 
 import adminDashboard from './routes/admin/dashboard.js'
@@ -75,6 +76,7 @@ import { setupSwagger } from './swagger.js'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const app = express()
+app.set('trust proxy', resolveTrustProxy())
 const PORT = process.env.PORT || 3002
 
 // Этап 42 (аудит kimi 2.3): resilience-гварды.

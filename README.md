@@ -179,7 +179,7 @@ cd server && npm test            # серверные тесты
 ### Тесты
 
 - **Фронтенд (Vitest):** 717 тестов, 58 файлов — **0 failures**
-- **Сервер (Vitest):** 1048 тестов, 75 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
+- **Сервер (Vitest):** 1054 теста, 76 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 195 тестов, 21 spec-файл — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
 ### Зависимости
@@ -326,7 +326,7 @@ cd server && npm test            # серверные тесты
 - `GET /health/live` (`server/src/health.js:13`) — liveness: сервер отвечает, всегда `200 {status:'ok'}`
 - `GET /health/ready` (`server/src/health.js:17`) — readiness: `SELECT 1` → `200 {status:'ready'}`, при недоступной БД → `503 {status:'unavailable'}`
 - `GET /api/admin/health` (`server/src/routes/admin/health.js:18`) — дашборд интеграций (MySQL/Redis/SMTP/Stripe/OpenAI/FCM) в админке, под `adminAuth`
-- Graceful shutdown по `SIGTERM` (`index.js:337`): `closeQueues()` → `disconnectRedis()` → `pool.end()` → `httpServer.close()`. `SIGINT` и сторожевой таймаут **не** обрабатываются — см. бэклог
+- Graceful shutdown по `SIGTERM` **и** `SIGINT` (`server/src/index.js:371-372` → `createGracefulShutdown`, `server/src/shutdown.js:15`): `stopWsTimers()` → `closeQueues()` → `disconnectRedis()` → `pool.end()` → `httpServer.close()`; повторный сигнал игнорируется (`shutdown.js:16`), сторожевой таймаут 10 с форсит выход 1 (`shutdown.js:20-24`)
 - В контейнере у nginx есть `location = /healthz` (`nginx/swiftmatch.http.conf:24`) — это балансировщик/healthcheck, не API
 
 ### 💾 Redis

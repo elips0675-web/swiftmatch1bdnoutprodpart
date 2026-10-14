@@ -47,6 +47,7 @@
 - [ ] Склонировать репо на VPS, собрать фронт: `VITE_API_URL=/api npx vite build` → `dist/`
 - [ ] `docker compose up -d`
 - [ ] Проверить по одному: app healthy (`docker compose ps`, внутри — `curl -f localhost:3002/health`), nginx проксирует `/api` 200, WS через 60s не обрывается, фото до 10 MB проходят (лимит приложения `server/src/routes/upload.js` = 10 MB; `client_max_body_size 20M` в nginx — запас), volume `uploads_data` смонтирован, сеть между контейнерами
+- [ ] Прокси и лимитер: API стоит за nginx, поэтому `trust proxy` по умолчанию = `uniquelocal` (доверяются приватные подсети docker) — rate-limit ключуется IP клиента, а не nginx. Другая топология — `TRUST_PROXY` в `.env` (`false`, число хопов, IP/CIDR-список). Проверка: два клиента с разных IP не делят один счётчик `600/мин`
 - [ ] По итогам (если что-то поправили в compose/nginx) — commit
 
 ## 5. Ключи — ввести реальные (по `runbook-keys.md`)

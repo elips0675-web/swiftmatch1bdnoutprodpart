@@ -432,7 +432,7 @@ Skip: не трогай iOS, только Android.
 Для каждого: файлы, строки, тест (имя файла), нужен ли гейт.
 
 Мой список (проверь каждый, дай вердикт есть/нет/неизвестно с file:line):
-- SIGINT и сторожевой таймаут shutdown
+- SIGINT и сторожевой таймаут shutdown — УЖЕ СДЕЛАНО (L3, 09.10.2026: server/src/shutdown.js, server/src/index.js:371-372), вердикт «есть»
 - Trivy exit-code (baseline, не блокирует деплой)
 - Log rotation для server/logs/api.log
 - Rate limit на POST сообщения чата
