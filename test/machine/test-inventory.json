@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-14T08:02:02.275Z",
+  "generated": "2026-10-14T08:36:22.561Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 58,
-    "tests": 717,
-    "passed": 717,
+    "files": 59,
+    "tests": 718,
+    "passed": 718,
     "failed": 0,
     "gate": {
       "files": 20,
       "tests": 479
     },
     "product": {
-      "files": 38,
-      "tests": 238
+      "files": 39,
+      "tests": 239
     },
     "perFile": [
       {
@@ -115,6 +115,10 @@
       {
         "file": "src/test/admin-queues.test.tsx",
         "tests": 4
+      },
+      {
+        "file": "src/test/admin-revenue.test.tsx",
+        "tests": 1
       },
       {
         "file": "src/test/admin-users-merge.test.tsx",
@@ -251,17 +255,17 @@
     ]
   },
   "server": {
-    "files": 76,
-    "tests": 1054,
-    "passed": 1054,
+    "files": 77,
+    "tests": 1068,
+    "passed": 1068,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 118
     },
     "product": {
-      "files": 71,
-      "tests": 936
+      "files": 72,
+      "tests": 950
     },
     "perFile": [
       {
@@ -314,7 +318,7 @@
       },
       {
         "file": "server/src/__tests__/admin.test.js",
-        "tests": 43
+        "tests": 46
       },
       {
         "file": "server/src/__tests__/affiliate.test.js",
@@ -541,6 +545,10 @@
         "tests": 29
       },
       {
+        "file": "server/src/__tests__/subscription-expiry.test.js",
+        "tests": 11
+      },
+      {
         "file": "server/src/__tests__/totp.test.js",
         "tests": 10
       },
@@ -669,7 +677,7 @@
     ]
   },
   "total": {
-    "files": 134,
-    "tests": 1771
+    "files": 136,
+    "tests": 1786
   }
 }

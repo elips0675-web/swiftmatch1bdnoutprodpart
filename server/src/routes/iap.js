@@ -69,9 +69,9 @@ router.post('/api/iap/webhook', async (req, res) => {
         }
         const expiresAt = new Date(expiration_at_ms)
         await pool.query(
-          `INSERT INTO subscriptions (user_id, tier, provider, provider_subscription_id, status, duration_months, price, expires_at, current_period_end)
-           VALUES (?, ?, 'revenuecat', ?, 'active', ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE status = 'active', duration_months = ?, price = ?, expires_at = ?, current_period_end = ?, tier = ?`,
+          `INSERT INTO subscriptions (user_id, tier, provider, provider_subscription_id, status, duration_months, price, expires_at, current_period_end, is_active)
+           VALUES (?, ?, 'revenuecat', ?, 'active', ?, ?, ?, ?, 1)
+           ON DUPLICATE KEY UPDATE status = 'active', is_active = 1, duration_months = ?, price = ?, expires_at = ?, current_period_end = ?, tier = ?`,
           [
             app_user_id,
             product.tier,
@@ -97,7 +97,7 @@ router.post('/api/iap/webhook', async (req, res) => {
         break
       case 'EXPIRATION':
         await pool.query(
-          "UPDATE subscriptions SET status = 'expired' WHERE user_id = ? AND provider_subscription_id = ?",
+          "UPDATE subscriptions SET status = 'expired', is_active = 0 WHERE user_id = ? AND provider_subscription_id = ?",
           [app_user_id, product_id],
         )
         break

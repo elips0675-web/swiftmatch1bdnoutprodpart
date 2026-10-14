@@ -178,8 +178,8 @@ cd server && npm test            # серверные тесты
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 717 тестов, 58 файлов — **0 failures**
-- **Сервер (Vitest):** 1054 теста, 76 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
+- **Фронтенд (Vitest):** 718 тестов, 59 файлов — **0 failures**
+- **Сервер (Vitest):** 1068 тестов, 77 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 195 тестов, 21 spec-файл — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
 ### Зависимости

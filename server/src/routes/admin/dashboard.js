@@ -23,7 +23,7 @@ router.get('/stats', async (req, res) => {
     )
     const [[{ totalMatches }]] = await pool.query('SELECT COUNT(*) as totalMatches FROM matches')
     const [[{ revenue }]] = await pool.query(
-      'SELECT COALESCE(SUM(price), 0) as revenue FROM subscriptions WHERE is_active = 1',
+      'SELECT COALESCE(SUM(price), 0) as revenue FROM subscriptions WHERE is_active = 1 AND expires_at > NOW()',
     )
     const [[{ activeSubs }]] = await pool.query(
       'SELECT COUNT(*) as activeSubs FROM subscriptions WHERE is_active = 1 AND expires_at > NOW()',

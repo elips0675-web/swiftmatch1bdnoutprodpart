@@ -72,6 +72,24 @@ describe('GET /api/admin/stats (dashboard)', () => {
     expect(res.body).toHaveProperty('totalMatches')
   })
 
+  it('выручка считается только по непросроченным подпискам и отдаётся в рублях', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ total: 100 }], []])
+      .mockResolvedValueOnce([[{ activeToday: 10 }], []])
+      .mockResolvedValueOnce([[{ totalMatches: 5 }], []])
+      .mockResolvedValueOnce([[{ revenue: 699 }], []])
+      .mockResolvedValueOnce([[{ activeSubs: 20 }], []])
+      .mockResolvedValueOnce([[{ newToday: 30 }], []])
+
+    const res = await request(app)
+      .get('/api/admin/stats')
+      .set('Authorization', `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body.revenue).toBe(699)
+    const revenueSql = String(pool.query.mock.calls[3][0])
+    expect(revenueSql).toMatch(/FROM subscriptions WHERE is_active = 1 AND expires_at > NOW\(\)/)
+  })
+
   it('handles database error', async () => {
     pool.query.mockRejectedValue(new Error('DB error'))
     const res = await request(app)
@@ -341,6 +359,39 @@ describe('GET /api/admin/analytics/registrations', () => {
       .set('Authorization', `Bearer ${adminToken()}`)
     expect(res.status).toBe(200)
     expect(Array.isArray(res.body)).toBe(true)
+  })
+})
+
+describe('GET /api/admin/analytics/revenue-mix', () => {
+  const app = createAdminApp(adminAnalytics)
+
+  it('не считает просроченные подписки в распределении по тарифам', async () => {
+    pool.query.mockResolvedValue([[{ tier: 'gold', cnt: 2 }], []])
+    const res = await request(app)
+      .get('/api/admin/analytics/revenue-mix')
+      .set('Authorization', `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    const sql = String(pool.query.mock.calls[0][0])
+    expect(sql).toMatch(/WHERE is_active = 1 AND expires_at > NOW\(\) GROUP BY tier/)
+  })
+})
+
+describe('GET /api/admin/monetization/funnel', () => {
+  const app = createAdminApp(adminMonetization)
+
+  it('в воронке считает только непросроченный Premium', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ registrations: 10 }], []])
+      .mockResolvedValueOnce([[{ profiles: 8 }], []])
+      .mockResolvedValueOnce([[{ firstLike: 5 }], []])
+      .mockResolvedValueOnce([[{ premium: 3 }], []])
+    const res = await request(app)
+      .get('/api/admin/monetization/funnel')
+      .set('Authorization', `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    const sql = String(pool.query.mock.calls[3][0])
+    expect(sql).toMatch(/FROM subscriptions WHERE is_active = 1 AND expires_at > NOW\(\)/)
+    expect(res.body.find((s) => s.stage === 'Premium').count).toBe(3)
   })
 })
 

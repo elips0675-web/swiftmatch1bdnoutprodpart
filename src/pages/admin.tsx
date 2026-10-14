@@ -114,7 +114,7 @@ export default function AdminDashboardPage() {
 
   const dSuffix = t('units.d_short');
   const currency = stats?.revenue != null
-    ? `${(stats.revenue / 100).toLocaleString()} ₽`
+    ? `${stats.revenue.toLocaleString()} ₽`
     : t('admin.dash.revenue_value');
 
   const kpis = [

@@ -78,6 +78,8 @@ describe('POST /api/iap/webhook security', () => {
     expect(params[3]).toBe(12)
     expect(params[4]).toBe(Math.round(499 * 12 * 0.6))
     expect(params[5]).toBeInstanceOf(Date)
+    expect(String(sql)).toMatch(/is_active/)
+    expect(String(sql)).toMatch(/ON DUPLICATE KEY UPDATE status = 'active', is_active = 1/)
   })
 
   it('маппинг для всех тиров: plus/gold/platinum с разными duration', async () => {
@@ -123,6 +125,7 @@ describe('POST /api/iap/webhook security', () => {
       .send({ event: { type: 'CANCELLATION', app_user_id: '5', product_id: 'plus_12m' } })
     let [sql] = pool.query.mock.calls[0]
     expect(String(sql)).toMatch(/status = 'canceled'/)
+    expect(String(sql)).not.toMatch(/is_active = 0/)
 
     pool.query.mockClear()
     await request(createApp())
@@ -131,6 +134,7 @@ describe('POST /api/iap/webhook security', () => {
       .send({ event: { type: 'EXPIRATION', app_user_id: '5', product_id: 'plus_12m' } })
     ;[sql] = pool.query.mock.calls[0]
     expect(String(sql)).toMatch(/status = 'expired'/)
+    expect(String(sql)).toMatch(/is_active = 0/)
   })
 
   it('неизвестный тип события -> 200 received без запросов к БД', async () => {

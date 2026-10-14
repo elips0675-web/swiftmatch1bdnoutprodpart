@@ -77,7 +77,7 @@ router.get('/analytics/retention', wrap(async (req, res) => {
  */
 router.get('/analytics/revenue-mix', wrap(async (req, res) => {
   const [rows] = await pool.query(
-    `SELECT tier, COUNT(*) as cnt FROM subscriptions WHERE is_active = 1 GROUP BY tier`,
+    `SELECT tier, COUNT(*) as cnt FROM subscriptions WHERE is_active = 1 AND expires_at > NOW() GROUP BY tier`,
   )
   const colors = { plus: '#3b82f6', gold: '#f59e0b', platinum: '#8b5cf6' }
   const names = { plus: 'Plus', gold: 'Gold', platinum: 'Platinum' }

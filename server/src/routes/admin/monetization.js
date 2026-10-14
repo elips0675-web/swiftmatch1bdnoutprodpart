@@ -172,7 +172,7 @@ router.get('/monetization/funnel', async (req, res) => {
     const [[{ registrations }]] = await pool.query('SELECT COUNT(*) as registrations FROM users')
     const [[{ profiles }]] = await pool.query('SELECT COUNT(*) as profiles FROM user_profiles')
     const [[{ firstLike }]] = await pool.query('SELECT COUNT(DISTINCT from_user_id) as firstLike FROM likes')
-    const [[{ premium }]] = await pool.query('SELECT COUNT(DISTINCT user_id) as premium FROM subscriptions WHERE is_active = 1')
+    const [[{ premium }]] = await pool.query('SELECT COUNT(DISTINCT user_id) as premium FROM subscriptions WHERE is_active = 1 AND expires_at > NOW()')
 
     res.json([
       { stage: 'Посетители', count: visitors },
