@@ -152,7 +152,7 @@ cd server && npm test            # серверные тесты
 | Дрейф схемы (на БД) | `node scripts/schema-drift-audit.mjs` (читает `DB_*`, нужен MySQL) | то же + сверка с **живой** MySQL: ловит «колонка есть в эталоне, но не создана ни одной миграцией». В CI база строится из эталона, поэтому класс виден только на реальной БД — гейт подключён в `server-test` (`deploy.yml`, реальный MySQL) и на VPS после `migrate.js` (L5) |
 | Секреты | `node scripts/secrets-leak-audit.mjs` | четыре независимых канала: `.dockerignore` пропускает `server/.env`/`.jwt-dev-secret`; rsync без `--exclude .env` стирает прод-`.env`; **rsync исключает не все классы файлов-секретов, которые гейт сам признаёт секретами** (`server/.jwt-dev-secret`, `.env.*`, `*.pfx`, `id_rsa` ехали на VPS при зелёном гейте — этап 35); **значение секрета, вписанное в отслеживаемый файл** (был VAPID-ключ в `README.md`) |
 | Персистентность деплоя | `node scripts/deploy-persistence-audit.mjs` | каталог записи фото не смонтирован volume'ом → `docker compose up --build` удаляет все фото; сверяет путь из кода с compose. Гейт читает S3-переключатель (`S3_BUCKET`+`AWS_ACCESS_KEY_ID` в env сервиса `app`): при S3 фото на диск не пишутся, дисковые проверки пропускаются **с явной пометкой**, а ключи без S3-ветки в `upload.js` — FAIL |
-| Заголовки безопасности на периметре | `npm run check:headers` | SPA и статику отдаёт **nginx**, а не Express — `helmet()` (`server/src/index.js`) покрывает только ответы API, и в образ едущий `nginx/swiftmatch.http.conf` не было ни одного security-заголовка (этап 38); **наследование `add_header`**: в `location` с собственным `add_header` (например `Cache-Control`) верхнеуровневые заголовки не действуют; три nginx-конфига, `vercel.json`, `index.html`, порядок `helmet()`/`express.static` |
+| Заголовки безопасности на периметре | `npm run check:headers` | SPA и статику отдаёт **nginx**, а не Express — `helmet()` (`server/src/index.js`) покрывает только ответы API, и в образ едущий `nginx/swiftmatch.http.conf` не было ни одного security-заголовка (этап 38); **наследование `add_header`**: в `location` с собственным `add_header` (например `Cache-Control`) верхнеуровневые заголовки не действуют; три nginx-конфига, `vercel.json`, `index.html`, порядок `helmet()`/`express.static`; **проверка 6 (этап 44): лимиты и таймауты периметра** — `limit_req_zone` только на http-уровне файла (внутри `server` nginx конфиг не запускает), частоты `api` 60r/s и `auth` 10r/s, `client_max_body_size 20M` и `/socket.io/` `proxy_read_timeout` ≥ 300s согласованы во всех трёх конфигах |
 | Счётчики тестов | `node scripts/test-counter-audit.mjs` (`--fix` переписывает и перегенерирует) | числа тестов в `README.md`, `project-context.md`, `test/README.md`, `test/project-context.md`, `test/ИНВЕНТАРЬ-ТЕСТОВ.md` разошлись с прогоном; машинный инвентарь `test/machine/test-inventory.json` + `test/machine/frontend-tests.txt`/`server-tests.txt`/`e2e-tests.txt` устарел; разбивка `product`/`gate` в инвентаре и строке «Продукт/гейты» (`scripts/**` и `*-audit`/`schema-drift`/`prod-mock`-тесты сервера — гейты, остальное — продукт; новый `*-audit.test.js` без записи в `SERVER_GATE_TESTS` — красный), иначе вывеска прячет мета-тесты |
 | Уязвимости prod-зависимостей | `npm run audit:prod` (корень и в `server/`) | `npm audit --omit=dev --audit-level=high` по обоим lock-файлам: в образ едет только прод-часть |
 | Порты и ключи | `npm run check:ports` | порты vite/proxy/`.env`/`CORS_ORIGIN` + `console.log` в `server/src` (осознанные progress-логи CLI-сида `server/src/seed.js` исключены — список `CONSOLE_LOG_EXEMPT_FILES`, число пропущенных печатается) |
@@ -178,8 +178,8 @@ cd server && npm test            # серверные тесты
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 718 тестов, 59 файлов — **0 failures**
-- **Сервер (Vitest):** 1068 тестов, 77 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
+- **Фронтенд (Vitest):** 735 тестов, 60 файлов — **0 failures**
+- **Сервер (Vitest):** 1142 теста, 81 файл — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 195 тестов, 21 spec-файл — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
 ### Зависимости
@@ -221,7 +221,7 @@ cd server && npm test            # серверные тесты
 | `env-parity` | `npm run check:env-parity` — все ключи `server/.env.example` задокументированы и в корневом `.env.example`; compose (сервис `app`) читает корневой `.env`, поэтому серверный ключ до контейнера не доедет (P2 #34) |
 | `swagger-coverage` | `npm run check:swagger-coverage` — база в 47 операций (этап 13), каждый документированный путь существует в коде, мёртвых операций нет (этап 45, N7) |
 | `prod-mock` | `npm run check:prod-mock` — каждый хендлер с платным стоком (`mock: true`, `'paid'`, `INSERT INTO … subscriptions`, `commission_rate = 15`) закрыт `refuseMockPayment(res)`; вебхуки исключены (N9-tail, после этапа 39) |
-| `security-headers` | `npm run check:headers` — security-заголовки на периметре: все три nginx-конфига (в образ едет `swiftmatch.http.conf`), наследование `add_header`, `vercel.json`, `index.html`, порядок `helmet()`/`express.static` (этап 38, подключён этапом 43) |
+| `security-headers` | `npm run check:headers` — security-заголовки на периметре: все три nginx-конфига (в образ едет `swiftmatch.http.conf`), наследование `add_header`, `vercel.json`, `index.html`, порядок `helmet()`/`express.static` (этап 38, подключён этапом 43) + лимиты и WS-таймаут периметра, проверка 6 (этап 44: `limit_req_zone` только http-уровень, api 60r/s / auth 10r/s, `client_max_body_size 20M`, `/socket.io/` ≥ 300s) |
 
 ### `.github/workflows/deploy.yml` — push в `main`/`develop`, PR в `main` (Node 22)
 
@@ -353,8 +353,8 @@ cd server && npm test            # серверные тесты
 ### 🐳 DevOps
 - **Docker:** multi-stage (`node:22-alpine` → `nginx:1.30-alpine`), healthcheck, non-root, `.dockerignore`, `restart: unless-stopped`
 - **Docker Compose:** app + nginx + MySQL + Redis + Prometheus + Grafana, именованные volume'ы
-- **Nginx в контейнере** (`nginx/swiftmatch.http.conf` — единственный, что копируется в образ, `Dockerfile:30`): `limit_req` 60r/s на `/api` и 10r/s на `/api/auth`, `client_max_body_size 20M`, WebSocket `proxy_read_timeout 86400s`, `location = /healthz`, SPA fallback
-- **Nginx на VPS** — файла два, и **они расходятся между собой**: `nginx/swiftmatch.conf` (TLS 443, редирект с 80, `limit_req` 30r/s/5r/s, 20M, 86400s) и корневой `nginx.conf` (TLS 443, редирект с 80, `proxy_read_timeout 60s`, **без** `limit_req` и без `client_max_body_size`). Ни один в образ не попадает; какой из двух применять на сервере — в бэклоге (P2)
+- **Nginx в контейнере** (`nginx/swiftmatch.http.conf` — единственный, что копируется в образ, `Dockerfile`): `limit_req` 60r/s на `/api` и 10r/s на `/api/auth`, `client_max_body_size 20M`, WebSocket `proxy_read_timeout 86400s`, `location = /healthz`, SPA fallback
+- **Nginx на VPS** — корневой `nginx.conf` (`127.0.0.1:3002`, TLS 443, редирект с 80) — **эталон хостового конфига**; `nginx/swiftmatch.conf` (`app:3002`) — альтернатива с TLS-терминацией внутри контейнера (`DEPLOY.md`). Ни один в образ не попадает. С этапа 44 лимиты, `client_max_body_size` и WS-таймаут **согласованы** во всех трёх файлах (api 60r/s, auth 10r/s, 20M, 86400s) — проверяет `npm run check:headers`, проверка 6 (раньше расходились: 30r/s/5r/s и хост без `limit_req` с обрывом WS на 60s)
 - **Мониторинг:** Prometheus-метрики (HTTP rps, p50/p95/p99, DB, WS, cache) + Grafana
 - **Load Testing:** `k6/load-test.js` (ramp-up 10→100 users, 6 endpoints)
 - **Git hooks:** Husky + lint-staged (ESLint + Prettier на staged)

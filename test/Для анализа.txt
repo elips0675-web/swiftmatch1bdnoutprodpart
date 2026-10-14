@@ -34,7 +34,7 @@ Node.js/Express + MySQL (mysql2) бэкенд, Socket.IO real-time, Capacitor An
 
 ## Статус проверок (13.10.2026, всё зелёное)
 
-- Тесты **1786/1786**: сервер 1068/1068 (77 файлов), фронт 718/718 (59 файлов: 229 в `src/` + 462 тестов гейтов в 19 файлах `scripts/`), E2E 195 в 21 спеках (статический счёт `playwright test --list`). Гейты: все зелёные — 23 джобы `ci.yml` + 7 `deploy.yml` (на 12.10.2026) + локальные `check:console`/`check:bundle`.
+- Тесты **1877/1877**: сервер 1142/1142 (81 файлов), фронт 735/735 (60 файлов: 229 в `src/` + 462 тестов гейтов в 19 файлах `scripts/`), E2E 195 в 21 спеках (статический счёт `playwright test --list`). Гейты: все зелёные — 23 джобы `ci.yml` + 7 `deploy.yml` (на 12.10.2026) + локальные `check:console`/`check:bundle`.
 - vite build ✅, tsc --noEmit 0 ошибок, eslint 0 errors (194 warnings — стилевые), Swagger ✅
 - E2E: Playwright, storageState из global-setup (.auth/*.json), аудит console-errors на каждой странице, screenshot/video/trace на падение; независимая очистка БД `scripts/e2e-cleanup.mjs` шагом с `if: always()`.
 - Pre-flight: `npm run check:ports`, `node scripts/schema-drift-audit.mjs --offline`, `npm run check:docs`, `npm run check:enum-constraints`, `npm run check:prod-mock`, `npm run check:headers`, `node scripts/test-counter-audit.mjs`.
@@ -157,8 +157,8 @@ i18n RU/EN, push VAPID + FCM hook, deep links hook, рефералка.
    `REVENUECAT_WEBHOOK_SECRET`). Без ключей всё деградирует мягко (mock/fallback),
    кроме Stripe- и RevenueCat-вебхуков (осознанные 502/503 в проде).
 2. **Релиз Android:** домен вместо LAN-IP, keystore-подпись, App Links (`assetlinks.json`), AAB + Google Play.
-3. **Кодовый бэклог (открыт):** L2 (расхождение двух хостовых nginx-конфигов), M2 (модерация Perspective
-   не реализована), P2 #23 (полной воронки E2E нет), P3 #26–32 (watchers, field-permissions, reports, export, opening-lines, team-scope, coverage ядра); порядок — в `Что доделать.txt`.
+3. **Кодовый бэклог (открыт):** L1 (ротация VAPID-ключа), M1 (окно чек-ина), M2 (модерация Perspective),
+   M4 (`csrfGuard` при выносе API), P3 #27 (field-level permissions), P3 #32 (покрытие ядра); порядок — в `Что доделать.txt`.
 4. **Осознанно отложено (не «забыто»):** полная CSRF-защита (double-submit token) — до выноса API
    на отдельный домен; окно времени у check-in (продуктовое решение). См. `Что доделать.txt`.
 5. **Не начато:** Design System / Storybook.

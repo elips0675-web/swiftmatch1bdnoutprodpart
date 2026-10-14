@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-14T08:36:22.561Z",
+  "generated": "2026-10-14T13:29:27.845Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 59,
-    "tests": 718,
-    "passed": 718,
+    "files": 60,
+    "tests": 735,
+    "passed": 735,
     "failed": 0,
     "gate": {
       "files": 20,
-      "tests": 479
+      "tests": 492
     },
     "product": {
-      "files": 39,
-      "tests": 239
+      "files": 40,
+      "tests": 243
     },
     "perFile": [
       {
@@ -34,7 +34,7 @@
       },
       {
         "file": "scripts/check-security-headers.test.mjs",
-        "tests": 46
+        "tests": 59
       },
       {
         "file": "scripts/dependency-audit.test.mjs",
@@ -237,6 +237,10 @@
         "tests": 17
       },
       {
+        "file": "src/test/settings-privacy.test.tsx",
+        "tests": 4
+      },
+      {
         "file": "src/test/two-fa-settings.test.tsx",
         "tests": 2
       },
@@ -255,22 +259,30 @@
     ]
   },
   "server": {
-    "files": 77,
-    "tests": 1068,
-    "passed": 1068,
+    "files": 81,
+    "tests": 1142,
+    "passed": 1142,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 118
     },
     "product": {
-      "files": 72,
-      "tests": 950
+      "files": 76,
+      "tests": 1024
     },
     "perFile": [
       {
         "file": "server/src/__tests__/active-user.test.js",
         "tests": 33
+      },
+      {
+        "file": "server/src/__tests__/activity-privacy-coverage.test.js",
+        "tests": 4
+      },
+      {
+        "file": "server/src/__tests__/activity-privacy.test.js",
+        "tests": 19
       },
       {
         "file": "server/src/__tests__/admin-auth.test.js",
@@ -389,6 +401,10 @@
         "tests": 6
       },
       {
+        "file": "server/src/__tests__/hangouts-watchers-relations.test.js",
+        "tests": 32
+      },
+      {
         "file": "server/src/__tests__/hangouts.test.js",
         "tests": 65
       },
@@ -475,6 +491,10 @@
       {
         "file": "server/src/__tests__/premium.test.js",
         "tests": 13
+      },
+      {
+        "file": "server/src/__tests__/presence.test.js",
+        "tests": 19
       },
       {
         "file": "server/src/__tests__/prod-mock-payments.test.js",
@@ -677,7 +697,7 @@
     ]
   },
   "total": {
-    "files": 136,
-    "tests": 1786
+    "files": 141,
+    "tests": 1877
   }
 }
