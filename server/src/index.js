@@ -25,6 +25,7 @@ import { initQueues, closeQueues } from './queue.js'
 import { startQueueBackpressureMonitor, stopQueueBackpressureMonitor } from './queue-monitor.js'
 import { startWeeklyReportMonitor, stopWeeklyReportMonitor } from './weekly-report.js'
 import { startSubscriptionExpiry, stopSubscriptionExpiry } from './subscriptions.js'
+import { startPaymentReconcile, stopPaymentReconcile } from './payment-reconcile.js'
 import { createGracefulShutdown } from './shutdown.js'
 import { resolveTrustProxy } from './trust-proxy.js'
 import { healthHandler, liveHandler, readyHandler } from './health.js'
@@ -350,6 +351,7 @@ startNotificationCleanup()
 startQueueBackpressureMonitor()
 startWeeklyReportMonitor()
 startSubscriptionExpiry()
+startPaymentReconcile()
 initQueues()
 httpServer.listen(PORT, () => {
   rootLogger.info(`SwiftMatch API running on port ${PORT}`)
@@ -364,6 +366,7 @@ const shutdown = createGracefulShutdown({
     stopQueueBackpressureMonitor()
     stopWeeklyReportMonitor()
     stopSubscriptionExpiry()
+    stopPaymentReconcile()
   },
   closeQueues,
   disconnectRedis,

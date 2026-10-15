@@ -57,12 +57,12 @@ const router = Router()
  * /api/premium/cancel:
  *   post:
  *     tags: [Premium]
- *     summary: Cancel active subscription
+ *     summary: Cancel active subscription (access stays until the paid period ends)
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Subscription cancelled
+ *         description: Subscription canceled, access remains until expires_at
  *       404:
  *         description: No active subscription found
  */
@@ -80,7 +80,7 @@ router.get('/api/premium/tiers', (req, res) => {
 router.get('/api/premium/my', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
-      "SELECT tier, duration_months, price, started_at, expires_at, is_active FROM subscriptions WHERE user_id = ? AND is_active = 1 AND expires_at > NOW() ORDER BY started_at DESC, id DESC LIMIT 1",
+      "SELECT tier, duration_months, price, started_at, expires_at, status, is_active FROM subscriptions WHERE user_id = ? AND is_active = 1 AND expires_at > NOW() ORDER BY started_at DESC, id DESC LIMIT 1",
       [req.userId],
     )
     if (rows.length === 0) return res.json(null)
@@ -173,11 +173,15 @@ router.post('/api/premium/create-checkout', auth, async (req, res) => {
 router.post('/api/premium/cancel', auth, async (req, res) => {
   try {
     const [result] = await pool.query(
-      "UPDATE subscriptions SET is_active = 0 WHERE user_id = ? AND is_active = 1 AND expires_at > NOW()",
+      "UPDATE subscriptions SET status = 'canceled' WHERE user_id = ? AND is_active = 1 AND expires_at > NOW()",
       [req.userId],
     )
     if (result.affectedRows === 0) return res.status(404).json({ message: 'No active subscription found' })
-    res.json({ message: 'Subscription cancelled' })
+    const [rows] = await pool.query(
+      "SELECT expires_at FROM subscriptions WHERE user_id = ? AND is_active = 1 AND expires_at > NOW() ORDER BY expires_at DESC, id DESC LIMIT 1",
+      [req.userId],
+    )
+    res.json({ message: 'Subscription cancelled', status: 'canceled', activeUntil: rows[0]?.expires_at ?? null })
   } catch (err) {
     logger.error('Cancel error:', err)
     res.status(500).json({ message: 'Failed to cancel subscription' })
@@ -251,19 +255,30 @@ router.post('/api/premium/webhook', async (req, res) => {
 
 export async function applyPremiumCheckout(event, conn) {
   const session = event.data.object
-  const { userId, tier, duration_months } = session.metadata
-  if (!userId || !tier) return
+  const metadata = session.metadata || {}
+  const { userId, tier, duration_months } = metadata
+  if (!userId || !tier) return false
+  const sessionId = session.id ? String(session.id) : null
+  if (sessionId) {
+    const [existing] = await conn.query(
+      "SELECT id FROM subscriptions WHERE provider = 'stripe' AND provider_subscription_id = ? LIMIT 1",
+      [sessionId],
+    )
+    if (existing.length > 0) return false
+  }
   const tierConfig = TIERS.find(t => t.id === tier)
-  const price = tierConfig ? tierConfig.price * Number(duration_months || 1) : 0
+  const months = Number(duration_months || 1)
+  const price = tierConfig ? tierConfig.price * months : 0
   await conn.query(
     "UPDATE subscriptions SET is_active = 0 WHERE user_id = ? AND is_active = 1 AND expires_at > NOW()",
     [Number(userId)],
   )
   await conn.query(
-    `INSERT INTO subscriptions (user_id, tier, duration_months, price, expires_at, is_active)
-     VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MONTH), 1)`,
-    [Number(userId), tier, Number(duration_months || 1), price, Number(duration_months || 1)],
+    `INSERT INTO subscriptions (user_id, provider, provider_subscription_id, tier, duration_months, price, expires_at, current_period_end, is_active, status)
+     VALUES (?, 'stripe', ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MONTH), DATE_ADD(NOW(), INTERVAL ? MONTH), 1, 'active')`,
+    [Number(userId), sessionId, tier, months, price, months, months],
   )
+  return true
 }
 
 export default router

@@ -1,5 +1,5 @@
 ===== Сервер (Vitest) =====
-1142 тестов в 81 файлах (зелёных 1142) (vitest --reporter=json)
+1168 тестов в 82 файлах (зелёных 1168) (vitest --reporter=json)
 
 # файл | тестов
 server/src/__tests__/active-user.test.js | 33
@@ -36,7 +36,7 @@ server/src/__tests__/geo-radius.test.js | 18
 server/src/__tests__/hangout-suggest.test.js | 6
 server/src/__tests__/hangouts-watchers-relations.test.js | 32
 server/src/__tests__/hangouts.test.js | 65
-server/src/__tests__/iap-webhook.test.js | 11
+server/src/__tests__/iap-webhook.test.js | 14
 server/src/__tests__/icebreakers.test.js | 3
 server/src/__tests__/idor.test.js | 21
 server/src/__tests__/image-pipeline.test.js | 8
@@ -51,12 +51,13 @@ server/src/__tests__/notification-gates.test.js | 13
 server/src/__tests__/notification-prefs.test.js | 45
 server/src/__tests__/notifications.test.js | 7
 server/src/__tests__/notify-failure.test.js | 7
-server/src/__tests__/order-by-audit.test.js | 30
+server/src/__tests__/order-by-audit.test.js | 34
 server/src/__tests__/partner-dashboard.test.js | 12
 server/src/__tests__/partner-webhook.test.js | 6
 server/src/__tests__/partners.test.js | 66
-server/src/__tests__/premium-webhook.test.js | 5
-server/src/__tests__/premium.test.js | 13
+server/src/__tests__/payment-reconcile.test.js | 13
+server/src/__tests__/premium-webhook.test.js | 7
+server/src/__tests__/premium.test.js | 17
 server/src/__tests__/presence.test.js | 19
 server/src/__tests__/prod-mock-payments.test.js | 30
 server/src/__tests__/profile-fields.test.js | 10

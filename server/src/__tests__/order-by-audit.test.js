@@ -206,6 +206,44 @@ describe('order-by-audit: динамическая сортировка', () => 
   })
 })
 
+describe('order-by-audit: столбец ORDER BY обязан существовать', () => {
+  it('ORDER BY по колонке, которой нет в таблице, — 500 (ER_BAD_FIELD_ERROR)', () => {
+    // Ровно этот запрос уехал в main: subscriptions.created_at не существует,
+    // поэтому GET /api/iap/status падал 500. Гейт молчал: уникальный замыкатель
+    // `id` на месте, а существование столбца не проверялось (iap.js:144).
+    const issues = auditSource(
+      "const q = \"SELECT tier, status FROM subscriptions WHERE user_id = ? AND provider = 'revenuecat' ORDER BY created_at DESC, id DESC LIMIT 1\"",
+    )
+    expect(issues).toHaveLength(1)
+    expect(issues[0].reason).toContain('created_at')
+    expect(issues[0].reason).toContain('subscriptions')
+  })
+
+  it('после фикса тот же запрос по started_at — чисто', () => {
+    const issues = auditSource(
+      "const q = \"SELECT tier, status FROM subscriptions WHERE user_id = ? AND provider = 'revenuecat' ORDER BY started_at DESC, id DESC LIMIT 1\"",
+    )
+    expect(issues).toHaveLength(0)
+  })
+
+  it('алиас из SELECT не объявляется отсутствующим столбцом', () => {
+    // `day` — вычисляемый алиас, а не колонка users. Причина срабатывания тут
+    // может быть только про замыкатель; «нет в таблице» на алиас — ложь.
+    const issues = auditSql(
+      'SELECT DATE(created_at) as day FROM users WHERE created_at > ? ORDER BY day DESC LIMIT 30',
+    )
+    expect(issues).toHaveLength(1)
+    expect(issues[0].reason).not.toContain('нет в таблице')
+  })
+
+  it('столбец присоединённой таблицы не приписывается главной', () => {
+    const issues = auditSql(
+      'SELECT h.id, up.display_name FROM hangouts h JOIN user_profiles up ON up.id = h.user_id ORDER BY h.created_at DESC, h.id DESC LIMIT ?',
+    )
+    expect(issues).toHaveLength(0)
+  })
+})
+
 describe('order-by-audit: главная таблица задаёт строку результата', () => {
   it('замыкатель на PK присоединённой таблицы не проходит: две строки главной дадут один id', () => {
     // ORDER BY по id профиля формально уникален, но несколько hangouts одного

@@ -257,6 +257,29 @@ function tiebreakCovers(terms, scope, tables) {
   return isUniqueColumn(last, scope, tables)
 }
 
+/**
+ * Столбцы ORDER BY, которых нет в главной таблице. Запрос с таким столбцом
+ * падает на живом сервере (ER_BAD_FIELD_ERROR 1054 = 500), а гейт этого не
+ * видел: он проверял замыкатель и неоднозначность, но не существование
+ * столбца. `ORDER BY created_at` в `subscriptions`, где такой колонки нет,
+ * проходил зелёным (server/src/routes/iap.js:144). Проверяются только
+ * резолвимые ссылки: выражения, агрегаты и алиасы из SELECT пропускаются.
+ */
+function unknownOrderColumns(terms, scope, tables, sql) {
+  if (!tables.length) return []
+  const [mainTable, mainAlias] = tables[0]
+  const cols = scope.all.get(mainTable)
+  if (!cols) return []
+  const aliases = selectAliases(sql)
+  const out = new Set()
+  for (const term of terms) {
+    const col = columnRef(term, mainAlias)
+    if (!col || aliases.has(col)) continue
+    if (!cols.includes(col)) out.add(col)
+  }
+  return [...out]
+}
+
 export function findOrderByIssues(schema, files) {
   const scope = parseUniqueIndex(schema)
   const issues = []
@@ -285,6 +308,11 @@ export function findOrderByIssues(schema, files) {
         if (!expr.includes('.') && selectAliases(sql).has(expr.toLowerCase())) continue
       }
       const tables = tablesOf(sql)
+      const unknown = unknownOrderColumns(terms, scope, tables, sql)
+      if (unknown.length) {
+        issues.push({ ...base, reason: `столбца «${unknown.join('», «')}» нет в таблице ${tables[0][0]}` })
+        continue
+      }
       if (expr && tiebreakCovers(terms, scope, tables)) {
         // Замыкатель есть, но без префикса он может быть неоднозначен: у
         // нескольких таблиц в FROM есть колонка `id`, и MySQL отдаст

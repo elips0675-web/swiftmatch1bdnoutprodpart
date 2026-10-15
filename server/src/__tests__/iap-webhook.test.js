@@ -5,6 +5,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import request from 'supertest'
 import express from 'express'
+import jwt from 'jsonwebtoken'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 
 vi.hoisted(() => {
   process.env.JWT_SECRET = 'test-secret'
@@ -174,5 +180,45 @@ describe('GET /api/iap/products', () => {
     expect(plus12.price).toBe(Math.round(499 * 12 * 0.6))
     const gold6 = res.body.find((p) => p.id === 'gold_6m')
     expect(gold6.price).toBe(Math.round(999 * 6 * 0.8))
+  })
+})
+
+describe('GET /api/iap/status', () => {
+  function authToken(userId = 5) {
+    return jwt.sign({ userId, role: 'user' }, process.env.JWT_SECRET, { expiresIn: '1h' })
+  }
+
+  it('сортирует по существующей колонке started_at (created_at в subscriptions нет)', async () => {
+    pool.query.mockResolvedValueOnce([
+      [{ tier: 'plus', status: 'active', current_period_end: '2026-12-01T00:00:00.000Z' }],
+      [],
+    ])
+    const res = await request(createApp())
+      .get('/api/iap/status')
+      .set('Authorization', `Bearer ${authToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ active: true, tier: 'plus', expiresAt: '2026-12-01T00:00:00.000Z' })
+    const sql = String(pool.query.mock.calls[0][0])
+    expect(sql).toContain('started_at')
+    expect(sql).not.toContain('created_at')
+  })
+
+  it('нет подписки -> active:false, tier:null', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    const res = await request(createApp())
+      .get('/api/iap/status')
+      .set('Authorization', `Bearer ${authToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ active: false, tier: null })
+  })
+})
+
+describe('схема subscriptions: апсерт RevenueCat опирается на UNIQUE-ключ', () => {
+  it('объявлен UNIQUE (provider, provider_subscription_id)', () => {
+    // Без этого ключа `ON DUPLICATE KEY UPDATE` в /api/iap/webhook не срабатывает
+    // и каждое продление (RENEWAL) вставляет новую строку вместо обновления —
+    // дефект держался именно на отсутствии уникального ключа (миграция 065).
+    const schema = fs.readFileSync(path.join(ROOT, 'database', 'mysql_schema.sql'), 'utf8')
+    expect(schema).toMatch(/UNIQUE KEY `uq_subscriptions_provider` \(`provider`,`provider_subscription_id`\)/)
   })
 })

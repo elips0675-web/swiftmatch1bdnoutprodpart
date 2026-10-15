@@ -15,7 +15,7 @@ vi.mock('../db.js', () => ({
 }))
 
 import pool from '../db.js'
-import premiumRoutes from '../routes/premium.js'
+import premiumRoutes, { applyPremiumCheckout } from '../routes/premium.js'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'test-secret'
 const app = express()
@@ -141,11 +141,70 @@ describe('POST /api/premium/cancel', () => {
     expect(res.body.message).toMatch(/cancelled/i)
   })
 
+  it('отмена сохраняет доступ до конца оплаченного периода', async () => {
+    pool.query
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []])
+      .mockResolvedValueOnce([[{ expires_at: '2026-12-01T00:00:00.000Z' }], []])
+    const res = await request(app)
+      .post('/api/premium/cancel')
+      .set('Authorization', `Bearer ${authToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('canceled')
+    expect(res.body.activeUntil).toBe('2026-12-01T00:00:00.000Z')
+    const cancelSql = String(pool.query.mock.calls[0][0])
+    expect(cancelSql).toContain("SET status = 'canceled'")
+    expect(cancelSql).not.toContain('is_active = 0')
+  })
+
   it('returns 404 when no active subscription', async () => {
     pool.query.mockResolvedValue([{ affectedRows: 0 }, []])
     const res = await request(app)
       .post('/api/premium/cancel')
       .set('Authorization', `Bearer ${authToken()}`)
     expect(res.status).toBe(404)
+  })
+})
+
+describe('applyPremiumCheckout: подписка привязана к платежу и идемпотентна', () => {
+  it('пишет provider=stripe и provider_subscription_id = session.id', async () => {
+    const conn = mockTransaction()
+    conn.query.mockImplementation(() => Promise.resolve([[], []]))
+    const applied = await applyPremiumCheckout(
+      { data: { object: { id: 'cs_123', metadata: { userId: '5', tier: 'plus', duration_months: '1' } } } },
+      conn,
+    )
+    expect(applied).toBe(true)
+    const insertCall = conn.query.mock.calls.find((c) => String(c[0]).includes('INSERT INTO subscriptions'))
+    expect(String(insertCall[0])).toContain('provider_subscription_id')
+    expect(String(insertCall[0])).toContain("'stripe'")
+    expect(insertCall[1]).toContain('cs_123')
+    expect(String(insertCall[0])).toContain("'active'")
+  })
+
+  it('повторная доставка того же платежа не продлевает подписку', async () => {
+    const conn = mockTransaction()
+    conn.query.mockImplementation((sql) =>
+      String(sql).includes('FROM subscriptions WHERE provider')
+        ? Promise.resolve([[{ id: 9 }], []])
+        : Promise.resolve([{ affectedRows: 1 }, []]),
+    )
+    const applied = await applyPremiumCheckout(
+      { data: { object: { id: 'cs_dup', metadata: { userId: '5', tier: 'plus' } } } },
+      conn,
+    )
+    expect(applied).toBe(false)
+    expect(conn.query.mock.calls.map((c) => String(c[0])).some((s) => s.includes('INSERT INTO subscriptions'))).toBe(false)
+  })
+
+  it('payload без session.id (старый формат) по-прежнему применяется', async () => {
+    const conn = mockTransaction()
+    conn.query.mockImplementation(() => Promise.resolve([[], []]))
+    const applied = await applyPremiumCheckout(
+      { data: { object: { metadata: { userId: '5', tier: 'plus' } } } },
+      conn,
+    )
+    expect(applied).toBe(true)
+    const insertCall = conn.query.mock.calls.find((c) => String(c[0]).includes('INSERT INTO subscriptions'))
+    expect(insertCall[1][1]).toBeNull()
   })
 })

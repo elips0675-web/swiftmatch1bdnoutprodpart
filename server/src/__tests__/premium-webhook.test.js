@@ -124,4 +124,52 @@ describe('POST /api/premium/webhook security', () => {
     expect(sqls.some((s) => s.includes('INSERT INTO subscriptions'))).toBe(false)
     expect(conn.rollback).toHaveBeenCalled()
   })
+
+  it('событие с session.id привязывает подписку к платежу (provider + id)', async () => {
+    constructEvent.mockReturnValue({
+      id: 'evt_010',
+      type: 'checkout.session.completed',
+      data: { object: { id: 'cs_010', metadata: { userId: '5', tier: 'gold', duration_months: '6' } } },
+    })
+    conn.query.mockImplementation((sql) =>
+      Promise.resolve(
+        String(sql).includes('FROM subscriptions WHERE provider')
+          ? [[], []]
+          : [{ affectedRows: 1 }, []],
+      ),
+    )
+    const res = await request(createApp())
+      .post('/api/premium/webhook')
+      .set('stripe-signature', 't=1,v1=ok')
+      .send({ fake: true })
+    expect(res.status).toBe(200)
+    const insertCall = conn.query.mock.calls.find((c) => String(c[0]).includes('INSERT INTO subscriptions'))
+    expect(String(insertCall[0])).toContain('provider_subscription_id')
+    expect(insertCall[1]).toContain('cs_010')
+  })
+
+  it('вебхук по уже проведённому платежу (сверка догнала) не продлевает подписку', async () => {
+    // Сессию уже применила сверка пропущенных оплат (payment-reconcile.js),
+    // а следом пришёл «догоняющий» вебхук с новым event_id: дедуп по event_id
+    // его не поймает, поэтому защита — уникальность session.id в подписках.
+    constructEvent.mockReturnValue({
+      id: 'evt_011',
+      type: 'checkout.session.completed',
+      data: { object: { id: 'cs_011', metadata: { userId: '5', tier: 'plus', duration_months: '1' } } },
+    })
+    conn.query.mockImplementation((sql) =>
+      Promise.resolve(
+        String(sql).includes('FROM subscriptions WHERE provider')
+          ? [[{ id: 3 }], []]
+          : [{ affectedRows: 1 }, []],
+      ),
+    )
+    const res = await request(createApp())
+      .post('/api/premium/webhook')
+      .set('stripe-signature', 't=1,v1=ok')
+      .send({ fake: true })
+    expect(res.status).toBe(200)
+    const sqls = conn.query.mock.calls.map((c) => String(c[0]))
+    expect(sqls.some((s) => s.includes('INSERT INTO subscriptions'))).toBe(false)
+  })
 })
