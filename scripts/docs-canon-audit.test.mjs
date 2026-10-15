@@ -488,8 +488,9 @@ describe('структурный гейт бэклога (Что доделат�
   it('все даты закрытий реального бэклога есть в реальной хронике', () => {
     const todo = read(TODO_JOURNAL)
     const done = read(DONE_JOURNAL)
+    expect(todo, 'бэклог пуст — проверка вырождена').toMatch(/^## /m)
+    expect(collectBacklogFindings(todo, done)).toEqual([])
     const dates = [...todo.matchAll(CLOSURE_DATE_RE)].map((m) => m[1])
-    expect(dates.length).toBeGreaterThan(0)
     for (const d of new Set(dates)) {
       expect(done, `нет даты ${d} в «Что сделано.txt»`).toContain(d)
     }

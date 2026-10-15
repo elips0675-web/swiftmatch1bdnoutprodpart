@@ -6,7 +6,7 @@
 >
 > **Очередь этапов 45+:** L/M/P2 (см. «Очередь» внизу).
 >
-> **Состояние git:** 15.10.2026 `main` впереди `origin/main` — локально закоммичены (не запушены) P2 #23, P3 #28, P3 #29, смоук непокрытых страниц (`e2e/pages-smoke.spec.ts`, E2E 195 в 21 спеке), L2 (`feat(nginx)`: эталон nginx-конфигов, проверка 6 гейта), P3 #26 (`feat`: серверное ядро watchers/relations/merge), P3 #27 (`feat`: присутствие + приватность статуса активности) и этап 45 (`feat`: платёжная сверка — `c0407de`) + `docs`-коммит (хроника, бэклог, инвентарь 1903, зеркала). **P3 #26, UI/флаг/i18n (этап 46) — в рабочем дереве, не закоммичен.** Рабочее дерево чистое (кроме 46). `Для анализа.txt` с 12.10.2026 трекается в git и сверяется гейтом счётчиков. Push — по правилу, только по отдельной команде владельца.
+> **Состояние git:** 15.10.2026 `main` == `origin/main` — всё закоммичено и запушено (0 впереди, `git status` чист). Отправлено: P2 #23, P3 #28, P3 #29, смоук непокрытых страниц (`e2e/pages-smoke.spec.ts`, E2E 195 в 21 спеке), L2 (`feat(nginx)`: эталон nginx-конфигов, проверка 6 гейта), P3 #26 (`feat`: серверное ядро watchers/relations/merge — `871b967`), P3 #27 (`feat`: присутствие + приватность статуса активности), этап 45 (`feat`: платёжная сверка — `c0407de`) и этап 46 (`feat(hangouts)`: P3 #26 UI/флаг/i18n — `08ff0eb`) + `docs`-коммиты (хроника, бэклог, инвентарь 1923, зеркала). Рабочее дерево чистое. `Для анализа.txt` с 12.10.2026 трекается в git и сверяется гейтом счётчиков. Push — по команде владельца (15.10.2026 выполнен).
 ---
 
 ## ⏳ Ждёт действий пользователя (ключи / внешние сервисы)
@@ -30,26 +30,7 @@
 
 ---
 
-## 🟠 P1 — важно для UX и монетизации
-
-### P1, таблица 26.09 — открытые пункты (уточнено по коду)
-
-| # | Пункт | Оценка | Что именно |
-|---|---|---|---|
-| ~~9б~~ | ~~**Документировать оставшиеся 161 роут**~~ ✅ **ЗАКРЫТО 11.10.2026** | — | Разбор — в `Что сделано.txt` |
-| ~~11~~ | ~~**Merge duplicate profiles (qwen #15)**~~ ✅ **ЗАКРЫТО 11.10.2026** | 2 дня | Сервер (`POST /api/admin/users/:id/merge` + `GET /api/admin/users/duplicates`) + UI «Дубликаты» в `/admin/users` — разбор в `Что сделано.txt` |
-
-### react-router-dom 6.30.4 → 7.18.4 (P1) — ЗАКРЫТО 11.10.2026
-
-### Логи сервера (G3 #36) — ЗАКРЫТО 11.10.2026
-
-### N4-остаток / перенос `profile-fields.js` на остальные пишущие маршруты — ЗАКРЫТО 12.10.2026
-
----
-
 ## 🟡 P2 — nice-to-have, дошлифовка
-
-### L2. Расхождение nginx-конфигов — ЗАКРЫТО 14.10.2026
 
 ### M1. Чек-ин не ограничен окном времени (продуктовое решение)
 
@@ -62,17 +43,6 @@
 ### M4. `csrfGuard` импортирован, но смонтирован быть не может (сознательное решение)
 
 `server/src/index.js:92` — `// app.use(csrfGuard)` закомментирован с пояснением «после выноса API на поддомен». Импорт убран, в комментарий вписано «вернуть в импорт». Пока API на том же домене, решение верное; при выносе на поддомен guard **обязан** быть включён, иначе cookie-сессии станут уязвимы к CSRF.
-
-### M6. `scripts/*.mjs` и `e2e/*.spec.js` линтером не покрыты (P2) — ЗАКРЫТО 11.10.2026
-
-### P2 #33–36 (новые 27.09–01.10, найдены при Trivy-скане и закрытии P0 #5)
-
-| # | Пункт | Оценка | Что именно |
-|---|---|---|---|
-| ~~33~~ | ~~**Базовые образы вне поддержки + непинованные теги**~~ ✅ **ЗАКРЫТО 12.10.2026** | 0.5–1 день + окно на MySQL | **EOL:** `nginx:1.27-alpine` (`Dockerfile:27`) — nginx 1.27 EOL 2025-06-24, целиться в 1.30; `mysql:8` (`docker-compose.yml:34`) + `mysql:8.0` в двух CI-сервисах — MySQL 8.0 EOL 2026-04-30, целиться в 8.4 LTS (EOL 2032). **Живые, не трогать:** `node:22-alpine`, `redis:7-alpine`. **Непинованные:** `prom/prometheus:latest` и `grafana/grafana:latest` — зафиксировать тег или digest. Почему не сделано: на машине нет `docker`. Порядок: (а) `nginx:1.30-alpine` — `docker build --target web` + поднять локально; (б) запинить prometheus/grafana; (в) MySQL 8.0 → 8.4 **отдельным окном с бэкапом** (`scripts/backup-mysql.ps1` есть) |
-| ~~36~~ | ~~**Отзыв сессии обрывает только refresh-цепочку: access-токен живёт 24 часа, уже открытый WebSocket остаётся живым**~~ ✅ **ЗАКРЫТО 11.10.2026** | 1 день + решение по TTL | Вариант (а): TTL access 24ч → 15 мин + клиентский таймер авто-refresh — разбор в `Что сделано.txt` |
-
-### CI: джоба docker-config-check не создаёт корневой .env — ЗАКРЫТО 12.10.2026
 
 ### CI: краснота `server-test` / `test-counters` / `e2e` / Trivy — исправлено, ждёт прогона в CI (12.10.2026)
 
@@ -88,24 +58,8 @@
 
 **Проверка (а):** локальная репетиция точного окружения джобы (пустая база без схемы + живой API на 3002) → exit 0, сервер 979/979, фронт 681/681, E2E 152 в 19 спеках, итого **1660/1660**; ровно та команда ожидания API, что стоит в workflow, отвечает `OK: … ответил 200`; `scripts/e2e-gate-audit.test.mjs` + `scripts/mysql-race-gate.test.mjs` — 64/64 (мина по дороге: шаг `Stop server` с `kill … || true` ломал `mysql-race-gate`, потому что тот читал секцию джобы до конца файла, — исправлено общим экстрактором `getJobSection` из `scripts/e2e-gate-audit.mjs`). Два новых теста парсера подняли фронт-счётчик (679 → 681), инвентарь и числа в доках обновлены `test-counter-audit.mjs --fix` + повторный прогон. **Остаток:** прогон в CI по отправленному `origin/main` (push 12.10.2026); тот же прогон подтверждает Trivy.
 
-### P2, таблица 26.09 — открытые пункты (уточнено по коду)
-
-| # | Пункт | Оценка | Что именно |
-|---|---|---|---|
-| ~~17~~ | ~~**Feature flag rollout %** (qwen #39, дипсик #11)~~ ✅ **ЗАКРЫТО 12.10.2026** | 1–2 дня | Одна колонка `rollout_percent` (0–100) на строку-конфиг + `getRolloutBucket(userId)` в контексте + поле «Процент выката» в админке — разбор в `Что сделано.txt` |
-| ~~18~~ | ~~**Health dashboard в админке** (дипсик #13)~~ ✅ **ЗАКРЫТО 12.10.2026** | 1–2 дня | `/admin/health` — MySQL/Redis/SMTP/Stripe/OpenAI/FCM + `/health/live` и `/health/ready`. Разбор в `Что сделано.txt` |
-| ~~19~~ | ~~**Queue monitor** (дипсик #14)~~ ✅ **ЗАКРЫТО 12.10.2026** | 1 день | 3 очереди email/push/image (Bull, `queue.js:64-66`) — UI `/admin/queues` + счётчики. Отключённые при недоступном Redis очереди (`queue.js:59-62`) теперь видны: `enabled:false` + баннер «Redis не настроен/недоступен». Разбор в `Что сделано.txt` |
-| ~~21~~ | ~~**Background sub-тесты** (qwen #25)~~ ✅ **ЗАКРЫТО 12.10.2026** | 1 день | `purgeOldNotifications` (`server/src/cleanup.js:24`, `DELETE … WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)`, срок 90 дней) + дневной таймер `startNotificationCleanup` (`:46`); backpressure — забитая очередь (`waiting+delayed ≥ QUEUE_ALERT_THRESHOLD`, дефолт 1000, env-настройка) шлёт письмо на `ADMIN_EMAIL` с анти-спамом (не чаще раза в час, `queue-monitor.js:105,146`); безопасные `stopCleanup()`/`stopQueueBackpressureMonitor()` (без запуска не падают, зовутся из graceful shutdown). Разбор в `Что сделано.txt` |
-| ~~22~~ | ~~**Virtual scroll тест в jsdom (qwen #26)**~~ ✅ **ЗАКРЫТО 12.10.2026** | — | Разбор — в `Что сделано.txt` |
-| ~~23~~ | ~~**E2E lifecycle вместо smoke (qwen #21, дипсик #19)**~~ ✅ **ЗАКРЫТО 13.10.2026** | 3 дня | Разбор — в `Что сделано.txt` |
-
 ### Слепые зоны тестов (консолидировано из kimi + дипсик) — сверено по коду 13.10.2026
 
-- ~~Redis fallback integration (ECONNREFUSED → приложение живёт)~~ ✅ **уже сделано:** предпроверка Redis перед Bull (`server/src/queue.js:99-117`) + юнит `redis-fallback.test.js`; живой путь очередей — питфолл 100.
-- ~~Refresh race E2E: два окна одного юзера, быстрый refresh в обоих~~ ✅ **уже сделано:** `e2e/security-blind-spots.spec.ts:40`.
-- ~~Cookie edge cases: expired cookie mid-session, revoked refresh, concurrent tabs~~ ✅ **уже сделано:** `e2e/security-blind-spots.spec.ts:73`.
-- ~~WS reconnect + exponential backoff (эмуляция обрыва мобильного интернета)~~ ✅ **уже сделано:** `server/src/ws.js:18` (`reverifySockets`) + `ws-auth-reverify.test.js`.
-- ~~GDPR full erasure cascade E2E (юзер → активность → erase → 404 везде)~~ ✅ **уже сделано:** `e2e/security-blind-spots.spec.ts:7`.
 - RevenueCat webhook E2E с моком событий (дипсик) — **открыто:** юниты есть (`server/src/__tests__/iap-webhook.test.js`, 11 тестов), E2E-события нет.
 - Backup/restore smoke в CI (restore → smoke-тесты) — **открыто:** `scripts/verify-backup.mjs` подключён шагом `deploy.yml:205`, прогон «restore → smoke» не заведён.
 - Интеграционный прогон против docker-compose на CI-раннере: `server/src/index.js` + `mysql:8.4` + `redis:7-alpine` + SMTP-webhook через `maildev` (не E2E, не смоук статики — живой API против реальных сервисов; Stripe/RevenueCat/FCM остаются в 503-fail-closed — они и так fail-closed, ключи не нужны; redis в CI-сервисах сейчас нет — есть только `mysql:8.4` в `deploy.yml:140,242`) — из разбора «Оценка дипсик1.txt» 11.10.2026. **Docker Desktop был установлен 12.10.2026, но откат Windows 13.10.2026 снял его** (проверено: `docker` нет в `PATH`, нет каталога `C:\Program Files\Docker Desktop`, поиск `docker.exe` по `C:`/`D:` пуст) — прогон снова заблокирован средой
@@ -114,9 +68,8 @@
 
 ### Остатки, подтверждённые сверкой двух аудитов 13.10.2026
 
-- **37 заглушек «⚠️ требует описания» в `test/ИНВЕНТАРЬ-ТЕСТОВ.md`** (21 сервер, 10 фронт, 5 скриптов, 1 E2E) — заполнить руками: гейт их пропускает, потому что наполнение по описанию не сверяет.
+- **45 заглушек «⚠️ требует описания» в `test/ИНВЕНТАРЬ-ТЕСТОВ.md`** (25 сервер, 14 фронт, 5 скриптов, 1 E2E; было 37 на 13.10.2026 — +8 файлов этапов 45/46 без описаний) — заполнить руками: гейт их пропускает, потому что наполнение по описанию не сверяет.
 - **Страницы фронта без собственного юнит-теста** (сверка `src/pages/*.tsx` ↔ `src/test/*.test.tsx`): `matches`, `search`, `search-filters`, `groups`, `groups-category`, `contest`, `events`, `onboarding`, `settings`, `settings-privacy`, `safety`, `schedule`, `support-chat`, `user`, `verify-email`, `about`, `faq`, `premium` и `premium-*`, `partner-*` — у части есть покрытие секций, но не страницы целиком. **Частично закрыто 13.10.2026:** E2E-смоук на эти пути заведён (`e2e/pages-smoke.spec.ts`, 24 страницы — открытие, заголовок, 5xx/console-error), собственного юнита у страниц по-прежнему нет — пункт открыт в части юнитов.
-- ~~**Админ-страницы без E2E** (сквозной путь есть только у `admin-content`/`admin-features`/`admin-messaging`/`admin-users`)~~ ✅ **ЗАКРЫТО 13.10.2026:** 12 страниц (`admin-analytics`, `admin-backup`, `admin-experiments`, `admin-hangouts`, `admin-monetization`, `admin-partners`, `admin-photos`, `admin-reports`, `admin-teams`, `admin-health`, `admin-queues`, `admin-webhooks`) открываются без 5xx/console-error — `e2e/pages-smoke.spec.ts`. Разбор в `Что сделано.txt`.
 - **Пагинации нет:** `GET /api/matches` (`server/src/routes/social.js:332`) отдаёт весь список, `GET /api/notifications` (`server/src/routes/notifications.js:103`) — жёсткий `LIMIT 30` без offset/курсора.
 - **`audit_log` не пишется на изменения фото:** профиль UPDATE аудируется — `auditUpdate` (`server/src/audit.js:31`) → `INSERT INTO audit_log` (`:15`), вызовы `server/src/routes/profile.js:317,731`, чтение `GET /api/profile/activity` (`profile.js:539-542`), тест `server/src/__tests__/profile.test.js:444`. А `user_photos` пишется без следа: `INSERT` (`server/src/routes/upload.js:142`), `DELETE` (`:243`), смена `moderation_status` (`:99,:105`, `server/src/routes/admin-moderation.js:78,106`) — ни одна не зовёт `auditLog`/`auditUpdate`; GDPR-удаление (`server/src/routes/gdpr.js:101`) — так же. (Исправлено 14.10.2026: пункт утверждал, что профиль не аудируется — это было ложное утверждение дипсик-свода.)
 - **Живые внешние контуры не проверяются:** SMTP/RevenueCat/FCM/Twilio/S3/OpenAI/Rekognition — только мок/fallback (`server/src/mail.js:36`, `server/src/circuit-breaker.js:38`, `server/src/ai-moderation.js:16,29`).
@@ -129,7 +82,6 @@
 - **Деплой без zero-downtime:** `docker compose up -d --build` пересоздаёт контейнер без health-wait и rollback — `.github/workflows/deploy.yml:553`.
 - **Алертинга нет:** в `monitoring/` только `prometheus.yml` и `grafana-*`, файла правил алертинга нет — дашборды без оповещений.
 - **Нет выделенных лимитеров на чат и AI:** только общие — `server/src/middleware/limiters.js` (auth 1000/мин, api 600/мин, like 30/мин); чат и AI идут под `app.use('/api/', limiter)` (`server/src/index.js:135`).
-- ~~**Нет сверки платежей и отмены через Stripe:**~~ ✅ **ЗАКРЫТО 15.10.2026** — догон пропущенных вебхуков (`server/src/payment-reconcile.js`) и `cancel` с сохранением доступа до конца периода (`server/src/routes/premium.js:173`). Разбор — в `Что сделано.txt`. Возвраты выделены отдельным пунктом ниже.
 - **Возвраты (`charge.refunded`) не снимают доступ:** обработчика нет ни в `server/src/routes/premium.js` (вебхук разбирает только `checkout.session.completed`, `:218`), ни в `server/src/payment-reconcile.js` (сверка берёт сессии с `payment_status = 'paid'`, `:41`). Чтобы снять или укоротить подписку по возврату, нужно связать событие с сессией: у `charge.refunded` есть `payment_intent`, но нет `session.id` — либо `checkout.sessions.list({ payment_intent })` в момент события, либо хранить `payment_intent`/`charge` в подписке. Политика (полный отзыв или доступ до конца периода) — за владельцем.
 - **`schema-drift-audit` слеп к SQL вне backtick-литералов и к неквалифицированным колонкам:** `scripts/schema-drift-audit.mjs` собирает только шаблонные литералы (`extractSqlLiterals`, `:96-104`) и только ссылки вида `alias.column` (`:57`), поэтому `ORDER BY created_at` в двойных кавычках (`server/src/routes/iap.js:144` — живой 500) гейт не видел. Частично закрыто 15.10.2026: гейт `scripts/order-by-audit.mjs` теперь проверяет существование колонки в `ORDER BY` (`unknownOrderColumns`, `:268`); сам дрейф-гейт остался с этим слепым пятном.
 - **Нет автообновления зависимостей:** `.github/dependabot.yml` отсутствует (Dependabot/Renovate не настроены).
@@ -139,10 +91,6 @@
 - **a11y системно не проверяется:** `aria-*` есть точечно (напр. `src/components/chat/chat-partner-actions.tsx:121`), смоук-теста нет.
 - **Нет quiet hours / DND:** `quiet`/`DND`/«не беспокоить» по `src` не встречаются.
 
-### Инструментарий рутины этапа + структурный гейт бэклога (перенесено из внешних разборов «Оценка доделать5/6», P2) — ЗАКРЫТО 11.10.2026
-
-### Перенять у Service Desk (`D:\Tickets Cursor nout\repo`) — машинный слой документации (P2) — ЗАКРЫТО 11.10.2026
-
 ---
 
 ## 🟢 P3 — бэклог, брать после P0–P2
@@ -151,14 +99,7 @@
 
 | # | Пункт | Оценка | Что именно |
 |---|---|---|---|
-| ~~26~~ | ~~**Watchers/Relations/Merge для Hangouts/Events** (дипсик #16)~~ ✅ **ЗАКРЫТО 15.10.2026** | 3–4 дня | `hangout_watchers` (подписка без участия), «похожие встречи»/«та же серия» (`hangout_series`), merge дублей встреч (tombstone `merged_into`), qwen #14 «Интересуют новые люди» (`user_watches`). Серверное ядро (14.10.2026): схема + миграция `063_hangout_watchers_relations_series.sql`; `server/src/routes/hangouts.js` (`POST /api/hangouts/series:361`, `PUT /api/hangouts/:id/series:433`, `GET /api/hangouts/:id/related:479`, watch/unwatch `:2073,2107`, деталь `watcher_count`/`is_watching:527-528`); `server/src/routes/admin/hangouts.js:144` (merge, audit `merge`); `server/src/routes/profile.js:772,806,829` (`user_watches`); 32 теста. **Остаток (UI, флаг, i18n) закрыт 15.10.2026:** два флага `hangout_relations_enabled`/`user_watches_enabled` (`database/mysql_schema.sql:397-398`, миграция `066_hangout_relations_user_watches_flags.sql`, `server/src/routes/admin/features.js:45-46,84`); новый `GET /api/hangouts/series` (`server/src/routes/hangouts.js:390`); UI — деталь (`src/pages/hangout-detail.tsx` watch `:475` + related `:741,749`), редактирование серии (`src/pages/hangout-edit.tsx:344`), подписка на профиль (`src/components/watch-button.tsx`, `src/pages/user.tsx:162`), список подписок (`src/pages/profile-watching.tsx`), админ-merge (`src/pages/admin-hangouts.tsx:178`); i18n ru/en по 42 ключа; +16 фронт и +4 сервер теста. Разбор — в `Что сделано.txt` |
-| ~~27~~ | ~~**Field-level permissions** (qwen #20, дипсик #17)~~ ✅ **ЗАКРЫТО (переосмыслено факт-чеком) 14.10.2026** | 2–3 дня | Заявленный объём факт-чек **не подтвердил**: `instagram` в коде отсутствует (0 совпадений по репо), `phone`/`email` лежат только в `users` (`database/mysql_schema.sql`) и не отдаются публичным `GET /api/profile/:id` (`server/src/routes/profile.js:566-570`). Реальной дырой оказались `online`/`last_seen`: их отдавали другим, но **никогда не записывали** (в репо не было ни одного `UPDATE user_profiles SET online/last_seen`) — точка всегда `0`, `last_seen` = время создания строки. Сделано: учёт присутствия `server/src/presence.js` (онлайн, пока жив хотя бы один сокет мультивкладки; `markOnline`/`markOffline`/`touchLastSeen` пишут в `user_profiles`), проводка `server/src/ws.js` (`PRESENCE_TOUCH_INTERVAL`), серверное сокрытие `applyActivityPrivacy` во всех публичных чтениях (профиль `:id`/`me`, поиск, мэтчи, чаты, деталь чата, лента/деталь встреч), настройки `show_online`/`show_last_seen` (`GET|PUT /api/settings/privacy`), тумблеры `src/pages/settings-privacy.tsx` под флагом `activity_privacy_enabled`, миграция `064_activity_privacy.sql`, i18n ru/en, тесты `server/src/__tests__/presence.test.js` (19), `activity-privacy.test.js` (19), `activity-privacy-coverage.test.js` (4, структурный гейт), `src/test/settings-privacy.test.tsx` (4). **Вне объёма:** realtime-вещание присутствия, гранулярность «только мэтчам», мультиинстансный учёт (Redis-adapter). Разбор — в `Что сделано.txt` |
-| ~~28~~ | ~~**Scheduled reports** (qwen #28)~~ ✅ **ЗАКРЫТО 13.10.2026** | 2 дня | еженедельная сводка админу — новые юзеры/мэтчи/выручка/жалобы (cron + шаблон). Сделано: `server/src/weekly-report.js` (`buildWeeklySummary` `:19`, `formatWeeklyReport` `:50`, `sendWeeklyReport` `:64`, таймер `:99`, `stopWeeklyReportMonitor` `:112`), роуты `server/src/routes/admin/weekly-report.js:22,45`, проводка `server/src/index.js:345,358`; 12 тестов; SQL проверен на живой БД. Разбор в `Что сделано.txt` |
-| ~~29~~ | ~~**GDPR export ZIP** (qwen #29)~~ ✅ **ЗАКРЫТО 13.10.2026** | 1 день | расширить `GET /api/data/export` (`gdpr.js:22`) до ZIP с фото/сообщениями/мэтчами. Сделано: `server/src/gdpr-export.js` (`buildExportPayload` `:34`, `resolveLocalPhotoPath` `:86`, `buildExportArchive` `:96`), ZIP-писатель вынесен в `server/src/zip.js` (импортируется и `backup.js`), маршрут JSON по умолчанию + `?format=zip`; UI качает ZIP (`src/pages/settings-privacy.tsx:98`); 15 тестов, архив проверен `Expand-Archive`. Разбор в `Что сделано.txt` |
-| ~~30~~ | ~~**Opening lines library** (qwen #27)~~ ✅ **ЗАКРЫТО 13.10.2026** | 2 дня | шаблоны первых сообщений по категориям, `{{firstName}}`/`{{commonInterest}}`. Сделано: 27 ключей `chats.opening.*` в `src/context/language-context.tsx:1055-1082` (ru) и `:2926-2953` (en) — 5 категорий × 4 фразы + `button`/`title`/`empty`; логика `src/lib/opening-lines.ts` (`renderOpeningLine` `:29`, `missingPlaceholders` `:22`); пикер `src/components/opening-lines-picker.tsx`, подключён в `src/pages/chats.tsx:772` и `src/pages/chats-chatId.tsx:472`; `GET /api/chats/:chatId` отдаёт `common_interest` (`server/src/routes/social.js:779`, локализация `?lang` `:767`); флаг `opening_lines_enabled` (`database/mysql_schema.sql:395`, миграция `061_opening_lines_flag.sql`, `server/src/routes/admin/features.js:42,79`). Разбор в `Что сделано.txt` |
-| ~~31~~ | ~~**Team/Group scope для модераторов** (qwen #31)~~ ✅ **ЗАКРЫТО 13.10.2026** | 2 дня | модератор видит только свои жалобы (сейчас все). Сделано: миграция `062_moderation_teams.sql` (`moderation_teams`, `moderation_team_members`, `reports.team_id`); скоуп в `server/src/middleware/adminAuth.js` (`req.admin.teams`, fail-soft), фильтр `r.team_id IN (?)` и 403 `REPORT_OUT_OF_SCOPE` в `server/src/routes/admin/reports.js`, авто round-robin в `server/src/routes/report.js`; CRUD команд и состава `server/src/routes/admin/teams.js` (8 эндпоинтов, мутации — только супер-админ), переназначение жалобы `POST /api/admin/reports/:id/assign`; UI `/admin/teams` (`src/pages/admin-teams.tsx`), колонка «Команда» и фильтр на `/admin/reports`; i18n ru/en. Тесты: `server/src/__tests__/moderation-teams.test.js` (10) + `admin-teams.test.js` (24). Разбор в `Что сделано.txt` |
 | 32 | Покрытие ядра (дипсик #20) | 4–5 дней | auth-context/use-premium/use-websocket/chats/hangout-detail — оптимистичные сценарии. В SwiftMatch **порогов coverage нет вообще** — ни в `vitest.config.ts`, ни в `server/vitest.config.js` |
-| ~~37~~ | ~~**Typecheck-гейт в CI проверяет ноль файлов**~~ (найден 13.10.2026) ✅ **ЗАКРЫТО 13.10.2026** | 0.5–1 день + разбор 93 ошибок | Гейт стал настоящим: `npm run typecheck` (`package.json:11`) = `tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit` (оба проекта), `ci.yml:14` и `deploy.yml:31` зовут его; 93 ошибки починены root-cause по 34 файлам; структурный аудит `scripts/typecheck-gate-audit.mjs` (`package.json:12`, джоба `typecheck-gate` `ci.yml:25`/шаг `:32`, шаг `deploy.yml:36`) не даёт вернуть `"files": []` или голый `tsc`; фронт 700→717 (+17 тестов аудита), итого 1765/1765. Разбор в `Что сделано.txt` |
 
 ### Инфра-мелочи / зависящие от внешнего окружения
 
