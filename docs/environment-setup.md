@@ -62,7 +62,7 @@
 | S3/DO/Selectel | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `S3_BUCKET`, `S3_ENDPOINT` | фотки на локальном диске | загрузка фото → файл в бакете |
 | Redis | `REDIS_URL` | in-memory fallback (1 инстанс) | `Redis connected` в логе + 2×re-limit |
 | VAPID (push) | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (сгенерить `npx web-push generate-vapid-keys`) | dev-ключ | пуш на web подписку |
-| OpenAI / Perspective | `OPENAI_API_KEY`, `OPENAI_MODEL`, `PERSPECTIVE_API_KEY` | icebreakers фолбэк из БД; модерация fail-open | icebreaker из OpenAI |
+| OpenAI / Perspective | `OPENAI_API_KEY`, `OPENAI_MODEL` (модерация текста идёт через них; `PERSPECTIVE_API_KEY` — только заготовка в `.env.example`, код её не читает, интеграция Perspective не реализована) | icebreakers фолбэк из БД; модерация fail-open (эвристика) | icebreaker из OpenAI |
 | Twilio | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | SMS не уходит | код на телефон |
 | FCM | `FCM_SERVER_KEY`, `FCM_SERVICE_ACCOUNT` | пуши Android не идут | пуш на устройство |
 | RevenueCat | `REVENUECAT_WEBHOOK_SECRET` + `VITE_REVENUECAT_API_KEY` (front) | IAP no-op (веб-fallback) | sandbox-покупка |
