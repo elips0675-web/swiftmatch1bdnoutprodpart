@@ -63,7 +63,7 @@ export function buildHeaderChecklist({ date }) {
   lines.push(`1. Строка 3: «Актуально: ${date}, закрыты <список>, следующий — …» — дополнить список и «следующий».`)
   lines.push('2. Счётчики: `node scripts/test-counter-audit.mjs --fix` (перепишет 7 файлов + инвентарь и зеркала чисел).')
   lines.push('3. Зеркала: `node scripts/check-doc-mirrors.mjs --fix` (побайтово).')
-  lines.push('4. Разделение ролей: закрытый пункт живёт в «Что сделано.txt»; в бэклоге — только компактная ✅-строка без тела (гейт check:docs, проверка backlog-closed-body).')
+  lines.push('4. Разделение ролей: закрытый пункт живёт в «Что сделано.txt»; в бэклоге — только заголовок-маркер без тела (гейт check:docs, проверки backlog-closed-body / backlog-closed-line).')
   return lines.join('\n')
 }
 

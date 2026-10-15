@@ -368,6 +368,13 @@ export function collectArchiveFindings(text) {
  *     Проверка появилась после реального дефекта: инструмент `stage-section.mjs`
  *     и `docs/AGENTS-workflow.md` диктовали «надгробие с телом», и три этапа
  *     копили закрытые секции, пока правило не поймали глазами.
+ *  7. **Закрытых строк таблиц и пунктов в бэклоге нет** (`backlog-closed-line`):
+ *     пометка `✅`/`ЗАКРЫТО <дата>` или зачёркнутый ID в строке `| … |`/пункте
+ *     `- …` — тот же дефект, что и тело под закрытым заголовком, только
+ *     построчный. Раздел «Правила работы с журналами и бэклогом» исключён:
+ *     там маркеры цитируются как правило. Проверка закрыла дыру, через которую
+ *     шесть закрытых пунктов (P1, P2 #17–23, P3 #26–31/#37) лежали в бэклоге
+ *     как описания и копились с каждым этапом.
  */
 export const TODO_JOURNAL = 'Что доделать.txt'
 export const DONE_JOURNAL = 'Что сделано.txt'
@@ -380,6 +387,8 @@ export const CHANGELOG_HEAD_RE = /Keep a Changelog/
 export const CHANGELOG_UNRELEASED_RE = /^##\s+\[Unreleased\]/im
 export const CHANGELOG_RELEASE_RE = /^##\s+\[[0-9]+\.[0-9]+\.[0-9]+\][^\n]*\d{4}-\d{2}-\d{2}/m
 export const CLOSED_HEADING_RE = /(?:ЗАКРЫТО\s*\d{2}\.\d{2}\.\d{4}|✅)\s*$/
+export const CLOSED_LINE_RE = /(?:✅|ЗАКРЫТО\s*\d{2}\.\d{2}\.\d{4})/
+export const RULES_SECTION_RE = /^##\s+Правила работы с журналами/
 
 export function tableIds(text) {
   const ids = []
@@ -398,6 +407,14 @@ export function tableIds(text) {
 export function collectBacklogFindings(todoText, doneText) {
   const findings = []
   const lines = todoText.split(/\r?\n/)
+
+  const rulesAt = lines.findIndex((l) => RULES_SECTION_RE.test(l))
+  let rulesEnd = lines.length
+  if (rulesAt >= 0) {
+    for (let j = rulesAt + 1; j < lines.length; j++) {
+      if (/^##\s/.test(lines[j])) { rulesEnd = j; break }
+    }
+  }
 
   const seenIds = new Map()
   lines.forEach((line, i) => {
@@ -442,6 +459,14 @@ export function collectBacklogFindings(todoText, doneText) {
         if (!next.trim() || next.trim() === '---') continue
         findings.push({ id: 'backlog-closed-body', file: TODO_JOURNAL, line: j + 1, text: 'тело под закрытым заголовком — закрытый пункт в бэклоге не живёт, развёрнутая запись — в «Что сделано.txt»' })
         break
+      }
+    }
+    const inRulesSection = rulesAt >= 0 && i >= rulesAt && i < rulesEnd
+    const isBacklogItem = line.startsWith('|') || /^\s*(?:[-*]|\d+\.)\s/.test(line)
+    if (isBacklogItem && !inRulesSection) {
+      const firstCell = line.startsWith('|') ? (line.split('|')[1] || '') : ''
+      if (CLOSED_LINE_RE.test(line) || /~~/.test(firstCell)) {
+        findings.push({ id: 'backlog-closed-line', file: TODO_JOURNAL, line: i + 1, text: 'закрытая строка таблицы / пункт в бэклоге — закрытый пункт живёт в «Что сделано.txt», в бэклоге остаётся только заголовок-маркер без тела' })
       }
     }
   })

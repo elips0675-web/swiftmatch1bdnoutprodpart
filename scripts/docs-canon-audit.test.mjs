@@ -447,7 +447,7 @@ describe('структурный гейт бэклога (Что доделат�
 
   it('ID открытого пункта не считается дублем с чужим номером', () => {
     const text = '| ~~9б~~ | закрыто |\n| 11 | открыто |\n'
-    expect(collectBacklogFindings(text, '')).toEqual([])
+    expect(ids(collectBacklogFindings(text, ''))).not.toContain('backlog-table-id-dup')
   })
 
   it('tableIds отдаёт первые ячейки строк `| … |` без зачёркиваний и служебных', () => {
@@ -513,6 +513,36 @@ describe('структурный гейт бэклога (Что доделат�
 
   it('✅ в середине заголовка — маркер секции, не закрытие (ложное срабатывание закрыто)', () => {
     const text = '## ✅ Принятые решения (не пересматривать без владельца)\n\n- **N3:** текст\n'
+    expect(collectBacklogFindings(text, '')).toEqual([])
+  })
+
+  it('закрытая строка таблицы (`✅`) — находка', () => {
+    const text = '| # | Пункт | Оценка |\n|---|---|---|\n| ~~9б~~ | ~~Документировать роуты~~ ✅ **ЗАКРЫТО 05.05.2028** | — |\n'
+    expect(ids(collectBacklogFindings(text, 'хроника 05.05.2028'))).toContain('backlog-closed-line')
+  })
+
+  it('закрытый пункт списка (`✅`) — находка', () => {
+    const text = '- ~~Redis fallback~~ ✅ **уже сделано:** интеграционный тест\n'
+    expect(ids(collectBacklogFindings(text, ''))).toContain('backlog-closed-line')
+  })
+
+  it('зачёркнутый ID строки таблицы — находка даже без `✅`', () => {
+    const text = '| # | Пункт |\n|---|---|\n| ~~37~~ | Инфра-мелочь |\n'
+    expect(ids(collectBacklogFindings(text, ''))).toContain('backlog-closed-line')
+  })
+
+  it('открытый пункт с зачёркнутым префиксом (`— открыто:`) — не находка', () => {
+    const text = '- ~~Cross-browser: projects в playwright.config.ts~~ — **открыто:** доступно по флагу `CROSS_BROWSER=1`\n'
+    expect(collectBacklogFindings(text, '')).toEqual([])
+  })
+
+  it('`✅` в цитате-шапке и в пункте правил — не находка (проверка смотрит пункты вне правил)', () => {
+    const text = '> **Как читать.** Пункт с ✅ закрыт и в бэклоге не живёт.\n\n## Правила работы с журналами и бэклогом\n\n- **Бэклог ≠ история.** закрытый пункт удаляется, либо помечается ✅ как маркер.\n'
+    expect(collectBacklogFindings(text, '')).toEqual([])
+  })
+
+  it('открытая строка таблицы — не находка', () => {
+    const text = '| # | Пункт |\n|---|---|\n| 32 | Покрытие ядра (дипсик #20) |\n'
     expect(collectBacklogFindings(text, '')).toEqual([])
   })
 })
