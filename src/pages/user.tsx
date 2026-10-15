@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { getToken } from "@/lib/token";
 import { useLanguage } from "@/context/language-context";
+import { WatchButton } from "@/components/watch-button";
 import { cn, getUserTitles } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -158,6 +159,7 @@ function UserProfileContent() {
             <Badge className="bg-orange-500 text-white border-0 px-3 py-1 font-black uppercase text-[9px] tracking-widest shadow-lg">
               {user.match}% {t('user.match_score')}
             </Badge>
+            {Number(userId) > 0 && <WatchButton userId={Number(userId)} />}
             <Button 
               variant="ghost" 
               size="icon" 

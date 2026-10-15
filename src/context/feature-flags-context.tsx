@@ -14,6 +14,8 @@ export interface FeatureFlags {
   profileActivityEnabled: boolean;
   openingLinesEnabled: boolean;
   activityPrivacyEnabled: boolean;
+  hangoutRelationsEnabled: boolean;
+  userWatchesEnabled: boolean;
   rolloutEnabled: boolean;
 }
 
@@ -28,6 +30,8 @@ const defaultFlags: FeatureFlags = {
   profileActivityEnabled: true,
   openingLinesEnabled: true,
   activityPrivacyEnabled: true,
+  hangoutRelationsEnabled: true,
+  userWatchesEnabled: true,
   rolloutEnabled: true,
 };
 
@@ -42,6 +46,8 @@ const mapApiFlags = (data: Record<string, boolean>): FeatureFlags => ({
   profileActivityEnabled: data.profileActivity ?? true,
   openingLinesEnabled: data.openingLines ?? true,
   activityPrivacyEnabled: data.activityPrivacy ?? true,
+  hangoutRelationsEnabled: data.hangoutRelations ?? true,
+  userWatchesEnabled: data.userWatches ?? true,
   rolloutEnabled: true,
 });
 
@@ -60,6 +66,8 @@ const applyRollout = (data: Record<string, unknown>): FeatureFlags => {
     profileActivityEnabled: raw.profileActivityEnabled && rolloutEnabled,
     openingLinesEnabled: raw.openingLinesEnabled && rolloutEnabled,
     activityPrivacyEnabled: raw.activityPrivacyEnabled && rolloutEnabled,
+    hangoutRelationsEnabled: raw.hangoutRelationsEnabled && rolloutEnabled,
+    userWatchesEnabled: raw.userWatchesEnabled && rolloutEnabled,
     rolloutEnabled,
   }
 }

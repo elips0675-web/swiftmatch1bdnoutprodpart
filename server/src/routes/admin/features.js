@@ -25,6 +25,7 @@ router.get('/features', async (req, res) => {
         groupsPage: true, contest: true, showAds: false, autosearch: true,
         hangouts: true, partnerOffers: false, profileActivity: true,
         openingLines: true, activityPrivacy: true,
+        hangoutRelations: true, userWatches: true,
         rolloutPercent: 100,
       })
     }
@@ -41,6 +42,8 @@ router.get('/features', async (req, res) => {
       profileActivity: Boolean(row.profile_activity_enabled ?? true),
       openingLines: Boolean(row.opening_lines_enabled ?? true),
       activityPrivacy: Boolean(row.activity_privacy_enabled ?? true),
+      hangoutRelations: Boolean(row.hangout_relations_enabled ?? true),
+      userWatches: Boolean(row.user_watches_enabled ?? true),
       rolloutPercent: Number(row.rollout_percent ?? 100),
     })
   } catch (err) {
@@ -63,7 +66,7 @@ router.get('/features', async (req, res) => {
 router.put('/features', async (req, res) => {
   try {
     const flags = req.body
-    const knownKeys = ['videoCalls', 'aiIcebreakers', 'aiCompatibility', 'groupsPage', 'contest', 'showAds', 'autosearch', 'hangouts', 'partnerOffers', 'profileActivity', 'openingLines', 'activityPrivacy', 'rolloutPercent']
+    const knownKeys = ['videoCalls', 'aiIcebreakers', 'aiCompatibility', 'groupsPage', 'contest', 'showAds', 'autosearch', 'hangouts', 'partnerOffers', 'profileActivity', 'openingLines', 'activityPrivacy', 'hangoutRelations', 'userWatches', 'rolloutPercent']
     if (!flags || Object.keys(flags).length === 0 || !knownKeys.some(k => k in flags)) {
       return res.status(400).json({ message: 'At least one known flag key required' })
     }
@@ -77,7 +80,8 @@ router.put('/features', async (req, res) => {
         contest_enabled = ?, show_ads = ?, autosearch_enabled = ?,
         hangouts_enabled = ?, partner_offers_enabled = ?,
         profile_activity_enabled = ?, rollout_percent = ?,
-        opening_lines_enabled = ?, activity_privacy_enabled = ?
+        opening_lines_enabled = ?, activity_privacy_enabled = ?,
+        hangout_relations_enabled = ?, user_watches_enabled = ?
        WHERE id = 1`,
       [
         Boolean(flags.videoCalls), Boolean(flags.aiIcebreakers),
@@ -86,6 +90,7 @@ router.put('/features', async (req, res) => {
         Boolean(flags.hangouts), Boolean(flags.partnerOffers),
         Boolean(flags.profileActivity), rolloutValue,
         Boolean(flags.openingLines), Boolean(flags.activityPrivacy),
+        Boolean(flags.hangoutRelations), Boolean(flags.userWatches),
       ],
     )
     res.json({ message: 'Feature flags updated' })

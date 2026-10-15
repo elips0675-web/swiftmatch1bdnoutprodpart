@@ -16,11 +16,12 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/context/language-context";
+import { useFeatureFlags } from "@/context/feature-flags-context";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { getToken } from "@/lib/token";
-import { formatEventDate, type Hangout } from "@/lib/hangouts";
+import { formatEventDate, type Hangout, type RelatedHangouts } from "@/lib/hangouts";
 import { categoryIcon } from "./hangouts";
-import { CalendarDays, MapPin, Users, Check, X, MessageCircle, ArrowLeft, Compass, Pencil, Heart, UserPlus, UserMinus, MessageSquareText, Navigation, Loader2 } from "lucide-react";
+import { CalendarDays, MapPin, Users, Check, X, MessageCircle, ArrowLeft, Compass, Pencil, Heart, UserPlus, UserMinus, MessageSquareText, Navigation, Loader2, Bell, BellRing } from "lucide-react";
 import { toast } from "sonner";
 import { SeoHead } from "@/components/seo/seo-head";
 
@@ -36,17 +37,42 @@ const STATUS_COLORS: Record<string, string> = {
   declined: "bg-gray-100 text-gray-500",
 };
 
+function RelatedRow({ hangout }: { hangout: Hangout }) {
+  const Icon = categoryIcon(hangout.category);
+  return (
+    <Link
+      to={`/hangouts/${hangout.id}`}
+      data-testid="related-hangout"
+      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/40 transition-colors"
+    >
+      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+        <Icon size={15} className="text-primary" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold truncate">{hangout.title}</p>
+        <p className="text-[11px] text-muted-foreground truncate">
+          {formatEventDate(hangout.event_date)}
+          {hangout.city ? ` · ${hangout.city}` : ""}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
 export default function HangoutDetailPage() {
   const { t } = useLanguage();
+  const { hangoutRelationsEnabled } = useFeatureFlags();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [hangout, setHangout] = useState<Hangout | null>(null);
+  const [related, setRelated] = useState<RelatedHangouts | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [respondOpen, setRespondOpen] = useState(false);
   const [respondMessage, setRespondMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
+  const [watchBusy, setWatchBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -68,6 +94,48 @@ export default function HangoutDetailPage() {
   }, [id, t]);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadRelated = useCallback(async () => {
+    if (!id || !hangoutRelationsEnabled) return;
+    try {
+      const token = getToken();
+      const res = await fetch(`/api/hangouts/${id}/related`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data?.sameSeries) || Array.isArray(data?.similar)) {
+        setRelated({ sameSeries: data.sameSeries ?? [], similar: data.similar ?? [] });
+      }
+    } catch {
+      /* связи — необязательный блок, ошибку не показываем */
+    }
+  }, [id, hangoutRelationsEnabled]);
+
+  useEffect(() => { loadRelated(); }, [loadRelated]);
+
+  const toggleWatch = async () => {
+    if (!id || !hangout) return;
+    const token = getToken();
+    if (!token) { navigate("/login"); return; }
+    setWatchBusy(true);
+    try {
+      const res = await fetch(`/api/hangouts/${id}/watch`, {
+        method: hangout.is_watching ? "DELETE" : "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("failed");
+      const data = await res.json();
+      setHangout((prev) => prev
+        ? { ...prev, is_watching: Boolean(data.watching), watcher_count: data.watcher_count ?? prev.watcher_count }
+        : prev);
+      toast.success(data.watching ? t("hangout.watch.toast_subscribed") : t("hangout.watch.toast_unsubscribed"));
+    } catch {
+      toast.error(t("hangout.watch.error"));
+    } finally {
+      setWatchBusy(false);
+    }
+  };
 
   const { socket } = useWebSocket();
   useEffect(() => {
@@ -400,6 +468,25 @@ export default function HangoutDetailPage() {
           </div>
         </Card>
 
+        {/* ─── RELATIONS: подписка на встречу без участия ─── */}
+        {hangoutRelationsEnabled && !hangout.is_author && hangout.status === "active" && (
+          <Card className="p-4 flex items-center gap-3 flex-wrap">
+            <Button
+              data-testid="watch-hangout"
+              variant={hangout.is_watching ? "default" : "outline"}
+              className="rounded-full font-bold"
+              disabled={watchBusy}
+              onClick={() => { const token = getToken(); if (!token) { navigate("/login"); return; } toggleWatch(); }}
+            >
+              {hangout.is_watching ? <BellRing size={16} className="mr-2" /> : <Bell size={16} className="mr-2" />}
+              {hangout.is_watching ? t("hangout.watch.subscribed") : t("hangout.watch.subscribe")}
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              {t("hangout.watch.count", { count: hangout.watcher_count ?? 0 })}
+            </span>
+          </Card>
+        )}
+
         {needsTicket && (
           <Card className="p-4 border-primary/30">
             <div className="flex items-center gap-3">
@@ -645,6 +732,28 @@ export default function HangoutDetailPage() {
               )}
             </div>
           </Card>
+        )}
+
+        {/* ─── RELATIONS: та же серия + похожие встречи ─── */}
+        {hangoutRelationsEnabled && related && (
+          <>
+            {related.sameSeries.length > 0 && (
+              <Card className="p-4" data-testid="related-same-series">
+                <p className="font-bold text-sm mb-3">{t("hangout.related.same_series")}</p>
+                <div className="space-y-1">
+                  {related.sameSeries.map((h) => <RelatedRow key={h.id} hangout={h} />)}
+                </div>
+              </Card>
+            )}
+            {related.similar.length > 0 && (
+              <Card className="p-4" data-testid="related-similar">
+                <p className="font-bold text-sm mb-3">{t("hangout.related.similar")}</p>
+                <div className="space-y-1">
+                  {related.similar.map((h) => <RelatedRow key={h.id} hangout={h} />)}
+                </div>
+              </Card>
+            )}
+          </>
         )}
       </main>
 

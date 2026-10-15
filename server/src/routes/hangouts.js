@@ -378,6 +378,34 @@ router.post('/api/hangouts/series', auth, async (req, res) => {
 
 /**
  * @openapi
+ * /api/hangouts/series:
+ *   get:
+ *     tags: [Hangouts]
+ *     summary: List hangout series owned by the current user
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Array of own series with hangout_count }
+ */
+router.get('/api/hangouts/series', auth, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT s.id, s.title, s.description, s.created_at,
+              (SELECT COUNT(*) FROM hangouts h WHERE h.series_id = s.id AND h.merged_into IS NULL) AS hangout_count
+       FROM hangout_series s
+       WHERE s.created_by = ?
+       ORDER BY s.created_at DESC, s.id DESC`,
+      [req.userId],
+    )
+    res.json(rows)
+  } catch (err) {
+    logger.error('Hangout series list error:', err)
+    res.status(500).json({ message: 'Failed to fetch series' })
+  }
+})
+
+/**
+ * @openapi
  * /api/hangouts/{id}/series:
  *   put:
  *     tags: [Hangouts]

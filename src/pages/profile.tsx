@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "@/shims/next-navigation";
-import { Settings, CircleCheck as CheckCircle2, Camera, Coffee, Music, Globe, Dumbbell, Edit2, Palette, Film, Flower2, Briefcase, Gamepad2, Dog, Ruler, Target, User, Info, Trophy, Heart, VenetianMask, Search, Maximize2, Trash2, X, Star, Check, CircleHelp as HelpCircle, Rocket, CreditCard, Video, BrainCircuit, Users, ChevronRight, AtSign } from "lucide-react";
+import { Settings, CircleCheck as CheckCircle2, Camera, Coffee, Music, Globe, Dumbbell, Edit2, Palette, Film, Flower2, Briefcase, Gamepad2, Dog, Ruler, Target, User, Info, Trophy, Heart, VenetianMask, Search, Maximize2, Trash2, X, Star, Check, CircleHelp as HelpCircle, Rocket, CreditCard, Video, BrainCircuit, Users, ChevronRight, AtSign, Eye } from "lucide-react";
 import { VerificationBadge } from "@/components/shared/verification";
 import Image from "@/shims/next-image";
 import Link from "@/shims/next-link";
@@ -58,7 +58,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const { t, language } = useLanguage();
   const { interests: allowedInterests } = useContentConfig();
-  const { profileActivityEnabled } = useFeatureFlags();
+  const { profileActivityEnabled, userWatchesEnabled } = useFeatureFlags();
   const [profile, setProfile] = useState<any>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [isMounted, setIsMounted] = useState(false);
@@ -506,6 +506,9 @@ function normalizeInterests(interests: InterestInput[]): string[] {
         <div className="h-24 gradient-bg relative -mx-5 mb-10">
           <div className="absolute top-1/2 -translate-y-1/2 left-[calc(50%+4rem)] right-0 flex justify-center gap-3">
             <Link href="/profile/edit" className="text-white/90 p-2 bg-black/10 rounded-full backdrop-blur-md transition-all active:scale-95"><Edit2 size={18} /></Link>
+            {userWatchesEnabled && (
+              <Link href="/profile/watching" aria-label={t('profile.watching.link')} title={t('profile.watching.link')} data-testid="profile-watching-link" className="text-white/90 p-2 bg-black/10 rounded-full backdrop-blur-md transition-all active:scale-95"><Eye size={18} /></Link>
+            )}
             <Link href="/faq" className="text-white/90 p-2 bg-black/10 rounded-full backdrop-blur-md transition-all active:scale-95"><HelpCircle size={18} /></Link>
             <Link href="/settings" className="text-white/90 p-2 bg-black/10 rounded-full backdrop-blur-md transition-all active:scale-95"><Settings size={18} /></Link>
           </div>

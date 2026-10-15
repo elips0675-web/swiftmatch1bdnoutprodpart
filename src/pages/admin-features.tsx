@@ -52,6 +52,8 @@ export default function FeatureFlagsPage() {
           { key: 'profileActivity', label: t('admin.features.profile_activity'), description: t('admin.features.profile_activity_desc'), enabled: Boolean(data.profileActivity ?? true), affectedUsers: 12480 },
           { key: 'openingLines', label: t('admin.features.opening_lines'), description: t('admin.features.opening_lines_desc'), enabled: Boolean(data.openingLines ?? true), affectedUsers: 12480 },
           { key: 'activityPrivacy', label: t('admin.features.activity_privacy'), description: t('admin.features.activity_privacy_desc'), enabled: Boolean(data.activityPrivacy ?? true), affectedUsers: 12480 },
+          { key: 'hangoutRelations', label: t('admin.features.hangout_relations'), description: t('admin.features.hangout_relations_desc'), enabled: Boolean(data.hangoutRelations ?? true), affectedUsers: 12480 },
+          { key: 'userWatches', label: t('admin.features.user_watches'), description: t('admin.features.user_watches_desc'), enabled: Boolean(data.userWatches ?? true), affectedUsers: 12480 },
         ];
         setFlags(mapped);
         setSavedFlags(mapped);

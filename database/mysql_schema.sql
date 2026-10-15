@@ -394,6 +394,8 @@ CREATE TABLE `feature_flags` (
   `b2b_marketplace_enabled` tinyint(1) NOT NULL DEFAULT '0',
   `opening_lines_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `activity_privacy_enabled` tinyint(1) NOT NULL DEFAULT '1',
+  `hangout_relations_enabled` tinyint(1) NOT NULL DEFAULT '1',
+  `user_watches_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `rollout_percent` tinyint unsigned NOT NULL DEFAULT '100',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

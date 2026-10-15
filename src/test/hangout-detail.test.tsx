@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import React from "react";
 import { HelmetProvider } from "react-helmet-async";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { toast } from "sonner";
 
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
@@ -63,6 +64,14 @@ const mockTranslations: Record<string, string> = {
   "hangout.status.active": "Активна",
   "hangout.category.cinema": "Кино",
   "hangout.type.date": "Свидание",
+  "hangout.watch.subscribe": "Следить",
+  "hangout.watch.subscribed": "Вы следите",
+  "hangout.watch.count": "Следят: {count}",
+  "hangout.watch.toast_subscribed": "Вы следите за встречей",
+  "hangout.watch.toast_unsubscribed": "Вы больше не следите за встречей",
+  "hangout.watch.error": "Не удалось изменить подписку",
+  "hangout.related.same_series": "Та же серия",
+  "hangout.related.similar": "Похожие встречи",
 };
 
 vi.mock("@/context/language-context", () => ({
@@ -158,4 +167,76 @@ describe("HangoutDetailPage (H3 pre-accept chat)", () => {
     });
     expect(screen.queryByTestId("message-organizer")).toBeNull();
   })
+});
+
+describe("HangoutDetailPage (P3 #26 watchers/relations)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockReset();
+  });
+
+  it("shows the follow button to a non-author and toggles the subscription", async () => {
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      const u = String(url);
+      if (u.includes("/related")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ sameSeries: [], similar: [] }) });
+      }
+      if (u.includes("/watch")) {
+        expect(init?.method).toBe("POST");
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ watching: true, watcher_count: 1 }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...baseHangout, watcher_count: 0, is_watching: false }) });
+    });
+    const HangoutDetail = (await import("@/pages/hangout-detail")).default;
+    renderDetail(<HangoutDetail />);
+
+    const button = await screen.findByTestId("watch-hangout");
+    expect(button.textContent).toContain("Следить");
+
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("watch-hangout").textContent).toContain("Вы следите");
+    });
+    expect(toast.success).toHaveBeenCalledWith("Вы следите за встречей");
+  });
+
+  it("renders same-series and similar blocks from /related", async () => {
+    const related = {
+      sameSeries: [{ ...baseHangout, id: 6, title: "Дюна, часть вторая" }],
+      similar: [{ ...baseHangout, id: 7, title: "Оппенгеймер" }],
+    };
+    mockFetch.mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes("/related")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(related) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(baseHangout) });
+    });
+    const HangoutDetail = (await import("@/pages/hangout-detail")).default;
+    renderDetail(<HangoutDetail />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("related-same-series")).toBeTruthy();
+    });
+    expect(screen.getByTestId("related-similar")).toBeTruthy();
+    expect(screen.getByText("Дюна, часть вторая")).toBeTruthy();
+    expect(screen.getByText("Оппенгеймер")).toBeTruthy();
+  });
+
+  it("does not show the follow button to the author", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (String(url).includes("/related")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ sameSeries: [], similar: [] }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...baseHangout, is_author: true }) });
+    });
+    const HangoutDetail = (await import("@/pages/hangout-detail")).default;
+    renderDetail(<HangoutDetail />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Иду на Дюну")).toBeTruthy();
+    });
+    expect(screen.queryByTestId("watch-hangout")).toBeNull();
+  });
 });

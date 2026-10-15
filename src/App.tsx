@@ -56,6 +56,7 @@ const Matches = lazy(() => import("./pages/matches"))
 const Premium = lazy(() => import("./pages/premium"))
 const SettingsPrivacy = lazy(() => import("./pages/settings-privacy"))
 const ProfileById = lazy(() => import("./pages/profile-[id]"))
+const ProfileWatching = lazy(() => import("./pages/profile-watching"))
 const GroupCategory = lazy(() => import("./pages/groups-category"))
 const LegalDataProcessing = lazy(() => import("./pages/legal-data-processing"))
 const LegalPrivacy = lazy(() => import("./pages/legal-privacy"))
@@ -100,6 +101,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/chats": "Чаты — SwiftMatch",
   "/profile": "Профиль — SwiftMatch",
   "/profile/edit": "Редактировать — SwiftMatch",
+  "/profile/watching": "Подписки — SwiftMatch",
   "/profile/attachment-test": "Тест привязанности — SwiftMatch",
   "/activity": "Активность — SwiftMatch",
   "/groups": "Группы — SwiftMatch",
@@ -240,6 +242,7 @@ const App = () => (
                             <Route path="/profile" element={<Profile />} />
                             <Route path="/matches" element={<Matches />} />
                             <Route path="/profile/edit" element={<ProfileEdit />} />
+                            <Route path="/profile/watching" element={<ProfileWatching />} />
                             <Route path="/profile/:id" element={<ProfileById />} />
                             <Route path="/profile/attachment-test" element={<ProfileAttachmentTest />} />
                             <Route path="/register" element={<Register />} />

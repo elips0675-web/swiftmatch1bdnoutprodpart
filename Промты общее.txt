@@ -132,7 +132,7 @@ Capacitor (мобилка), Docker + nginx (деплой).
 
 1. Прочитай `AGENTS.md` (гипер-краткое резюме и навигация).
 2. Прочитай `docs/AGENTS-production.md` (Pre-flight Checklist: «Production ≠ File Created»).
-3. Прочитай `docs/AGENTS-pitfalls.md` (103 грабли — не наступай на известные).
+3. Прочитай `docs/AGENTS-pitfalls.md` (104 грабли — не наступай на известные).
 4. Проверь, не закрыта ли задача в `Что доделать.txt`.
 
 Перед коммитом:
@@ -199,7 +199,7 @@ Capacitor (мобилка), Docker + nginx (деплой).
 
 1. `AGENTS.md` — гипер-краткое резюме + навигация.
 2. `docs/AGENTS-production.md` — Pre-flight Checklist.
-3. `docs/AGENTS-pitfalls.md` — 103 грабли.
+3. `docs/AGENTS-pitfalls.md` — 104 грабли.
 4. `Что доделать.txt` — бэклог (читать раздел «Порядок»).
 5. `Что сделано.txt` — история этапов (читать только последние этапы).
 6. `CONTRIBUTING.md` — правила вклада.

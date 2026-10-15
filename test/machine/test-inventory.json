@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-15T07:10:00.071Z",
+  "generated": "2026-10-15T08:00:07.475Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 60,
-    "tests": 735,
-    "passed": 735,
+    "files": 63,
+    "tests": 751,
+    "passed": 751,
     "failed": 0,
     "gate": {
       "files": 20,
       "tests": 492
     },
     "product": {
-      "files": 40,
-      "tests": 243
+      "files": 43,
+      "tests": 259
     },
     "perFile": [
       {
@@ -109,6 +109,10 @@
         "tests": 2
       },
       {
+        "file": "src/test/admin-hangouts-merge.test.tsx",
+        "tests": 2
+      },
+      {
         "file": "src/test/admin-health.test.tsx",
         "tests": 3
       },
@@ -166,11 +170,11 @@
       },
       {
         "file": "src/test/hangout-detail.test.tsx",
-        "tests": 2
+        "tests": 5
       },
       {
         "file": "src/test/hangout-edit.test.tsx",
-        "tests": 4
+        "tests": 7
       },
       {
         "file": "src/test/hangouts.test.tsx",
@@ -221,6 +225,10 @@
         "tests": 11
       },
       {
+        "file": "src/test/profile-watching.test.tsx",
+        "tests": 4
+      },
+      {
         "file": "src/test/register.test.tsx",
         "tests": 9
       },
@@ -255,13 +263,17 @@
       {
         "file": "src/test/utils.test.ts",
         "tests": 8
+      },
+      {
+        "file": "src/test/watch-button.test.tsx",
+        "tests": 4
       }
     ]
   },
   "server": {
     "files": 82,
-    "tests": 1168,
-    "passed": 1168,
+    "tests": 1172,
+    "passed": 1172,
     "failed": 0,
     "gate": {
       "files": 5,
@@ -269,7 +281,7 @@
     },
     "product": {
       "files": 77,
-      "tests": 1046
+      "tests": 1050
     },
     "perFile": [
       {
@@ -330,7 +342,7 @@
       },
       {
         "file": "server/src/__tests__/admin.test.js",
-        "tests": 46
+        "tests": 49
       },
       {
         "file": "server/src/__tests__/affiliate.test.js",
@@ -402,7 +414,7 @@
       },
       {
         "file": "server/src/__tests__/hangouts-watchers-relations.test.js",
-        "tests": 32
+        "tests": 33
       },
       {
         "file": "server/src/__tests__/hangouts.test.js",
@@ -701,7 +713,7 @@
     ]
   },
   "total": {
-    "files": 142,
-    "tests": 1903
+    "files": 145,
+    "tests": 1923
   }
 }

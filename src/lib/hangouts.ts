@@ -62,6 +62,9 @@ export interface Hangout {
   max_companions: number
   status: HangoutStatus
   created_at: string
+  series_id?: number | null
+  is_watching?: boolean
+  watcher_count?: number
   display_name?: string
   avatar_url?: string | null
   age?: number
@@ -115,6 +118,27 @@ export interface MyHangoutResponse {
   hangout_status: HangoutStatus
   display_name: string
   avatar_url: string | null
+}
+
+export interface HangoutSeries {
+  id: number
+  title: string
+  description: string | null
+  created_at: string
+  hangout_count?: number
+}
+
+export interface RelatedHangouts {
+  sameSeries: Hangout[]
+  similar: Hangout[]
+}
+
+export interface WatchedUser {
+  id: number
+  display_name: string
+  avatar_url: string | null
+  age?: number
+  created_at: string
 }
 
 export function formatEventDate(value: string): string {

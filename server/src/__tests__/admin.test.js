@@ -215,6 +215,26 @@ describe('GET /api/admin/features', () => {
     expect(res.body.rolloutPercent).toBe(100)
   })
 
+  it('hangoutRelations/userWatches трактуются как «включено», если колонок ещё нет', async () => {
+    pool.query.mockResolvedValue([[{ id: 1, video_calls_enabled: 1 }], []])
+    const res = await request(app)
+      .get('/api/admin/features')
+      .set('Authorization', `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body.hangoutRelations).toBe(true)
+    expect(res.body.userWatches).toBe(true)
+  })
+
+  it('hangoutRelations/userWatches отражают свои колонки', async () => {
+    pool.query.mockResolvedValue([[{ id: 1, hangout_relations_enabled: 0, user_watches_enabled: 0 }], []])
+    const res = await request(app)
+      .get('/api/admin/features')
+      .set('Authorization', `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body.hangoutRelations).toBe(false)
+    expect(res.body.userWatches).toBe(false)
+  })
+
   it('rolloutPercent трактуется как 100, если колонки ещё нет (миграция не применена)', async () => {
     pool.query.mockResolvedValue([[{ id: 1, video_calls_enabled: 1 }], []])
     const res = await request(app)
@@ -285,6 +305,19 @@ describe('PUT /api/admin/features', () => {
     const updateCall = pool.query.mock.calls.find(([sql]) => /opening_lines_enabled/.test(sql))
     expect(updateCall).toBeTruthy()
     expect(updateCall[1][11]).toBe(false)
+  })
+
+  it('принимает hangoutRelations/userWatches и пишет свои колонки', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    const res = await request(app)
+      .put('/api/admin/features')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ hangoutRelations: false, userWatches: false })
+    expect(res.status).toBe(200)
+    const updateCall = pool.query.mock.calls.find(([sql]) => /hangout_relations_enabled/.test(sql))
+    expect(updateCall).toBeTruthy()
+    expect(updateCall[1][13]).toBe(false)
+    expect(updateCall[1][14]).toBe(false)
   })
 
   it('пишет rollout_percent при rolloutPercent', async () => {

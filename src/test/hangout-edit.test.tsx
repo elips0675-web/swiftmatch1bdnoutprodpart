@@ -42,6 +42,15 @@ const mockTranslations: Record<string, string> = {
   "hangout.toast.updated": "Встреча обновлена!",
   "button.save": "Сохранить",
   "hangout.action.back": "Назад",
+  "hangout.series.title": "Серия встреч",
+  "hangout.series.hint": "Объедините повторяющиеся встречи в серию",
+  "hangout.series.none": "Без серии",
+  "hangout.series.new": "Новая серия",
+  "hangout.series.name_placeholder": "Название серии",
+  "hangout.series.create": "Создать серию",
+  "hangout.series.create_error": "Не удалось создать серию",
+  "hangout.series.save_error": "Не удалось обновить серию",
+  "hangout.series.saved": "Серия обновлена",
 };
 
 vi.mock("@/context/language-context", () => ({
@@ -87,8 +96,29 @@ describe("HangoutEditPage", () => {
     mockFetch.mockReset();
   });
 
+  function primeFetch(overrides: { hangout?: Record<string, unknown>; series?: unknown[] } = {}) {
+    const hangout = overrides.hangout ?? ownHangout;
+    const series = overrides.series ?? [];
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      const u = String(url);
+      if (u === "/api/hangouts/series") {
+        if (init?.method === "POST") {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 42, title: "Новая" }) });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(series) });
+      }
+      if (u.endsWith("/series")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }
+      if (init?.method === "PUT" && u === "/api/hangouts/7") {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(hangout) });
+    });
+  }
+
   it("prefills form for author of active hangout", async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(ownHangout) });
+    primeFetch();
     const Page = (await import("@/pages/hangout-edit")).default;
 
     renderPage(<Page />);
@@ -101,9 +131,7 @@ describe("HangoutEditPage", () => {
   });
 
   it("submits PUT with edited fields", async () => {
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(ownHangout) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) });
+    primeFetch();
     const Page = (await import("@/pages/hangout-edit")).default;
 
     renderPage(<Page />);
@@ -128,10 +156,7 @@ describe("HangoutEditPage", () => {
   });
 
   it("shows forbidden state for non-author", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ ...ownHangout, is_author: false }),
-    });
+    primeFetch({ hangout: { ...ownHangout, is_author: false } });
     const Page = (await import("@/pages/hangout-edit")).default;
 
     renderPage(<Page />);
@@ -142,16 +167,78 @@ describe("HangoutEditPage", () => {
   });
 
   it("shows forbidden state for cancelled hangout", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ ...ownHangout, status: "cancelled" }),
-    });
+    primeFetch({ hangout: { ...ownHangout, status: "cancelled" } });
     const Page = (await import("@/pages/hangout-edit")).default;
 
     renderPage(<Page />);
 
     await waitFor(() => {
       expect(screen.getByTestId("edit-forbidden")).toBeTruthy();
+    });
+  });
+
+  it("attaches an existing own series via PUT /api/hangouts/:id/series", async () => {
+    primeFetch({ series: [{ id: 3, title: "Кофейные пятницы", hangout_count: 2 }] });
+    const Page = (await import("@/pages/hangout-edit")).default;
+
+    renderPage(<Page />);
+    const attach = await screen.findByTestId("attach-series-3");
+    fireEvent.click(attach);
+
+    await waitFor(() => {
+      const putCall = mockFetch.mock.calls.find(
+        ([url, opts]) => String(url) === "/api/hangouts/7/series" && opts?.method === "PUT",
+      );
+      if (!putCall) throw new Error("PUT series call not found");
+      expect(JSON.parse(putCall[1].body)).toEqual({ series_id: 3 });
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("detach-series")).toBeTruthy();
+    });
+  });
+
+  it("creates a series and attaches the hangout to it", async () => {
+    primeFetch();
+    const Page = (await import("@/pages/hangout-edit")).default;
+
+    renderPage(<Page />);
+    fireEvent.click(await screen.findByTestId("open-new-series"));
+    fireEvent.change(screen.getByTestId("new-series-title"), { target: { value: "Киновечера" } });
+    fireEvent.click(screen.getByTestId("create-series"));
+
+    await waitFor(() => {
+      const postCall = mockFetch.mock.calls.find(
+        ([url, opts]) => String(url) === "/api/hangouts/series" && opts?.method === "POST",
+      );
+      if (!postCall) throw new Error("POST series call not found");
+      expect(JSON.parse(postCall[1].body)).toEqual({ title: "Киновечера" });
+    });
+    await waitFor(() => {
+      const putCall = mockFetch.mock.calls.find(
+        ([url, opts]) => String(url) === "/api/hangouts/7/series" && opts?.method === "PUT",
+      );
+      if (!putCall) throw new Error("PUT series call not found");
+      expect(JSON.parse(putCall[1].body)).toEqual({ series_id: 42 });
+    });
+  });
+
+  it("detaches the hangout from its series", async () => {
+    primeFetch({
+      hangout: { ...ownHangout, series_id: 3 },
+      series: [{ id: 3, title: "Кофейные пятницы" }],
+    });
+    const Page = (await import("@/pages/hangout-edit")).default;
+
+    renderPage(<Page />);
+    const detach = await screen.findByTestId("detach-series");
+    fireEvent.click(detach);
+
+    await waitFor(() => {
+      const putCall = mockFetch.mock.calls.find(
+        ([url, opts]) => String(url) === "/api/hangouts/7/series" && opts?.method === "PUT",
+      );
+      if (!putCall) throw new Error("PUT series call not found");
+      expect(JSON.parse(putCall[1].body)).toEqual({ series_id: null });
     });
   });
 });

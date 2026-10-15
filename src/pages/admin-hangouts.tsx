@@ -3,8 +3,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, Ban, CircleCheck, Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { CalendarDays, Ban, CircleCheck, Loader2, GitMerge } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/language-context";
 import { getToken } from "@/lib/token";
@@ -38,6 +47,9 @@ export default function AdminHangoutsPage() {
   const [items, setItems] = useState<AdminHangout[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
+  const [mergeTarget, setMergeTarget] = useState<AdminHangout | null>(null);
+  const [mergeIntoId, setMergeIntoId] = useState('');
+  const [merging, setMerging] = useState(false);
 
   const fetchData = useCallback(async (status: string) => {
     setLoading(true);
@@ -77,7 +89,39 @@ export default function AdminHangoutsPage() {
     }
   };
 
+  const openMerge = (h: AdminHangout) => {
+    setMergeTarget(h);
+    setMergeIntoId('');
+  };
+
+  const handleMerge = async () => {
+    if (!mergeTarget) return;
+    const keepId = Number(mergeIntoId);
+    if (!Number.isInteger(keepId) || keepId <= 0 || keepId === mergeTarget.id) {
+      toast.error(t('admin.hangouts.merge_invalid'));
+      return;
+    }
+    setMerging(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`/api/admin/hangouts/${mergeTarget.id}/merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ mergeIntoId: keepId }),
+      });
+      if (!res.ok) throw new Error('failed');
+      toast.success(t('admin.hangouts.merge_success', { id: mergeTarget.id, target: keepId }));
+      setMergeTarget(null);
+      fetchData(statusFilter);
+    } catch {
+      toast.error(t('admin.hangouts.merge_error'));
+    } finally {
+      setMerging(false);
+    }
+  };
+
   return (
+    <>
     <Card className="border-0 shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-3">
         <CardTitle className="text-lg font-black flex items-center gap-2">
@@ -128,6 +172,15 @@ export default function AdminHangoutsPage() {
                     <TableCell><Badge className={STATUS_BADGES[h.status]}>{t(`hangout.status.${h.status}`)}</Badge></TableCell>
                     <TableCell>
                       <div className="flex gap-1.5 justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          data-testid={`merge-hangout-${h.id}`}
+                          className="rounded-full h-8 px-3"
+                          onClick={() => openMerge(h)}
+                        >
+                          <GitMerge size={13} className="mr-1" /> {t('admin.hangouts.merge')}
+                        </Button>
                         {h.status !== 'blocked' ? (
                           <Button
                             size="sm"
@@ -159,5 +212,39 @@ export default function AdminHangoutsPage() {
         )}
       </CardContent>
     </Card>
+
+    <Dialog open={!!mergeTarget} onOpenChange={(open) => { if (!open) setMergeTarget(null); }}>
+      <DialogContent data-testid="merge-hangout-dialog">
+        <DialogHeader>
+          <DialogTitle>{t('admin.hangouts.merge_title')}</DialogTitle>
+          <DialogDescription>
+            {t('admin.hangouts.merge_desc', { id: mergeTarget?.id ?? '' })}
+          </DialogDescription>
+        </DialogHeader>
+        <Input
+          data-testid="merge-into-id"
+          type="number"
+          min={1}
+          value={mergeIntoId}
+          onChange={(e) => setMergeIntoId(e.target.value)}
+          placeholder={t('admin.hangouts.merge_placeholder')}
+        />
+        <DialogFooter>
+          <Button variant="ghost" className="rounded-full" onClick={() => setMergeTarget(null)}>
+            {t('hangout.action.cancel')}
+          </Button>
+          <Button
+            data-testid="confirm-merge-hangout"
+            className="rounded-full font-bold"
+            disabled={merging}
+            onClick={handleMerge}
+          >
+            {merging ? <Loader2 size={14} className="mr-2 animate-spin" /> : <GitMerge size={14} className="mr-2" />}
+            {t('admin.hangouts.merge_confirm')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

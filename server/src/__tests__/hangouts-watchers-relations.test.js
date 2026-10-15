@@ -258,6 +258,25 @@ describe('POST /api/hangouts/series', () => {
   })
 })
 
+describe('GET /api/hangouts/series', () => {
+  it('отдаёт свои серии со счётчиком встреч и без чужих', async () => {
+    pool.query.mockResolvedValueOnce([[
+      { id: 5, title: 'Летние прогулки', description: null, created_at: '2026-10-01', hangout_count: 3 },
+    ], []])
+    const res = await request(createUserApp())
+      .get('/api/hangouts/series')
+      .set('Authorization', `Bearer ${token(1)}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].hangout_count).toBe(3)
+    const sql = String(pool.query.mock.calls[0][0])
+    expect(sql).toContain('FROM hangout_series')
+    expect(sql).toContain('created_by = ?')
+    expect(sql).toContain('merged_into IS NULL')
+    expect(pool.query.mock.calls[0][1]).toEqual([1])
+  })
+})
+
 describe('PUT /api/hangouts/:id/series', () => {
   const put = (id, body, userId = 1) =>
     request(createUserApp())

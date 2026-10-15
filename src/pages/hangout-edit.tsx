@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AppHeader } from "@/components/layout/app-header";
 import { BottomNav } from "@/components/navigation/bottom-nav";
@@ -15,11 +15,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLanguage } from "@/context/language-context";
+import { useFeatureFlags } from "@/context/feature-flags-context";
 import { usePremium } from "@/hooks/use-premium";
 import { getToken } from "@/lib/token";
-import type { Hangout } from "@/lib/hangouts";
+import type { Hangout, HangoutSeries } from "@/lib/hangouts";
 import { toast } from "sonner";
-import { Loader2, Lock } from "lucide-react";
+import { Loader2, Lock, Plus } from "lucide-react";
 
 const COMPANION_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const COMPANION_OPTIONS_PREMIUM = [...COMPANION_OPTIONS, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
@@ -35,6 +36,7 @@ function toLocalInput(iso?: string): string {
 export default function HangoutEditPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useLanguage();
+  const { hangoutRelationsEnabled } = useFeatureFlags();
   const navigate = useNavigate();
   const { isPremium } = usePremium();
   const companionOptions = isPremium ? COMPANION_OPTIONS_PREMIUM : COMPANION_OPTIONS;
@@ -50,6 +52,30 @@ export default function HangoutEditPage() {
   const [price, setPrice] = useState("");
   const [capacity, setCapacity] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [seriesList, setSeriesList] = useState<HangoutSeries[]>([]);
+  const [seriesId, setSeriesId] = useState("");
+  const [newSeriesOpen, setNewSeriesOpen] = useState(false);
+  const [newSeriesTitle, setNewSeriesTitle] = useState("");
+  const [seriesBusy, setSeriesBusy] = useState(false);
+
+  const loadSeries = useCallback(async () => {
+    const token = getToken();
+    if (!token) return;
+    try {
+      const res = await fetch("/api/hangouts/series", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setSeriesList(Array.isArray(data) ? data : []);
+    } catch {
+      /* список серий — необязательный блок */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (hangoutRelationsEnabled) loadSeries();
+  }, [hangoutRelationsEnabled, loadSeries]);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +105,7 @@ export default function HangoutEditPage() {
         setMaxCompanions(Number(data.max_companions) || 1);
         setPrice(data.price !== null && data.price !== undefined ? String(data.price) : "");
         setCapacity(data.capacity !== null && data.capacity !== undefined ? String(data.capacity) : "");
+        setSeriesId(data.series_id ? String(data.series_id) : "");
       } catch {
         if (!cancelled) setNotEditable(true);
       } finally {
@@ -125,6 +152,52 @@ export default function HangoutEditPage() {
       toast.error(t("hangout.error.load"));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const assignSeries = useCallback(async (value: string) => {
+    if (!id) return;
+    const token = getToken();
+    if (!token) { navigate("/login"); return; }
+    setSeriesBusy(true);
+    try {
+      const res = await fetch(`/api/hangouts/${id}/series`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ series_id: value ? Number(value) : null }),
+      });
+      if (!res.ok) throw new Error("failed");
+      setSeriesId(value);
+      toast.success(t("hangout.series.saved"));
+    } catch {
+      toast.error(t("hangout.series.save_error"));
+    } finally {
+      setSeriesBusy(false);
+    }
+  }, [id, navigate, t]);
+
+  const createSeries = async () => {
+    const cleanTitle = newSeriesTitle.trim();
+    if (!cleanTitle) return;
+    const token = getToken();
+    if (!token) { navigate("/login"); return; }
+    setSeriesBusy(true);
+    try {
+      const res = await fetch("/api/hangouts/series", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: cleanTitle }),
+      });
+      if (!res.ok) throw new Error("failed");
+      const created = await res.json();
+      setNewSeriesTitle("");
+      setNewSeriesOpen(false);
+      await loadSeries();
+      await assignSeries(String(created.id));
+    } catch {
+      toast.error(t("hangout.series.create_error"));
+    } finally {
+      setSeriesBusy(false);
     }
   };
 
@@ -266,6 +339,83 @@ export default function HangoutEditPage() {
                 placeholder={t("hangout.form.ticket_capacity_placeholder")}
               />
             </div>
+
+            {hangoutRelationsEnabled && (
+              <div className="space-y-2" data-testid="hangout-series-section">
+                <Label>{t("hangout.series.title")}</Label>
+                <p className="text-xs text-muted-foreground">{t("hangout.series.hint")}</p>
+
+                <div className="text-sm font-semibold" data-testid="current-series">
+                  {seriesId
+                    ? (seriesList.find((s) => String(s.id) === seriesId)?.title ?? t("hangout.series.title"))
+                    : t("hangout.series.none")}
+                </div>
+
+                {seriesList.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {seriesList.map((s) => (
+                      <Button
+                        key={s.id}
+                        type="button"
+                        size="sm"
+                        variant={String(s.id) === seriesId ? "default" : "outline"}
+                        data-testid={`attach-series-${s.id}`}
+                        className="rounded-full"
+                        disabled={seriesBusy}
+                        onClick={() => assignSeries(String(s.id))}
+                      >
+                        {s.title}
+                      </Button>
+                    ))}
+                    {seriesId && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        data-testid="detach-series"
+                        className="rounded-full"
+                        disabled={seriesBusy}
+                        onClick={() => assignSeries("")}
+                      >
+                        {t("hangout.series.none")}
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {newSeriesOpen ? (
+                  <div className="flex gap-2 pt-1">
+                    <Input
+                      data-testid="new-series-title"
+                      value={newSeriesTitle}
+                      onChange={(e) => setNewSeriesTitle(e.target.value)}
+                      placeholder={t("hangout.series.name_placeholder")}
+                      maxLength={150}
+                    />
+                    <Button
+                      data-testid="create-series"
+                      type="button"
+                      disabled={seriesBusy || !newSeriesTitle.trim()}
+                      onClick={createSeries}
+                      className="rounded-full shrink-0 font-bold"
+                    >
+                      {t("hangout.series.create")}
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    data-testid="open-new-series"
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="rounded-full"
+                    onClick={() => setNewSeriesOpen(true)}
+                  >
+                    <Plus size={14} className="mr-1" /> {t("hangout.series.new")}
+                  </Button>
+                )}
+              </div>
+            )}
 
             <Button
               data-testid="submit-hangout-edit"
