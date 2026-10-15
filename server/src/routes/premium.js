@@ -250,6 +250,42 @@ router.post('/api/premium/webhook', async (req, res) => {
     }
   }
 
+  if (event.type === 'charge.refunded') {
+    const eventId = String(event.id || '')
+    await logWebhookDelivery({ provider: WEBHOOK_PROVIDERS.premium, eventId, eventType: event.type, payload: event })
+    try {
+      const conn = await pool.getConnection()
+      try {
+        await conn.beginTransaction()
+        const [evt] = await conn.query(
+          'INSERT IGNORE INTO webhook_events (provider, event_id) VALUES (?, ?)',
+          [WEBHOOK_PROVIDERS.premium, eventId],
+        )
+        if (!evt || evt.affectedRows === 0) {
+          await conn.rollback()
+          logger.warn(`Webhook event ${event.id} already processed, skipping`)
+          return res.json({ received: true })
+        }
+        const outcome = await applyStripeRefund(event, conn)
+        await conn.commit()
+        if (outcome.applied || outcome.reason === 'partial') {
+          await markWebhookProcessed(WEBHOOK_PROVIDERS.premium, eventId)
+          if (!outcome.applied) logger.warn(`Refund event ${event.id} ignored: ${outcome.reason}`)
+        } else {
+          await markWebhookFailed(WEBHOOK_PROVIDERS.premium, eventId, `refund not applied: ${outcome.reason}`)
+        }
+      } catch (err) {
+        await conn.rollback()
+        throw err
+      } finally {
+        conn.release()
+      }
+    } catch (err) {
+      logger.error('Refund webhook error:', err)
+      await markWebhookFailed(WEBHOOK_PROVIDERS.premium, eventId, err.message)
+    }
+  }
+
   res.json({ received: true })
 })
 
@@ -259,6 +295,9 @@ export async function applyPremiumCheckout(event, conn) {
   const { userId, tier, duration_months } = metadata
   if (!userId || !tier) return false
   const sessionId = session.id ? String(session.id) : null
+  const paymentIntent = typeof session.payment_intent === 'string'
+    ? session.payment_intent
+    : (session.payment_intent?.id ?? null)
   if (sessionId) {
     const [existing] = await conn.query(
       "SELECT id FROM subscriptions WHERE provider = 'stripe' AND provider_subscription_id = ? LIMIT 1",
@@ -274,11 +313,40 @@ export async function applyPremiumCheckout(event, conn) {
     [Number(userId)],
   )
   await conn.query(
-    `INSERT INTO subscriptions (user_id, provider, provider_subscription_id, tier, duration_months, price, expires_at, current_period_end, is_active, status)
-     VALUES (?, 'stripe', ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MONTH), DATE_ADD(NOW(), INTERVAL ? MONTH), 1, 'active')`,
-    [Number(userId), sessionId, tier, months, price, months, months],
+    `INSERT INTO subscriptions (user_id, provider, provider_subscription_id, provider_payment_intent, tier, duration_months, price, expires_at, current_period_end, is_active, status)
+     VALUES (?, 'stripe', ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MONTH), DATE_ADD(NOW(), INTERVAL ? MONTH), 1, 'active')`,
+    [Number(userId), sessionId, paymentIntent, tier, months, price, months, months],
   )
   return true
+}
+
+export async function applyStripeRefund(event, conn) {
+  const charge = event?.data?.object || {}
+  const paymentIntent = typeof charge.payment_intent === 'string'
+    ? charge.payment_intent
+    : (charge.payment_intent?.id ?? null)
+  const amount = Number(charge.amount)
+  const refundedAmount = Number(charge.amount_refunded)
+  const fullyRefunded = charge.refunded === true || (amount > 0 && refundedAmount >= amount)
+  if (!fullyRefunded) return { applied: false, reason: 'partial' }
+  if (!paymentIntent) return { applied: false, reason: 'no-payment-intent' }
+  const [rows] = await conn.query(
+    "SELECT id FROM subscriptions WHERE provider = 'stripe' AND provider_payment_intent = ? LIMIT 1",
+    [paymentIntent],
+  )
+  if (rows.length === 0) return { applied: false, reason: 'not-found' }
+  await conn.query(
+    "UPDATE subscriptions SET is_active = 0, status = 'refunded' WHERE id = ?",
+    [rows[0].id],
+  )
+  return { applied: true, subscriptionId: rows[0].id }
+}
+
+export async function applyPremiumEvent(event, conn) {
+  const type = event?.type
+  if (type === 'charge.refunded') return applyStripeRefund(event, conn)
+  if (type === 'checkout.session.completed') return applyPremiumCheckout(event, conn)
+  return false
 }
 
 export default router

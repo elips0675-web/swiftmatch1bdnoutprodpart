@@ -8,7 +8,7 @@ import {
   markWebhookFailed,
   WEBHOOK_PROVIDERS,
 } from '../../webhooks.js'
-import { applyPremiumCheckout } from '../premium.js'
+import { applyPremiumEvent } from '../premium.js'
 import { applyEventTicket } from '../events.js'
 import { applyPartnerOrder } from '../partners.js'
 import { applyPartnerSubscription } from '../partner-dashboard.js'
@@ -17,7 +17,7 @@ import { applyHangoutTicket } from '../hangouts.js'
 const router = Router()
 
 const REPLAY_HANDLERS = {
-  [WEBHOOK_PROVIDERS.premium]: applyPremiumCheckout,
+  [WEBHOOK_PROVIDERS.premium]: applyPremiumEvent,
   [WEBHOOK_PROVIDERS.events]: applyEventTicket,
   [WEBHOOK_PROVIDERS.partnerOrder]: applyPartnerOrder,
   [WEBHOOK_PROVIDERS.partnerSubscription]: applyPartnerSubscription,

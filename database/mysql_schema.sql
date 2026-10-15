@@ -1245,6 +1245,7 @@ CREATE TABLE `subscriptions` (
   `user_id` int unsigned NOT NULL,
   `provider` enum('stripe','revenuecat') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `provider_subscription_id` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `provider_payment_intent` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `tier` enum('plus','gold','platinum') COLLATE utf8mb4_unicode_ci NOT NULL,
   `duration_months` tinyint unsigned NOT NULL,
   `price` decimal(10,2) NOT NULL,
@@ -1252,13 +1253,14 @@ CREATE TABLE `subscriptions` (
   `expires_at` timestamp NOT NULL,
   `current_period_end` timestamp NULL DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
-  `status` enum('active','canceled','expired','past_due') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `status` enum('active','canceled','expired','past_due','refunded') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
   PRIMARY KEY (`id`),
   KEY `idx_subscriptions_user` (`user_id`),
   KEY `idx_subscriptions_active` (`is_active`,`expires_at`),
   KEY `idx_user_id` (`user_id`),
   KEY `idx_active_expires` (`is_active`,`expires_at`),
   KEY `idx_subscriptions_provider` (`provider`,`provider_subscription_id`),
+  KEY `idx_subscriptions_payment_intent` (`provider_payment_intent`),
   UNIQUE KEY `uq_subscriptions_provider` (`provider`,`provider_subscription_id`),
   CONSTRAINT `subscriptions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

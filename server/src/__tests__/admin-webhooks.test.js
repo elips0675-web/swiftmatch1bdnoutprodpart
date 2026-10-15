@@ -13,7 +13,11 @@ vi.mock('../logger.js', () => ({
   rootLogger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }))
 
-vi.mock('../routes/premium.js', () => ({ applyPremiumCheckout: vi.fn(async () => {}) }))
+vi.mock('../routes/premium.js', () => ({
+  applyPremiumEvent: vi.fn(async () => {}),
+  applyPremiumCheckout: vi.fn(async () => {}),
+  applyStripeRefund: vi.fn(async () => {}),
+}))
 vi.mock('../routes/events.js', () => ({ applyEventTicket: vi.fn(async () => {}) }))
 vi.mock('../routes/partners.js', () => ({ applyPartnerOrder: vi.fn(async () => {}) }))
 vi.mock('../routes/partner-dashboard.js', () => ({ applyPartnerSubscription: vi.fn(async () => {}) }))
@@ -21,7 +25,7 @@ vi.mock('../routes/hangouts.js', () => ({ applyHangoutTicket: vi.fn(async () => 
 
 import pool from '../db.js'
 import adminWebhooks from '../routes/admin/webhooks.js'
-import { applyPremiumCheckout } from '../routes/premium.js'
+import { applyPremiumEvent } from '../routes/premium.js'
 
 const conn = {
   beginTransaction: vi.fn(),
@@ -110,7 +114,7 @@ describe('POST /api/admin/webhooks/:id/replay', () => {
     })
     const res = await request(createApp()).post('/api/admin/webhooks/5/replay')
     expect(res.status).toBe(200)
-    expect(applyPremiumCheckout).toHaveBeenCalled()
+    expect(applyPremiumEvent).toHaveBeenCalled()
     expect(conn.commit).toHaveBeenCalled()
     const sqls = pool.query.mock.calls.map((c) => String(c[0]))
     expect(sqls.some((s) => s.includes('UPDATE webhook_deliveries') && s.includes("'processed'"))).toBe(true)
@@ -123,7 +127,7 @@ describe('POST /api/admin/webhooks/:id/replay', () => {
       eventId: 'evt_f',
       payload: JSON.stringify({ id: 'evt_f', type: 'checkout.session.completed', data: { object: { metadata: {} } } }),
     })
-    applyPremiumCheckout.mockRejectedValueOnce(new Error('replay boom'))
+    applyPremiumEvent.mockRejectedValueOnce(new Error('replay boom'))
     const res = await request(createApp()).post('/api/admin/webhooks/6/replay')
     expect(res.status).toBe(500)
     expect(conn.rollback).toHaveBeenCalled()
