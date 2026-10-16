@@ -1,5 +1,5 @@
 ===== Сервер (Vitest) =====
-1216 тестов в 86 файлах (зелёных 1216) (vitest --reporter=json)
+1228 тестов в 87 файлах (зелёных 1228) (vitest --reporter=json)
 
 # файл | тестов
 server/src/__tests__/active-user.test.js | 33
@@ -30,7 +30,7 @@ server/src/__tests__/csrf.test.js | 6
 server/src/__tests__/date-checkin.test.js | 3
 server/src/__tests__/date-only.test.js | 6
 server/src/__tests__/deploy-persistence-audit.test.js | 18
-server/src/__tests__/email-unsubscribe.test.js | 14
+server/src/__tests__/email-unsubscribe.test.js | 16
 server/src/__tests__/events.test.js | 14
 server/src/__tests__/fcm.test.js | 10
 server/src/__tests__/gdpr-erase.test.js | 3
@@ -66,6 +66,7 @@ server/src/__tests__/presence.test.js | 19
 server/src/__tests__/prod-mock-payments.test.js | 30
 server/src/__tests__/profile-fields.test.js | 10
 server/src/__tests__/profile.test.js | 38
+server/src/__tests__/push-job.test.js | 10
 server/src/__tests__/push.test.js | 6
 server/src/__tests__/queue-monitor.test.js | 19
 server/src/__tests__/race.mysql.test.js | 6

@@ -30,6 +30,7 @@ vi.mock('../routes/push.js', () => ({
 import pool from '../db.js'
 import { sendCustomEmail } from '../mail.js'
 import { sendPushToAll } from '../routes/push.js'
+import logger from '../logger.js'
 import unsubscribeRoutes from '../routes/unsubscribe.js'
 import adminMessaging from '../routes/admin/messaging.js'
 import {
@@ -224,5 +225,49 @@ describe('рассылка email-кампаний', () => {
     expect(res.status).toBe(201)
     expect(sendPushToAll).toHaveBeenCalledWith('Hi', 'Body', '/')
     expect(sendCustomEmail).not.toHaveBeenCalled()
+  })
+
+  it('массовая рассылка: письмо каждому получателю, у каждого своя ссылка отписки', async () => {
+    respond({
+      'INSERT INTO campaigns': [[{ insertId: 10 }], []],
+      'SELECT u.id, u.email FROM users u': [[
+        { id: 2, email: 'a@example.com' },
+        { id: 3, email: 'b@example.com' },
+      ], []],
+      'SELECT email_unsubscribe_enabled FROM feature_flags': [[{ email_unsubscribe_enabled: 1 }], []],
+    })
+    const res = await request(adminApp()).post('/api/admin/campaigns')
+      .send({ title: 'Hi', body: 'Body', channel: 'email' })
+    expect(res.status).toBe(201)
+    expect(sendCustomEmail).toHaveBeenCalledTimes(2)
+    expect(sendCustomEmail.mock.calls.map((call) => call[0])).toEqual(['a@example.com', 'b@example.com'])
+
+    const htmlA = sendCustomEmail.mock.calls[0][2]
+    const htmlB = sendCustomEmail.mock.calls[1][2]
+    expect(htmlA).toContain(unsubscribeToken(2, 'a@example.com'))
+    expect(htmlB).toContain(unsubscribeToken(3, 'b@example.com'))
+    expect(htmlA).not.toContain(unsubscribeToken(3, 'b@example.com'))
+  })
+
+  it('сбой отправки одному получателю не мешает остальным и не роняет кампанию', async () => {
+    respond({
+      'INSERT INTO campaigns': [[{ insertId: 11 }], []],
+      'SELECT u.id, u.email FROM users u': [[
+        { id: 2, email: 'bad@example.com' },
+        { id: 3, email: 'good@example.com' },
+      ], []],
+      'SELECT email_unsubscribe_enabled FROM feature_flags': [[{ email_unsubscribe_enabled: 1 }], []],
+    })
+    sendCustomEmail.mockReset()
+    sendCustomEmail.mockRejectedValueOnce(new Error('SMTP down')).mockResolvedValue({ queued: true })
+
+    const res = await request(adminApp()).post('/api/admin/campaigns')
+      .send({ title: 'Hi', body: 'Body', channel: 'email' })
+    expect(res.status).toBe(201)
+    expect(sendCustomEmail).toHaveBeenCalledTimes(2)
+    expect(sendCustomEmail.mock.calls[1][0]).toBe('good@example.com')
+
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(logger.error).toHaveBeenCalledWith('Campaign email send failed:', expect.any(Error))
   })
 })
