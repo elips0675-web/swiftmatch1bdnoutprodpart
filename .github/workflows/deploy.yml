@@ -89,6 +89,11 @@ jobs:
       # был написан как describe.skipIf(!admin). Гейт проверяет, что сервис
       # объявлен, REQUIRE_MYSQL=1 задан и отсутствие БД — падение, а не пропуск.
       - run: npm run check:mysql-race
+      # Структурный гейт смоука очередей: сервис redis в test-server,
+      # REQUIRE_REDIS=1 и «отсутствие Redis — падение, а не пропуск» в
+      # server/scripts/queue-smoke.mjs. Блокирует деплой по той же причине, что и
+      # check:mysql-race: джоба не должна зеленеть, не выполнив смоук на живом движке.
+      - run: npm run check:queue-smoke
       # Этап 37 (N4): CHECK/ENUM схемы против валидаторов кода. MySQL отвечает
       # на нарушение ограничения 500, а не 400 — ограничение живёт в схеме, а
       # проверяет его код. Гейт ловит четыре класса: код-валидатор шире CHECK,
@@ -155,6 +160,15 @@ jobs:
           --health-retries=5
         ports:
           - 3306:3306
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+        ports:
+          - 6379:6379
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -224,6 +238,12 @@ jobs:
           DB_NAME: swiftmatch_test
           JWT_SECRET: ci-test-jwt-secret-key
           PORT: 3002
+      - name: Queue smoke (живой Redis)
+        run: node scripts/queue-smoke.mjs
+        working-directory: server
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+          REQUIRE_REDIS: '1'
 
   # Счётчики тестов в документации сверяются с прогоном: README,
   # project-context и test/ИНВЕНТАРЬ-ТЕСТОВ.md хранят числа, и они устаревают

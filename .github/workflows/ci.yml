@@ -143,6 +143,12 @@ jobs:
   # объявлен, а REQUIRE_MYSQL=1 превращает отсутствие БД в падение; локально без
   # БД файл по-прежнему пропускается, чтобы `npm test` у разработчика не краснел.
   # Структуру джобы проверяет гейт scripts/mysql-race-gate.mjs.
+  #
+  # Тот же приём — для очередей: юнит-тесты queue-monitor.test.js гоняют ветки
+  # getJobCounts/getFailed/retry на фейке, а без сервиса Redis смоук
+  # server/scripts/queue-smoke.mjs не выполнялся бы ни разу. Сервис redis,
+  # REDIS_URL и REQUIRE_REDIS=1 делают отсутствие Redis падением; структуру
+  # проверяет гейт scripts/queue-smoke-gate.mjs.
   test-server:
     runs-on: ubuntu-latest
     services:
@@ -157,11 +163,22 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     env:
       DB_HOST: 127.0.0.1
       DB_USER: root
       DB_PASSWORD: swiftmatch_test
       REQUIRE_MYSQL: '1'
+      REDIS_URL: redis://127.0.0.1:6379
+      REQUIRE_REDIS: '1'
     defaults:
       run:
         working-directory: server
@@ -172,6 +189,7 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm test
+      - run: node scripts/queue-smoke.mjs
 
   # Гейт «живой тест на MySQL действительно выполняется» (этап 36, N1).
   # Проверяет три вещи, которые вместе дают зелёную джобу при полном пропуске
@@ -186,6 +204,19 @@ jobs:
         with:
           node-version: 22
       - run: node scripts/mysql-race-gate.mjs
+
+  # Гейт «смоук очередей на живом Redis действительно выполняется».
+  # Проверяет три вещи: сервис redis в test-server, REQUIRE_REDIS=1 и «пропуск
+  # превращается в падение» в самом server/scripts/queue-smoke.mjs. Локально гейт
+  # зелёный на честном окружении без Redis — он проверяет структуру, а не соединение.
+  queue-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/queue-smoke-gate.mjs
 
   # Дрейф схемы: каждая колонка, которую читает код в server/src, должна
   # существовать в эталоне database/mysql_schema.sql. Здесь — offline-половина

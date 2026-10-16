@@ -3,6 +3,7 @@
 Сделано 15.10.2026: платёжная сверка Stripe — этап 45 (`c0407de`); остаток P3 #26 — UI/флаг/i18n — этап 46 (`08ff0eb`); P3 #27 (присутствие + приватность статуса активности); возвраты `charge.refunded` — `1fce1f1`. Redis поднят и в живом контуре (`/health` → `redis:"live"`).
 Сделано 16.10.2026: аудит действий над фото (`server/src/routes/upload.js`, `admin-moderation.js`) + живой дефект `audit_log.record_id` (`NOT NULL` → nullable, миграция 068) + красный E2E этапа 45 (переписан `e2e/premium.spec.ts`) + бюджет хука `race.mysql.test.js` 60с→180с (`037c8d3`); пагинация `GET /api/matches`/`GET /api/notifications` + страница `/matches` с «Показать ещё» (+3 серверных, +4 фронт-теста; сервер 1197, фронт 761).
 Сделано 16.10.2026 (продолжение): выделенные лимитеры на чат (`POST /api/chats/:chatId/messages`, 100/мин) и AI (`POST /api/icebreakers/suggest`, 30/мин) — `chatMessageLimiter`/`icebreakerLimiter` в `server/src/middleware/limiters.js` (env `CHAT_MESSAGE_RATE_MAX`/`ICEBREAKER_RATE_MAX`); `.github/dependabot.yml` (npm root + `/server`, github-actions, docker). Сервер 1199.
+Сделано 16.10.2026 (продолжение 2): смоук очередей на живом Redis — `server/scripts/queue-smoke.mjs` (джоба дошла → упавшая видна с причиной → `retry` вернул в работу) + сервис `redis:7-alpine`/`REQUIRE_REDIS=1` в `test-server`/`server-test`; структурный гейт `scripts/queue-smoke-gate.mjs` (джоба `queue-smoke` в `ci.yml`).
 Всё закоммичено. Есть ли локальные неотправленные коммиты — сверять командой (`git rev-list --count origin/main..main`), а не строкой: счётчик протухает на каждом коммите. Прежняя строка «main == origin/main, 0 впереди» протухла.
 
 🔴 Блокеры — ждут владельца (без этого остальное упирается)
@@ -21,7 +22,7 @@ M1 — окно чек-ина ±2 ч или оставить как есть (р
 M4 — csrfGuard включить до первого реального платежа или при выносе API на поддомен	по событию
 Алертинга нет (Grafana без правил), деплой без zero-downtime/rollback, нет unsubscribe в рассылках	средняя
 Тесты: 45 заглушек в инвентаре, юнитов у ~18 страниц фронта нет, нет тестов referral/contest/schedule/attachment, RevenueCat webhook E2E, backup-restore smoke (deploy.yml:212), a11y, cross-browser только по флагу	средняя
-Из свода оценок 15.10.2026: Redis в CI-сервисы + смоук очередей, CI-тест «миграции на отставшей БД», гейты blocks-coverage и «мёртвый query-параметр», тесты фоновых задач, Storybook	средняя/низкая
+Из свода оценок 15.10.2026: CI-тест «миграции на отставшей БД», гейты blocks-coverage и «мёртвый query-параметр», тесты фоновых задач, Storybook	средняя/низкая
 Мелочь: порогов coverage нет, 28 moderate в prod-зависимостях server/ (0 high/critical)	низкая
 
 🟢 P3 — после P2
@@ -40,6 +41,7 @@ P3 #27 (приватность активности) — закрыт; M1 — м
 Страница `/matches` — покрыта юнит-тестом (`src/test/matches.test.tsx`), снята из «страниц без юнита»; попутно исправлено чтение полей API.
 Выделенные лимитеры чата и AI — закрыты: общий `app.use('/api/', limiter)` больше не единственный барьер (`server/src/middleware/limiters.js`).
 Автообновление зависимостей — закрыто: `.github/dependabot.yml` (npm root + `/server`, github-actions, docker).
+Смоук очередей на живом Redis — закрыт: `server/scripts/queue-smoke.mjs` + сервис `redis:7-alpine`/`REQUIRE_REDIS=1` в `test-server`/`server-test`, гейт `scripts/queue-smoke-gate.mjs`.
 
 Очередь работ без ключей — по важности
 🔝 Блок 0 — сделать первым
@@ -51,7 +53,7 @@ P3 #27 (приватность активности) — закрыт; M1 — м
 Zero-downtime деплой — deploy.yml пересоздаёт контейнер без health-wait и rollback.
 unsubscribe в рассылках (admin/messaging.js).
 🧪 Блок 3 — тесты и качество
-Redis в CI-сервисы + смоук очередей, «миграции на отставшей БД» — из свода оценок.
+«Миграции на отставшей БД» — из свода оценок.
 Backup/restore smoke в CI — verify-backup.mjs подключён (deploy.yml:212), прогона «restore → smoke» нет.
 45 заглушек, юниты страниц, RevenueCat E2E, cross-browser (CROSS_BROWSER=1 уже есть), аварийные фоновые задачи.
 🟢 Блок 4 — после, не срочно

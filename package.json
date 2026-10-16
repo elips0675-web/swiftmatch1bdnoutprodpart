@@ -27,6 +27,7 @@
     "check:swagger-coverage": "node scripts/swagger-coverage-audit.mjs",
     "check:prod-mock": "node scripts/prod-mock-audit.mjs",
     "check:mysql-race": "node scripts/mysql-race-gate.mjs",
+    "check:queue-smoke": "node scripts/queue-smoke-gate.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
