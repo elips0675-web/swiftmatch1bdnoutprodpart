@@ -36,18 +36,82 @@ export function listJsFiles(dir, out = []) {
 
 const SQL_TABLE = /\b(?:FROM|JOIN|INTO|UPDATE)\s+`?([a-z_][a-z0-9_]*)`?/gi
 
-const SQL_KEYWORDS = new Set([
+export const SQL_KEYWORDS = new Set([
   'select', 'where', 'and', 'or', 'not', 'on', 'set', 'values', 'dual', 'order', 'group',
   'by', 'having', 'limit', 'offset', 'union', 'all', 'distinct', 'as', 'join', 'left',
   'right', 'inner', 'outer', 'cross', 'from', 'update', 'into', 'insert', 'delete', 'table',
   'using', 'partition', 'with', 'recursive', 'lateral', 'natural', 'for', 'if', 'case',
   'when', 'then', 'else', 'end', 'exists', 'in', 'is', 'null', 'between', 'like', 'asc',
-  'desc', 'force', 'ignore', 'index', 'key', 'straight_join', 'for', 'of', 'window'
+  'desc', 'force', 'ignore', 'index', 'key', 'straight_join', 'of', 'window',
+  'duplicate', 'interval', 'value', 'true', 'false', 'current_timestamp', 'current_date',
+  'current_time', 'localtime', 'localtimestamp', 'nulls', 'first', 'last', 'over', 'rows',
+  'range', 'preceding', 'following', 'unbounded', 'current', 'binary', 'collate',
+  'separator', 'unsigned', 'signed', 'replace',
+  'day', 'days', 'week', 'weeks', 'quarter', 'quarters', 'month', 'months',
+  'year', 'years', 'hour', 'hours', 'minute', 'minutes', 'second', 'seconds',
+  'microsecond', 'microseconds', 'weekday', 'weekofyear', 'dayofweek',
+  'dayofmonth', 'dayofyear', 'dayname', 'monthname', 'datediff', 'adddate',
+  'subdate', 'date', 'time', 'timestamp', 'datetime', 'yearweek', 'week_day'
 ])
+
+function stripStrings(sql) {
+  return sql.replace(/'(?:\\.|[^'\\])*'/g, ' ')
+}
+
+function blankParens(sql) {
+  let out = ''
+  let depth = 0
+  for (let i = 0; i < sql.length; i++) {
+    const ch = sql[i]
+    if (ch === '(') {
+      depth++
+      out += ' '
+      continue
+    }
+    if (ch === ')') {
+      depth = Math.max(0, depth - 1)
+      out += ' '
+      continue
+    }
+    out += depth > 0 ? ' ' : ch
+  }
+  return out
+}
+
+function splitTopLevel(clause) {
+  const parts = []
+  let depth = 0
+  let buf = ''
+  for (let i = 0; i < clause.length; i++) {
+    const ch = clause[i]
+    if (ch === '(') depth++
+    if (ch === ')') depth = Math.max(0, depth - 1)
+    if (ch === ',' && depth === 0) {
+      parts.push(buf.trim())
+      buf = ''
+      continue
+    }
+    buf += ch
+  }
+  if (buf.trim()) parts.push(buf.trim())
+  return parts
+}
 
 export function extractColumnRefs(src) {
   const refs = new Map()
   const aliasToTable = new Map()
+  const add = (table, column) => {
+    if (!table || !column) return
+    const t = String(table).toLowerCase()
+    const c = String(column).toLowerCase()
+    if (SQL_KEYWORDS.has(c)) return
+    if (!refs.has(t)) refs.set(t, new Set())
+    refs.get(t).add(c)
+  }
+
+  const noStrings = stripStrings(src)
+  const masked = blankParens(noStrings)
+
   const reAlias = /\b(?:FROM|JOIN)\s+`?(\w+)`?\s+(?:AS\s+)?(\w+)/gi
   for (const m of src.matchAll(reAlias)) {
     const alias = m[2].toLowerCase()
@@ -58,10 +122,9 @@ export function extractColumnRefs(src) {
     const alias = m[1].toLowerCase()
     const column = m[2].toLowerCase()
     if (!aliasToTable.has(alias)) continue
-    const table = aliasToTable.get(alias)
-    if (!refs.has(table)) refs.set(table, new Set())
-    refs.get(table).add(column)
+    add(aliasToTable.get(alias), column)
   }
+
   const tables = new Set()
   for (const m of src.matchAll(SQL_TABLE)) {
     const name = m[1].toLowerCase()
@@ -70,6 +133,87 @@ export function extractColumnRefs(src) {
     if (/^\s*=|^\s*VALUES\s*\(/i.test(after)) continue
     tables.add(name)
   }
+
+  const funcNames = new Set()
+  for (const m of noStrings.matchAll(/([a-z_][a-z0-9_]*)\s*\(/gi)) {
+    funcNames.add(m[1].toLowerCase())
+  }
+
+  for (const m of src.matchAll(/\bINSERT\s+INTO\s+`?([a-z_][a-z0-9_]*)`?\s*\(([^)]*)\)/gi)) {
+    const table = m[1].toLowerCase()
+    if (SQL_KEYWORDS.has(table)) continue
+    for (const raw of m[2].split(',')) {
+      const c = raw.trim().replace(/^`|`$/g, '').toLowerCase()
+      if (/^[a-z_][a-z0-9_]*$/.test(c) && !SQL_KEYWORDS.has(c)) add(table, c)
+    }
+  }
+
+  for (const m of masked.matchAll(/\bUPDATE\s+`?([a-z_][a-z0-9_]*)`?\s+SET\s+([\s\S]*?)(?=\bWHERE\b|\bORDER\b|\bLIMIT\b|$)/gi)) {
+    const table = m[1].toLowerCase()
+    if (SQL_KEYWORDS.has(table)) continue
+    for (const a of m[2].matchAll(/(?:^|,)\s*`?(\w+)`?\s*=/g)) {
+      const c = a[1].toLowerCase()
+      if (!SQL_KEYWORDS.has(c)) add(table, c)
+    }
+  }
+
+  const hasInsert = /\bINSERT\b/i.test(src)
+  const hasDerived = /\b(?:FROM|JOIN)\s*\(/i.test(noStrings)
+  const asAliases = new Set()
+  for (const m of masked.matchAll(/\bAS\s+`?([a-z_][a-z0-9_]*)`?/gi)) {
+    const a = m[1].toLowerCase()
+    if (!SQL_KEYWORDS.has(a)) asAliases.add(a)
+  }
+
+  const topTables = new Set()
+  for (const m of masked.matchAll(/\b(?:FROM|JOIN)\s+`?([a-z_][a-z0-9_]*)`?/gi)) {
+    const n = m[1].toLowerCase()
+    if (!SQL_KEYWORDS.has(n)) topTables.add(n)
+  }
+  const topAliases = new Set()
+  for (const m of masked.matchAll(/\b(?:FROM|JOIN)\s+`?([a-z_][a-z0-9_]*)`?\s+(?:AS\s+)?([a-z_][a-z0-9_]*)/gi)) {
+    const a = m[2].toLowerCase()
+    if (!SQL_KEYWORDS.has(a)) topAliases.add(a)
+  }
+
+  if (topTables.size === 1) {
+    const table = [...topTables][0]
+    const isColumn = (w) => {
+      if (!w) return false
+      if (SQL_KEYWORDS.has(w)) return false
+      if (w === table) return false
+      if (topAliases.has(w)) return false
+      if (asAliases.has(w)) return false
+      if (funcNames.has(w)) return false
+      return true
+    }
+    const sel = /\bSELECT\s+([\s\S]*?)\s+\bFROM\b/i.exec(masked)
+    if (sel) {
+      const list = sel[1].replace(/^\s*(?:DISTINCT|ALL)\b/i, '')
+      for (const part of splitTopLevel(list)) {
+        const c = part.trim().match(/^`?([a-z_][a-z0-9_]*)`?$/)
+        if (c && isColumn(c[1].toLowerCase())) add(table, c[1].toLowerCase())
+      }
+    }
+    const where = /\bWHERE\b([\s\S]*?)(?=\bORDER\b|\bGROUP\b|\bLIMIT\b|\bOFFSET\b|\bHAVING\b|\bFOR\b|$)/i.exec(masked)
+    if (where && !hasInsert && !hasDerived) {
+      for (const m of where[1].matchAll(/\b([a-z_][a-z0-9_]*)\b\s*(?:\bNOT\s+)?(?:=|<>|!=|<=|>=|<|>|\bIN\b|\bIS\b|\bLIKE\b|\bBETWEEN\b)/gi)) {
+        const c = m[1].toLowerCase()
+        if (isColumn(c)) add(table, c)
+      }
+    }
+    for (const kw of ['ORDER BY', 'GROUP BY']) {
+      const re = new RegExp('\\b' + kw.replace(' ', '\\s+') + '\\s+([\\s\\S]*?)(?=\\bLIMIT\\b|\\bOFFSET\\b|\\bORDER\\b|\\bHAVING\\b|\\bFOR\\b|$)', 'i')
+      const mm = re.exec(masked)
+      if (!mm) continue
+      for (const part of splitTopLevel(mm[1])) {
+        const t = part.replace(/\b(?:ASC|DESC)\b/gi, '').trim()
+        const c = t.match(/^`?([a-z_][a-z0-9_]*)`?$/)
+        if (c && isColumn(c[1].toLowerCase())) add(table, c[1].toLowerCase())
+      }
+    }
+  }
+
   return { refs, tables }
 }
 
@@ -98,6 +242,16 @@ export function extractSqlLiterals(src) {
   for (const m of src.matchAll(/`([\s\S]*?)`/g)) {
     const body = m[1]
     if (!SQL_START.test(body) && !SQL_FRAGMENT.test(body)) continue
+    out.push(body)
+  }
+  for (const m of src.matchAll(/'((?:\\.|[^'\\])*)'/g)) {
+    const body = m[1]
+    if (!SQL_START.test(body)) continue
+    out.push(body)
+  }
+  for (const m of src.matchAll(/"((?:\\.|[^"\\])*)"/g)) {
+    const body = m[1]
+    if (!SQL_START.test(body)) continue
     out.push(body)
   }
   return out

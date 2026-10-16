@@ -53,18 +53,21 @@ describe('schema-drift-audit: алиасы резолвятся внутри о�
     expect(refs.has('WHERE')).toBe(false)
   })
 
-  it('невалидный SQL без алиаса не роняет скан и не приписывает колонки', () => {
+  it('невалидный SQL без алиаса не роняет скан и не приписывает колонки псевдо-алиасу', () => {
     const src = 'SELECT up.display_name FROM user_profiles WHERE up.id = ?'
     const { refs, tables } = extractColumnRefs(src)
-    expect(refs.size).toBe(0)
     expect([...tables]).toEqual(['user_profiles'])
     expect(refs.has('WHERE')).toBe(false)
+    for (const key of refs.keys()) expect(key).toBe('user_profiles')
+    expect([...refs.get('user_profiles')]).toEqual(['id'])
   })
 
-  it('FROM без алиаса не добавляет колонки', () => {
-    const src = 'SELECT display_name, age FROM user_profiles'
-    const { refs } = extractColumnRefs(src)
-    expect(refs.has('user_profiles')).toBe(false)
+  it('неквалифицированная колонка при единственной таблице приписывается ей (п.13), при JOIN — нет', () => {
+    const single = extractColumnRefs('SELECT display_name, age FROM user_profiles')
+    expect([...single.refs.get('user_profiles')].sort()).toEqual(['age', 'display_name'])
+
+    const joined = extractColumnRefs('SELECT display_name FROM user_profiles JOIN users ON user_profiles.id = users.id')
+    expect(joined.refs.size).toBe(0)
   })
 
   it('INSERT ... ON DUPLICATE KEY UPDATE не читается как имя таблицы', () => {
