@@ -80,7 +80,7 @@ test.describe('Premium: tiers + mock Stripe checkout flow', () => {
     expect([401, 403]).toContain(cancel.status)
   })
 
-  test('cancel deactivates an active mock subscription', async ({ playwright, request }) => {
+  test('cancel keeps access until the paid period ends and sets status canceled', async ({ playwright }) => {
     const ctx = await playwright.request.newContext()
     const user = await registerUser(ctx, 'cancel')
 
@@ -92,11 +92,16 @@ test.describe('Premium: tiers + mock Stripe checkout flow', () => {
 
     const cancel = await apiCall(ctx, 'POST', '/api/premium/cancel', {}, user.token)
     expect(cancel.status).toBe(200)
+    expect(cancel.body.status).toBe('canceled')
+    // Отмена не снимает доступ: is_active остаётся 1 до expires_at, сервер отдаёт activeUntil
+    expect(cancel.body.activeUntil).not.toBeNull()
 
     const after = await getMySubscription(ctx, user.token)
     expect(after.status).toBe(200)
-    // is_active=0 → сервер возвращает null (нет активной и непросроченной подписки)
-    expect(after.body).toBeNull()
+    expect(after.body).not.toBeNull()
+    expect(after.body.status).toBe('canceled')
+    expect(after.body.is_active).toBe(1)
+    expect(new Date(after.body.expires_at).getTime()).toBe(new Date(cancel.body.activeUntil).getTime())
   })
 
   test('cancel without active subscription returns 404', async ({ playwright, request }) => {

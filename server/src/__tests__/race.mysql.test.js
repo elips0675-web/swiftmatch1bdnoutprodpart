@@ -115,7 +115,11 @@ describe.skipIf(!admin && !requireMysql)('гонки на живом MySQL (P0 #
       'INSERT INTO users (id, email, password_hash) VALUES (1, ?, ?), (2, ?, ?)',
       ['race-1@test.local', 'x', 'race-2@test.local', 'x'],
     )
-  }, 60000)
+    // Бюджет хука — только гвардия от зависания, а не проверка скорости: заливка
+    // всей боевой схемы (15.10.2026 измерено 9.4 с на свободной машине) под
+    // нагрузкой вылезала за 60 с — «Hook timed out in 60000ms» красным в полном
+    // прогоне, при зелёном одиночном запуске.
+  }, 180000)
 
   afterAll(async () => {
     if (pool) await pool.end().catch(() => {})
@@ -126,8 +130,8 @@ describe.skipIf(!admin && !requireMysql)('гонки на живом MySQL (P0 #
     await admin.query(`DROP DATABASE IF EXISTS \`${DB_NAME}\``).catch(() => {})
     await admin.end().catch(() => {})
     // Та же причина, что у beforeAll: DROP под полным прогоном тоже может не
-    // уложиться в 10 с, а падение afterAll оставило бы базу-сироту.
-  }, 60000)
+    // уложиться в бюджет, а падение afterAll оставило бы базу-сироту.
+  }, 180000)
 
   it('два параллельных INSERT IGNORE INTO likes дают одну строку и affectedRows 1/0', async () => {
     const insert = (from, to) =>

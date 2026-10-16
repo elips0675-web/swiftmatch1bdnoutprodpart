@@ -311,3 +311,81 @@ describe('POST /api/upload: модерация не настроена (N3, P0-E
     expect(approval).toBeUndefined()
   })
 })
+
+// Свод 15.10.2026: user_photos писался без следа в audit_log (профиль аудировался, фото — нет).
+// Проверки идут по факту вызова INSERT в audit_log и по его параметрам: пул замокан, поэтому
+// «запрос выполнится на живой БД» это не доказывает — доказательство живости отдельно, скриптом.
+describe('POST /api/upload: след в audit_log', () => {
+  const app = createApp()
+  const saved = { NODE_ENV: process.env.NODE_ENV, PHOTO_MODERATION_MODE: process.env.PHOTO_MODERATION_MODE }
+
+  beforeEach(() => {
+    process.env.NODE_ENV = 'test'
+    delete process.env.PHOTO_MODERATION_MODE
+    pool.query.mockReset()
+  })
+
+  afterEach(() => {
+    process.env.NODE_ENV = saved.NODE_ENV
+    if (saved.PHOTO_MODERATION_MODE === undefined) delete process.env.PHOTO_MODERATION_MODE
+    else process.env.PHOTO_MODERATION_MODE = saved.PHOTO_MODERATION_MODE
+  })
+
+  it('загрузка пишет action=create с url, сортировкой и статусом модерации', async () => {
+    mockSingle.mockImplementationOnce((req, res, cb) => {
+      req.file = { filename: '1700000002-111.jpg', originalname: 'a.jpg', path: '/tmp/a.jpg' }
+      cb(null)
+    })
+    pool.query.mockResolvedValue([{ insertId: 77 }, []])
+    const res = await request(app)
+      .post('/api/upload')
+      .set('Authorization', authHeader(5))
+      .attach('photo', Buffer.from('x'), { filename: 'a.jpg', contentType: 'image/jpeg' })
+    expect(res.status).toBe(200)
+    const audit = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO audit_log'))
+    expect(audit, 'INSERT в audit_log не ушёл').toBeTruthy()
+    const [, params] = audit
+    expect(params[0]).toBe('user_photos')
+    expect(params[1]).toBe(77)
+    expect(params[2]).toBe('create')
+    expect(JSON.parse(params[4])).toEqual({
+      url: '/uploads/1700000002-111.jpg',
+      sort_order: 0,
+      moderation_status: 'approved',
+    })
+    expect(params[5]).toBe(5)
+  })
+})
+
+describe('DELETE /api/photos/:id: след в audit_log', () => {
+  const app = createApp()
+
+  beforeEach(() => {
+    pool.query.mockReset()
+  })
+
+  it('удаление пишет action=delete с url и актором', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ url: '/uploads/gone.jpg' }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await request(app).delete('/api/photos/12').set('Authorization', authHeader(5))
+    expect(res.status).toBe(200)
+    const audit = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO audit_log'))
+    expect(audit, 'INSERT в audit_log не ушёл').toBeTruthy()
+    const [, params] = audit
+    expect(params[0]).toBe('user_photos')
+    expect(params[1]).toBe(12)
+    expect(params[2]).toBe('delete')
+    expect(JSON.parse(params[3])).toEqual({ url: '/uploads/gone.jpg' })
+    expect(params[5]).toBe(5)
+  })
+
+  it('404 (чужое фото) следа не оставляет — аудит пишется только по факту удаления', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    const res = await request(app).delete('/api/photos/999').set('Authorization', authHeader(5))
+    expect(res.status).toBe(404)
+    const audit = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO audit_log'))
+    expect(audit).toBeUndefined()
+  })
+})

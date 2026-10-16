@@ -10,6 +10,7 @@ import logger from '../logger.js'
 import { processImage } from '../image-pipeline.js'
 import { moderateImage } from '../ai-moderation.js'
 import { requirePhotoModerationOrRefuse, initialPhotoModerationStatus } from '../runtime.js'
+import { auditLog } from '../audit.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(__dirname, '../../uploads')
@@ -87,7 +88,7 @@ async function getUpload() {
 }
 
 // Обновление статуса модерации после INSERT (photoId известен только после вставки)
-async function updateModeration(photoId, modResult) {
+async function updateModeration(photoId, modResult, actor = {}) {
   if (!photoId) return
   if (modResult.safe === null || modResult.source === 'none') {
     // Вердикта AI нет: не трогаем статус от INSERT (в проде это 'pending'), не одобряем вслепую.
@@ -106,6 +107,17 @@ async function updateModeration(photoId, modResult) {
       [photoId],
     )
   }
+  await auditLog({
+    tableName: 'user_photos',
+    recordId: photoId,
+    action: 'update',
+    newValues: {
+      moderation_status: modResult.safe ? 'approved' : 'flagged',
+      moderation_reason: modResult.safe ? null : modResult.reasons.join(', '),
+    },
+    userId: actor.userId,
+    ipAddress: actor.ipAddress,
+  })
 }
 
 /**
@@ -138,11 +150,20 @@ router.post('/api/upload', auth, async (req, res) => {
     // S3: multer-s3 кладёт location/key (не filename), локально — filename
     const url = USE_S3 ? req.file.location : `/uploads/${req.file.filename}`
 
+    const status = initialPhotoModerationStatus()
     const [result] = await pool.query(
       'INSERT INTO user_photos (user_id, url, sort_order, moderation_status) VALUES (?, ?, ?, ?)',
-      [userId, url, parseInt(sortOrder), initialPhotoModerationStatus()],
+      [userId, url, parseInt(sortOrder), status],
     )
     const photoId = result.insertId
+    await auditLog({
+      tableName: 'user_photos',
+      recordId: photoId,
+      action: 'create',
+      newValues: { url, sort_order: parseInt(sortOrder), moderation_status: status },
+      userId,
+      ipAddress: req.ip,
+    })
 
     if (USE_S3) {
       // S3: скачиваем оригинал во временный файл, режем варианты и запускаем модерацию
@@ -167,7 +188,7 @@ router.post('/api/upload', auth, async (req, res) => {
               }))
             }
           }),
-          moderateImage(tmpOriginal).then((modResult) => updateModeration(photoId, modResult)),
+          moderateImage(tmpOriginal).then((modResult) => updateModeration(photoId, modResult, { userId, ipAddress: req.ip })),
         ]
         // Ждём, чтобы не удалить tmpDir под sharp'ом; ошибки не роняют ответ
         const settled = await Promise.allSettled(tasks)
@@ -184,7 +205,7 @@ router.post('/api/upload', auth, async (req, res) => {
     } else if (req.file.path) {
       const tasks = [
         processImage(req.file.path),
-        moderateImage(req.file.path).then((modResult) => updateModeration(photoId, modResult)),
+        moderateImage(req.file.path).then((modResult) => updateModeration(photoId, modResult, { userId, ipAddress: req.ip })),
       ]
       const settled = await Promise.allSettled(tasks)
       settled.forEach((r, i) => {
@@ -241,6 +262,14 @@ router.delete('/api/photos/:id', auth, async (req, res) => {
     }
 
     await pool.query('DELETE FROM user_photos WHERE id = ? AND user_id = ?', [req.params.id, req.userId])
+    await auditLog({
+      tableName: 'user_photos',
+      recordId: Number(req.params.id),
+      action: 'delete',
+      oldValues: { url: rows[0].url },
+      userId: req.userId,
+      ipAddress: req.ip,
+    })
     res.json({ success: true })
   } catch (err) {
     logger.error('Delete photo error:', err)

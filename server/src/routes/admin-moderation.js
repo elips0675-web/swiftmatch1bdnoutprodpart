@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import pool from '../db.js'
 import logger from '../logger.js'
+import { auditLog } from '../audit.js'
 
 const router = Router()
 
@@ -81,6 +82,15 @@ router.post('/photos/:id/approve', async (req, res) => {
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'Photo not found or already moderated' })
     }
+    await auditLog({
+      tableName: 'user_photos',
+      recordId: Number(req.params.id),
+      action: 'update',
+      oldValues: { moderation_status: 'pending' },
+      newValues: { moderation_status: 'approved' },
+      userId: req.admin?.id ?? null,
+      ipAddress: req.ip,
+    })
     res.json({ message: 'Photo approved' })
   } catch (err) {
     logger.error('Approve photo error:', err)
@@ -109,6 +119,15 @@ router.post('/photos/:id/reject', async (req, res) => {
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'Photo not found or already moderated' })
     }
+    await auditLog({
+      tableName: 'user_photos',
+      recordId: Number(req.params.id),
+      action: 'update',
+      oldValues: { moderation_status: 'pending' },
+      newValues: { moderation_status: 'rejected', moderation_reason: reason || null },
+      userId: req.admin?.id ?? null,
+      ipAddress: req.ip,
+    })
     res.json({ message: 'Photo rejected' })
   } catch (err) {
     logger.error('Reject photo error:', err)

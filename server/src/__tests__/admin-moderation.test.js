@@ -118,6 +118,37 @@ describe('POST /api/admin/photos/:id/approve', () => {
       .set('Authorization', `Bearer ${adminToken()}`)
     expect(res.status).toBe(500)
   })
+
+  // Свод 15.10.2026: смена moderation_status в user_photos не оставляла следа.
+  it('пишет след в audit_log, актор берётся из req.admin.id', async () => {
+    const tok = jwt.sign({ id: 42, role: 'admin' }, JWT_SECRET, { expiresIn: '1h' })
+    pool.query
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []])
+      .mockResolvedValueOnce([[], []])
+    const res = await request(app)
+      .post('/api/admin/photos/1/approve')
+      .set('Authorization', `Bearer ${tok}`)
+    expect(res.status).toBe(200)
+    const audit = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO audit_log'))
+    expect(audit, 'INSERT в audit_log не ушёл').toBeTruthy()
+    const [, params] = audit
+    expect(params[0]).toBe('user_photos')
+    expect(params[1]).toBe(1)
+    expect(params[2]).toBe('update')
+    expect(JSON.parse(params[3])).toEqual({ moderation_status: 'pending' })
+    expect(JSON.parse(params[4])).toEqual({ moderation_status: 'approved' })
+    expect(params[5]).toBe(42)
+  })
+
+  it('404 (фото уже промодерировано) следа не оставляет', async () => {
+    pool.query.mockResolvedValueOnce([{ affectedRows: 0 }, []])
+    const res = await request(app)
+      .post('/api/admin/photos/1/approve')
+      .set('Authorization', `Bearer ${adminToken()}`)
+    expect(res.status).toBe(404)
+    const audit = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO audit_log'))
+    expect(audit).toBeUndefined()
+  })
 })
 
 describe('POST /api/admin/photos/:id/reject', () => {
@@ -155,5 +186,25 @@ describe('POST /api/admin/photos/:id/reject', () => {
       .post('/api/admin/photos/1/reject')
       .set('Authorization', `Bearer ${adminToken()}`)
     expect(res.status).toBe(500)
+  })
+
+  it('пишет след в audit_log с причиной и актором', async () => {
+    const tok = jwt.sign({ id: 42, role: 'admin' }, JWT_SECRET, { expiresIn: '1h' })
+    pool.query
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []])
+      .mockResolvedValueOnce([[], []])
+    const res = await request(app)
+      .post('/api/admin/photos/1/reject')
+      .set('Authorization', `Bearer ${tok}`)
+      .send({ reason: 'Inappropriate content' })
+    expect(res.status).toBe(200)
+    const audit = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO audit_log'))
+    expect(audit, 'INSERT в audit_log не ушёл').toBeTruthy()
+    const [, params] = audit
+    expect(params[0]).toBe('user_photos')
+    expect(params[1]).toBe(1)
+    expect(params[2]).toBe('update')
+    expect(JSON.parse(params[4])).toEqual({ moderation_status: 'rejected', moderation_reason: 'Inappropriate content' })
+    expect(params[5]).toBe(42)
   })
 })

@@ -64,6 +64,48 @@ describe('ENUM audit_log.action вмещает все значения, что �
   })
 })
 
+function auditLogRecordIdNullable() {
+  const sql = fs.readFileSync(SCHEMA, 'utf8')
+  const table = /CREATE TABLE `audit_log` \(([\s\S]*?)\n\)/i.exec(sql)
+  if (!table) throw new Error('audit_log не найден в mysql_schema.sql')
+  const m = /`record_id`\s+int unsigned\s+(NOT NULL|DEFAULT NULL)/i.exec(table[1])
+  if (!m) throw new Error('audit_log.record_id не найден')
+  return m[1].toUpperCase() !== 'NOT NULL'
+}
+
+function auditNullRecordIdCallSites() {
+  const found = []
+  for (const file of listJsFiles(SERVER_SRC)) {
+    const src = fs.readFileSync(file, 'utf8')
+    const rel = path.relative(ROOT, file).replace(/\\/g, '/')
+    const lines = src.split(/\r?\n/)
+    lines.forEach((line, i) => {
+      if (/recordId:\s*null/.test(line)) found.push({ file: rel, line: i + 1 })
+    })
+  }
+  return found
+}
+
+// Питфолл 98 закрыл ENUM-часть отказа на пути массового удаления
+// ('delete_bulk' был вне ENUM -> 1265). Вторая причина отказа на ТОМ ЖЕ пути
+// (record_id NOT NULL + recordId: null -> 1048, аудит молча терялся) осталась:
+// её не видит ни ENUM-тест, ни мок БД — только сверка кода со схемой.
+describe('audit_log.record_id вмещает NULL, если код так пишет', () => {
+  it('сканер находит хотя бы один `recordId: null` — иначе проверка зелёная по построению', () => {
+    const sites = auditNullRecordIdCallSites()
+    expect(sites.length, 'ни одного recordId: null в коде — проверка бессмысленна').toBeGreaterThanOrEqual(1)
+  })
+
+  it('`recordId: null` в коде требует NULL-допустимой колонки', () => {
+    const sites = auditNullRecordIdCallSites()
+    const nullable = auditLogRecordIdNullable()
+    expect(
+      nullable,
+      `код пишет recordId: null (${sites.map((s) => `${s.file}:${s.line}`).join(', ')}), а audit_log.record_id объявлен NOT NULL — в strict-режиме MySQL INSERT упадёт с 1048, auditLog проглотит ошибку`,
+    ).toBe(true)
+  })
+})
+
 describe('soft-delete: удалить можно, вернуть — нет', () => {
   it('production-код пишет deleted_at = NOW(), а не сбрасывает в NULL', () => {
     const writers = []

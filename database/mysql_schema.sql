@@ -66,7 +66,7 @@ DROP TABLE IF EXISTS `audit_log`;
 CREATE TABLE `audit_log` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `table_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `record_id` int unsigned NOT NULL,
+  `record_id` int unsigned DEFAULT NULL,
   `action` enum('create','update','delete','delete_bulk','restore','impersonate','merge') COLLATE utf8mb4_unicode_ci NOT NULL,
   `old_values` json DEFAULT NULL,
   `new_values` json DEFAULT NULL,
