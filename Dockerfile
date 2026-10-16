@@ -1,11 +1,11 @@
-FROM node:22-alpine AS frontend
+FROM node:25-alpine AS frontend
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:22-alpine AS server
+FROM node:25-alpine AS server
 RUN apk add --no-cache curl
 WORKDIR /app
 COPY server/package*.json ./server/
