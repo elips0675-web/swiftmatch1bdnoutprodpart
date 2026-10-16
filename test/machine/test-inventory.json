@@ -1,21 +1,25 @@
 {
-  "generated": "2026-10-16T09:19:05.926Z",
+  "generated": "2026-10-16T16:59:08.481Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 64,
-    "tests": 761,
-    "passed": 761,
+    "files": 67,
+    "tests": 815,
+    "passed": 815,
     "failed": 0,
     "gate": {
-      "files": 20,
-      "tests": 498
+      "files": 23,
+      "tests": 552
     },
     "product": {
       "files": 44,
       "tests": 263
     },
     "perFile": [
+      {
+        "file": "scripts/blocks-coverage-audit.test.mjs",
+        "tests": 26
+      },
       {
         "file": "scripts/check-doc-mirrors.test.mjs",
         "tests": 10
@@ -61,6 +65,10 @@
         "tests": 8
       },
       {
+        "file": "scripts/migrations-lag-audit.test.mjs",
+        "tests": 13
+      },
+      {
         "file": "scripts/mysql-race-gate.test.mjs",
         "tests": 28
       },
@@ -71,6 +79,10 @@
       {
         "file": "scripts/prod-mock-audit.test.mjs",
         "tests": 10
+      },
+      {
+        "file": "scripts/query-param-audit.test.mjs",
+        "tests": 15
       },
       {
         "file": "scripts/secrets-leak-audit.test.mjs",
@@ -725,7 +737,7 @@
     ]
   },
   "total": {
-    "files": 148,
-    "tests": 1960
+    "files": 151,
+    "tests": 2014
   }
 }

@@ -128,6 +128,16 @@ jobs:
       # 9 пар трекаются в git, а гейт блокирует деплой: забытый синк зеркала
       # после правки канона — красный шаг, а не тихое устаревание.
       - run: npm run check:mirrors
+      # Остатки свода 15.10.2026: выборка чужого профиля/фото обязана быть под
+      # блок-предикатом (питфолл 46). Блок-лист — SQL-предикат, а не проверка в
+      # JS: запрос по id без него отдаёт имя заблокированного. Гейт принимает
+      # notBlocked/blockFilter, пометку `@public` в SQL или строку JUSTIFIED с
+      # якорем; протухшее оправдание — красный шаг.
+      - run: npm run check:blocks-coverage
+      # Остатки свода 15.10.2026: query-параметр прочитан и забыт. Фронт шлёт
+      # `?premium=1`, бэкенд читает `req.query.premium` и не использует — фильтр
+      # молча не работает. Правило узкое, находок ноль; границы — в шапке скрипта.
+      - run: npm run check:query-param
 
   frontend-test:
     name: Frontend Tests (Vitest)
@@ -215,6 +225,20 @@ jobs:
           DB_USER: root
           DB_PASSWORD: swiftmatch_test
           DB_NAME: swiftmatch_test
+      # Питфолл 99: оффлайн-аудит схемы зелёный, а живая БД отстала от миграций —
+      # код читает колонку, которой в БД нет, и это живой 500. Гейт собирает
+      # scratch-БД из mysql_schema.sql, по одной снимает колонки последних
+      # миграций и требует, чтобы дрейф-аудит краснел именно на читаемой кодом
+      # колонке (COLUMN_MISSING_IN_CODE), а на полной схеме был зелёным.
+      # Отдельная джоба в CI (migrations-lag); здесь — тот же шаг перед деплоем.
+      - name: Migrations lag detected by drift audit (питфолл 99)
+        run: node scripts/migrations-lag-audit.mjs
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASSWORD: swiftmatch_test
+          DB_NAME: swiftmatch_test
+          REQUIRE_MYSQL: '1'
       - name: EXPLAIN audit all SQL queries
         run: node scripts/sql-explain-audit.mjs
         env:

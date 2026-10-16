@@ -515,3 +515,68 @@ jobs:
         with:
           node-version: 22
       - run: npm run check:mirrors
+
+  # Выборка чужого профиля/фото обязана быть под блок-предикатом (остатки свода
+  # 15.10.2026, питфолл 46). Блок-лист — это SQL-предикат, а не проверка в JS,
+  # поэтому `SELECT display_name FROM user_profiles WHERE id = ?` отдаёт имя
+  # заблокированного. Гейт требует notBlocked/blockFilter, пометку
+  # `@public: <причина>` в самом SQL или строку в JUSTIFIED с якорем; проверяет
+  # и то, что оправдание не протухло при сдвиге строки. Зависимости не нужны:
+  # гейт читает исходники server/src.
+  blocks-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm run check:blocks-coverage
+
+  # Query-параметр прочитан и забыт (остатки свода 15.10.2026). Класс: фронт
+  # шлёт `?premium=1`, бэкенд читает `req.query.premium` и нигде не использует —
+  # фильтр молча не работает, и такое ищется глазами. Правило узкое (используется
+  # либо само имя, либо переменная, куда связано значение), поэтому находок ноль;
+  # границы правила описаны в шапке скрипта. Зависимости не нужны.
+  query-param:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm run check:query-param
+
+  # БД, отставшая от миграций, обязана краснить дрейф-аудит (питфолл 99).
+  # Отдельная джоба, а не шаг в test-server: нужен живой MySQL и КОРНЕВЫЕ
+  # зависимости (mysql2), а test-server работает в server/ и корневые
+  # node_modules не ставит. REQUIRE_MYSQL=1 превращает отсутствие БД в падение,
+  # а не в зелёный пропуск. Структуру парсера держат тесты в корневом vitest
+  # (scripts/migrations-lag-audit.test.mjs, джоба `test`); здесь — живой прогон.
+  migrations-lag:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: swiftmatch_test
+          MYSQL_DATABASE: swiftmatch_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASSWORD: swiftmatch_test
+      DB_NAME: swiftmatch_test
+      REQUIRE_MYSQL: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run check:migrations-lag
