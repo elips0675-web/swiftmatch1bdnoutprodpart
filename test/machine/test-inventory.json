@@ -1,15 +1,15 @@
 {
-  "generated": "2026-10-16T19:19:33.844Z",
+  "generated": "2026-10-16T19:36:14.590Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 69,
-    "tests": 845,
-    "passed": 845,
+    "files": 70,
+    "tests": 866,
+    "passed": 866,
     "failed": 0,
     "gate": {
-      "files": 24,
-      "tests": 577
+      "files": 25,
+      "tests": 598
     },
     "product": {
       "files": 45,
@@ -19,6 +19,10 @@
       {
         "file": "scripts/blocks-coverage-audit.test.mjs",
         "tests": 26
+      },
+      {
+        "file": "scripts/check-alerts.test.mjs",
+        "tests": 21
       },
       {
         "file": "scripts/check-doc-mirrors.test.mjs",
@@ -765,7 +769,7 @@
     ]
   },
   "total": {
-    "files": 158,
-    "tests": 2105
+    "files": 159,
+    "tests": 2126
   }
 }

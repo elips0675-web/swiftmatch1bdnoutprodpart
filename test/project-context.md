@@ -289,11 +289,11 @@ UI: зелёный badge ≥80, жёлтый ≥50, красный <50; спис
 
 | Сервис | Порт | Описание |
 |--------|------|----------|
-| Prometheus | `:9090` | Сбор метрик с `/metrics` endpoint |
+| Prometheus | `:9090` | Сбор метрик с `/metrics` endpoint; правила алертинга — `monitoring/alerts.yml` (подключены в `rule_files` и смонтированы в контейнер, этап 48) |
 | Grafana | `:3001` | 7-panel dashboard (HTTP rps, p50/p95/p99, DB queries, WS events, cache hit/miss, memory, CPU) |
 | k6 | CLI | `k6/load-test.js` — ramp-up 10→100 users, 6 endpoints |
 
-`server/src/metrics.js` использует prom-client: counters (http_requests_total, db_queries_total, ws_events_total) + histograms (http_request_duration_ms, db_query_duration_ms).
+`server/src/metrics.js` использует prom-client: counters (http_requests_total, ws_messages_total, cache_hits_total, cache_misses_total) + histograms (http_request_duration_seconds, db_query_duration_seconds) + gauges (ws_connections_active, ws_rooms_active, queue_jobs); имена метрик в `expr` правил алертинга сверяет `npm run check:alerts`.
 
 ## Срез на август 2026 (этапы 27–59) — исторический, не текущее состояние
 
@@ -331,8 +331,8 @@ UI: зелёный badge ≥80, жёлтый ≥50, красный <50; спис
 
 > ⚠️ Лог выше обрывается на этапе 59 и счётчиках 388/388 — это состояние на конец первой серии этапов.
 > **Дальше** история идёт в `Что сделано.txt` (секции «Этап 15…18», нумерация отдельная) и в
-> `Что доделать.txt`. Актуальный срез на 16.10.2026: **2105/2105** тестов
-> (сервер 1260/1260 в 89 файлах, фронт 845/845 в 69 файле), E2E 21 спеков / 195 `test()`
+> `Что доделать.txt`. Актуальный срез на 16.10.2026: **2126/2126** тестов
+> (сервер 1260/1260 в 89 файлах, фронт 866/866 в 70 файле), E2E 21 спеков / 195 `test()`
 > (живой прогон выполнен на этапе 30 — см. ниже), `npm audit --omit=dev`: 0 high / 0 critical.
 >
 > **Этапы 20–24 (сентябрь 2026, отдельная серия) — то, что появилось позже этого среза:**

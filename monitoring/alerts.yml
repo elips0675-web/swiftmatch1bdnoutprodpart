@@ -1,0 +1,81 @@
+# Правила алертинга SwiftMatch API (этап 48).
+#
+# Все метрики в expr объявлены в server/src/metrics.js (или это встроенные
+# метрики Prometheus: up, ALERTS, ...). Файл читает Prometheus — он подключён
+# в monitoring/prometheus.yml (rule_files) и смонтирован в docker-compose.yml.
+# Структуру и имена метрик проверяет scripts/check-alerts.mjs.
+
+groups:
+  - name: swiftmatch-api
+    rules:
+      - alert: SwiftMatchApiDown
+        expr: 'up{job="swiftmatch-api"} == 0'
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'SwiftMatch API не отвечает на скрейп /metrics'
+          description: 'Метрика up для job=swiftmatch-api держится в нуле дольше двух минут: контейнер app упал, не поднялся или не проходит healthcheck. Смотреть /health/live и /health/ready, логи контейнера app.'
+
+      - alert: SwiftMatchApiErrorRate
+        expr: 'sum(rate(http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total[5m])), 1) > 0.05'
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Более пяти процентов ответов API — пятисотки'
+          description: 'Доля ответов 5xx держится выше пяти процентов дольше пяти минут. Разложить http_requests_total по route и status, затем читать логи сервера по этим маршрутам.'
+
+      - alert: SwiftMatchApiLatencyP95
+        expr: 'histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 1'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: '95-й перцентиль ответа API выше секунды'
+          description: 'Медленные ответы дольше десяти минут. Проверить http_request_duration_seconds по route, затем медленные SQL-запросы через db_query_duration_seconds.'
+
+      - alert: SwiftMatchDbLatencyP95
+        expr: 'histogram_quantile(0.95, sum(rate(db_query_duration_seconds_bucket[5m])) by (le)) > 0.5'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: '95-й перцентиль SQL-запроса выше половины секунды'
+          description: 'Медленная база дольше десяти минут. Разложить db_query_duration_seconds по query, проверить индексы и медленные запросы MySQL.'
+
+      - alert: SwiftMatchQueueBacklog
+        expr: 'sum(queue_jobs{state="waiting"}) > 100'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Очередь задач растёт: больше ста ждущих заданий'
+          description: 'Задания email/push/image копятся в waiting дольше десяти минут — воркеры не успевают или не запущены. Проверить процесс воркера и Redis.'
+
+      - alert: SwiftMatchQueueFailed
+        expr: 'sum(queue_jobs{state="failed"}) > 0'
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'В очередях есть проваленные задания'
+          description: 'Задания перешли в failed и не убраны дольше пятнадцати минут. Смотреть причину в логах воркера и содержимое failed-набора в Redis.'
+
+      - alert: SwiftMatchCacheHitRatioLow
+        expr: 'sum(rate(cache_hits_total[15m])) / clamp_min(sum(rate(cache_hits_total[15m])) + sum(rate(cache_misses_total[15m])), 1) < 0.5'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Доля попаданий в кэш ниже половины'
+          description: 'Кэш почти не помогает тридцать минут: либо ключи сменились, либо Redis недоступен и запросы идут мимо кэша. Сравнить cache_hits_total и cache_misses_total, проверить Redis.'
+
+      - alert: SwiftMatchApiNoTraffic
+        expr: 'sum(rate(http_requests_total[15m])) == 0'
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: 'API жив, но не получает запросов'
+          description: 'up равен единице, а трафика нет полчаса: похоже, сломан балансировщик, домен или прокси, а не само приложение. Проверить доступность снаружи.'
