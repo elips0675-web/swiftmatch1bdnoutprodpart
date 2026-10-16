@@ -1,5 +1,5 @@
 ===== Сервер (Vitest) =====
-1228 тестов в 87 файлах (зелёных 1228) (vitest --reporter=json)
+1260 тестов в 89 файлах (зелёных 1260) (vitest --reporter=json)
 
 # файл | тестов
 server/src/__tests__/active-user.test.js | 33
@@ -65,7 +65,7 @@ server/src/__tests__/premium.test.js | 17
 server/src/__tests__/presence.test.js | 19
 server/src/__tests__/prod-mock-payments.test.js | 30
 server/src/__tests__/profile-fields.test.js | 10
-server/src/__tests__/profile.test.js | 38
+server/src/__tests__/profile.test.js | 42
 server/src/__tests__/push-job.test.js | 10
 server/src/__tests__/push.test.js | 6
 server/src/__tests__/queue-monitor.test.js | 19
@@ -73,7 +73,9 @@ server/src/__tests__/race.mysql.test.js | 6
 server/src/__tests__/race.test.js | 8
 server/src/__tests__/ratelimit.test.js | 4
 server/src/__tests__/redis-fallback.test.js | 7
+server/src/__tests__/referral.test.js | 12
 server/src/__tests__/sanitize.test.js | 7
+server/src/__tests__/schedule.test.js | 16
 server/src/__tests__/schema-drift.test.js | 16
 server/src/__tests__/secrets-leak-audit.test.js | 24
 server/src/__tests__/security.headers.test.js | 7

@@ -536,3 +536,62 @@ describe('audit_log: история изменений профиля (L7)', () 
     expect(res.body[0].new_values).toEqual({ display_name: 'New' })
   })
 })
+
+describe('PUT /api/profile/score', () => {
+  beforeEach(() => {
+    pool.query.mockReset()
+  })
+
+  function scoreQueries(profile, photoCount, interestCount) {
+    pool.query
+      .mockResolvedValueOnce([[profile].filter(Boolean), []])
+      .mockResolvedValueOnce([[{ cnt: photoCount }], []])
+      .mockResolvedValueOnce([[{ cnt: interestCount }], []])
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []])
+  }
+
+  it('404 без профиля и без записи score', async () => {
+    scoreQueries(null, 0, 0)
+    const res = await request(app).put('/api/profile/score').set('Authorization', `Bearer ${authToken(1)}`)
+    expect(res.status).toBe(404)
+    expect(pool.query).toHaveBeenCalledTimes(1)
+  })
+
+  it('пустой профиль → 0 баллов, запись в user_profiles', async () => {
+    scoreQueries(
+      { display_name: null, bio: null, city: null, lat: null, lng: null, zodiac: null, education: null, dating_goal: null, height: null, attachment_style: null, gender: null },
+      0,
+      0,
+    )
+    const res = await request(app).put('/api/profile/score').set('Authorization', `Bearer ${authToken(1)}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ score: 0, photoCount: 0, interestCount: 0 })
+    const [sql, params] = pool.query.mock.calls[3]
+    expect(String(sql)).toMatch(/UPDATE user_profiles SET profile_score = \?/)
+    expect(params).toEqual([0, 1])
+  })
+
+  it('bio считается по длине (floor(len/15), максимум 15), фото — по 5, интересы — по 3', async () => {
+    scoreQueries(
+      { display_name: 'A', bio: 'x'.repeat(30), city: null, lat: null, lng: null, zodiac: null, education: null, dating_goal: null, height: null, attachment_style: null, gender: null },
+      2,
+      4,
+    )
+    const res = await request(app).put('/api/profile/score').set('Authorization', `Bearer ${authToken(1)}`)
+    expect(res.status).toBe(200)
+    expect(res.body.score).toBe(10 + 2 + 10 + 12)
+  })
+
+  it('полный профиль упирается в потолок 100', async () => {
+    scoreQueries(
+      { display_name: 'A', bio: 'x'.repeat(400), city: 'Moscow', lat: null, lng: null, zodiac: 'leo', education: 'msu', dating_goal: 'serious', height: 180, attachment_style: 'secure', gender: 'male' },
+      5,
+      10,
+    )
+    const res = await request(app).put('/api/profile/score').set('Authorization', `Bearer ${authToken(1)}`)
+    expect(res.status).toBe(200)
+    expect(res.body.score).toBe(100)
+    expect(res.body.photoCount).toBe(5)
+    expect(res.body.interestCount).toBe(10)
+  })
+})
