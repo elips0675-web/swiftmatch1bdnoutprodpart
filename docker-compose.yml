@@ -66,6 +66,11 @@ services:
       - redis_data:/data
 
   app:
+    # Явное имя образа — цель отката: deploy.yml тегирует текущую версию как
+    # swiftmatch-app:rollback, и сборка (она переназначает только :latest)
+    # этот тег не перезаписывает. Без image имя зависело бы от имени проекта
+    # compose (`<project>-app`), и откат не знал бы, за какой тег цепляться.
+    image: swiftmatch-app
     build:
       context: .
       target: server
@@ -110,6 +115,7 @@ services:
         condition: service_started
 
   nginx:
+    image: swiftmatch-web
     build:
       context: .
       target: web

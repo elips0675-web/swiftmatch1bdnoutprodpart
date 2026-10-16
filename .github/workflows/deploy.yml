@@ -41,6 +41,7 @@ jobs:
       - run: node scripts/secrets-leak-audit.mjs
       # Этап 21 (P0 #37): фото не должны теряться при `docker compose up --build`.
       - run: node scripts/deploy-persistence-audit.mjs
+      - run: npm run check:deploy-rollout
       # Этап 28: пагинация детерминирована (замыкатель по PK главной таблицы).
       # Ловит `ORDER BY created_at LIMIT ?` без замыкателя — между страницами
       # дубли и пропуски. Чистый Node, зависимостей не требует.
@@ -582,6 +583,11 @@ jobs:
           script: |
             set -e
             cd /app/swiftmatch
+            # Health-gate (и шаг отката) проверяют опубликованный порт через curl
+            # на самом VPS. Нет curl — падаем сразу, до любых изменений: иначе
+            # разбор уйдёт в сторону «health не поднялся», хотя сервис цел
+            # (docs/AGENTS-deployment.md, раздел «Деплой и откат»).
+            command -v curl >/dev/null 2>&1 || { echo "FAIL: на VPS нет curl — им проверяется подъём сервиса (docs/AGENTS-deployment.md)"; exit 1; }
             # Прод-секреты лежат на VPS в /app/swiftmatch/.env (в git их нет).
             # Этап 20: rsync выше теперь исключает .env, поэтому --delete больше
             # НЕ стирает файл и эта строка срабатывает только на первом деплое.
@@ -589,9 +595,34 @@ jobs:
             # JWT_SECRET из шаблона, а middleware.js в production такой старт
             # отвергает — намеренно громко, вместо тихо сломанной подписи.
             test -f .env || cp .env.example .env
+            # Цель отката: образ работающей версии под тегом :rollback. Сборка
+            # ниже переназначает только :latest, поэтому :rollback сохраняет
+            # предыдущий образ и откат возможен без пересборки.
+            if docker image inspect swiftmatch-app:latest >/dev/null 2>&1; then
+              docker tag swiftmatch-app:latest swiftmatch-app:rollback
+              docker tag swiftmatch-web:latest swiftmatch-web:rollback
+              echo "rollback target: swiftmatch-app:rollback, swiftmatch-web:rollback"
+            else
+              echo "rollback target: нет (первый деплой с этими именами образов)"
+            fi
             # Собрать образы и запустить compose (schema применяется при первичном старте
-            # пустого DB volume через docker-entrypoint-initdb.d — см. docker-compose.yml)
-            docker compose up -d --build
+            # пустого DB volume через docker-entrypoint-initdb.d — см. docker-compose.yml).
+            # --wait не отдаёт управление, пока сервисы с healthcheck не станут
+            # healthy: «контейнер запущен» != «API отвечает».
+            docker compose up -d --build --wait
+            # Health-gate отдельной проверкой: --wait молчит про сервисы без
+            # healthcheck и не проверяет ответ через nginx.
+            for i in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:3002/health >/dev/null && curl -fsS http://127.0.0.1:8080/ >/dev/null; then
+                ok=1
+                break
+              fi
+              sleep 5
+            done
+            if [ "${ok:-}" != "1" ]; then
+              echo "FAIL: health не поднялся за 150 c (app:3002/health или web:8080)"
+              exit 1
+            fi
             # Применить новые миграции && проверить схему против кода
             docker compose exec -T app node database/migrations/migrate.js
             docker compose exec -T app node scripts/schema-validate.mjs
@@ -601,3 +632,40 @@ jobs:
             # виден только на реальной БД).
             docker compose exec -T app node scripts/schema-drift-audit.mjs
             docker compose ps
+
+      # Откат на предыдущий образ: отдельный шаг с if: failure(), потому что
+      # падение посреди ssh-скрипта (health-gate, миграция, schema-drift)
+      # оставляет прод на новой версии — без автоматического отката он лежит
+      # до ручного вмешательства.
+      - name: Rollback on failed deploy
+        if: failure()
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd /app/swiftmatch
+            if ! docker image inspect swiftmatch-app:rollback >/dev/null 2>&1; then
+              echo "FAIL: образа отката нет — откатывать не на что, поднимите вручную (docs/rollback-plan.md)"
+              exit 1
+            fi
+            docker tag swiftmatch-app:rollback swiftmatch-app:latest
+            docker tag swiftmatch-web:rollback swiftmatch-web:latest
+            # --no-build: вернуть именно предыдущий образ, а не пересобрать код
+            # из рабочей копии; миграции не откатываются (forward-only) — см.
+            # docs/rollback-plan.md.
+            docker compose up -d --no-build --wait
+            for i in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:3002/health >/dev/null && curl -fsS http://127.0.0.1:8080/ >/dev/null; then
+                ok=1
+                break
+              fi
+              sleep 5
+            done
+            if [ "${ok:-}" != "1" ]; then
+              echo "FAIL: откат не поднялся — ручной план: docs/rollback-plan.md"
+              exit 1
+            fi
+            echo "OK: откат на предыдущий образ выполнен, health отвечает"

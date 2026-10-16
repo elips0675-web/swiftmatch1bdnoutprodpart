@@ -172,6 +172,7 @@ cd server && npm test            # серверные тесты
 | Mock-платежи не утекают в прод | `npm run check:prod-mock` | `refuseMockPayment` стоит в пяти точках, но новая mock-ветка в PR отдаст товар бесплатно: в `server/src/routes/*.js` каждый хендлер с платным стоком (`mock: true`, `'paid'`, `INSERT INTO … subscriptions`, `commission_rate = 15`) обязан закрываться fail-closed отказом; вебхуки (`received: true`) — контракт Stripe, вне проверки; не-Stripe выдача подписки (RevenueCat) не считается (N9-tail, после этапа 39) |
 | Смоук живого UI | `npm run check:console` | console-ошибки, pageerror и ответы 5xx на статических страницах preview (8081 + API 3002), пустая страница, страница без русского текста (сырой ключ i18n), админ-роут, куда не попали из-за редиректа; фильтры известного шума — как в `e2e/helpers/audit.ts`. **Локально, в CI не подключён** — CI закрыт полным Playwright E2E; требует живых серверов (`запуск-всего.bat`). Перенос из Service Desk |
 | Бюджет бандла | `npm run check:bundle` | gzip initial JS/CSS — все ассеты, на которые ссылается `dist/index.html` (в т.ч. `vendor-*`, который мимо паттерна `index-*` не виден), выше бюджета 500 / 40 KB при базовой линии 371.7 / 20.3 KB на 08.10.2026 — подтянутая крупная зависимость или раздувшийся entry. **Локально, в CI не подключён**: требует собранный `npx vite build` |
+| Деплой: health-gate и откат | `npm run check:deploy-rollout` | выкладка считает успехом «контейнер стартовал»: `docker compose up -d --build` возвращал 0, а падение следующих шагов (миграции, `schema-validate`, `schema-drift`) оставляло прод на новой версии без отката. Гейт связывает `docker-compose.yml` и `.github/workflows/deploy.yml`: `image:` у `app`/`nginx` (иначе имя образа зависит от имени проекта compose и `:rollback` не за что зацепить), `app` имеет healthcheck с curl, снимок `:rollback` снимается **до** сборки (после — затёр бы образ новой версии), `docker compose up -d --build --wait`, проба того же порта/пути, что healthcheck compose (в workflow `127.0.0.1`, в compose `localhost` — сверяются порт и путь), `exit 1` после пробы, запрет `continue-on-error`, отдельный шаг отката `if: failure()` с `--no-build`, восстановлением обоих образов и своей пробой, и `needs: e2e-test` (этап 49; остаток тест-ориентированного свода дипсик 13.10.2026) |
 | Зеркала документации `test/` | `npm run check:mirrors` | каталог `test/` — компактный набор для внешнего AI-анализа; расхождение sha256 с корнем (набор «правила + состояние»: `Что доделать.txt`, `README.md`, `project-context.md`, `AGENTS.md`, `docs/AGENTS-pitfalls.md`, `docs/AGENTS-workflow.md`, `docs/AGENTS-production.md`, `docs/AGENTS-security.md`) или пропавшее зеркало. Все 8 пар трекаются в git (`git add -f`, каталог в `.gitignore`), гейт в CI (джоба `mirrors` в `ci.yml` + шаг в `lint-and-typecheck` `deploy.yml`), отсутствие зеркала или расхождение — exit 1. Починить: `node scripts/check-doc-mirrors.mjs --fix` |
 
 Каждый гейт обязан падать на сломанном входе — иначе это декорация
@@ -179,7 +180,7 @@ cd server && npm test            # серверные тесты
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 866 тестов, 70 файлов — **0 failures**
+- **Фронтенд (Vitest):** 889 тестов, 71 файл — **0 failures**
 - **Сервер (Vitest):** 1260 тестов, 89 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 205 тестов, 22 spec-файла — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
@@ -213,6 +214,7 @@ cd server && npm test            # серверные тесты
 | `secrets-leak` | `secrets-leak-audit.mjs` |
 | `test-counters` | `test-counter-audit.mjs` (нужны оба `node_modules`) |
 | `deploy-persistence` | `deploy-persistence-audit.mjs` |
+| `deploy-rollout` | `npm run check:deploy-rollout` — структура безопасной выкладки: `--wait` + проба health из compose, снимок `:rollback` до сборки, отдельный шаг отката `if: failure()` с `--no-build` и пробой (этап 49) |
 | `dependency-audit` | `npm run audit:prod` в корне и в `server/` (без `npm ci` — аудиту нужен только lock-файл) |
 | `docs-canon` | `npm run check:docs` — раскладка документации: правила только в `docs/AGENTS-*.md`, идеи 21–34 в `docs/product-roadmap.md`, архив помечен, запрещённых формулировок в отслеживаемых `.md`/`.txt` нет, версии стека в таблицах сверены с `package.json`, упоминаний удалённого `zod` нет (этап 32) |
 | `n-plus-one` | `npm run check:n-plus-one` — SQL внутри цикла по коллекции (2N запросов вместо 2) + протухшие оправдания `JUSTIFIED` (этап 33, N5) |
@@ -235,7 +237,7 @@ cd server && npm test            # серверные тесты
 | `test-counters` | сверка чисел с прогоном |
 | `e2e-test` | Playwright на поднятом стеке (needs: lint, frontend, server) + выгрузка отчёта; с этапа 30 рецепт идентичен `e2e` в `ci.yml` (сид демо-данных, `wait-for-url` вместо `sleep`, `vite preview --strictPort`) |
 | `docker-config-check` | `docker compose config` + сборка образов `server`/`web` + Trivy (сейчас `exit-code: 0`, режим baseline) |
-| `deploy` | **только push в `main`**: rsync на VPS (с `--exclude .env`, `uploads`, ключи) → `docker compose up -d --build` → `migrate.js` → `schema-validate.mjs` → **`schema-drift-audit.mjs` (live, код + эталон против БД VPS)** |
+| `deploy` | **только push в `main`**: rsync на VPS (с `--exclude .env`, `uploads`, ключи) → снимок работающих образов `:rollback` → `docker compose up -d --build --wait` + проба `/health` (3002) и nginx (8080) → `migrate.js` → `schema-validate.mjs` → **`schema-drift-audit.mjs` (live, код + эталон против БД VPS)**; при падении любого шага — шаг отката `if: failure()`: `:rollback` → `:latest`, `docker compose up -d --no-build --wait`, своя проверка health (этап 49) |
 
 `deploy` в `needs`: `lint-and-typecheck`, `frontend-test`, `server-test`,
 `e2e-test`, `test-counters`.

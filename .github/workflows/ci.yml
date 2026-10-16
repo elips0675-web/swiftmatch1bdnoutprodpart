@@ -327,6 +327,21 @@ jobs:
           node-version: 22
       - run: node scripts/deploy-persistence-audit.mjs
 
+  # Выкладка обязана доказать, что версия поднялась (health-gate по пробе из
+  # docker-compose.yml), и уметь откатиться: снимок предыдущих образов под
+  # тегом :rollback снимается ДО сборки, а падение любого шага (health,
+  # миграция, schema-drift) запускает отдельный шаг отката с if: failure().
+  # Без тега `:rollback` откатывать физически нечего — гейт держит именно
+  # структуру, а не слово «rollback» в комментарии.
+  deploy-rollout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm run check:deploy-rollout
+
   # Корневой .env.example обязан документировать все ключи server/.env.example:
   # docker-compose (сервис app) читает КОРНЕВОЙ .env (env_file), поэтому ключ,
   # описанный только в серверном шаблоне, в контейнер не попадёт (P2 #34).

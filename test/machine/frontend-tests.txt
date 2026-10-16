@@ -1,5 +1,5 @@
 ===== Фронт (Vitest) =====
-866 тестов в 70 файлах (зелёных 866) (vitest --reporter=json)
+889 тестов в 71 файлах (зелёных 889) (vitest --reporter=json)
 
 # файл | тестов
 scripts/blocks-coverage-audit.test.mjs | 26
@@ -10,6 +10,7 @@ scripts/check-env-parity.test.mjs | 5
 scripts/check-ports.test.mjs | 5
 scripts/check-security-headers.test.mjs | 59
 scripts/dependency-audit.test.mjs | 29
+scripts/deploy-rollout-audit.test.mjs | 23
 scripts/docs-canon-audit.test.mjs | 84
 scripts/e2e-cleanup.test.mjs | 11
 scripts/e2e-gate-audit.test.mjs | 36
