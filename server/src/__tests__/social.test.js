@@ -409,3 +409,36 @@ describe('POST /api/likes', () => {
     expect(res.status).toBe(201)
   })
 })
+
+describe('GET /api/matches — пагинация', () => {
+  function get(query = '') {
+    const app = createApp()
+    return request(app).get(`/api/matches${query}`).set('Authorization', `Bearer ${authToken()}`)
+  }
+
+  it('по умолчанию limit=50 и offset=0, LIMIT ? OFFSET ? в SQL', async () => {
+    pool.query.mockResolvedValueOnce([[{ id: 1, user_id: 2, online: 1, show_online: 1 }], []])
+    const res = await get()
+    expect(res.status).toBe(200)
+    const [sql, params] = pool.query.mock.calls[0]
+    expect(sql).toMatch(/LIMIT \? OFFSET \?/)
+    expect(params).toEqual([1, 1, 1, 50, 0])
+  })
+
+  it('limit и offset уезжают в SQL и в параметры, порядок стабилен по m.id', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    const res = await get('?limit=2&offset=1')
+    expect(res.status).toBe(200)
+    const [sql, params] = pool.query.mock.calls[0]
+    expect(sql).toMatch(/ORDER BY m\.created_at DESC, m\.id DESC/)
+    expect(sql).toMatch(/LIMIT \? OFFSET \?/)
+    expect(params).toEqual([1, 1, 1, 2, 1])
+  })
+
+  it('limit сверх 100 урезается до 100, отрицательный offset — до 0', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    await get('?limit=999&offset=-5')
+    expect(pool.query.mock.calls[0][1]).toEqual([1, 1, 1, 100, 0])
+  })
+})
+

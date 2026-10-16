@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-16T07:35:22.234Z",
+  "generated": "2026-10-16T08:31:03.936Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 63,
-    "tests": 757,
-    "passed": 757,
+    "files": 64,
+    "tests": 761,
+    "passed": 761,
     "failed": 0,
     "gate": {
       "files": 20,
       "tests": 498
     },
     "product": {
-      "files": 43,
-      "tests": 259
+      "files": 44,
+      "tests": 263
     },
     "perFile": [
       {
@@ -205,6 +205,10 @@
         "tests": 6
       },
       {
+        "file": "src/test/matches.test.tsx",
+        "tests": 4
+      },
+      {
         "file": "src/test/notification-preferences-section.test.tsx",
         "tests": 12
       },
@@ -272,8 +276,8 @@
   },
   "server": {
     "files": 83,
-    "tests": 1191,
-    "passed": 1191,
+    "tests": 1197,
+    "passed": 1197,
     "failed": 0,
     "gate": {
       "files": 5,
@@ -281,7 +285,7 @@
     },
     "product": {
       "files": 78,
-      "tests": 1069
+      "tests": 1075
     },
     "perFile": [
       {
@@ -474,7 +478,7 @@
       },
       {
         "file": "server/src/__tests__/notifications.test.js",
-        "tests": 7
+        "tests": 10
       },
       {
         "file": "server/src/__tests__/notify-failure.test.js",
@@ -582,7 +586,7 @@
       },
       {
         "file": "server/src/__tests__/social.test.js",
-        "tests": 29
+        "tests": 32
       },
       {
         "file": "server/src/__tests__/subscription-expiry.test.js",
@@ -717,7 +721,7 @@
     ]
   },
   "total": {
-    "files": 146,
-    "tests": 1948
+    "files": 147,
+    "tests": 1958
   }
 }

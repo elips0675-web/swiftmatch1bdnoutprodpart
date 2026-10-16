@@ -113,3 +113,40 @@ describe('PUT /api/notifications/:id/read', () => {
     expect(pool.query.mock.calls[0][1]).toEqual(['77', 9])
   })
 })
+
+describe('GET /api/notifications — пагинация', () => {
+  it('по умолчанию limit=30 и offset=0 (поведение до пагинации сохранено)', async () => {
+    pool.query
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ unread: 0 }], []])
+    const res = await request(app)
+      .get('/api/notifications')
+      .set('Authorization', `Bearer ${authToken(9)}`)
+    expect(res.status).toBe(200)
+    const [sql, params] = pool.query.mock.calls[0]
+    expect(sql).toMatch(/LIMIT \? OFFSET \?/)
+    expect(params).toEqual([9, 30, 0])
+  })
+
+  it('limit и offset из query уезжают в SQL и в параметры', async () => {
+    pool.query
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ unread: 0 }], []])
+    const res = await request(app)
+      .get('/api/notifications?limit=5&offset=10')
+      .set('Authorization', `Bearer ${authToken(9)}`)
+    expect(res.status).toBe(200)
+    expect(pool.query.mock.calls[0][1]).toEqual([9, 5, 10])
+  })
+
+  it('limit сверх 100 урезается до 100, отрицательный offset — до 0', async () => {
+    pool.query
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ unread: 0 }], []])
+    await request(app)
+      .get('/api/notifications?limit=999&offset=-3')
+      .set('Authorization', `Bearer ${authToken(9)}`)
+    expect(pool.query.mock.calls[0][1]).toEqual([9, 100, 0])
+  })
+})
+

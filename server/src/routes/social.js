@@ -328,18 +328,30 @@ router.post('/api/likes', auth, likeLimiter, async (req, res) => {
  *     summary: List matches
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 50, minimum: 1, maximum: 100 }
+ *         description: Page size
+ *       - in: query
+ *         name: offset
+ *         schema: { type: integer, default: 0, minimum: 0 }
+ *         description: Rows to skip
  *     responses:
  *       200: { description: OK }
  */
 router.get('/api/matches', auth, cacheRoutePerUser(30), async (req, res) => {
   try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100)
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0)
     const [rows] = await pool.query(
       `SELECT m.id, m.created_at as matched_at, up.id as user_id, up.display_name, up.name, up.age, up.avatar_url, up.city, up.online, up.show_online
        FROM matches m
        JOIN user_profiles up ON up.id = CASE WHEN m.user1_id = ? THEN m.user2_id ELSE m.user1_id END
        WHERE m.matched = 1 AND (m.user1_id = ? OR m.user2_id = ?) AND ${activeUser('up')}
-       ORDER BY m.created_at DESC`,
-      [req.userId, req.userId, req.userId],
+       ORDER BY m.created_at DESC, m.id DESC
+       LIMIT ? OFFSET ?`,
+      [req.userId, req.userId, req.userId, limit, offset],
     )
     res.json(applyActivityPrivacy(rows, req.userId, (row) => row.user_id))
   } catch (err) {

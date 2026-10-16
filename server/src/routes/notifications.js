@@ -84,11 +84,22 @@ router.put('/api/notifications/preferences', auth, async (req, res) => {
  *     summary: List recent notifications with unread count
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 30, minimum: 1, maximum: 100 }
+ *         description: Page size
+ *       - in: query
+ *         name: offset
+ *         schema: { type: integer, default: 0, minimum: 0 }
+ *         description: Rows to skip
  *     responses:
  *       200: { description: Notification items and unread count }
  */
 router.get('/api/notifications', auth, async (req, res) => {
   try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 30, 1), 100)
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0)
     const [rows] = await pool.query(
       `SELECT n.id, n.type, n.payload, n.is_read, n.created_at,
               up.display_name AS actor_name,
@@ -100,8 +111,8 @@ router.get('/api/notifications', auth, async (req, res) => {
               ON h.id = CAST(JSON_UNQUOTE(JSON_EXTRACT(n.payload, '$.hangout_id')) AS UNSIGNED)
        WHERE n.user_id = ? AND n.deleted_at IS NULL
        ORDER BY n.created_at DESC, n.id DESC
-       LIMIT 30`,
-      [req.userId],
+       LIMIT ? OFFSET ?`,
+      [req.userId, limit, offset],
     )
     const [[{ unread }]] = await pool.query(
       'SELECT COUNT(*) AS unread FROM notifications WHERE user_id = ? AND is_read = 0 AND deleted_at IS NULL',
