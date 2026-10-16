@@ -16,6 +16,7 @@ export interface FeatureFlags {
   activityPrivacyEnabled: boolean;
   hangoutRelationsEnabled: boolean;
   userWatchesEnabled: boolean;
+  emailUnsubscribeEnabled: boolean;
   rolloutEnabled: boolean;
 }
 
@@ -32,6 +33,7 @@ const defaultFlags: FeatureFlags = {
   activityPrivacyEnabled: true,
   hangoutRelationsEnabled: true,
   userWatchesEnabled: true,
+  emailUnsubscribeEnabled: true,
   rolloutEnabled: true,
 };
 
@@ -48,6 +50,7 @@ const mapApiFlags = (data: Record<string, boolean>): FeatureFlags => ({
   activityPrivacyEnabled: data.activityPrivacy ?? true,
   hangoutRelationsEnabled: data.hangoutRelations ?? true,
   userWatchesEnabled: data.userWatches ?? true,
+  emailUnsubscribeEnabled: data.emailUnsubscribe ?? true,
   rolloutEnabled: true,
 });
 
@@ -68,6 +71,7 @@ const applyRollout = (data: Record<string, unknown>): FeatureFlags => {
     activityPrivacyEnabled: raw.activityPrivacyEnabled && rolloutEnabled,
     hangoutRelationsEnabled: raw.hangoutRelationsEnabled && rolloutEnabled,
     userWatchesEnabled: raw.userWatchesEnabled && rolloutEnabled,
+    emailUnsubscribeEnabled: raw.emailUnsubscribeEnabled && rolloutEnabled,
     rolloutEnabled,
   }
 }

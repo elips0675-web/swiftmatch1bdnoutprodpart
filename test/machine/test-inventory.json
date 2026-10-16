@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-16T18:18:15.385Z",
+  "generated": "2026-10-16T18:46:52.205Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 68,
-    "tests": 837,
-    "passed": 837,
+    "files": 69,
+    "tests": 842,
+    "passed": 842,
     "failed": 0,
     "gate": {
       "files": 24,
       "tests": 574
     },
     "product": {
-      "files": 44,
-      "tests": 263
+      "files": 45,
+      "tests": 268
     },
     "perFile": [
       {
@@ -273,6 +273,10 @@
         "tests": 2
       },
       {
+        "file": "src/test/unsubscribe-page.test.tsx",
+        "tests": 5
+      },
+      {
         "file": "src/test/use-premium.test.ts",
         "tests": 5
       },
@@ -291,17 +295,17 @@
     ]
   },
   "server": {
-    "files": 85,
-    "tests": 1202,
-    "passed": 1202,
+    "files": 86,
+    "tests": 1216,
+    "passed": 1216,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 122
     },
     "product": {
-      "files": 80,
-      "tests": 1080
+      "files": 81,
+      "tests": 1094
     },
     "perFile": [
       {
@@ -415,6 +419,10 @@
       {
         "file": "server/src/__tests__/deploy-persistence-audit.test.js",
         "tests": 18
+      },
+      {
+        "file": "server/src/__tests__/email-unsubscribe.test.js",
+        "tests": 14
       },
       {
         "file": "server/src/__tests__/events.test.js",
@@ -745,7 +753,7 @@
     ]
   },
   "total": {
-    "files": 153,
-    "tests": 2039
+    "files": 155,
+    "tests": 2058
   }
 }

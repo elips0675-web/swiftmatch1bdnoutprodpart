@@ -3,8 +3,12 @@ import pool from '../../db.js'
 import { sendPushToAll } from '../push.js'
 import { sendCustomEmail } from '../../mail.js'
 import logger from '../../logger.js'
+import { buildUnsubscribeUrl, listEmailRecipients, isUnsubscribeFeatureEnabled } from '../../email-unsubscribe.js'
 
 const router = Router()
+
+const CAMPAIGN_TARGETS = ['all', 'premium', 'new']
+const CAMPAIGN_CHANNELS = ['push', 'email']
 
 /**
  * @openapi
@@ -49,25 +53,32 @@ router.post('/campaigns', async (req, res) => {
   if (!title || !body) {
     return res.status(400).json({ message: 'Title and body required' })
   }
+  const targetValue = target || 'all'
+  const channelValue = channel || 'push'
+  if (!CAMPAIGN_TARGETS.includes(targetValue) || !CAMPAIGN_CHANNELS.includes(channelValue)) {
+    return res.status(400).json({ message: 'Unknown campaign target or channel' })
+  }
   try {
     const [result] = await pool.query(
       `INSERT INTO campaigns (title, body, target, channel, admin_id, status, delivered, opened, clicked)
        VALUES (?, ?, ?, ?, ?, 'sent', 0, 0, 0)`,
-      [title, body, target || 'all', channel || 'push', req.admin.id],
+      [title, body, targetValue, channelValue, req.admin.id],
     )
 
-    if (channel === 'push') {
+    if (channelValue === 'push') {
       sendPushToAll(title, body, '/').catch(err => {
         logger.error('Campaign push send failed:', err)
       })
     }
 
-    if (channel === 'email') {
-      const [users] = await pool.query(
-        'SELECT email FROM users WHERE is_active = 1 AND deleted_at IS NULL',
-      )
-      const html = `<h2>${title}</h2><p>${body}</p>`
-      for (const u of users) {
+    if (channelValue === 'email') {
+      const recipients = await listEmailRecipients()
+      const withLink = await isUnsubscribeFeatureEnabled()
+      for (const u of recipients) {
+        const footer = withLink
+          ? `<p style="font-size:12px;color:#888">${buildUnsubscribeUrl(u.id, u.email)}</p>`
+          : ''
+        const html = `<h2>${title}</h2><p>${body}</p>${footer}`
         sendCustomEmail(u.email, title, html).catch(err => {
           logger.error('Campaign email send failed:', err)
         })

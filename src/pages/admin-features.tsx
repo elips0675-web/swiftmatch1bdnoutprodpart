@@ -54,6 +54,7 @@ export default function FeatureFlagsPage() {
           { key: 'activityPrivacy', label: t('admin.features.activity_privacy'), description: t('admin.features.activity_privacy_desc'), enabled: Boolean(data.activityPrivacy ?? true), affectedUsers: 12480 },
           { key: 'hangoutRelations', label: t('admin.features.hangout_relations'), description: t('admin.features.hangout_relations_desc'), enabled: Boolean(data.hangoutRelations ?? true), affectedUsers: 12480 },
           { key: 'userWatches', label: t('admin.features.user_watches'), description: t('admin.features.user_watches_desc'), enabled: Boolean(data.userWatches ?? true), affectedUsers: 12480 },
+          { key: 'emailUnsubscribe', label: t('admin.features.email_unsubscribe'), description: t('admin.features.email_unsubscribe_desc'), enabled: Boolean(data.emailUnsubscribe ?? true), affectedUsers: 12480 },
         ];
         setFlags(mapped);
         setSavedFlags(mapped);

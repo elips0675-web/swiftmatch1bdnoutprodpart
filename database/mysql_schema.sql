@@ -308,6 +308,21 @@ CREATE TABLE `emergency_contacts` (
   CONSTRAINT `emergency_contacts_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=38 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `email_unsubscribes`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `email_unsubscribes` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int unsigned DEFAULT NULL,
+  `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `reason` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_email_unsubscribes_email` (`email`),
+  KEY `idx_email_unsubscribes_user` (`user_id`),
+  CONSTRAINT `email_unsubscribes_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `event_tickets`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -396,6 +411,7 @@ CREATE TABLE `feature_flags` (
   `activity_privacy_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `hangout_relations_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `user_watches_enabled` tinyint(1) NOT NULL DEFAULT '1',
+  `email_unsubscribe_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `rollout_percent` tinyint unsigned NOT NULL DEFAULT '100',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

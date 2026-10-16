@@ -65,6 +65,7 @@ const Login = lazy(() => import("./pages/login"))
 const ForgotPassword = lazy(() => import("./pages/forgot-password"))
 const ResetPassword = lazy(() => import("./pages/reset-password"))
 const VerifyEmail = lazy(() => import("./pages/verify-email"))
+const Unsubscribe = lazy(() => import("./pages/unsubscribe"))
 const Onboarding = lazy(() => import("./pages/onboarding"))
 const Profile = lazy(() => import("./pages/profile"))
 const ProfileEdit = lazy(() => import("./pages/profile-edit"))
@@ -238,6 +239,7 @@ const App = () => (
                             <Route path="/forgot-password" element={<ForgotPassword />} />
                             <Route path="/reset-password" element={<ResetPassword />} />
                             <Route path="/verify-email" element={<VerifyEmail />} />
+                            <Route path="/unsubscribe" element={<Unsubscribe />} />
                             <Route path="/onboarding" element={<Onboarding />} />
                             <Route path="/profile" element={<Profile />} />
                             <Route path="/matches" element={<Matches />} />

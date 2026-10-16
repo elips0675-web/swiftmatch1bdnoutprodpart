@@ -1,5 +1,5 @@
 ===== Фронт (Vitest) =====
-837 тестов в 68 файлах (зелёных 837) (vitest --reporter=json)
+842 тестов в 69 файлах (зелёных 842) (vitest --reporter=json)
 
 # файл | тестов
 scripts/blocks-coverage-audit.test.mjs | 26
@@ -66,6 +66,7 @@ src/test/rollout.test.ts | 6
 src/test/sessions-section.test.tsx | 17
 src/test/settings-privacy.test.tsx | 4
 src/test/two-fa-settings.test.tsx | 2
+src/test/unsubscribe-page.test.tsx | 5
 src/test/use-premium.test.ts | 5
 src/test/use-websocket.test.tsx | 14
 src/test/utils.test.ts | 8

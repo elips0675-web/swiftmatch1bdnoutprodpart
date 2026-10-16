@@ -933,6 +933,18 @@ export const translations = {
     'auth.verify_prompt': 'Подтвердите ваш email',
     'auth.verify_prompt_desc': 'Мы отправили письмо с ссылкой для подтверждения. Проверьте почту.',
 
+    // Unsubscribe (email campaign opt-out)
+    'unsubscribe.title': 'Отписка от рассылок',
+    'unsubscribe.description': 'Письма кампаний больше не будут приходить на вашу почту.',
+    'unsubscribe.loading': 'Отписываем...',
+    'unsubscribe.success': 'Вы отписаны от рассылок',
+    'unsubscribe.success_desc': 'Эта почта больше не получает письма кампаний.',
+    'unsubscribe.error': 'Не удалось отписать',
+    'unsubscribe.invalid_link': 'Ссылка недействительна или устарела',
+    'unsubscribe.disabled': 'Отписка временно недоступна',
+    'unsubscribe.retry': 'Попробовать снова',
+    'unsubscribe.support_hint': 'Если ссылка не работает, напишите в поддержку, и мы отключим рассылку вручную.',
+
     // Register
     'register.account_created': 'Аккаунт создан!',
     'register.consent_doc': 'документу об обработке данных',
@@ -1299,6 +1311,8 @@ export const translations = {
     'admin.features.hangout_relations_desc': 'Подписка на встречу без участия, «та же серия» и «похожие встречи», привязка к серии',
     'admin.features.user_watches': 'Подписки на людей',
     'admin.features.user_watches_desc': '«Интересуют новые люди»: подписка на активность другого профиля',
+    'admin.features.email_unsubscribe': 'Отписка от email-рассылок',
+    'admin.features.email_unsubscribe_desc': 'Ссылка «отписаться» в письмах кампаний и публичная страница /unsubscribe',
     'admin.features.reset': 'Сбросить',
     'admin.features.reset_btn': 'Сбросить настройки',
     'admin.features.rollout': 'Роллаут',
@@ -2879,6 +2893,18 @@ export const translations = {
     'auth.verify_prompt': 'Verify your email',
     'auth.verify_prompt_desc': 'We sent a verification link. Please check your inbox.',
 
+    // Unsubscribe (email campaign opt-out)
+    'unsubscribe.title': 'Unsubscribe from campaigns',
+    'unsubscribe.description': 'Campaign emails will no longer reach your inbox.',
+    'unsubscribe.loading': 'Unsubscribing...',
+    'unsubscribe.success': 'You are unsubscribed',
+    'unsubscribe.success_desc': 'This address will no longer receive campaign emails.',
+    'unsubscribe.error': 'Failed to unsubscribe',
+    'unsubscribe.invalid_link': 'This link is invalid or has expired',
+    'unsubscribe.disabled': 'Unsubscribe is temporarily unavailable',
+    'unsubscribe.retry': 'Try again',
+    'unsubscribe.support_hint': 'If the link does not work, contact support and we will opt you out manually.',
+
     // Register
     'register.account_created': 'Account created!',
     'register.consent_doc': 'Data Processing Notice',
@@ -3247,6 +3273,8 @@ export const translations = {
     'admin.features.hangout_relations_desc': 'Follow a hangout without joining, "same series" and "similar hangouts", series assignment',
     'admin.features.user_watches': 'User follows',
     'admin.features.user_watches_desc': '"Interested in new people": follow another profile\'s activity',
+    'admin.features.email_unsubscribe': 'Email campaign unsubscribe',
+    'admin.features.email_unsubscribe_desc': '"Unsubscribe" link in campaign emails and the public /unsubscribe page',
     'admin.features.reset': 'Reset',
     'admin.features.reset_btn': 'Reset Settings',
     'admin.features.rollout': 'Rollout',

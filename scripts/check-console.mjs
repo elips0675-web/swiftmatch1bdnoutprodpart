@@ -26,7 +26,7 @@ const PAGES = [
   '/', '/hangouts', '/hangouts/create', '/hangouts/my', '/chats', '/search',
   '/search/filters', '/matches', '/schedule', '/events', '/groups', '/activity',
   '/premium', '/settings', '/settings/privacy', '/profile', '/profile/edit',
-  '/faq', '/about', '/safety', '/login', '/register',
+  '/faq', '/about', '/safety', '/login', '/register', '/unsubscribe',
   '/admin', '/admin/users', '/admin/content', '/admin/features',
   '/admin/analytics', '/admin/hangouts', '/admin/partners',
   '/admin/reports', '/admin/teams',
