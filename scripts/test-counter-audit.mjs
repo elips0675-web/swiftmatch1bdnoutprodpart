@@ -28,10 +28,13 @@
  *     обязана быть строка с **точным** числом тестов. Отсутствующая строка —
  *     это ровно тот случай «файл есть в репозитории, а в снимке его нет»,
  *     из-за которого инвентарь разошёлся с прогоном (3 серверных файла и 16
- *     тестов `blocks.test.js` не попали в таблицу после этапа 22).
+ *     тестов `blocks.test.js` не попали в таблицу после этапа 22). Строка
+ *     с описанием-заглушкой `PLACEHOLDER_HINT` — тоже ошибка: иначе гейт
+ *     зеленел на пустом месте (питфолл 59 `docs/AGENTS-pitfalls.md`).
  *
  * `--fix` переписывает числа сам (включая русские окончания: `49 файла` →
- * `52 файлов`), дописывает недостающие строки с пометкой «требует описания» и
+ * `52 файлов`), дописывает недостающие строки с пометкой «требует описания»
+ * (эту пометку теперь обязан закрыть человек — гейт её роняет) и
  * обновляет дату среза. Молчаливых мест не остаётся: цифра, которую гейт не
  * умеет проверять, не должна и попадать в документы.
  *
@@ -439,6 +442,13 @@ const ROW_LINE_RE = /^\| `([^`]+)` \|(?:\\\||[^|])*\| (\d+) \|$/
  * инвентаря перечислен.
  */
 const TEST_PATH_RE = /^(?:server\/src\/__tests__\/|src\/|e2e\/|scripts\/).+\.(?:test|spec)\.m?[jt]sx?$/
+/**
+ * Метка незаполненного описания в инвентаре. Пишется `--fix` и обязана
+ * ронять проверку: раньше гейт принимал её как обычное описание, и строка
+ * `| \`file\` | ⚠️ требует описания | N |` жила в инвентаре незамеченной.
+ * Константа общая с `--fix`, поэтому писатель и проверяющий не разъедутся.
+ */
+export const PLACEHOLDER_HINT = 'требует описания'
 
 /**
  * Окончание в шаблоне — `[а-яё]*`, а не `[а-яё]+`: при числе 1 `plural()`
@@ -583,6 +593,9 @@ export function checkInventoryRows(relPath, text, perFile, options = {}) {
     if (row.claimed !== actual) {
       problems.push({ file: relPath, claim: 'inventory-row', line: lineOf(text, row.index), message: `${row.file}: в прогоне ${actual}, в инвентаре ${row.claimed}` })
     }
+    if (row.text.includes(PLACEHOLDER_HINT)) {
+      problems.push({ file: relPath, claim: 'inventory-row', line: lineOf(text, row.index), message: `${row.file}: описание — заглушка «${PLACEHOLDER_HINT}», впиши, что покрывают тесты` })
+    }
   }
   for (const [file, actual] of perFile) {
     if (options.skipE2E && file.startsWith('e2e/')) continue
@@ -618,7 +631,7 @@ export function fixInventoryRows(text, perFile) {
     for (const [file, count] of perFile) {
       if (!file.startsWith(section.prefix)) continue
       if (present.has(file)) continue
-      missing.push(`| \`${file}\` | ⚠️ требует описания | ${count} |`)
+      missing.push(`| \`${file}\` | ⚠️ ${PLACEHOLDER_HINT} | ${count} |`)
     }
     if (missing.length && lastRow !== -1) {
       missing.sort()

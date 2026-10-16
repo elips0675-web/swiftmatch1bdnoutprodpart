@@ -363,8 +363,58 @@ describe("fixInventoryRows", () => {
     expect(scriptsRow).toBeGreaterThan(scriptsIndex);
   });
 
-  it("после фикса строковая сверка молчит", () => {
-    expect(checkInventoryRows("inv.md", fixInventoryRows(threeSections, perFile), perFile)).toEqual([]);
+  it("после фикса остаётся нераскрытая заглушка, и гейт её ловит", () => {
+    const problems = checkInventoryRows("inv.md", fixInventoryRows(threeSections, perFile), perFile);
+    expect(problems.map((p) => p.message)).toEqual([
+      "server/src/__tests__/b.test.js: описание — заглушка «требует описания», впиши, что покрывают тесты",
+    ]);
+  });
+});
+
+describe("заглушка описания — не пропуск", () => {
+  const perFile = new Map([
+    ["server/src/__tests__/a.test.js", 4],
+    ["server/src/__tests__/b.test.js", 3],
+  ]);
+
+  it("ручное описание проходит", () => {
+    const text = [
+      "| `server/src/__tests__/a.test.js` | покрывает лайки в одну сторону | 4 |",
+      "| `server/src/__tests__/b.test.js` | покрывает взаимные пары | 3 |",
+    ].join("\n");
+    expect(checkInventoryRows("inv.md", text, perFile)).toEqual([]);
+  });
+
+  it("строка-заглушка роняет проверку и называет номер строки", () => {
+    const text = [
+      "| `server/src/__tests__/a.test.js` | покрывает лайки в одну сторону | 4 |",
+      "| `server/src/__tests__/b.test.js` | ⚠️ требует описания | 3 |",
+    ].join("\n");
+    expect(checkInventoryRows("inv.md", text, perFile)).toEqual([
+      {
+        file: "inv.md",
+        claim: "inventory-row",
+        line: 2,
+        message: "server/src/__tests__/b.test.js: описание — заглушка «требует описания», впиши, что покрывают тесты",
+      },
+    ]);
+  });
+
+  it("заполненный `--fix` инвентарь зеленеет только после ручного описания", () => {
+    const oneRow = [
+      "## Сервер — 1 файл, 4 теста",
+      "",
+      "| Файл | Что покрывает | Тестов |",
+      "|---|---|---|",
+      "| `server/src/__tests__/a.test.js` | покрывает лайки в одну сторону | 4 |",
+    ].join("\n");
+    const fixed = fixInventoryRows(oneRow, perFile);
+    expect(fixed).toContain("⚠️ " + "требует описания");
+    expect(checkInventoryRows("inv.md", fixed, perFile).map((p) => p.message)).toEqual([
+      "server/src/__tests__/b.test.js: описание — заглушка «требует описания», впиши, что покрывают тесты",
+    ]);
+    const filled = fixed.replace("⚠️ требует описания", "покрывает взаимные пары");
+    expect(checkInventoryRows("inv.md", filled, perFile)).toEqual([]);
   });
 });
 

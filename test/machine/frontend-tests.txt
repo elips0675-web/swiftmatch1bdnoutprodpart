@@ -1,5 +1,5 @@
 ===== Фронт (Vitest) =====
-842 тестов в 69 файлах (зелёных 842) (vitest --reporter=json)
+845 тестов в 69 файлах (зелёных 845) (vitest --reporter=json)
 
 # файл | тестов
 scripts/blocks-coverage-audit.test.mjs | 26
@@ -24,7 +24,7 @@ scripts/secrets-leak-audit.test.mjs | 22
 scripts/stage-facts.test.mjs | 15
 scripts/stage-section.test.mjs | 10
 scripts/swagger-coverage-audit.test.mjs | 9
-scripts/test-counter-audit.test.mjs | 44
+scripts/test-counter-audit.test.mjs | 47
 scripts/typecheck-gate-audit.test.mjs | 17
 src/hooks/__tests__/use-fcm-token.test.tsx | 3
 src/test/activity-list.test.tsx | 3
