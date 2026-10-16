@@ -50,6 +50,28 @@ export const makeLikeLimiter = () =>
     message: { message: 'Too many likes' },
   })
 
+export const makeChatMessageLimiter = () =>
+  rateLimit({
+    windowMs: 60_000,
+    max: Number(process.env.CHAT_MESSAGE_RATE_MAX || 100),
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: getRateLimitStore('rl:chatmsg:'),
+    message: { message: 'Too many messages' },
+  })
+
+export const makeIcebreakerLimiter = () =>
+  rateLimit({
+    windowMs: 60_000,
+    max: Number(process.env.ICEBREAKER_RATE_MAX || 30),
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: getRateLimitStore('rl:icebreaker:'),
+    message: { message: 'Too many icebreaker requests' },
+  })
+
 // Синглтоны для приложения
 export const authLimiter = makeAuthLimiter()
 export const apiLimiter = makeApiLimiter()
+export const chatMessageLimiter = makeChatMessageLimiter()
+export const icebreakerLimiter = makeIcebreakerLimiter()

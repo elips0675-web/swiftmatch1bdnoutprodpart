@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { auth } from '../middleware.js'
+import { icebreakerLimiter } from '../middleware/limiters.js'
 import pool from '../db.js'
 import { rootLogger } from '../logger.js'
 import { createBreaker } from '../circuit-breaker.js'
@@ -51,7 +52,7 @@ const openaiBreaker = createBreaker(
  *     responses:
  *       200: { description: Array of icebreaker suggestions }
  */
-router.post('/api/icebreakers/suggest', auth, async (req, res) => {
+router.post('/api/icebreakers/suggest', auth, icebreakerLimiter, async (req, res) => {
   try {
     const { chat_user_id, language = 'ru' } = req.body
     if (!chat_user_id) {

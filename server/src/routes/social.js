@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import rateLimit from 'express-rate-limit'
-import { getRateLimitStore } from '../middleware/limiters.js'
+import { getRateLimitStore, chatMessageLimiter } from '../middleware/limiters.js'
 import pool from '../db.js'
 import { getIO } from '../ws.js'
 import { getBannedWords, containsBannedWord } from '../banned-words.js'
@@ -949,7 +949,7 @@ router.get('/api/chats/:chatId/messages', auth, async (req, res) => {
  *     responses:
  *       200: { description: OK }
  */
-router.post('/api/chats/:chatId/messages', auth, async (req, res) => {
+router.post('/api/chats/:chatId/messages', auth, chatMessageLimiter, async (req, res) => {
   const { text, image_url, ttl_seconds } = req.body
   if (!text && !image_url) return res.status(400).json({ message: 'Text or image is required' })
 

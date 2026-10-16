@@ -94,6 +94,8 @@ services:
       REDIS_URL: redis://redis:6379
       # hangout createLimiter (10/мин по умолчанию) — слишком низкий для E2E-прогонов
       HANGOUT_CREATE_RATE_MAX: ${HANGOUT_CREATE_RATE_MAX:-10}
+      CHAT_MESSAGE_RATE_MAX: ${CHAT_MESSAGE_RATE_MAX:-100}
+      ICEBREAKER_RATE_MAX: ${ICEBREAKER_RATE_MAX:-30}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
       interval: 30s
