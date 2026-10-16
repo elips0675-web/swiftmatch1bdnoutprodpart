@@ -4,6 +4,7 @@ import pool from '../db.js'
 import { auth } from '../middleware.js'
 import logger from '../logger.js'
 import { textField } from '../profile-fields.js'
+import { auditLog } from '../audit.js'
 import { buildExportPayload, buildExportArchive } from '../gdpr-export.js'
 
 const router = Router()
@@ -98,7 +99,17 @@ router.post('/api/data/erase/confirm', auth, async (req, res) => {
       ['confirmed', request.id],
     )
 
-    await pool.query('DELETE FROM user_photos WHERE user_id = ?', [req.userId])
+    const [photoDelete] = await pool.query('DELETE FROM user_photos WHERE user_id = ?', [req.userId])
+    if (photoDelete.affectedRows > 0) {
+      await auditLog({
+        tableName: 'user_photos',
+        recordId: null,
+        action: 'delete_bulk',
+        oldValues: { user_id: req.userId, count: photoDelete.affectedRows },
+        userId: req.userId,
+        ipAddress: req.ip,
+      })
+    }
     await pool.query('DELETE FROM user_interests WHERE user_id = ?', [req.userId])
     await pool.query('DELETE FROM likes WHERE from_user_id = ? OR to_user_id = ?', [req.userId, req.userId])
     await pool.query('DELETE FROM messages WHERE sender_id = ?', [req.userId])
