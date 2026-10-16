@@ -48,13 +48,24 @@ function sendEvent(overrides = {}, raw = false) {
 }
 
 describe('POST /api/iap/webhook security', () => {
-  it('секрет не настроен -> 503 not configured', async () => {
+  it('секрет не настроен -> 503 not configured (свежий импорт модуля без env)', async () => {
+    const prev = process.env.REVENUECAT_WEBHOOK_SECRET
     delete process.env.REVENUECAT_WEBHOOK_SECRET
+    vi.resetModules()
     try {
-      const res = await request(createApp()).post('/api/iap/webhook').set('Authorization', '').send({})
-      expect([401, 503]).toContain(res.status)
+      const fresh = await import('../routes/iap.js')
+      const app = express()
+      app.use(express.json())
+      app.use(fresh.default)
+      const res = await request(app)
+        .post('/api/iap/webhook')
+        .set('Authorization', 'Bearer rc_secret_dummy')
+        .send({ event: { type: 'INITIAL_PURCHASE', app_user_id: '5', product_id: 'plus_1m' } })
+      expect(res.status).toBe(503)
+      expect(pool.query).not.toHaveBeenCalled()
     } finally {
-      process.env.REVENUECAT_WEBHOOK_SECRET = 'rc_secret_dummy'
+      process.env.REVENUECAT_WEBHOOK_SECRET = prev
+      vi.resetModules()
     }
   })
 
@@ -214,11 +225,15 @@ describe('GET /api/iap/status', () => {
 })
 
 describe('схема subscriptions: апсерт RevenueCat опирается на UNIQUE-ключ', () => {
-  it('объявлен UNIQUE (provider, provider_subscription_id)', () => {
+  it('объявлен UNIQUE (provider, provider_subscription_id, user_id)', () => {
     // Без этого ключа `ON DUPLICATE KEY UPDATE` в /api/iap/webhook не срабатывает
     // и каждое продление (RENEWAL) вставляет новую строку вместо обновления —
     // дефект держался именно на отсутствии уникального ключа (миграция 065).
+    // user_id в ключе обязателен: provider_subscription_id у RevenueCat — это
+    // product_id, одинаковый у всех покупателей, поэтому без user_id покупка
+    // второго пользователя обновляла чужую строку и второй оставался без
+    // подписки (нашёл e2e/iap-webhook.spec.ts; миграция 070).
     const schema = fs.readFileSync(path.join(ROOT, 'database', 'mysql_schema.sql'), 'utf8')
-    expect(schema).toMatch(/UNIQUE KEY `uq_subscriptions_provider` \(`provider`,`provider_subscription_id`\)/)
+    expect(schema).toMatch(/UNIQUE KEY `uq_subscriptions_provider` \(`provider`,`provider_subscription_id`,`user_id`\)/)
   })
 })

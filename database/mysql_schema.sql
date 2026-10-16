@@ -1277,7 +1277,7 @@ CREATE TABLE `subscriptions` (
   KEY `idx_active_expires` (`is_active`,`expires_at`),
   KEY `idx_subscriptions_provider` (`provider`,`provider_subscription_id`),
   KEY `idx_subscriptions_payment_intent` (`provider_payment_intent`),
-  UNIQUE KEY `uq_subscriptions_provider` (`provider`,`provider_subscription_id`),
+  UNIQUE KEY `uq_subscriptions_provider` (`provider`,`provider_subscription_id`,`user_id`),
   CONSTRAINT `subscriptions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

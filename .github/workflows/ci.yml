@@ -77,6 +77,7 @@ jobs:
       DB_PASSWORD: swiftmatch_test
       DB_NAME: swiftmatch_test
       JWT_SECRET: ci-e2e-secret-not-for-production-0123456789
+      REVENUECAT_WEBHOOK_SECRET: ci-e2e-revenuecat-webhook
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-16T19:36:14.590Z",
+  "generated": "2026-10-16T20:05:29.327Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -671,15 +671,15 @@
     ]
   },
   "e2e": {
-    "files": 21,
-    "tests": 195,
+    "files": 22,
+    "tests": 205,
     "gate": {
       "files": 0,
       "tests": 0
     },
     "product": {
-      "files": 21,
-      "tests": 195
+      "files": 22,
+      "tests": 205
     },
     "perFile": [
       {
@@ -729,6 +729,10 @@
       {
         "file": "e2e/hangouts2.spec.ts",
         "tests": 6
+      },
+      {
+        "file": "e2e/iap-webhook.spec.ts",
+        "tests": 10
       },
       {
         "file": "e2e/interests.spec.ts",

@@ -344,6 +344,13 @@ jobs:
           --health-retries=5
         ports:
           - 3306:3306
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASSWORD: swiftmatch_test
+      DB_NAME: swiftmatch_test
+      JWT_SECRET: ci-e2e-jwt-secret
+      REVENUECAT_WEBHOOK_SECRET: ci-e2e-revenuecat-webhook
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -359,18 +366,8 @@ jobs:
         run: mysql -h127.0.0.1 -uroot -pswiftmatch_test swiftmatch_test < database/mysql_schema.sql
       - name: Seed applied migrations (этап 79)
         run: node scripts/seed-migrations.mjs
-        env:
-          DB_HOST: 127.0.0.1
-          DB_USER: root
-          DB_PASSWORD: swiftmatch_test
-          DB_NAME: swiftmatch_test
       - name: Apply DB migrations (этап 78)
         run: node database/migrations/migrate.js
-        env:
-          DB_HOST: 127.0.0.1
-          DB_USER: root
-          DB_PASSWORD: swiftmatch_test
-          DB_NAME: swiftmatch_test
       # Сид демо-данных (этап 30): без него global-setup не может залогиниться
       # за user2@mail.ru/admin@mail.ru — в mysql_schema.sql нет ни одного
       # INSERT INTO users, все четыре storageState остаются пустыми, и 13
@@ -378,19 +375,13 @@ jobs:
       # e2e-test никогда не была зелёной, а deploy зависит от неё.
       - name: Seed demo data
         run: node server/src/seed.js
-        env:
-          DB_HOST: 127.0.0.1
-          DB_USER: root
-          DB_PASSWORD: swiftmatch_test
-          DB_NAME: swiftmatch_test
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
       - name: Build frontend
         run: npx vite build
       - name: Start server
         run: |
-          PORT=3002 DB_HOST=127.0.0.1 DB_USER=root DB_PASSWORD=swiftmatch_test DB_NAME=swiftmatch_test JWT_SECRET=ci-e2e-jwt-secret \
-          node server/src/index.js &
+          PORT=3002 node server/src/index.js &
           echo "SERVER_PID=$!" >> $GITHUB_ENV
       - name: Wait for API (этап 30)
         run: node scripts/wait-for-url.mjs http://127.0.0.1:3002/health --status 200 --timeout 120000
