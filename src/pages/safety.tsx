@@ -157,6 +157,7 @@ export default function SafetyPage() {
         <CardContent className="space-y-3">
           <select
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            aria-label={t('safety.select_contact')}
             value={contactId || ''}
             onChange={e => setContactId(Number(e.target.value))}
           >

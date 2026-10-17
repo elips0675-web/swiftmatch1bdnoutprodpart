@@ -118,7 +118,7 @@ export default function LoginPage() {
       <div className="absolute bottom-[-10%] right-[-20%] w-[100%] h-[50%] bg-[#ff8e53]/10 rounded-full blur-[120px] -z-10"></div>
 
       <header className="p-4 flex items-center justify-between">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full h-10 w-10">
+        <Button variant="ghost" size="icon" aria-label={t('common.back')} onClick={() => router.back()} className="rounded-full h-10 w-10">
           <ChevronLeft size={24} />
         </Button>
         <Button variant="ghost" onClick={() => router.push("/")} className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
