@@ -205,7 +205,7 @@ function SubGroupsContent() {
             <AnimatePresence>
                 {showPremiumDialog && (
                 <Dialog open={showPremiumDialog} onOpenChange={setShowPremiumDialog}>
-                    <DialogContent className="max-w-[340px] rounded-2xl p-0 overflow-hidden border-0 bg-white app-shadow">
+                    <DialogContent aria-describedby={undefined} className="max-w-[340px] rounded-2xl p-0 overflow-hidden border-0 bg-white app-shadow">
                     <div className="relative h-40 bg-gradient-to-r from-blue-500 to-teal-500 flex flex-col items-center justify-center text-white p-6 overflow-hidden">
                         <div className="absolute inset-0 bg-black/5"></div>
                         <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.2, 0.1] }} transition={{ duration: 2, repeat: Infinity }} className="absolute"><Gift size={160} /></motion.div>

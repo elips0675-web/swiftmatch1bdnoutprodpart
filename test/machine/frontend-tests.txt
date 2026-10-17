@@ -1,5 +1,5 @@
 ===== Фронт (Vitest) =====
-983 тестов в 85 файлах (зелёных 983) (vitest --reporter=json)
+1008 тестов в 88 файлах (зелёных 1008) (vitest --reporter=json)
 
 # файл | тестов
 scripts/blocks-coverage-audit.test.mjs | 26
@@ -50,6 +50,8 @@ src/test/faq.test.tsx | 3
 src/test/feature-flags-context.test.tsx | 5
 src/test/flower-order-dialog.test.tsx | 4
 src/test/forgot-password.test.tsx | 5
+src/test/groups-category.test.tsx | 7
+src/test/groups.test.tsx | 8
 src/test/hangout-create.test.tsx | 3
 src/test/hangout-detail.test.tsx | 5
 src/test/hangout-edit.test.tsx | 7
@@ -75,6 +77,7 @@ src/test/rollout.test.ts | 6
 src/test/safety.test.tsx | 7
 src/test/schedule.test.tsx | 5
 src/test/search-filters.test.tsx | 7
+src/test/search.test.tsx | 10
 src/test/sessions-section.test.tsx | 17
 src/test/settings-privacy.test.tsx | 4
 src/test/settings.test.tsx | 12

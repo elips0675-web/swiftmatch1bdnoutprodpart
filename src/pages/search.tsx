@@ -327,7 +327,7 @@ function SearchContent() {
             <Badge variant="outline" className="text-[8px] font-bold bg-white">{currentIndex + 1} / {userList.length}</Badge>
             <Badge variant="secondary" className="text-[8px] font-bold text-primary bg-primary/5">{pageTitle}</Badge>
             {searchParams.get('mode') === 'autosearch' && (
-                <button onClick={() => setIsFiltersOpen(true)} className="p-2 bg-white rounded-full shadow-sm">
+                <button data-testid="open-filters" onClick={() => setIsFiltersOpen(true)} className="p-2 bg-white rounded-full shadow-sm">
                     <SlidersHorizontal size={14} className="text-primary" />
                 </button>
             )}
@@ -417,6 +417,7 @@ function SearchContent() {
                     <X size={26} strokeWidth={3} />
                 </Button>
                 <Button
+                    data-testid="super-like-button"
                     className="relative w-16 h-16 rounded-full bg-blue-500 text-white shadow-2xl shadow-blue-500/40 hover:scale-110 active:scale-95 transition-all border-0 disabled:bg-slate-300 disabled:shadow-none flex items-center justify-center"
                     onClick={handleSuperLike}
                     disabled={(currentUser?.superLikes || 0) === 0}
@@ -425,6 +426,7 @@ function SearchContent() {
                     <span className="absolute bottom-1.5 text-[10px] font-bold">{currentUser?.superLikes || 0}</span>
                 </Button>
                 <Button
+                    data-testid="like-button"
                     className="w-[4.5rem] h-[4.5rem] rounded-full gradient-bg text-white shadow-2xl shadow-primary/40 hover:scale-110 active:scale-95 transition-all border-0 flex items-center justify-center"
                     onClick={handleLike}
                 >

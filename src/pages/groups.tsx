@@ -140,7 +140,7 @@ export default function GroupsPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   // Demo data for different tabs
-  const myGroupIds = [1, 3, 5];
+  const myGroupIds = ['music', 'creativity', 'gaming'];
   const myGroups = GROUP_CATEGORIES.filter(g => myGroupIds.includes(g.id));
   const topGroups = GROUP_CATEGORIES.slice(2, 6);
   const popularGroups = GROUP_CATEGORIES;
