@@ -748,16 +748,16 @@ function ChatsContent() {
                 {reactionEmojis.length > 0 && (
                   <div className={cn("flex gap-1 mt-1", msg.sender === "me" ? "justify-end" : "justify-start")}>
                     {reactionEmojis.map(emoji => (
-                      <button key={emoji} onClick={(e) => { e.stopPropagation(); toggleReaction(msg.id, emoji); }} className="text-xs bg-white/70 rounded-full px-1.5 py-0.5 border border-border/30 shadow-sm hover:bg-muted/50 transition-all active:scale-90">
+                      <button key={emoji} aria-label={emoji} onClick={(e) => { e.stopPropagation(); toggleReaction(msg.id, emoji); }} className="text-xs bg-white/70 rounded-full px-1.5 py-0.5 border border-border/30 shadow-sm hover:bg-muted/50 transition-all active:scale-90">
                         {emoji} <span className="text-[9px] text-muted-foreground font-bold">{msgReactions.filter((r: any) => r.emoji === emoji).length}</span>
                       </button>
                     ))}
-                    <button onClick={() => setReactionMsgId(isReactionPickerOpen ? null : msg.id)} className="text-muted-foreground/50 hover:text-muted-foreground transition-all"><Smile size={12} /></button>
+                    <button aria-label={t('chats.add_reaction')} onClick={() => setReactionMsgId(isReactionPickerOpen ? null : msg.id)} className="text-muted-foreground/50 hover:text-muted-foreground transition-all"><Smile size={12} /></button>
                   </div>
                 )}
                 {reactionEmojis.length === 0 && (
                   <div className={cn("flex mt-0.5", msg.sender === "me" ? "justify-end" : "justify-start")}>
-                    <button onClick={() => setReactionMsgId(isReactionPickerOpen ? null : msg.id)} className="text-muted-foreground/30 hover:text-muted-foreground/60 transition-all"><Smile size={10} /></button>
+                    <button aria-label={t('chats.add_reaction')} onClick={() => setReactionMsgId(isReactionPickerOpen ? null : msg.id)} className="text-muted-foreground/30 hover:text-muted-foreground/60 transition-all"><Smile size={10} /></button>
                   </div>
                 )}
                 {isReactionPickerOpen && (
@@ -765,7 +765,7 @@ function ChatsContent() {
                     {QUICK_REACTIONS.map(reaction => {
                       const ReactionIcon = reaction.icon;
                       return (
-                        <button key={reaction.id} onClick={() => toggleReaction(msg.id, reaction.label)} className="w-7 h-7 flex items-center justify-center hover:bg-muted rounded-lg transition-all active:scale-90">
+                        <button key={reaction.id} data-testid={`reaction-quick-${reaction.id}`} aria-label={reaction.label} onClick={() => toggleReaction(msg.id, reaction.label)} className="w-7 h-7 flex items-center justify-center hover:bg-muted rounded-lg transition-all active:scale-90">
                           <span className="[transform:translateZ(0)] scale-75"><ReactionIcon size={18} className={reaction.color} /></span>
                         </button>
                       );
@@ -834,15 +834,15 @@ function ChatsContent() {
             <div className="space-y-4 mt-4">
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5 block">{t('schedule.date')}</label>
-                <input type="date" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)} className="w-full h-11 px-4 bg-muted/50 border-0 rounded-xl text-sm font-medium" min={new Date().toISOString().split('T')[0]} />
+                <input type="date" data-testid="schedule-date" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)} className="w-full h-11 px-4 bg-muted/50 border-0 rounded-xl text-sm font-medium" min={new Date().toISOString().split('T')[0]} />
               </div>
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5 block">{t('chats.online')}</label>
-                <input type="time" value={scheduleTime} onChange={e => setScheduleTime(e.target.value)} className="w-full h-11 px-4 bg-muted/50 border-0 rounded-xl text-sm font-medium" />
+                <input type="time" data-testid="schedule-time" value={scheduleTime} onChange={e => setScheduleTime(e.target.value)} className="w-full h-11 px-4 bg-muted/50 border-0 rounded-xl text-sm font-medium" />
               </div>
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5 block">{t('schedule.duration')}</label>
-                <select value={scheduleDuration} onChange={e => setScheduleDuration(Number(e.target.value))} className="w-full h-11 px-4 bg-muted/50 border-0 rounded-xl text-sm font-medium">
+                <select data-testid="schedule-duration" value={scheduleDuration} onChange={e => setScheduleDuration(Number(e.target.value))} className="w-full h-11 px-4 bg-muted/50 border-0 rounded-xl text-sm font-medium">
                   {[15, 30, 45, 60, 90, 120].map(m => (
                     <option key={m} value={m}>{t('schedule.minutes', { n: m })}</option>
                   ))}
@@ -850,9 +850,9 @@ function ChatsContent() {
               </div>
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5 block">{t('schedule.message')}</label>
-                <textarea value={scheduleMessage} onChange={e => setScheduleMessage(e.target.value)} className="w-full h-20 px-4 py-3 bg-muted/50 border-0 rounded-xl text-sm font-medium resize-none" placeholder={t('chats.placeholder')} />
+                <textarea data-testid="schedule-message" value={scheduleMessage} onChange={e => setScheduleMessage(e.target.value)} className="w-full h-20 px-4 py-3 bg-muted/50 border-0 rounded-xl text-sm font-medium resize-none" placeholder={t('chats.placeholder')} />
               </div>
-              <Button onClick={handleProposeDate} disabled={!scheduleDate || !scheduleTime || isScheduling} className="w-full h-11 rounded-xl gradient-bg text-white font-bold gap-2">
+              <Button data-testid="schedule-submit" onClick={handleProposeDate} disabled={!scheduleDate || !scheduleTime || isScheduling} className="w-full h-11 rounded-xl gradient-bg text-white font-bold gap-2">
                 {isScheduling ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Calendar size={16} />}
                 {t('schedule.propose_btn')}
               </Button>
@@ -868,6 +868,7 @@ function ChatsContent() {
                 return (
                   <button
                     key={theme.id}
+                    data-testid={`chat-theme-${theme.id}`}
                     onClick={() => handleThemeClick(theme.id)}
                     className="flex items-center gap-2 px-3 py-3 rounded-xl border border-border/40 bg-muted/20 hover:bg-primary/10 hover:border-primary/20 active:scale-95 transition-all text-left"
                   >
