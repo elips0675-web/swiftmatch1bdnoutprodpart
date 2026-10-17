@@ -164,6 +164,7 @@ function UserProfileContent() {
               variant="ghost" 
               size="icon" 
               onClick={() => setIsReportDialogOpen(true)}
+              data-testid="report-user"
               className="rounded-full bg-white/40 backdrop-blur-md text-destructive hover:bg-white/60 border border-white/40 shadow-sm transition-all"
             >
               <Flag size={20} />
@@ -183,6 +184,7 @@ function UserProfileContent() {
                   else { toast({ variant: 'destructive', title: t('user.block_error') }) }
                 } catch { toast({ variant: 'destructive', title: t('user.block_error') }) }
               }}
+              data-testid="block-user"
               className="rounded-full bg-white/40 backdrop-blur-md text-muted-foreground hover:bg-white/60 hover:text-destructive border border-white/40 shadow-sm transition-all"
             >
               <Ban size={20} />
@@ -434,7 +436,7 @@ function UserProfileContent() {
           <Button onClick={() => router.push('/')} variant="outline" className="w-12 h-12 rounded-full border-2 border-muted hover:bg-muted text-muted-foreground flex items-center justify-center transition-all active:scale-90 shadow-lg bg-white shrink-0">
             <X size={22} />
           </Button>
-          <Button onClick={() => setShowInviteDialog(true)} variant="outline" className="w-12 h-12 rounded-full border-2 border-primary/20 bg-white hover:bg-primary/5 text-primary flex items-center justify-center transition-all active:scale-90 shadow-lg shrink-0">
+          <Button data-testid="invite-user" onClick={() => setShowInviteDialog(true)} variant="outline" className="w-12 h-12 rounded-full border-2 border-primary/20 bg-white hover:bg-primary/5 text-primary flex items-center justify-center transition-all active:scale-90 shadow-lg shrink-0">
             <Coffee size={20} />
           </Button>
           <Button onClick={handleLike} className="h-14 flex-1 rounded-full gradient-bg text-white font-black uppercase tracking-[0.2em] text-[11px] shadow-xl shadow-primary/30 flex items-center justify-center gap-2 active:scale-95 transition-all border-0">
@@ -542,7 +544,7 @@ function UserProfileContent() {
         </Dialog>
 
       <Dialog open={isViewerOpen} onOpenChange={setIsViewerOpen}>
-        <DialogContent className="max-w-[440px] w-[95vw] h-[85vh] p-0 border-0 bg-transparent shadow-none flex flex-col items-center justify-center [&>button]:hidden">
+        <DialogContent aria-describedby={undefined} className="max-w-[440px] w-[95vw] h-[85vh] p-0 border-0 bg-transparent shadow-none flex flex-col items-center justify-center [&>button]:hidden">
           <DialogTitle className="sr-only">{t('gallery.viewer')}</DialogTitle>
           <Carousel className="w-full h-full" opts={{ startIndex: activePhotoIndex }}>
             <CarouselContent className="h-full ml-0">

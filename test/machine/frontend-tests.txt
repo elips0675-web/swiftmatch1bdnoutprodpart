@@ -1,5 +1,5 @@
 ===== Фронт (Vitest) =====
-1008 тестов в 88 файлах (зелёных 1008) (vitest --reporter=json)
+1033 тестов в 90 файлах (зелёных 1033) (vitest --reporter=json)
 
 # файл | тестов
 scripts/blocks-coverage-audit.test.mjs | 26
@@ -64,6 +64,7 @@ src/test/language-context.test.tsx | 6
 src/test/login.test.tsx | 6
 src/test/matches.test.tsx | 4
 src/test/notification-preferences-section.test.tsx | 12
+src/test/onboarding.test.tsx | 13
 src/test/opening-lines-picker.test.tsx | 4
 src/test/opening-lines.test.ts | 5
 src/test/premium.test.tsx | 8
@@ -87,6 +88,7 @@ src/test/unsubscribe-page.test.tsx | 5
 src/test/unsubscribe.test.tsx | 6
 src/test/use-premium.test.ts | 5
 src/test/use-websocket.test.tsx | 14
+src/test/user.test.tsx | 12
 src/test/utils.test.ts | 8
 src/test/verify-email.test.tsx | 6
 src/test/watch-button.test.tsx | 4

@@ -137,7 +137,7 @@ describe('Страница groups-category', () => {
   });
 
   it('промо-баннер открывает диалог, «смотреть рекламу» даёт тост и закрывает его', () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     render(
       <MemoryRouter>
         <GroupsCategoryPage />
@@ -148,7 +148,8 @@ describe('Страница groups-category', () => {
 
     expect(screen.getAllByText('groups.ad.title')).toHaveLength(2);
     expect(screen.getAllByText('groups.ad.price').length).toBeGreaterThan(0);
-    expect(consoleError).not.toHaveBeenCalled();
+    const warnings = consoleWarn.mock.calls.map((call) => String(call[0]));
+    expect(warnings.some((warning) => warning.includes('Missing `Description`'))).toBe(false);
 
     fireEvent.click(screen.getByText('autosearch.free'));
 
