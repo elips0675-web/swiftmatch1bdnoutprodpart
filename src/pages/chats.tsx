@@ -124,6 +124,7 @@ const CHAT_THEMES = [
 const ITEMS_PER_PAGE = 8;
 
 function Pagination({ current, total, onChange }: { current: number, total: number, onChange: (p: number) => void }) {
+  const { t } = useLanguage();
   if (total <= 1) return null;
 
   const pages = [];
@@ -139,6 +140,7 @@ function Pagination({ current, total, onChange }: { current: number, total: numb
         className="w-8 h-8 rounded-lg border-muted bg-white" 
         disabled={current === 1}
         onClick={() => onChange(current - 1)}
+        aria-label={t('chats.page_prev')}
       >
         <ChevronLeft size={14} />
       </Button>
@@ -164,6 +166,7 @@ function Pagination({ current, total, onChange }: { current: number, total: numb
         className="w-8 h-8 rounded-lg border-muted bg-white" 
         disabled={current === total}
         onClick={() => onChange(current + 1)}
+        aria-label={t('chats.page_next')}
       >
         <ChevronRight size={14} />
       </Button>
@@ -643,7 +646,7 @@ function ChatsContent() {
       <>
       <div className="flex flex-col bg-[#f8f9fb]" style={{ height: `calc(${viewportHeight}px - 4rem)` }}>
         <header className="flex items-center gap-2 px-3 py-2 border-b border-border bg-white/90 backdrop-blur-lg z-50 h-16 shrink-0">
-          <Button variant="ghost" size="icon" onClick={handleBack} className="rounded-full hover:bg-muted/50"><ChevronLeft size={24} /></Button>
+          <Button variant="ghost" size="icon" aria-label={t('common.back')} onClick={handleBack} className="rounded-full hover:bg-muted/50"><ChevronLeft size={24} /></Button>
           <div className="relative">
             <div className="w-10 h-10 rounded-full overflow-hidden relative border-2 border-white shadow-sm bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
               {selectedChat.img ? <Image src={selectedChat.img} alt={selectedChat.name || ''} fill sizes="40px" className="object-cover" />
@@ -658,13 +661,13 @@ function ChatsContent() {
             </p>
           </div>
           <div className="flex items-center">
-            {!selectedChat.isGroup && videoCallsEnabled && <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:bg-muted/50" onClick={() => setIsVideoCall(true)}><Video size={18} /></Button>}
-            {!selectedChat.isGroup && <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:bg-muted/50" onClick={() => setIsVoiceCall(true)}><Phone size={18} /></Button>}
-            {!selectedChat.isGroup && <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:bg-muted/50" onClick={() => setShowScheduleDialog(true)}><Calendar size={18} /></Button>}
-            <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:bg-muted/50" onClick={() => setShowTopicsDialog(true)}><Info size={18} /></Button>
+            {!selectedChat.isGroup && videoCallsEnabled && <Button variant="ghost" size="icon" aria-label={t('chats.video_call')} className="rounded-full text-muted-foreground hover:bg-muted/50" onClick={() => setIsVideoCall(true)}><Video size={18} /></Button>}
+            {!selectedChat.isGroup && <Button variant="ghost" size="icon" aria-label={t('chats.voice_call')} className="rounded-full text-muted-foreground hover:bg-muted/50" onClick={() => setIsVoiceCall(true)}><Phone size={18} /></Button>}
+            {!selectedChat.isGroup && <Button variant="ghost" size="icon" aria-label={t('schedule.propose_btn')} className="rounded-full text-muted-foreground hover:bg-muted/50" onClick={() => setShowScheduleDialog(true)}><Calendar size={18} /></Button>}
+            <Button variant="ghost" size="icon" aria-label={t('chats.ai_themes')} className="rounded-full text-muted-foreground hover:bg-muted/50" onClick={() => setShowTopicsDialog(true)}><Info size={18} /></Button>
             <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:bg-muted/50"><MoreVertical size={18} /></Button>
+                    <Button variant="ghost" size="icon" aria-label={t('chats.actions')} className="rounded-full text-muted-foreground hover:bg-muted/50"><MoreVertical size={18} /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="rounded-2xl border-0 app-shadow p-1.5 min-w-[160px] bg-white">
                     <DropdownMenuItem onSelect={() => { deleteConversation(selectedChat.id); handleBack(); }} className="rounded-xl font-bold text-[10px] uppercase tracking-wider cursor-pointer py-2 text-destructive focus:text-destructive focus:bg-destructive/10">
