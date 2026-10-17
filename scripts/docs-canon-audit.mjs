@@ -390,6 +390,14 @@ export const CLOSED_HEADING_RE = /(?:ЗАКРЫТО\s*\d{2}\.\d{2}\.\d{4}|✅)\s
 export const CLOSED_LINE_RE = /(?:✅|ЗАКРЫТО\s*\d{2}\.\d{2}\.\d{4})/
 export const RULES_SECTION_RE = /^##\s+Правила работы с журналами/
 
+/** Объём бэклога: сигнал, что в него снова пишут историю, а не открытые пункты. */
+export const BACKLOG_MAX_LINES = 1500
+export const BACKLOG_MAX_KB = 120
+/** Строка таблицы открытого/решаемого пункта: первая ячейка — стабильный ID `<ДОМЕН>-<номер>`. */
+export const BACKLOG_ID_ROW_RE = /^\|\s*[A-ZА-Я]+-\d+\s*\|/
+/** Дата проверки в колонке «Проверено». */
+export const BACKLOG_VERIFIED_DATE_RE = /\d{2}\.\d{2}\.\d{4}/
+
 export function tableIds(text) {
   const ids = []
   text.split(/\r?\n/).forEach((line) => {
@@ -478,6 +486,17 @@ export function collectBacklogFindings(todoText, doneText) {
       findings.push({ id: 'backlog-closure-unchronicled', file: TODO_JOURNAL, line: 1, text: `дата «ЗАКРЫТО ${date}» отсутствует в ${DONE_JOURNAL} — закрытие без хроники` })
     }
   }
+
+  const sizeKb = Buffer.byteLength(todoText, 'utf8') / 1024
+  if (lines.length > BACKLOG_MAX_LINES || sizeKb > BACKLOG_MAX_KB) {
+    findings.push({ id: 'backlog-max-lines', file: TODO_JOURNAL, line: 1, text: `файл раздулся до ${lines.length} строк / ${sizeKb.toFixed(1)} КБ (лимит ${BACKLOG_MAX_LINES} строк / ${BACKLOG_MAX_KB} КБ) — закрытые пункты выносите в ${DONE_JOURNAL} или ${AGENDA_ARCHIVE}` })
+  }
+
+  lines.forEach((line, i) => {
+    if (!BACKLOG_ID_ROW_RE.test(line)) return
+    if (BACKLOG_VERIFIED_DATE_RE.test(line)) return
+    findings.push({ id: 'backlog-item-verified', file: TODO_JOURNAL, line: i + 1, text: 'у пункта в таблице нет даты в колонке «Проверено» — пункт без даты проверки в бэклог не берётся' })
+  })
 
   return findings
 }

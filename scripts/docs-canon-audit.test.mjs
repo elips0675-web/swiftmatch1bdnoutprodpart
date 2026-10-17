@@ -60,6 +60,8 @@ import {
   getStepBlock,
   blockAllowsFailure,
   jobAllowsFailure,
+  BACKLOG_MAX_LINES,
+  BACKLOG_MAX_KB,
   audit,
 } from './docs-canon-audit.mjs'
 
@@ -544,6 +546,36 @@ describe('структурный гейт бэклога (Что доделат�
   it('открытая строка таблицы — не находка', () => {
     const text = '| # | Пункт |\n|---|---|\n| 32 | Покрытие ядра (дипсик #20) |\n'
     expect(collectBacklogFindings(text, '')).toEqual([])
+  })
+
+  it('бэклог сверх лимита объёма — находка `backlog-max-lines`', () => {
+    const bloated = Array.from({ length: BACKLOG_MAX_LINES + 1 }, (_, i) => `строка ${i}`).join('\n')
+    const finding = collectBacklogFindings(bloated, '').find(f => f.id === 'backlog-max-lines')
+    expect(finding).toBeTruthy()
+    expect(finding.text).toContain(String(BACKLOG_MAX_LINES))
+  })
+
+  it('бэклог в пределах лимита объёма — находки нет', () => {
+    const withinLimit = Array.from({ length: BACKLOG_MAX_LINES }, (_, i) => `строка ${i}`).join('\n')
+    expect(ids(collectBacklogFindings(withinLimit, ''))).not.toContain('backlog-max-lines')
+    expect(BACKLOG_MAX_KB).toBeGreaterThan(0)
+  })
+
+  it('строка-пункт с ID и датой в «Проверено» — тишина', () => {
+    const text = '## 4. Открытые задачи\n| ID | P | Что | Проверено |\n|---|---|---|---|\n| TEST-01 | P0 | живой E2E | 17.10.2026 |\n'
+    expect(collectBacklogFindings(text, '')).toEqual([])
+  })
+
+  it('строка-пункт с ID без даты — находка `backlog-item-verified`', () => {
+    const text = '| ID | P | Что | Проверено |\n|---|---|---|---|\n| TEST-01 | P0 | живой E2E | 17.10.2026 |\n| TEST-02 | P1 | backup-restore | — |\n'
+    const found = collectBacklogFindings(text, '').filter(f => f.id === 'backlog-item-verified')
+    expect(found).toHaveLength(1)
+    expect(found[0].line).toBe(4)
+  })
+
+  it('заголовок и разделитель таблицы не считаются пунктами без даты', () => {
+    const text = '| ID | P | Что | Проверено |\n|---|---|---|---|\n'
+    expect(ids(collectBacklogFindings(text, ''))).not.toContain('backlog-item-verified')
   })
 })
 

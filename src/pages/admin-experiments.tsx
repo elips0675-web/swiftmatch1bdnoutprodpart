@@ -34,7 +34,8 @@ export default function AdminExperimentsPage() {
       const token = getToken();
       const res = await fetch('/api/admin/experiments', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!res.ok) throw new Error('Failed to fetch');
-      setExperiments(await res.json());
+      const data = await res.json();
+      setExperiments(Array.isArray(data) ? data : []);
     } catch {
       toast.error(t('admin.experiments.load_error'));
     } finally {
@@ -47,11 +48,12 @@ export default function AdminExperimentsPage() {
   const toggleExperiment = async (exp: Experiment, enabled: boolean) => {
     try {
       const token = getToken();
-      await fetch(`/api/admin/experiments/${exp.id}`, {
+      const res = await fetch(`/api/admin/experiments/${exp.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ enabled }),
       });
+      if (!res.ok) throw new Error('Failed to toggle');
       setExperiments(prev => prev.map(e => e.id === exp.id ? { ...e, enabled: enabled ? 1 : 0 } : e));
       toast.success(enabled ? t('admin.experiments.enabled') : t('admin.experiments.disabled'));
     } catch {
@@ -62,10 +64,11 @@ export default function AdminExperimentsPage() {
   const deleteExperiment = async (exp: Experiment) => {
     try {
       const token = getToken();
-      await fetch(`/api/admin/experiments/${exp.id}`, {
+      const res = await fetch(`/api/admin/experiments/${exp.id}`, {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
+      if (!res.ok) throw new Error('Failed to delete');
       setExperiments(prev => prev.filter(e => e.id !== exp.id));
       toast.success(t('admin.experiments.deleted'));
     } catch {

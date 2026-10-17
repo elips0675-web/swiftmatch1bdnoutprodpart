@@ -48,8 +48,8 @@ export default function AdminMessagingPage() {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) throw new Error('Failed to fetch');
-      const data: Campaign[] = await res.json();
-      setCampaigns(data);
+      const data = await res.json();
+      setCampaigns(Array.isArray(data) ? data : []);
     } catch {
       setCampaigns([]);
     } finally {

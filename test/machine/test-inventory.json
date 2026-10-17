@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-17T06:16:13.280Z",
+  "generated": "2026-10-17T15:49:29.279Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 99,
-    "tests": 1100,
-    "passed": 1100,
+    "files": 102,
+    "tests": 1142,
+    "passed": 1142,
     "failed": 0,
     "gate": {
       "files": 26,
-      "tests": 621
+      "tests": 626
     },
     "product": {
-      "files": 73,
-      "tests": 479
+      "files": 76,
+      "tests": 516
     },
     "perFile": [
       {
@@ -54,7 +54,7 @@
       },
       {
         "file": "scripts/docs-canon-audit.test.mjs",
-        "tests": 84
+        "tests": 89
       },
       {
         "file": "scripts/e2e-cleanup.test.mjs",
@@ -141,6 +141,10 @@
         "tests": 12
       },
       {
+        "file": "src/test/admin-experiments.test.tsx",
+        "tests": 14
+      },
+      {
         "file": "src/test/admin-features.test.tsx",
         "tests": 2
       },
@@ -151,6 +155,14 @@
       {
         "file": "src/test/admin-health.test.tsx",
         "tests": 3
+      },
+      {
+        "file": "src/test/admin-messaging.test.tsx",
+        "tests": 11
+      },
+      {
+        "file": "src/test/admin-monetization.test.tsx",
+        "tests": 12
       },
       {
         "file": "src/test/admin-photos.test.tsx",
@@ -889,7 +901,7 @@
     ]
   },
   "total": {
-    "files": 188,
-    "tests": 2360
+    "files": 191,
+    "tests": 2402
   }
 }
