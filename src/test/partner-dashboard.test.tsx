@@ -119,7 +119,9 @@ type Scenario = {
   dash?: unknown;
   dashStatus?: number;
   offs?: unknown;
+  offsStatus?: number;
   convs?: unknown;
+  convsStatus?: number;
   onOfferWrite?: (method: string, body: unknown) => Response | Promise<Response>;
   onSubscribe?: () => Response | Promise<Response>;
 };
@@ -129,9 +131,9 @@ function mockServer(scenario: Scenario = {}) {
   mockFetch.mockImplementation((url: string, init?: RequestInit) => {
     const method = init?.method ?? 'GET';
     if (url === '/api/partner/dashboard') return jsonResponse(scenario.dash ?? dashboard, scenario.dashStatus ?? 200);
-    if (url === '/api/partner/conversions') return jsonResponse(scenario.convs ?? conversions);
+    if (url === '/api/partner/conversions') return jsonResponse(scenario.convs ?? conversions, scenario.convsStatus ?? 200);
     if (url === '/api/partner/offers') {
-      if (method === 'GET') return jsonResponse(state.offers);
+      if (method === 'GET') return jsonResponse(state.offers, scenario.offsStatus ?? 200);
       const body = init?.body ? JSON.parse(String(init.body)) : {};
       if (scenario.onOfferWrite) return scenario.onOfferWrite(method, body);
       state.offers = [...(state.offers as typeof offers), { ...offers[0], id: 99, ...body, clicks: 0, status: 'active' }];
@@ -188,6 +190,13 @@ describe('Страница partner-dashboard', () => {
     expect(screen.getByText('partner.stat_commission')).toBeInTheDocument();
   });
 
+  it('тип партнёра в шапке переводится ключом partner.type_*, а не сырым кодом', async () => {
+    mockServer();
+    await renderLoaded();
+
+    expect(screen.getByText('partner.type_deeplink')).toBeInTheDocument();
+  });
+
   it('три запроса уходят с Bearer-токеном', async () => {
     mockServer();
     await renderLoaded();
@@ -235,6 +244,36 @@ describe('Страница partner-dashboard', () => {
 
     await openTab('partner.tab_conversions');
     expect(screen.getByText('partner.conversion_empty')).toBeInTheDocument();
+  });
+
+  it('список офферов не загрузился (500) — ошибка с кнопкой повтора, а не «нет офферов»', async () => {
+    let fail = true;
+    mockFetch.mockImplementation((url: string) => {
+      if (url === '/api/partner/dashboard') return jsonResponse(dashboard);
+      if (url === '/api/partner/conversions') return jsonResponse(conversions);
+      if (url === '/api/partner/offers') return fail ? jsonResponse({ message: 'boom' }, 500) : jsonResponse(offers);
+      return jsonResponse({});
+    });
+    await renderLoaded();
+
+    await openTab('partner.tab_offers');
+    expect(screen.getByText('partner.offers_load_error')).toBeInTheDocument();
+    expect(screen.queryByText('partner.offer_empty')).toBeNull();
+
+    fail = false;
+    await userEvent.click(screen.getByText('partner.retry'));
+
+    expect(await screen.findByText('Билеты со скидкой')).toBeInTheDocument();
+    expect(screen.queryByText('partner.offers_load_error')).toBeNull();
+  });
+
+  it('список конверсий не загрузился (500) — ошибка, а не «нет конверсий»', async () => {
+    mockServer({ convsStatus: 500 });
+    await renderLoaded();
+
+    await openTab('partner.tab_conversions');
+    expect(screen.getByText('partner.conversions_load_error')).toBeInTheDocument();
+    expect(screen.queryByText('partner.conversion_empty')).toBeNull();
   });
 
   it('список офферов: категория, клики, цена, город и бейдж паузы', async () => {
@@ -353,6 +392,25 @@ describe('Страница partner-dashboard', () => {
     expect(put?.[0]).toBe('/api/partner/offers/11');
     expect(JSON.parse(String(put?.[1].body))).toEqual({ status: 'paused' });
     await waitFor(() => expect(screen.getAllByText('partner.status_paused')).toHaveLength(2));
+  });
+
+  it('пауза оффера: отказ сервера — тост и бейдж не переключается', async () => {
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === '/api/partner/dashboard') return jsonResponse(dashboard);
+      if (url === '/api/partner/conversions') return jsonResponse(conversions);
+      if (url === '/api/partner/offers') return jsonResponse(offers);
+      if (url.startsWith('/api/partner/offers/') && init?.method === 'PUT') return jsonResponse({ message: 'boom' }, 500);
+      return jsonResponse({});
+    });
+    await renderLoaded();
+
+    await openTab('partner.tab_offers');
+    expect(screen.getAllByText('partner.status_paused')).toHaveLength(1);
+
+    await userEvent.click(screen.getByTestId('toggle-offer-11'));
+
+    await waitFor(() => expect(h.toastError).toHaveBeenCalledWith('partner.offer_pause_error'));
+    expect(screen.getAllByText('partner.status_paused')).toHaveLength(1);
   });
 
   it('конверсии: название оффера, заглушка неизвестного оффера и комиссия', async () => {

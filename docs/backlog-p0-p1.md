@@ -24,9 +24,6 @@
 - **DOC-02** Шапка `Что доделать.txt` — перегружена хроникой закрытых этапов 45/46 (лимитеры чата/AI, алерты, пагинация, аудит фото, RevenueCat E2E, trust proxy, GDPR-ZIP, weekly report, P3 #26/#27/#28/#29, M5/M6, L2 и др.). Протухшие утверждения: «Redis-сервер не поднят» vs `redis: live` в `/health`; «E2E 205/205» — статический счёт смешан с живым; блок CI «ждёт прогона» рядом с «гейты 28/28».
 
 ## P1. Детали по багам «UI не врёт»
-- **PART-01** `src/pages/partner-dashboard.tsx:106-115` (`toggleOfferStatus`) — не проверяет `res.ok`, статус переключается до ответа; на 500/403 UI показывает `partner.status_paused`, сервер остаётся активным. Требуется ключ ошибки (ближайшие `partner.offer_delete_error`, `partner.subscribe_error`) — выбор владельца.
-- **PART-02** `src/pages/partner-dashboard.tsx:157` — выводит `data.partner.type` сырым кодом; переводы есть (`partner.type_deeplink`, `partner.type_api`, `partner.type_saas`).
-- **PART-03** `src/pages/partner-dashboard.tsx:51-56,68` — на не-2xx `api()` возвращает `null`, вызывающий код не обновляет список → 500 маскируется под «офферов нет».
 - **ADM-01** `src/pages/admin-photos.tsx:53-56` — тост только в `if (res.ok)`, при 403/500/сети админ не видит ошибку.
 - **ADM-02** `src/pages/admin-photos.tsx:51` — причина отклонения `"Inappropriate content"` жёстко в коде, не локализуема, не выбирается модератором.
 - **ADM-03** `src/pages/admin-analytics.tsx:70-72,80-83,103,130` — ~10 сырых литералов без `t()` (MAU, Conversion, ARPU, Live, Real data from database, Аналитика и Метрики, Retention Rate, `% вернувшихся`, Новые пользователи).

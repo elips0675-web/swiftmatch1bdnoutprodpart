@@ -35,6 +35,8 @@ interface PartnerConversion {
 
 type PartnerTab = 'dashboard' | 'offers' | 'conversions' | 'subscription'
 
+type ApiResult<T> = { ok: true; data: T } | { ok: false }
+
 function formatPrice(p: number) { return p.toLocaleString('ru-RU') + ' ₽' }
 
 export default function PartnerDashboard() {
@@ -46,32 +48,34 @@ export default function PartnerDashboard() {
   const [offers, setOffers] = useState<PartnerOffer[]>([])
   const [conversions, setConversions] = useState<PartnerConversion[]>([])
   const [showCreateOffer, setShowCreateOffer] = useState(false)
+  const [offersError, setOffersError] = useState(false)
+  const [conversionsError, setConversionsError] = useState(false)
   const [newOffer, setNewOffer] = useState({ category: 'cinema', title: '', description: '', deeplink: '', price: '', city: '', placement: 'chat' })
 
-  const api = useCallback(async <T,>(url: string): Promise<T | null> => {
+  const api = useCallback(async <T,>(url: string): Promise<ApiResult<T>> => {
     const token = getToken()
     const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-    if (!res.ok) return null
-    return res.json()
+    if (!res.ok) return { ok: false }
+    return { ok: true, data: (await res.json()) as T }
   }, [])
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [dash, offs, convs] = await Promise.all([
-          api<PartnerDashboardData>('/api/partner/dashboard'),
-          api<PartnerOffer[]>('/api/partner/offers'),
-          api<PartnerConversion[]>('/api/partner/conversions'),
-        ])
-        if (!dash) { router.replace('/'); return }
-        setData(dash)
-        if (offs) setOffers(offs)
-        if (convs) setConversions(convs)
-      } catch { router.replace('/') }
-      finally { setLoading(false) }
-    }
-    load()
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [dash, offs, convs] = await Promise.all([
+        api<PartnerDashboardData>('/api/partner/dashboard'),
+        api<PartnerOffer[]>('/api/partner/offers'),
+        api<PartnerConversion[]>('/api/partner/conversions'),
+      ])
+      if (!dash.ok) { router.replace('/'); return }
+      setData(dash.data)
+      if (offs.ok) { setOffers(Array.isArray(offs.data) ? offs.data : []); setOffersError(false) } else { setOffersError(true) }
+      if (convs.ok) { setConversions(Array.isArray(convs.data) ? convs.data : []); setConversionsError(false) } else { setConversionsError(true) }
+    } catch { router.replace('/') }
+    finally { setLoading(false) }
   }, [api, router])
+
+  useEffect(() => { load() }, [load])
 
   const createOffer = async () => {
     if (!newOffer.title.trim() || !newOffer.deeplink.trim()) { toast.error(t('partner.offer_required_fields')); return }
@@ -90,7 +94,7 @@ export default function PartnerDashboard() {
     setShowCreateOffer(false)
     setNewOffer({ category: 'cinema', title: '', description: '', deeplink: '', price: '', city: '', placement: 'chat' })
     const offs = await api<PartnerOffer[]>('/api/partner/offers')
-    if (offs) setOffers(offs)
+    if (offs.ok) { setOffers(Array.isArray(offs.data) ? offs.data : []); setOffersError(false) }
   }
 
   const deleteOffer = async (id: number) => {
@@ -106,11 +110,16 @@ export default function PartnerDashboard() {
   const toggleOfferStatus = async (offer: PartnerOffer) => {
     const token = getToken()
     const newStatus = offer.status === 'active' ? 'paused' : 'active'
-    await fetch(`/api/partner/offers/${offer.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ status: newStatus }),
-    })
+    try {
+      const res = await fetch(`/api/partner/offers/${offer.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      if (!res.ok) { toast.error(t('partner.offer_pause_error')); return }
+    } catch {
+      toast.error(t('partner.offer_pause_error')); return
+    }
     setOffers((prev) => prev.map((o) => o.id === offer.id ? { ...o, status: newStatus } : o))
   }
 
@@ -154,7 +163,7 @@ export default function PartnerDashboard() {
           <div>
             <h1 className="text-2xl font-black font-headline">{data.partner.name}</h1>
             <div className="text-xs text-muted-foreground flex items-center gap-2">
-              <Badge variant="secondary" className="text-[10px]">{data.partner.type}</Badge>
+              <Badge variant="secondary" className="text-[10px]">{t(`partner.type_${data.partner.type}`)}</Badge>
               {data.subscription?.tier === 'pro' && <Badge className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-300"><Star size={9} className="mr-0.5" fill="currentColor" />Pro</Badge>}
             </div>
           </div>
@@ -223,7 +232,14 @@ export default function PartnerDashboard() {
                 </CardContent>
               </Card>
             )}
-            {offers.length === 0 ? (
+            {offersError ? (
+              <Card>
+                <CardContent className="p-8 text-center space-y-3">
+                  <p className="text-sm text-muted-foreground">{t('partner.offers_load_error')}</p>
+                  <Button size="sm" variant="outline" onClick={() => load()}>{t('partner.retry')}</Button>
+                </CardContent>
+              </Card>
+            ) : offers.length === 0 ? (
               <Card><CardContent className="p-8 text-center text-muted-foreground text-sm">{t('partner.offer_empty')}</CardContent></Card>
             ) : (
               <div className="space-y-2">
@@ -261,7 +277,14 @@ export default function PartnerDashboard() {
           {/* Conversions */}
           <TabsContent value="conversions">
             <h2 className="text-lg font-black font-headline mb-4">{t('partner.tab_conversions')}</h2>
-            {conversions.length === 0 ? (
+            {conversionsError ? (
+              <Card>
+                <CardContent className="p-8 text-center space-y-3">
+                  <p className="text-sm text-muted-foreground">{t('partner.conversions_load_error')}</p>
+                  <Button size="sm" variant="outline" onClick={() => load()}>{t('partner.retry')}</Button>
+                </CardContent>
+              </Card>
+            ) : conversions.length === 0 ? (
               <Card><CardContent className="p-8 text-center text-muted-foreground text-sm">{t('partner.conversion_empty')}</CardContent></Card>
             ) : (
               <div className="space-y-2">
