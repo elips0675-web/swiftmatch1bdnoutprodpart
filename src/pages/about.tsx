@@ -14,25 +14,25 @@ export default function AboutPage() {
       title: t('about.frontend.title'),
       desc: t('about.frontend.desc'),
       icon: <Layout className="text-blue-500" />,
-      tags: ['Next.js 15', 'React 19', 'Tailwind']
+      tags: ['React 18', 'Vite', 'Tailwind']
     },
     {
       title: t('about.backend.title'),
       desc: t('about.backend.desc'),
       icon: <Database className="text-orange-500" />,
-      tags: ['Firebase Auth', 'Firestore']
+      tags: ['Express', 'MySQL 8', 'Socket.io']
     },
     {
       title: t('about.ai.title'),
       desc: t('about.ai.desc'),
       icon: <Sparkles className="text-purple-500" />,
-      tags: ['Genkit', 'Gemini 2.5']
+      tags: ['OpenAI']
     },
     {
       title: t('about.performance.title'),
       desc: t('about.performance.desc'),
       icon: <Zap className="text-amber-500" />,
-      tags: ['RSC', 'LCP Optimization']
+      tags: ['Lazy loading', 'Code-splitting']
     }
   ];
 
@@ -99,7 +99,7 @@ export default function AboutPage() {
           </div>
           <h4 className="font-black text-lg tracking-tight">Mobile First MVP</h4>
           <p className="text-xs text-muted-foreground leading-relaxed font-medium">
-            Проект полностью оптимизирован для работы в браузере мобильного устройства, обеспечивая нативный пользовательский опыт без необходимости установки приложения.
+            {t('about.mobile.desc')}
           </p>
           <div className="flex justify-center gap-4 pt-2">
             <div className="flex items-center gap-1 text-[10px] font-black text-primary uppercase">

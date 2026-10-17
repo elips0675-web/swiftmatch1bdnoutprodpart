@@ -609,6 +609,7 @@ export const translations = {
     'about.ai.desc': 'Используется для анализа совместимости, генерации био и фраз для начала разговора.',
     'about.performance.title': 'Производительность',
     'about.performance.desc': 'Оптимизация изображений (WebP/AVIF), ленивая загрузка и code-splitting для быстрой загрузки на мобильных.',
+    'about.mobile.desc': 'Проект полностью оптимизирован для работы в браузере мобильного устройства, обеспечивая нативный пользовательский опыт без необходимости установки приложения.',
     // Admin
     'admin.dashboard': 'Дашборд',
     'admin.users': 'Пользователи',
@@ -2548,6 +2549,7 @@ export const translations = {
     'about.ai.desc': 'Used for compatibility analysis, bio generation and icebreaker suggestions.',
     'about.performance.title': 'Performance',
     'about.performance.desc': 'Image optimization (WebP/AVIF), lazy loading and code-splitting for fast loading on mobile.',
+    'about.mobile.desc': 'The project is fully optimized for mobile browsers, delivering a native-like experience without installing an app.',
     // Admin
     'admin.dashboard': 'Dashboard',
     'admin.users': 'Users',

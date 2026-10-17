@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-17T04:41:08.201Z",
+  "generated": "2026-10-17T05:06:15.649Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 80,
-    "tests": 948,
-    "passed": 948,
+    "files": 85,
+    "tests": 983,
+    "passed": 983,
     "failed": 0,
     "gate": {
       "files": 26,
       "tests": 621
     },
     "product": {
-      "files": 54,
-      "tests": 327
+      "files": 59,
+      "tests": 362
     },
     "perFile": [
       {
@@ -125,6 +125,10 @@
         "tests": 3
       },
       {
+        "file": "src/test/about.test.tsx",
+        "tests": 5
+      },
+      {
         "file": "src/test/activity-list.test.tsx",
         "tests": 3
       },
@@ -199,6 +203,10 @@
       {
         "file": "src/test/flower-order-dialog.test.tsx",
         "tests": 4
+      },
+      {
+        "file": "src/test/forgot-password.test.tsx",
+        "tests": 5
       },
       {
         "file": "src/test/hangout-create.test.tsx",
@@ -277,6 +285,10 @@
         "tests": 9
       },
       {
+        "file": "src/test/reset-password.test.tsx",
+        "tests": 7
+      },
+      {
         "file": "src/test/restaurant-booking-dialog.test.tsx",
         "tests": 3
       },
@@ -305,6 +317,10 @@
         "tests": 4
       },
       {
+        "file": "src/test/settings.test.tsx",
+        "tests": 12
+      },
+      {
         "file": "src/test/support-chat.test.tsx",
         "tests": 7
       },
@@ -315,6 +331,10 @@
       {
         "file": "src/test/unsubscribe-page.test.tsx",
         "tests": 5
+      },
+      {
+        "file": "src/test/unsubscribe.test.tsx",
+        "tests": 6
       },
       {
         "file": "src/test/use-premium.test.ts",
@@ -813,7 +833,7 @@
     ]
   },
   "total": {
-    "files": 169,
-    "tests": 2208
+    "files": 174,
+    "tests": 2243
   }
 }
