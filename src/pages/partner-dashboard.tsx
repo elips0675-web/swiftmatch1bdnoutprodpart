@@ -153,10 +153,10 @@ export default function PartnerDashboard() {
           </div>
           <div>
             <h1 className="text-2xl font-black font-headline">{data.partner.name}</h1>
-            <p className="text-xs text-muted-foreground flex items-center gap-2">
+            <div className="text-xs text-muted-foreground flex items-center gap-2">
               <Badge variant="secondary" className="text-[10px]">{data.partner.type}</Badge>
               {data.subscription?.tier === 'pro' && <Badge className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-300"><Star size={9} className="mr-0.5" fill="currentColor" />Pro</Badge>}
-            </p>
+            </div>
           </div>
         </div>
 
@@ -244,10 +244,10 @@ export default function PartnerDashboard() {
                         </div>
                       </div>
                       <div className="flex gap-1 shrink-0">
-                        <Button variant="ghost" size="sm" onClick={() => toggleOfferStatus(o)}>
+                        <Button variant="ghost" size="sm" data-testid={`toggle-offer-${o.id}`} onClick={() => toggleOfferStatus(o)}>
                           {o.status === 'active' ? <Pause size={14} /> : <Play size={14} />}
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => deleteOffer(o.id)}>
+                        <Button variant="ghost" size="sm" data-testid={`delete-offer-${o.id}`} onClick={() => deleteOffer(o.id)}>
                           <Trash2 size={14} className="text-destructive" />
                         </Button>
                       </div>
