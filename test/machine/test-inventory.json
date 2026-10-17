@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-17T05:58:02.248Z",
+  "generated": "2026-10-17T06:16:13.280Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 96,
-    "tests": 1072,
-    "passed": 1072,
+    "files": 99,
+    "tests": 1100,
+    "passed": 1100,
     "failed": 0,
     "gate": {
       "files": 26,
       "tests": 621
     },
     "product": {
-      "files": 70,
-      "tests": 451
+      "files": 73,
+      "tests": 479
     },
     "perFile": [
       {
@@ -133,6 +133,14 @@
         "tests": 3
       },
       {
+        "file": "src/test/admin-analytics.test.tsx",
+        "tests": 7
+      },
+      {
+        "file": "src/test/admin-backup.test.tsx",
+        "tests": 12
+      },
+      {
         "file": "src/test/admin-features.test.tsx",
         "tests": 2
       },
@@ -143,6 +151,10 @@
       {
         "file": "src/test/admin-health.test.tsx",
         "tests": 3
+      },
+      {
+        "file": "src/test/admin-photos.test.tsx",
+        "tests": 9
       },
       {
         "file": "src/test/admin-queues.test.tsx",
@@ -877,7 +889,7 @@
     ]
   },
   "total": {
-    "files": 185,
-    "tests": 2332
+    "files": 188,
+    "tests": 2360
   }
 }

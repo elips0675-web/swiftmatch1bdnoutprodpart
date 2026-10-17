@@ -32,7 +32,10 @@ export default function AdminPhotosPage() {
       const res = await fetch(endpoint, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      if (res.ok) setPhotos(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setPhotos(Array.isArray(data) ? data : []);
+      }
     } catch { /* ignore network errors */ } finally { setLoading(false) }
   }, [filter]);
 

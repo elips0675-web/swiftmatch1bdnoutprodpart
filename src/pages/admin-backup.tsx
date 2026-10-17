@@ -33,7 +33,8 @@ export default function AdminBackupPage() {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) throw new Error('Failed to fetch');
-      setBackups(await res.json());
+      const data = await res.json();
+      setBackups(Array.isArray(data) ? data : []);
     } catch {
       toast.error(t('admin.backup.error_list'));
     } finally {
