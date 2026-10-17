@@ -39,7 +39,7 @@
 ## Слепые зоны тестов (для контекста)
 - Backup/restore smoke в CI (TEST-02) — `scripts/verify-backup.mjs` подключён шагом, прогона «restore → smoke» нет.
 - Интеграционный прогон против docker-compose (TEST-03) — MySQL+Redis+maildev (SMTP-флоу в моках).
-- Пороги coverage заведены 17.10.2026 (COV-01 — `npm run test:coverage`, буфер −2 п.п.); покрытие ядра (COV-02) — отдельная работа.
+- Пороги coverage заведены 17.10.2026 (COV-01 — `npm run test:coverage`, буфер −2 п.п.); покрытие ядра (COV-02) — отдельная работа. **Часть 1, 17.10.2026:** `auth-context.tsx` 54.6 → 92.7 %, `_chats-chatId-adapter.tsx` 0 → 100 % (тесты только, код не менялся); остаются `chats.tsx` (0 %), `hangout-detail.tsx` (49.8 %), `use-premium.ts` (86 %).
 - a11y-смоук заведён 17.10.2026 (A11Y-01 — `src/test/a11y-smoke.test.tsx`: 8 страниц через `axe-core`); cross-browser — принятое ограничение (XB-01, `CROSS_BROWSER=1`).
 - Native/WebView E2E (Capacitor) — заблокирован устройством/Android Studio.
 
