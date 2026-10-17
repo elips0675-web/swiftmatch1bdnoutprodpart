@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check, X, Loader2, Image, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/context/language-context';
@@ -23,6 +24,7 @@ export default function AdminPhotosPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<Record<number, boolean>>({});
   const [filter, setFilter] = useState<'all' | 'pending'>('all');
+  const [rejectReason, setRejectReason] = useState('admin.photos.reason.inappropriate');
 
   const fetchPhotos = useCallback(async () => {
     setLoading(true);
@@ -48,13 +50,15 @@ export default function AdminPhotosPage() {
       const res = await fetch(`/api/admin/photos/${id}/${action}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: action === 'reject' ? JSON.stringify({ reason: 'Inappropriate content' }) : undefined,
+        body: action === 'reject' ? JSON.stringify({ reason: rejectReason }) : undefined,
       });
       if (res.ok) {
         setPhotos(prev => prev.filter(p => p.id !== id));
         toast.success(action === 'approve' ? t('admin.photos.approved') : t('admin.photos.rejected'));
+      } else {
+        toast.error(t('admin.photos.error'));
       }
-    } catch { /* ignore network errors */ } finally { setSaving(prev => ({ ...prev, [id]: false })) }
+    } catch { toast.error(t('admin.photos.error')); } finally { setSaving(prev => ({ ...prev, [id]: false })) }
   };
 
   return (
@@ -106,15 +110,28 @@ export default function AdminPhotosPage() {
                   <Badge variant="outline" className="text-muted-foreground shrink-0">#{photo.user_id}</Badge>
                 </div>
                 {filter !== 'all' && (
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={() => handleAction(photo.id, 'approve')} disabled={saving[photo.id]} className="flex-1 rounded-full">
-                      {saving[photo.id] ? <Loader2 className="animate-spin" size={14} /> : <Check size={14} />}
-                      {' '}{t('admin.photos.approve')}
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleAction(photo.id, 'reject')} disabled={saving[photo.id]} className="flex-1 rounded-full">
-                      {saving[photo.id] ? <Loader2 className="animate-spin" size={14} /> : <X size={14} />}
-                      {' '}{t('admin.photos.reject')}
-                    </Button>
+                  <div className="flex flex-col gap-2">
+                    <Select value={rejectReason} onValueChange={setRejectReason}>
+                      <SelectTrigger className="h-8 text-xs" data-testid="reject-reason" aria-label={t('admin.photos.reason_label')}>
+                        <SelectValue placeholder={t('admin.photos.reason_label')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin.photos.reason.inappropriate">{t('admin.photos.reason.inappropriate')}</SelectItem>
+                        <SelectItem value="admin.photos.reason.spam">{t('admin.photos.reason.spam')}</SelectItem>
+                        <SelectItem value="admin.photos.reason.offensive">{t('admin.photos.reason.offensive')}</SelectItem>
+                        <SelectItem value="admin.photos.reason.other">{t('admin.photos.reason.other')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => handleAction(photo.id, 'approve')} disabled={saving[photo.id]} className="flex-1 rounded-full">
+                        {saving[photo.id] ? <Loader2 className="animate-spin" size={14} /> : <Check size={14} />}
+                        {' '}{t('admin.photos.approve')}
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => handleAction(photo.id, 'reject')} disabled={saving[photo.id]} className="flex-1 rounded-full">
+                        {saving[photo.id] ? <Loader2 className="animate-spin" size={14} /> : <X size={14} />}
+                        {' '}{t('admin.photos.reject')}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>

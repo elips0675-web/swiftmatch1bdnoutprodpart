@@ -11,6 +11,10 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@/lib/token', () => ({ getToken: () => h.token }));
 
+vi.mock('@/context/language-context', () => ({
+  useLanguage: () => ({ t: (key: string) => key, language: 'RU', setLanguage: () => {} }),
+}));
+
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children?: React.ReactNode }) => <div data-testid="responsive">{children}</div>,
   AreaChart: ({ data }: { data?: unknown }) => <div data-testid="area-chart" data-points={JSON.stringify(data)} />,
@@ -80,9 +84,9 @@ describe('Страница admin-analytics', () => {
     }
     expect(screen.getByText('3.4%')).toBeInTheDocument();
     expect(screen.getByText('890 ₽')).toBeInTheDocument();
-    expect(screen.getByText('MAU')).toBeInTheDocument();
-    expect(screen.getByText('Conversion')).toBeInTheDocument();
-    expect(screen.getByText('ARPU')).toBeInTheDocument();
+    expect(screen.getByText('admin.analytics.mau')).toBeInTheDocument();
+    expect(screen.getByText('admin.analytics.conversion')).toBeInTheDocument();
+    expect(screen.getByText('admin.analytics.arpu')).toBeInTheDocument();
   });
 
   it('без токена запросы уходят без Authorization', async () => {
@@ -104,7 +108,7 @@ describe('Страница admin-analytics', () => {
 
     render(<AdminAnalyticsPage />);
 
-    await screen.findByText('Аналитика и Метрики');
+    await screen.findByText('admin.analytics.title');
     expect(screen.queryByText('12 480')).toBeNull();
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3);
   });
@@ -114,8 +118,8 @@ describe('Страница admin-analytics', () => {
 
     render(<AdminAnalyticsPage />);
 
-    await screen.findByText('Аналитика и Метрики');
-    expect(screen.getByText('MAU')).toBeInTheDocument();
+    await screen.findByText('admin.analytics.title');
+    expect(screen.getByText('admin.analytics.mau')).toBeInTheDocument();
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3);
   });
 
@@ -147,10 +151,10 @@ describe('Страница admin-analytics', () => {
     render(<AdminAnalyticsPage />);
     await screen.findByText('12 480');
 
-    expect(screen.getByText('Technical Health')).toBeInTheDocument();
-    expect(screen.getByText('API Status')).toBeInTheDocument();
-    expect(screen.getByText('Connected')).toBeInTheDocument();
-    expect(screen.getByText('Live DB')).toBeInTheDocument();
+    expect(screen.getByText('admin.analytics.technical_health')).toBeInTheDocument();
+    expect(screen.getByText('admin.analytics.api_status')).toBeInTheDocument();
+    expect(screen.getByText('admin.analytics.connected')).toBeInTheDocument();
+    expect(screen.getByText('admin.analytics.live_db')).toBeInTheDocument();
     expect(mockFetch.mock.calls.every((call) => String(call[0]).includes('/api/admin/analytics/'))).toBe(true);
   });
 });

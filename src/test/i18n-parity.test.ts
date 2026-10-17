@@ -15,6 +15,9 @@ const SKIP_DIRS = new Set(["node_modules", "dist", "test", "__tests__", ".git"])
 const CYRILLIC = /[Ѐ-ӿ]/
 
 const LATIN_ONLY_OK = [
+  "admin.analytics.arpu",
+  "admin.analytics.live",
+  "admin.analytics.mau",
   "admin.users.email",
   "admin.users.duplicates.email",
   "admin.webhooks.provider.revenuecat",

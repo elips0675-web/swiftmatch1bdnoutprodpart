@@ -26,6 +26,22 @@ vi.mock('@/context/language-context', () => {
   return { useLanguage: () => ({ t, language: 'RU', setLanguage: () => {} }) };
 });
 
+vi.mock('@/components/ui/select', () => ({
+  Select: ({ value, onValueChange, children }: { value: string; onValueChange?: (value: string) => void; children?: React.ReactNode }) => (
+    <select data-testid="reject-reason" value={value} onChange={(event) => onValueChange?.(event.target.value)}>
+      {children}
+    </select>
+  ),
+  SelectTrigger: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+  SelectValue: ({ placeholder }: { placeholder?: string }) => (
+    <option value="" disabled>
+      {placeholder}
+    </option>
+  ),
+  SelectContent: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+  SelectItem: ({ value, children }: { value: string; children?: React.ReactNode }) => <option value={value}>{children}</option>,
+}));
+
 import AdminPhotosPage from '@/pages/admin-photos';
 
 const photo = {
@@ -144,10 +160,26 @@ describe('Страница admin-photos', () => {
     const reject = mockFetch.mock.calls.find((call) => String(call[0]).endsWith('/reject'));
     expect(reject?.[0]).toBe('/api/admin/photos/7/reject');
     expect(reject?.[1].method).toBe('POST');
-    expect(JSON.parse(String(reject?.[1].body))).toEqual({ reason: 'Inappropriate content' });
+    expect(JSON.parse(String(reject?.[1].body))).toEqual({ reason: 'admin.photos.reason.inappropriate' });
   });
 
-  it('отказ модерации (500): фото остаётся, тоста нет (молчаливый отказ)', async () => {
+  it('отклонение: причина выбирается модератором и уходит на сервер', async () => {
+    mockFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'POST' ? jsonResponse({ ok: true }) : jsonResponse([photo]),
+    );
+    await renderLoaded();
+    await userEvent.click(screen.getByText('admin.photos.pending'));
+    await screen.findByText('Аня');
+
+    await userEvent.selectOptions(screen.getByTestId('reject-reason'), 'admin.photos.reason.spam');
+    await userEvent.click(screen.getByText('admin.photos.reject'));
+
+    await waitFor(() => expect(h.toastSuccess).toHaveBeenCalledWith('admin.photos.rejected'));
+    const reject = mockFetch.mock.calls.find((call) => String(call[0]).endsWith('/reject'));
+    expect(JSON.parse(String(reject?.[1].body))).toEqual({ reason: 'admin.photos.reason.spam' });
+  });
+
+  it('отказ модерации (500): фото остаётся, показывается тост ошибки', async () => {
     mockFetch.mockImplementation((url: string) =>
       url === '/api/admin/photos/pending' ? jsonResponse([photo]) : jsonResponse({ message: 'boom' }, 500),
     );
@@ -157,9 +189,8 @@ describe('Страница admin-photos', () => {
 
     await userEvent.click(screen.getByText('admin.photos.approve'));
 
-    await waitFor(() => expect(mockFetch.mock.calls.some((call) => String(call[0]).endsWith('/approve'))).toBe(true));
+    await waitFor(() => expect(h.toastError).toHaveBeenCalledWith('admin.photos.error'));
     expect(h.toastSuccess).not.toHaveBeenCalled();
-    expect(h.toastError).not.toHaveBeenCalled();
     expect(screen.getByText('Аня')).toBeInTheDocument();
   });
 

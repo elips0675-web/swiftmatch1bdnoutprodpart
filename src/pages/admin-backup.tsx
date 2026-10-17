@@ -13,8 +13,13 @@ interface BackupItem {
   createdAt: string;
 }
 
-function formatSize(bytes: number): string {
-  return (bytes / (1024 * 1024)).toFixed(2);
+function formatSize(bytes: number, t: (key: string) => string): string {
+  const kb = 1024;
+  const mb = kb * 1024;
+  const gb = mb * 1024;
+  if (bytes >= gb) return `${(bytes / gb).toFixed(2)} ${t('admin.backup.unit_gb')}`;
+  if (bytes >= mb) return `${(bytes / mb).toFixed(2)} ${t('admin.backup.unit_mb')}`;
+  return `${(bytes / kb).toFixed(2)} ${t('admin.backup.unit_kb')}`;
 }
 
 export default function AdminBackupPage() {
@@ -56,7 +61,9 @@ export default function AdminBackupPage() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        throw new Error(body?.message || 'Failed');
+        const key = body?.message === 'BACKUP_MYSQLDUMP_NOT_AVAILABLE' ? 'admin.backup.error_mysqldump' : 'admin.backup.error_create';
+        toast.error(t(key));
+        return;
       }
       toast.success(t('admin.backup.create_success'));
       await load();
@@ -152,7 +159,7 @@ export default function AdminBackupPage() {
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{new Date(b.createdAt).toLocaleString()}</span>
                     <Badge variant="secondary" className="text-[9px]">{b.name.endsWith('.zip') ? t('admin.backup.file_label') : t('admin.backup.db_label')}</Badge>
-                    <Badge variant="outline" className="text-[9px]">{formatSize(b.size)} MB</Badge>
+                    <Badge variant="outline" className="text-[9px]">{formatSize(b.size, t)}</Badge>
                   </div>
                 </div>
                 <Button data-testid={`download-${b.name}`} variant="outline" size="sm" className="rounded-full"

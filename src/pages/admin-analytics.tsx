@@ -4,6 +4,7 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tool
 import { TrendingUp, Users, DollarSign, ArrowUpRight, Zap, ShieldCheck, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getToken } from '@/lib/token';
+import { useLanguage } from '@/context/language-context';
 
 interface Overview {
   mau: string;
@@ -28,6 +29,7 @@ interface RegistrationItem {
 }
 
 export default function AdminAnalyticsPage() {
+  const { t } = useLanguage();
   const [overview, setOverview] = useState<Overview | null>(null);
   const [retention, setRetention] = useState<RetentionItem[]>([]);
   const [revenueMix, setRevenueMix] = useState<RevenueMixItem[]>([]);
@@ -67,9 +69,9 @@ export default function AdminAnalyticsPage() {
   }
 
   const stats = [
-    { title: 'MAU', value: overview?.mau ?? '—', sub: '', icon: Users, color: 'text-blue-500', border: 'border-blue-500' },
-    { title: 'Conversion', value: overview?.conversionRate ?? '—', sub: '', icon: Zap, color: 'text-primary', border: 'border-primary' },
-    { title: 'ARPU', value: overview?.arpu ?? '—', sub: '', icon: DollarSign, color: 'text-amber-500', border: 'border-amber-500' },
+    { title: t('admin.analytics.mau'), value: overview?.mau ?? '—', sub: '', icon: Users, color: 'text-blue-500', border: 'border-blue-500' },
+    { title: t('admin.analytics.conversion'), value: overview?.conversionRate ?? '—', sub: '', icon: Zap, color: 'text-primary', border: 'border-primary' },
+    { title: t('admin.analytics.arpu'), value: overview?.arpu ?? '—', sub: '', icon: DollarSign, color: 'text-amber-500', border: 'border-amber-500' },
   ];
 
   return (
@@ -77,10 +79,10 @@ export default function AdminAnalyticsPage() {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Badge className="bg-emerald-500 text-white border-0 font-black text-[9px] uppercase tracking-widest">Live</Badge>
-            <span className="text-[10px] text-muted-foreground font-bold uppercase">Real data from database</span>
+            <Badge className="bg-emerald-500 text-white border-0 font-black text-[9px] uppercase tracking-widest">{t('admin.analytics.live')}</Badge>
+            <span className="text-[10px] text-muted-foreground font-bold uppercase">{t('admin.analytics.real_data')}</span>
           </div>
-          <h2 className="text-3xl font-black tracking-tight">Аналитика и Метрики</h2>
+          <h2 className="text-3xl font-black tracking-tight">{t('admin.analytics.title')}</h2>
         </div>
       </header>
 
@@ -100,7 +102,7 @@ export default function AdminAnalyticsPage() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="border-0 shadow-sm lg:col-span-2">
-          <CardHeader><CardTitle className="text-lg font-black">Retention Rate</CardTitle><CardDescription>% вернувшихся</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="text-lg font-black">{t('admin.analytics.retention_rate')}</CardTitle><CardDescription>{t('admin.analytics.retention_desc')}</CardDescription></CardHeader>
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={retention} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -115,7 +117,7 @@ export default function AdminAnalyticsPage() {
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
-          <CardHeader><CardTitle className="text-lg font-black">Revenue Mix</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg font-black">{t('admin.analytics.revenue_mix')}</CardTitle></CardHeader>
           <CardContent className="h-[300px] flex flex-col items-center justify-center">
             <ResponsiveContainer width="100%" height={200}>
               <PieChart><Pie data={revenueMix} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">{revenueMix.map((e,i)=><Cell key={i} fill={e.color}/>)}</Pie><Tooltip contentStyle={{borderRadius:'12px',border:'none'}}/></PieChart>
@@ -127,7 +129,7 @@ export default function AdminAnalyticsPage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="border-0 shadow-sm">
-          <CardHeader><CardTitle className="text-lg font-black">Новые пользователи</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg font-black">{t('admin.analytics.new_users')}</CardTitle></CardHeader>
           <CardContent className="h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={registrations} margin={{top:10,right:10,left:-20,bottom:0}}>
@@ -143,10 +145,10 @@ export default function AdminAnalyticsPage() {
         </Card>
         <Card className="border-0 shadow-sm bg-primary/5 border-primary/10 overflow-hidden relative">
           <div className="absolute -right-8 -top-8 text-primary opacity-5 transform rotate-12"><Zap size={160} fill="currentColor"/></div>
-          <CardHeader><div className="flex items-center gap-2"><ShieldCheck className="text-primary" size={24}/><CardTitle className="text-lg font-black uppercase">Technical Health</CardTitle></div></CardHeader>
+          <CardHeader><div className="flex items-center gap-2"><ShieldCheck className="text-primary" size={24}/><CardTitle className="text-lg font-black uppercase">{t('admin.analytics.technical_health')}</CardTitle></div></CardHeader>
           <CardContent className="space-y-6 relative z-10">
             <div className="grid grid-cols-2 gap-4">
-              {[{l:'API Status',v:'Connected',c:'text-emerald-500'},{l:'Data Source',v:'Live DB',c:'text-blue-500'},{l:'Errors',v:'—',c:'text-muted-foreground'},{l:'API Latency',v:'—',c:'text-amber-500'}].map(s=>(
+              {[{l:t('admin.analytics.api_status'),v:t('admin.analytics.connected'),c:'text-emerald-500'},{l:t('admin.analytics.data_source'),v:t('admin.analytics.live_db'),c:'text-blue-500'},{l:t('admin.analytics.errors'),v:'—',c:'text-muted-foreground'},{l:t('admin.analytics.api_latency'),v:'—',c:'text-amber-500'}].map(s=>(
                 <div key={s.l} className="bg-background p-4 rounded-2xl shadow-sm border"><p className="text-[10px] font-black text-muted-foreground uppercase mb-1">{s.l}</p><p className={`text-xl font-black ${s.c}`}>{s.v}</p></div>
               ))}
             </div>

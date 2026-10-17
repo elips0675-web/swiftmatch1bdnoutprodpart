@@ -71,10 +71,22 @@ describe('Страница admin-backup', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockFetch.mock.calls[0][0]).toBe('/api/admin/backup');
     expect(mockFetch.mock.calls[0][1]).toEqual({ headers: { Authorization: 'Bearer test-token' } });
-    expect(screen.getByText('1.50 MB')).toBeInTheDocument();
-    expect(screen.getByText('0.50 MB')).toBeInTheDocument();
+    expect(screen.getByText('1.50 admin.backup.unit_mb')).toBeInTheDocument();
+    expect(screen.getByText('512.00 admin.backup.unit_kb')).toBeInTheDocument();
     expect(screen.getByText('admin.backup.db_label')).toBeInTheDocument();
     expect(screen.getByText('admin.backup.file_label')).toBeInTheDocument();
+  });
+
+  it('размер показывается в КБ/МБ/ГБ по величине', async () => {
+    mockFetch.mockImplementation(() => jsonResponse([
+      { name: 'small.sql', size: 512, createdAt: '2026-10-01T10:00:00.000Z' },
+      { name: 'huge.zip', size: 3221225472, createdAt: '2026-10-02T10:00:00.000Z' },
+    ]));
+    render(<AdminBackupPage />);
+
+    await screen.findByText('small.sql');
+    expect(screen.getByText('0.50 admin.backup.unit_kb')).toBeInTheDocument();
+    expect(screen.getByText('3.00 admin.backup.unit_gb')).toBeInTheDocument();
   });
 
   it('пустой список — заглушка без тоста', async () => {
@@ -138,9 +150,24 @@ describe('Страница admin-backup', () => {
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(3));
   });
 
-  it('отказ создания: тост error_create, а message сервера не показывается', async () => {
+  it('отказ создания с кодом BACKUP_MYSQLDUMP_NOT_AVAILABLE — точный тост, сырое message не показывается', async () => {
     mockFetch.mockImplementation((_url: string, init?: RequestInit) =>
-      init?.method === 'POST' ? jsonResponse({ message: 'mysqldump не найден' }, 500) : jsonResponse([]),
+      init?.method === 'POST' ? jsonResponse({ message: 'BACKUP_MYSQLDUMP_NOT_AVAILABLE' }, 500) : jsonResponse([]),
+    );
+    render(<AdminBackupPage />);
+    await screen.findByText('admin.backup.empty');
+
+    await userEvent.click(screen.getByTestId('create-backup'));
+
+    await waitFor(() => expect(h.toastError).toHaveBeenCalledWith('admin.backup.error_mysqldump'));
+    expect(h.toastError).not.toHaveBeenCalledWith('BACKUP_MYSQLDUMP_NOT_AVAILABLE');
+    expect(h.toastError).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('отказ создания без известного кода — общий тост error_create', async () => {
+    mockFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'POST' ? jsonResponse({ message: 'непонятная ошибка' }, 500) : jsonResponse([]),
     );
     render(<AdminBackupPage />);
     await screen.findByText('admin.backup.empty');
@@ -148,9 +175,8 @@ describe('Страница admin-backup', () => {
     await userEvent.click(screen.getByTestId('create-backup'));
 
     await waitFor(() => expect(h.toastError).toHaveBeenCalledWith('admin.backup.error_create'));
-    expect(h.toastError).not.toHaveBeenCalledWith('mysqldump не найден');
+    expect(h.toastError).not.toHaveBeenCalledWith('непонятная ошибка');
     expect(h.toastError).toHaveBeenCalledTimes(1);
-    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
   it('создание архива файлов уходит на /api/admin/backup/files и перечитывает список', async () => {

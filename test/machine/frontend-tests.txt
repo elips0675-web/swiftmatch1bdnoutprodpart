@@ -1,5 +1,5 @@
 ===== Фронт (Vitest) =====
-1206 тестов в 106 файлах (зелёных 1206) (vitest --reporter=json)
+1209 тестов в 106 файлах (зелёных 1209) (vitest --reporter=json)
 
 # файл | тестов
 scripts/blocks-coverage-audit.test.mjs | 26
@@ -32,7 +32,7 @@ src/hooks/__tests__/use-fcm-token.test.tsx | 3
 src/test/about.test.tsx | 5
 src/test/activity-list.test.tsx | 3
 src/test/admin-analytics.test.tsx | 7
-src/test/admin-backup.test.tsx | 12
+src/test/admin-backup.test.tsx | 14
 src/test/admin-content.test.tsx | 14
 src/test/admin-experiments.test.tsx | 14
 src/test/admin-features.test.tsx | 2
@@ -41,7 +41,7 @@ src/test/admin-health.test.tsx | 3
 src/test/admin-messaging.test.tsx | 11
 src/test/admin-monetization.test.tsx | 12
 src/test/admin-partners.test.tsx | 17
-src/test/admin-photos.test.tsx | 9
+src/test/admin-photos.test.tsx | 10
 src/test/admin-queues.test.tsx | 4
 src/test/admin-reports.test.tsx | 15
 src/test/admin-revenue.test.tsx | 1
