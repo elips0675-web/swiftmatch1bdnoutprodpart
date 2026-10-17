@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
 
@@ -229,5 +229,40 @@ describe('Страница search', () => {
     fireEvent.click(screen.getByTestId('open-filters'));
 
     expect(await screen.findByTestId('filters-dialog')).toBeInTheDocument();
+  });
+
+  it('жалоба на кандидата уходит на сервер через POST /api/reports', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', fetchMock);
+    renderPage();
+    await firstCard();
+
+    fireEvent.click(screen.getByTestId('report-profile'));
+    expect(screen.getByText('report.title')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('report.button.send'));
+    expect(h.toast).toHaveBeenCalledWith({
+      variant: 'destructive',
+      title: 'report.toast.no_reason_title',
+      description: 'report.toast.no_reason_desc',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getAllByRole('radio')[0]);
+    fireEvent.click(screen.getByText('report.button.send'));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/reports',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ reported_id: 3, reason: 'spam' }),
+        }),
+      ),
+    );
+    expect(h.toast).toHaveBeenCalledWith({
+      title: 'report.toast.success_title',
+      description: 'report.toast.success_desc Александр.',
+    });
   });
 });

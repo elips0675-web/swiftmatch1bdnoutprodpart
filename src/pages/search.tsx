@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/language-context";
 import { toast } from "@/hooks/use-toast";
 import { ALL_DEMO_USERS } from "@/lib/demo-data";
+import { REPORT_REASONS, submitReport } from "@/lib/reports";
 import Link from "@/shims/next-link";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -38,8 +39,6 @@ const cardVariants = {
   center: { x: 0, opacity: 1 },
   exit: (direction: number) => ({ x: direction < 0 ? 300 : -300, opacity: 0 }),
 };
-
-const REPORT_REASONS = ['report.reason.spam', 'report.reason.abuse', 'report.reason.fake', 'report.reason.scam', 'report.reason.content'];
 
 const attachmentCompatibilityScores: Record<AttachmentStyle, Record<AttachmentStyle, number>> = {
     secure: { secure: 2, anxious: 2, avoidant: 2 },
@@ -279,9 +278,14 @@ function SearchContent() {
     });
   };
 
-  const handleReportSubmit = () => {
+  const handleReportSubmit = async () => {
     if (!reportReason) {
       toast({ variant: 'destructive', title: t('report.toast.no_reason_title'), description: t('report.toast.no_reason_desc') });
+      return;
+    }
+    const ok = await submitReport(Number(user?.id), reportReason, reportDescription);
+    if (!ok) {
+      toast({ variant: 'destructive', title: t('error.generic_title') });
       return;
     }
     toast({ title: t('report.toast.success_title'), description: `${t('report.toast.success_desc')} ${user?.name || ''}.` });
@@ -328,6 +332,11 @@ function SearchContent() {
             {searchParams.get('mode') === 'autosearch' && (
                 <button data-testid="open-filters" onClick={() => setIsFiltersOpen(true)} className="p-2 bg-white rounded-full shadow-sm">
                     <SlidersHorizontal size={14} className="text-primary" />
+                </button>
+            )}
+            {user && (
+                <button data-testid="report-profile" aria-label={t('button.report')} onClick={() => setIsReportDialogOpen(true)} className="p-2 bg-white rounded-full shadow-sm">
+                    <Flag size={14} className="text-destructive" />
                 </button>
             )}
         </div>

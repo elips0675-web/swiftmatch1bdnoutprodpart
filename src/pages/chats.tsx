@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 import { motion, AnimatePresence } from "framer-motion";
@@ -28,6 +28,7 @@ import { useWebRTC } from "@/hooks/use-webrtc";
 import { aiChatIcebreakerSuggestions } from "@/shims/ai-flows";
 import { OpeningLinesPicker } from "@/components/opening-lines-picker";
 import { firstNameOf } from "@/lib/opening-lines";
+import { REPORT_REASONS, submitReport } from "@/lib/reports";
 
 const VideoCallDialog = dynamic(() => import('@/components/video-call').then(mod => mod.VideoCallDialog), { ssr: false });
 const VoiceCallDialog = dynamic(() => import('@/components/voice-call').then(mod => mod.VoiceCallDialog), { ssr: false });
@@ -621,6 +622,22 @@ function ChatsContent() {
     setReactionMsgId(null)
   }
 
+  const handleReportSubmit = async () => {
+    if (!reportReason) {
+      toast({ variant: 'destructive', title: t('report.toast.no_reason_title'), description: t('report.toast.no_reason_desc') });
+      return;
+    }
+    const ok = await submitReport(selectedChat?.other_user_id ?? 0, reportReason, reportDescription);
+    if (!ok) {
+      toast({ variant: 'destructive', title: t('error.generic_title') });
+      return;
+    }
+    toast({ title: t('report.toast.success_title'), description: t('report.toast.success_desc') });
+    setIsReportDialogOpen(false);
+    setReportReason('');
+    setReportDescription('');
+  };
+
   const handleBack = () => {
     if (matchId || groupId) {
       router.back();
@@ -674,10 +691,12 @@ function ChatsContent() {
                         <Trash2 size={14} className="mr-2" />
                         {t('chats.delete_conversation')}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setIsReportDialogOpen(true); }} className="rounded-xl font-bold text-[10px] uppercase tracking-wider cursor-pointer py-2 text-destructive focus:text-destructive focus:bg-destructive/10">
-                        <Flag size={14} className="mr-2" />
-                        {t('button.report')}
-                    </DropdownMenuItem>
+                    {!selectedChat.isGroup && (
+                      <DropdownMenuItem data-testid="chat-report-open" onSelect={(e) => { e.preventDefault(); setIsReportDialogOpen(true); }} className="rounded-xl font-bold text-[10px] uppercase tracking-wider cursor-pointer py-2 text-destructive focus:text-destructive focus:bg-destructive/10">
+                          <Flag size={14} className="mr-2" />
+                          {t('button.report')}
+                      </DropdownMenuItem>
+                    )}
                 </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -858,6 +877,47 @@ function ChatsContent() {
                 );
               })}
             </div>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
+          <DialogContent className="max-w-sm rounded-2xl border-0 p-6 bg-white app-shadow">
+            <DialogTitle className="flex items-center gap-2 text-lg font-black">
+              <Flag size={18} className="text-destructive" />
+              {t('report.title')}
+            </DialogTitle>
+            <DialogDescription className="text-xs font-medium leading-relaxed text-muted-foreground">
+              {t('report.description')}
+            </DialogDescription>
+            <div className="space-y-1.5">
+              {REPORT_REASONS.map((reasonKey) => (
+                <button
+                  key={reasonKey}
+                  data-testid={`report-reason-${reasonKey}`}
+                  onClick={() => setReportReason(reasonKey)}
+                  className={cn(
+                    "w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all",
+                    reportReason === reasonKey ? "gradient-bg text-white" : "bg-muted/40 text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  {t(reasonKey)}
+                </button>
+              ))}
+            </div>
+            <textarea
+              data-testid="report-description"
+              value={reportDescription}
+              onChange={(e) => setReportDescription(e.target.value)}
+              placeholder={t('report.details_placeholder')}
+              className="w-full h-20 px-4 py-3 bg-muted/50 border-0 rounded-xl text-sm font-medium resize-none"
+            />
+            <DialogFooter className="flex gap-2">
+              <Button data-testid="report-cancel" variant="ghost" onClick={() => setIsReportDialogOpen(false)} className="flex-1 rounded-xl font-bold">
+                {t('report.button.cancel')}
+              </Button>
+              <Button data-testid="report-submit" onClick={handleReportSubmit} className="flex-1 rounded-xl font-bold bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                {t('report.button.send')}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

@@ -1,5 +1,5 @@
 ===== Фронт (Vitest) =====
-1258 тестов в 109 файлах (зелёных 1258) (vitest --reporter=json)
+1261 тестов в 109 файлах (зелёных 1261) (vitest --reporter=json)
 
 # файл | тестов
 scripts/blocks-coverage-audit.test.mjs | 26
@@ -53,7 +53,7 @@ src/test/api.test.ts | 5
 src/test/auth-context.test.tsx | 21
 src/test/chat-partner-actions.test.tsx | 3
 src/test/chats-history.test.tsx | 14
-src/test/chats-list.test.tsx | 8
+src/test/chats-list.test.tsx | 9
 src/test/chats-route-adapter.test.tsx | 2
 src/test/contest.test.tsx | 7
 src/test/error-boundary.test.tsx | 5
@@ -97,7 +97,7 @@ src/test/rollout.test.ts | 6
 src/test/safety.test.tsx | 7
 src/test/schedule.test.tsx | 5
 src/test/search-filters.test.tsx | 7
-src/test/search.test.tsx | 10
+src/test/search.test.tsx | 11
 src/test/sessions-section.test.tsx | 17
 src/test/settings-privacy.test.tsx | 4
 src/test/settings.test.tsx | 12
@@ -107,7 +107,7 @@ src/test/unsubscribe-page.test.tsx | 5
 src/test/unsubscribe.test.tsx | 6
 src/test/use-premium.test.ts | 5
 src/test/use-websocket.test.tsx | 14
-src/test/user.test.tsx | 12
+src/test/user.test.tsx | 13
 src/test/utils.test.ts | 8
 src/test/verify-email.test.tsx | 6
 src/test/watch-button.test.tsx | 4

@@ -6,6 +6,7 @@ import Link from "@/shims/next-link";
 import dynamic from "@/shims/next-dynamic";
 import { MapPin, CircleCheck as CheckCircle2, Star, Camera, Coffee, Music, Globe, Dumbbell, Palette, Film, Flower2, Briefcase, Gamepad2, Maximize2, X, Dog, Ruler, Target, Sparkles, Heart, MessageCircle, ChevronLeft, ChevronRight, Cpu, Anchor, Map, Sprout, BookOpen, Scissors, FlaskConical, Car, ChefHat, Brush, Mountain, Wine, Flag, Sun, User, Info, Trophy, VenetianMask, Search, ThumbsUp, ThumbsDown, RefreshCw, BrainCircuit, Trees, UtensilsCrossed, Send, ImageIcon, Ban } from "lucide-react";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
+import { REPORT_REASONS, submitReport } from "@/lib/reports";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
@@ -43,8 +44,6 @@ const interestIcons: Record<string, any> = {
     "Photography": Camera, "Travel": Globe, "Sports": Dumbbell, "Art": Palette, "Movies": Film, "Yoga": Flower2, "Business": Briefcase, "Gaming": Gamepad2,
     "interest.photography": Camera, "interest.travel": Globe, "interest.coffee": Coffee, "interest.music": Music, "interest.sport": Dumbbell, "interest.art": Palette, "interest.movies": Film, "interest.yoga": Flower2, "interest.games": Gamepad2, "interest.animals": Dog, "interest.books": BookOpen, "interest.cooking": ChefHat, "interest.design": Palette, "interest.nature": Sun, "interest.fashion": Sparkles, "interest.dance": Music, "interest.tech": Cpu, "interest.volunteering": Heart, "interest.politics": Briefcase, "interest.psychology": Heart, "interest.philosophy": Heart, "interest.meditation": Flower2, "interest.gardening": Sprout, "interest.cars": Car, "interest.science": FlaskConical, "interest.history": BookOpen, "interest.architecture": Briefcase
 };
-
-const REPORT_REASONS = ['report.reason.spam', 'report.reason.abuse', 'report.reason.fake', 'report.reason.scam', 'report.reason.content'];
 
 const DataBox = React.memo(({ label, value, icon: Icon, color = "default" }: { label: string, value: any, icon?: any, color?: "default" | "primary" }) => (
   <div className="space-y-1.5">
@@ -126,9 +125,14 @@ function UserProfileContent() {
     }
   };
 
-  const handleReportSubmit = () => {
+  const handleReportSubmit = async () => {
     if (!reportReason) {
       toast({ variant: 'destructive', title: t('report.toast.no_reason_title'), description: t('report.toast.no_reason_desc') });
+      return;
+    }
+    const ok = await submitReport(Number(userId), reportReason, reportDescription);
+    if (!ok) {
+      toast({ variant: 'destructive', title: t('error.generic_title') });
       return;
     }
     toast({ title: t('report.toast.success_title'), description: `${t('report.toast.success_desc')} ${user.name}.` });

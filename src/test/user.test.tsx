@@ -117,7 +117,9 @@ describe('Страница user', () => {
     expect(messages.filter((message) => message.includes('Missing `Description`'))).toEqual([]);
   });
 
-  it('жалоба без причины не отправляется, с причиной — уходит и закрывает диалог', async () => {
+  it('жалоба без причины не отправляется, с причиной уходит на сервер и закрывает диалог', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderPage();
 
@@ -131,16 +133,44 @@ describe('Страница user', () => {
       title: 'report.toast.no_reason_title',
       description: 'report.toast.no_reason_desc',
     });
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.getByText('report.title')).toBeInTheDocument();
 
     await user.click(screen.getAllByRole('radio')[0]);
     await user.click(screen.getByText('report.button.send'));
 
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/reports',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ reported_id: 2, reason: 'spam' }),
+        }),
+      ),
+    );
     expect(h.toast).toHaveBeenCalledWith({
       title: 'report.toast.success_title',
       description: 'report.toast.success_desc Анна.',
     });
     await waitFor(() => expect(screen.queryByText('report.title')).toBeNull());
+  });
+
+  it('отказ сервера на жалобу показывает ошибку, а не ложный успех', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByTestId('report-user'));
+    await user.click(screen.getAllByRole('radio')[0]);
+    await user.click(screen.getByText('report.button.send'));
+
+    await waitFor(() =>
+      expect(h.toast).toHaveBeenCalledWith({ variant: 'destructive', title: 'error.generic_title' }),
+    );
+    expect(h.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'report.toast.success_title' }),
+    );
+    expect(screen.getByText('report.title')).toBeInTheDocument();
   });
 
   it('блокировка после подтверждения шлёт POST и уводит назад', async () => {

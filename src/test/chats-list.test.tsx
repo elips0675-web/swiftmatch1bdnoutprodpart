@@ -34,7 +34,23 @@ vi.mock("@/hooks/use-websocket", () => ({
 
 vi.mock("@/hooks/use-webrtc", () => ({ useWebRTC: () => ({}) }))
 
-vi.mock("@/hooks/use-toast", () => ({ toast: vi.fn() }))
+const toastMock = vi.hoisted(() => vi.fn())
+
+vi.mock("@/hooks/use-toast", () => ({ toast: toastMock }))
+
+vi.mock("@/components/ui/dropdown-menu", async () => {
+  const Pass = ({ children }: { children?: React.ReactNode }) => <>{children}</>
+  const Item = ({
+    children,
+    onSelect,
+    ...rest
+  }: React.ComponentProps<"button"> & { onSelect?: (e: { preventDefault: () => void }) => void }) => (
+    <button type="button" {...rest} onClick={() => onSelect?.({ preventDefault: () => {} })}>
+      {children}
+    </button>
+  )
+  return { DropdownMenu: Pass, DropdownMenuTrigger: Pass, DropdownMenuContent: Pass, DropdownMenuItem: Item }
+})
 
 vi.mock("@/hooks/useAntiScreenshot", () => ({ useAntiScreenshot: () => ({ current: null }) }))
 
@@ -236,5 +252,46 @@ describe("Страница чатов (список)", () => {
     fireEvent.click(screen.getByRole("button", { name: "common.back" }))
 
     expect(await screen.findByTestId("chat-row-1")).toBeInTheDocument()
+  })
+
+  it("жалоба на собеседника уходит на сервер через POST /api/reports", async () => {
+    const message = {
+      id: 11,
+      text: "Привет",
+      sender_id: 501,
+      created_at: new Date().toISOString(),
+      reactions: [],
+      reply_to: null,
+      ttl_seconds: null,
+    }
+    mockApi([chat(1, "Аня")], [message])
+
+    render(<ChatsPage />)
+    fireEvent.click(await screen.findByTestId("chat-row-1"))
+    await screen.findByTestId("messages-scroll")
+
+    fireEvent.click(screen.getByTestId("chat-report-open"))
+    expect(screen.getByText("report.title")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText("report.button.send"))
+    expect(toastMock).toHaveBeenCalledWith({
+      variant: "destructive",
+      title: "report.toast.no_reason_title",
+      description: "report.toast.no_reason_desc",
+    })
+
+    fireEvent.click(screen.getByText("report.reason.content"))
+    fireEvent.click(screen.getByTestId("report-submit"))
+
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/reports",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ reported_id: 501, reason: "offensive" }),
+        }),
+      ),
+    )
+    await waitFor(() => expect(screen.queryByText("report.title")).toBeNull())
   })
 })
