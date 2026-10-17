@@ -11,6 +11,18 @@ export default defineConfig({
     testTimeout: 15000,
     hookTimeout: 10000,
     include: ["src/**/*.{test,spec}.{ts,tsx}", "scripts/**/*.test.mjs"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text-summary"],
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.test.{ts,tsx}", "src/test/**", "src/**/*.d.ts"],
+      thresholds: {
+        statements: 63,
+        branches: 71,
+        functions: 57,
+        lines: 63,
+      },
+    },
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },

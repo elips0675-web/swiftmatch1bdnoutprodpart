@@ -39,8 +39,8 @@
 ## Слепые зоны тестов (для контекста)
 - Backup/restore smoke в CI (TEST-02) — `scripts/verify-backup.mjs` подключён шагом, прогона «restore → smoke» нет.
 - Интеграционный прогон против docker-compose (TEST-03) — MySQL+Redis+maildev (SMTP-флоу в моках).
-- Порогов coverage нет (COV-01); покрытие ядра (COV-02).
-- a11y системно не проверяется (A11Y-01), cross-browser по флагу (XB-01).
+- Пороги coverage заведены 17.10.2026 (COV-01 — `npm run test:coverage`, буфер −2 п.п.); покрытие ядра (COV-02) — отдельная работа.
+- a11y системно не проверяется (A11Y-01) — открыто; cross-browser — принятое ограничение (XB-01, `CROSS_BROWSER=1`), закрыто 17.10.2026.
 - Native/WebView E2E (Capacitor) — заблокирован устройством/Android Studio.
 
 ## Инфра/зависимости (детали)

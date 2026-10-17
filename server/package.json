@@ -8,6 +8,7 @@
     "db:seed": "node src/seed.js",
     "db:reset": "node src/seed.js",
     "test": "vitest run",
+ "test:coverage": "vitest run --coverage",
     "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
@@ -45,6 +46,7 @@
     "winston": "^3.17.0"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "4.1.11",
     "supertest": "^7.2.2",
     "vitest": "^4.1.9"
   }
