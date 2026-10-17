@@ -19,9 +19,8 @@
 - **TEST-01** Полный живой E2E после этапов 45/46 не прогонялся. Статический счёт `playwright test --list` — 205 тестов; последний полный живой прогон 12.10.2026 (152 в 19 спеках). Требуется перезапуск API, `GET /health` (redis: live), полный прогон `npm run test:e2e`.
 - **CI-01** Блок «CI: краснота server-test/test-counters/e2e/Trivy — исправлено, ждёт прогона» (12.10.2026). Таблица фиксов из исходного файла: `e2e` (Init DB schema), `wait-for-url.mjs` (оба формата флагов), `server-test` (корневой `npm ci`), `test-counters` (MySQL + живой API + `Stop server` с `if: always()`), Trivy (очистка `/root/.npm`, `TRIVY_TIMEOUT: 15m0s`).
 
-## P0. Консистентность документов (DOC-01, INV-01, DOC-02)
+## P0. Консистентность документов (DOC-01, DOC-02)
 - **DOC-01** `test/Для анализа.txt` — исторический срез 12.10.2026, содержит закрытые пункты как открытые (питфолл 101).
-- **INV-01** `test/ИНВЕНТАРЬ-ТЕСТОВ.md` — 3 заглушки `⚠️ требует описания` (`admin-experiments` 14, `admin-messaging` 11, `admin-monetization` 12); шапка/итоги не синхронизированы с фактическими 102 файлами/1137 тестами. Гейт роняет `PLACEHOLDER_HINT`.
 - **DOC-02** Шапка `Что доделать.txt` — перегружена хроникой закрытых этапов 45/46 (лимитеры чата/AI, алерты, пагинация, аудит фото, RevenueCat E2E, trust proxy, GDPR-ZIP, weekly report, P3 #26/#27/#28/#29, M5/M6, L2 и др.). Протухшие утверждения: «Redis-сервер не поднят» vs `redis: live` в `/health`; «E2E 205/205» — статический счёт смешан с живым; блок CI «ждёт прогона» рядом с «гейты 28/28».
 
 ## P1. Детали по багам «UI не врёт»
@@ -56,7 +55,6 @@
 - Порогов coverage нет (COV-01); покрытие ядра (COV-02).
 - a11y системно не проверяется (A11Y-01), cross-browser по флагу (XB-01).
 - Native/WebView E2E (Capacitor) — заблокирован устройством/Android Studio.
-- Страницы без юнитов (PGS-01): `admin-teams`, `admin-content`, `admin-reports`, `admin-partners`.
 
 ## Инфра/зависимости (детали)
 - **DEPS-01** `server/`: 28 moderate (`@sentry/node` 9→11, `firebase-admin`→14.5.0, `bull`→advisory в `uuid`); `npm audit fix --force` понижает `bull` до 1.1.3 — нельзя. 0 high/critical.
@@ -65,6 +63,6 @@
 ## Watch (детали)
 - **W-01** CI зелёный после правок 12.10.2026 (server-test/test-counters/e2e/Trivy) — проверить последний run на `main`.
 - **W-02** Trivy не падает на `root/.npm` (очистка в Dockerfile, `TRIVY_TIMEOUT: 15m0s`).
-- **W-03** Заглушек в инвентаре 0 (`PLACEHOLDER_HINT` отсутствует).
+- **W-03** ✅ Заглушек в инвентаре 0 (`PLACEHOLDER_HINT` отсутствует) — подтверждено 17.10.2026.
 - **W-04** Redis live на стенде + очереди работают (`GET /health` → `redis: "live"`).
 - **W-05** Полный живой E2E после этапов 45/46 подтверждён.

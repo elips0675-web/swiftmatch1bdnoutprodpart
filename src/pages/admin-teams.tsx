@@ -191,18 +191,19 @@ export default function AdminTeamsPage() {
 
   const load = useCallback(async () => {
     try {
-      const [teamList, me] = await Promise.all([
+      const [rawTeams, me] = await Promise.all([
         apiFetch<Team[]>('/api/admin/teams'),
         apiFetch<{ id?: number; teams?: number[] }>('/api/admin/me'),
       ]);
+      const teamList = Array.isArray(rawTeams) ? rawTeams : [];
       setTeams(teamList);
-      setIsSuperAdmin(Array.isArray(me.teams) && me.teams.length === 0);
-      setMyId(typeof me.id === 'number' ? me.id : null);
+      setIsSuperAdmin(Array.isArray(me?.teams) && me.teams.length === 0);
+      setMyId(typeof me?.id === 'number' ? me.id : null);
       const memberLists = await Promise.all(
         teamList.map(team => apiFetch<Member[]>(`/api/admin/teams/${team.id}/members`).catch(() => [] as Member[])),
       );
       const map: Record<number, Member[]> = {};
-      teamList.forEach((team, i) => { map[team.id] = memberLists[i]; });
+      teamList.forEach((team, i) => { map[team.id] = Array.isArray(memberLists[i]) ? memberLists[i] : []; });
       setMembersByTeam(map);
     } catch {
       toast.error(t('admin.error.load'));

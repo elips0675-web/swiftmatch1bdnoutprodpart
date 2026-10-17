@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-17T15:49:29.279Z",
+  "generated": "2026-10-17T16:38:48.937Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 102,
-    "tests": 1142,
-    "passed": 1142,
+    "files": 106,
+    "tests": 1202,
+    "passed": 1202,
     "failed": 0,
     "gate": {
       "files": 26,
       "tests": 626
     },
     "product": {
-      "files": 76,
-      "tests": 516
+      "files": 80,
+      "tests": 576
     },
     "perFile": [
       {
@@ -141,6 +141,10 @@
         "tests": 12
       },
       {
+        "file": "src/test/admin-content.test.tsx",
+        "tests": 14
+      },
+      {
         "file": "src/test/admin-experiments.test.tsx",
         "tests": 14
       },
@@ -165,6 +169,10 @@
         "tests": 12
       },
       {
+        "file": "src/test/admin-partners.test.tsx",
+        "tests": 17
+      },
+      {
         "file": "src/test/admin-photos.test.tsx",
         "tests": 9
       },
@@ -173,8 +181,16 @@
         "tests": 4
       },
       {
+        "file": "src/test/admin-reports.test.tsx",
+        "tests": 15
+      },
+      {
         "file": "src/test/admin-revenue.test.tsx",
         "tests": 1
+      },
+      {
+        "file": "src/test/admin-teams.test.tsx",
+        "tests": 14
       },
       {
         "file": "src/test/admin-users-merge.test.tsx",
@@ -901,7 +917,7 @@
     ]
   },
   "total": {
-    "files": 191,
-    "tests": 2402
+    "files": 195,
+    "tests": 2462
   }
 }

@@ -79,11 +79,11 @@ export default function AdminReportsPage() {
         apiGet<Team[]>('/api/admin/teams'),
         apiGet<{ teams?: number[] }>('/api/admin/me'),
       ]);
-      setReports(r);
-      setModLog(log);
-      setBannedUsers(users.users);
-      setTeams(teamList);
-      setIsSuperAdmin(Array.isArray(me.teams) && me.teams.length === 0);
+      setReports(Array.isArray(r) ? r : []);
+      setModLog(Array.isArray(log) ? log : []);
+      setBannedUsers(Array.isArray(users?.users) ? users.users : []);
+      setTeams(Array.isArray(teamList) ? teamList : []);
+      setIsSuperAdmin(Array.isArray(me?.teams) && me.teams.length === 0);
     } catch {
       toast.error(t('admin.error.load'));
     } finally {

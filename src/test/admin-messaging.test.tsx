@@ -38,7 +38,7 @@ vi.mock('@/components/ui/select', () => ({
 
 import AdminMessagingPage from '@/pages/admin-messaging';
 
-const mockCreateObjectURL = vi.fn(() => 'blob:csv');
+const mockCreateObjectURL = vi.fn((_blob: Blob) => 'blob:csv');
 const mockRevokeObjectURL = vi.fn();
 
 function jsonResponse(body: unknown, status = 200) {
