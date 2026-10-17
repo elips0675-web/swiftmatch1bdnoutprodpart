@@ -367,8 +367,6 @@ export default function HangoutDetailPage() {
   }
 
   const Icon = categoryIcon(hangout.category);
-  const myStatus = hangout.my_response_status;
-  const acceptedCount = hangout.accepted_count ?? 0;
   const isDate = hangout.hangout_type === 'date';
   const isCompany = hangout.hangout_type === 'company';
   const isPaid = Number(hangout.price) > 0;
@@ -585,6 +583,16 @@ export default function HangoutDetailPage() {
                       <MessageCircle size={15} className="mr-2" /> {t("hangout.action.message_organizer")}
                     </Button>
                   </Link>
+                )}
+                {hangout.my_response_status === "pending" && hangout.status === "active" && (
+                  <Button
+                    data-testid="cancel-response"
+                    variant="outline"
+                    className="w-full rounded-full font-bold text-destructive"
+                    onClick={() => { const token = getToken(); if (!token) { navigate("/login"); return; } cancelResponse(); }}
+                  >
+                    <X size={15} className="mr-2" /> {t("hangout.action.cancel_response")}
+                  </Button>
                 )}
               </div>
             )}
