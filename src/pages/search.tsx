@@ -64,7 +64,6 @@ interface AutoSearchFilters {
 }
 interface SearchUser {
   id: number;
-  isSystem?: boolean;
   gender: string;
   lookingFor: string;
   age: number;
@@ -88,7 +87,7 @@ function performAutosearch(filters: AutoSearchFilters, allUsers: SearchUser[], c
 
     return allUsers
         .filter(user => {
-            if (user.id === currentUser.id || user.isSystem) return false;
+            if (user.id === currentUser.id) return false;
 
             const userGenderMatch = currentUser.lookingFor === 'all' || user.gender === currentUser.lookingFor;
             const currentUserGenderMatch = user.lookingFor === 'all' || currentUser.gender === user.lookingFor;
@@ -198,7 +197,7 @@ function SearchContent() {
         }
     } else {
         setPageTitle(t('home.nearby'));
-        initialUsers = ALL_DEMO_USERS.filter(u => u.id !== currentUser.id && !u.isSystem).slice(0, 10);
+        initialUsers = ALL_DEMO_USERS.filter(u => u.id !== currentUser.id).slice(0, 10);
         setSelectedInterests([]);
     }
     setUserList(initialUsers);

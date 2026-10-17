@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
+import { containsForbiddenWords } from "@/lib/word-filter";
 
 const iconMap: Record<string, React.ElementType> = {
   Music, Dumbbell, Palette, Gamepad2, Film, Globe, ChefHat, Cpu, BookOpen, Sparkles, Shirt, HeartPulse, Dog, FlaskConical, Briefcase, Home: HomeIcon, Car, Laugh, Star, Scroll
@@ -177,8 +178,7 @@ export default function GroupsPage() {
       return;
     }
 
-    const forbiddenWords = ["spam", "нецензурно"];
-    if (forbiddenWords.some(word => newGroupName.toLowerCase().includes(word) || newGroupDesc.toLowerCase().includes(word))) {
+    if (containsForbiddenWords(newGroupName) || containsForbiddenWords(newGroupDesc)) {
         toast({
           variant: "destructive",
           title: t('groups.create.forbidden_title'),

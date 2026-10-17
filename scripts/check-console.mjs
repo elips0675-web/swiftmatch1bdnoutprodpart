@@ -27,6 +27,8 @@ const PAGES = [
   '/search/filters', '/matches', '/schedule', '/events', '/groups', '/activity',
   '/premium', '/settings', '/settings/privacy', '/profile', '/profile/edit',
   '/faq', '/about', '/safety', '/login', '/register', '/unsubscribe',
+  '/premium/success', '/premium/cancel', '/partner/register', '/partner/dashboard',
+  '/partner-order/success', '/partner-order/cancel',
   '/admin', '/admin/users', '/admin/content', '/admin/features',
   '/admin/analytics', '/admin/hangouts', '/admin/partners',
   '/admin/reports', '/admin/teams',

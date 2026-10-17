@@ -179,7 +179,7 @@ describe('Страница groups', () => {
 
     await user.click(screen.getByTestId('create-group-button'));
     await user.selectOptions(screen.getByTestId('group-category'), 'music');
-    await user.type(screen.getByTestId('group-name'), 'Spam party');
+    await user.type(screen.getByTestId('group-name'), 'Казино клуб');
     await user.click(screen.getByTestId('submit-create-group'));
 
     expect(h.toast).toHaveBeenCalledWith({
@@ -190,7 +190,7 @@ describe('Страница groups', () => {
 
     await user.clear(screen.getByTestId('group-name'));
     await user.type(screen.getByTestId('group-name'), 'Книжный клуб');
-    await user.type(screen.getByTestId('group-description'), 'нецензурно');
+    await user.type(screen.getByTestId('group-description'), 'спам');
     await user.click(screen.getByTestId('submit-create-group'));
 
     expect(h.toast).toHaveBeenCalledTimes(2);

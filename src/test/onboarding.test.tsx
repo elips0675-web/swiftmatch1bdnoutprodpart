@@ -275,6 +275,7 @@ describe('Страница onboarding', () => {
     await user.type(screen.getByPlaceholderText('25'), '30');
     await user.type(screen.getByPlaceholderText('175'), '175');
     await user.type(screen.getByPlaceholderText('onboarding.step2.city_placeholder'), 'Москва');
+    await user.click(screen.getByText('circadian.early_bird'));
     await user.click(screen.getByText('button.continue'));
 
     fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'goal.friendship' } });
@@ -294,10 +295,9 @@ describe('Страница onboarding', () => {
       city: 'Москва',
       height: 175,
       goal: 'goal.friendship',
-      zodiac: '',
       gender: 'male',
       looking_for: 'all',
-      circadian: '',
+      circadian: 'lark',
       bio: 'Привет',
       avatar_url: '/demo/people/me.png',
     });

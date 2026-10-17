@@ -24,15 +24,11 @@
 - **DOC-02** Шапка `Что доделать.txt` — перегружена хроникой закрытых этапов 45/46 (лимитеры чата/AI, алерты, пагинация, аудит фото, RevenueCat E2E, trust proxy, GDPR-ZIP, weekly report, P3 #26/#27/#28/#29, M5/M6, L2 и др.). Протухшие утверждения: «Redis-сервер не поднят» vs `redis: live` в `/health`; «E2E 205/205» — статический счёт смешан с живым; блок CI «ждёт прогона» рядом с «гейты 28/28».
 
 ## P1. Детали по багам «UI не врёт»
-- **GRP-01** `src/pages/groups.tsx:180` — локальный `["spam","нецензурно"]` вместо канонических `containsForbiddenWords` (`src/lib/word-filter.ts`) и серверного списка (`server/src/banned-words.js`).
-- **USER-01** `src/pages/user.tsx:108,145` — мёртвые ветки `isSystem` (данные из `ALL_DEMO_USERS`, флаг не выставлен; также проверки в `src/pages/search.tsx:91,201`, `src/pages/Home.tsx:60`).
-- **ONB-01** `src/pages/onboarding.tsx:77,185` — отправляет `zodiac: formData.zodiac` (`""`) и затирает ранее заполненный знак зодиака.
-- **ONB-02** `src/pages/onboarding.tsx:264` — сравнение `formData.circadian === 'lark'`, при этом кнопки пишут `early-bird/night-owl/flexible` (расхождение с `src/types/index.ts:20`, `src/lib/constants.ts:150-152`, `src/lib/demo-data.ts:25`).
-- **ONB-03** `src/pages/onboarding.tsx:132,367` — кнопка генерации био «AI {t('button.save')}»; при пустых интересах берётся `onboarding.step4.desc` вместо предупреждения.
-- **CON-01** `scripts/check-console.mjs:25-33` — не сканирует `/premium/success`, `/premium/cancel`, `/partner/register`, `/partner/dashboard`, `/partner/order/*`.
+Код-часть закрыта 17.10.2026 (PART-01–PART-03, ADM-01–ADM-04, ADM-06, GRP-01, USER-01, ONB-01–ONB-02, CON-01) — см. `Что сделано.txt`; разбор — там же в записи «UI не врёт, часть 3». Оставшийся пункт `ONB-03` требует решения владельца и перенесён в раздел ниже.
 
 ## Решения владельца (decision) — подробности
 - **ADM-05** `src/pages/admin-photos.tsx:108` — кнопки одобрить/отклонить только при `filter !== 'all'`. Варианты: (а) оставить — только очередь модерации; (б) разрешить модерацию в «все фото».
+- **ONB-03** `src/pages/onboarding.tsx:132,367` — кнопка генерации био «AI {t('button.save')}» (должна говорить «сгенерировать»); при пустых интересах берётся `onboarding.step4.desc` вместо предупреждения. Нужны ключи/тексты.
 - **SRCH-01** `src/pages/search.tsx:100` принимает `"all"` и `"Все"`, `src/components/dialogs/filters-dialog.tsx:49,176` держит `"Все"`. Свести к одному каноническому значению.
 - **SRCH-02** `src/pages/search.tsx:470` управляется `isReportDialogOpen`, но `setIsReportDialogOpen(true)` в файле не вызывается (`:289,493`). Нужна кнопка жалобы на карточке (как в `chats.tsx:674`, `user.tsx:166`) или зафиксировать отсутствие.
 - **SRCH-03** `src/pages/search.tsx:341,499` — `FiltersDialog` рендерится только при `searchFilters` (заполняется в `mode=autosearch`), в обычном режиме кнопка «сменить фильтры» нажимается в пустоту. Вариант: вести на `/search-filters` в обычном режиме.

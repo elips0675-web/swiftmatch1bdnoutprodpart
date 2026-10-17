@@ -57,7 +57,7 @@ export default function Home() {
 
   const topUsers = useMemo(() => {
     return [...ALL_DEMO_USERS]
-      .filter(u => u.id !== (currentUser?.id || 1) && !u.isSystem)
+      .filter(u => u.id !== (currentUser?.id || 1))
       .sort((a, b) => b.match - a.match)
       .slice(0, 4);
   }, [currentUser]);

@@ -182,7 +182,7 @@ export default function OnboardingPage() {
             city: formData.city,
             height: parseInt(formData.height) || null,
             goal: formData.datingGoal,
-            zodiac: formData.zodiac,
+            ...(formData.zodiac ? { zodiac: formData.zodiac } : {}),
             gender: formData.gender,
             looking_for: formData.lookingFor,
             circadian: formData.circadian,

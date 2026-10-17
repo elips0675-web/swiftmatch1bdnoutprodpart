@@ -147,8 +147,8 @@ export const POPULAR_CITIES: Record<string, string[]> = {
 };
 
 export const CIRCADIAN_RHYTHM_OPTIONS = [
-    { value: 'early-bird', label: 'circadian.early_bird' },
-    { value: 'night-owl', label: 'circadian.night_owl' },
+    { value: 'lark', label: 'circadian.early_bird' },
+    { value: 'owl', label: 'circadian.night_owl' },
     { value: 'flexible', label: 'circadian.flexible' },
 ];
 

@@ -105,11 +105,6 @@ function UserProfileContent() {
   }, []);
 
   useEffect(() => {
-    if (user && user.isSystem) {
-      router.replace('/');
-      return;
-    }
-
     const randomPhotos: string[] = [];
     const available = [...PlaceHolderImages].filter(p => p.imageUrl !== user.img);
     const count = Math.min(4, available.length);
@@ -120,7 +115,7 @@ function UserProfileContent() {
     }
 
     setPhotos([user.img, ...randomPhotos]);
-  }, [user, router]);
+  }, [user]);
 
   const earnedTitles = useMemo(() => getUserTitles(user, language), [user, language]);
 
@@ -142,7 +137,7 @@ function UserProfileContent() {
     setReportDescription('');
   };
 
-  if (!user || user.isSystem) return null;
+  if (!user) return null;
 
   return (
     <div className="flex flex-col min-h-screen bg-[#f8f9fb]">
