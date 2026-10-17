@@ -2,11 +2,11 @@
 Актуально: 17.10.2026
 
 > Детальные описания, обсуждения и разборы, которые были в основном файле `Что доделать.txt`.  
-> Основной компактный бэклог — в `Что доделать.txt` (после рефакторинга) или `Новый Что доделать.md`.  
+> Основной компактный бэклог — в `Что доделать.txt`.  
 > История закрытий — `Что сделано.txt`. Архив — `docs/agenda-archive.md`.
 
 ## P0. Блокеры среды (ENV-01–ENV-04)
-См. раздел 1 в `Новый Что доделать.md`. Детали из исходного файла:
+См. блокеры среды в `Что доделать.txt`. Детали из исходного файла:
 
 - **ENV-01** `server/.env` — реальные ключи: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SMTP_USER/PASS`, `SENTRY_DSN`, `AWS_*`/`S3_BUCKET`, `OPENAI_API_KEY`, `FCM_SERVER_KEY`, `REVENUECAT_WEBHOOK_SECRET`, `TWILIO_*`. Проверка: `powershell -File scripts/check-keys.ps1`.
 - **ENV-02** GitHub secrets для deploy.yml: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DB_*`.
