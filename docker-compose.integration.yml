@@ -1,0 +1,66 @@
+# Override для интеграционного прогона TEST-03: реальный server/src/index.js
+# против тех же сервисов, что и в docker-compose.yml (db: mysql:8.4, redis:
+# redis:7-alpine), плюс maildev — SMTP-ловушка вместо реального почтового
+# сервера. Прогон идёт против основного compose-файла, а не против его копии:
+# схема, initdb-скрипты и healthcheck те же, что поедут на VPS.
+#
+# Порты сдвинуты мимо занятых на машине разработчика (канон —
+# docs/AGENTS-startup.md: Docker и Laragon одновременно не поднимать):
+#   3306 — Laragon mysqld,     6379 — Laragon redis-server,
+#   1025 — Laragon mailpit,    3307/3002/8080 — основной docker-compose.
+# Без `!override` merge ports конкатенирует списки, и хост-порт 3307/6379
+# публиковался бы наряду с тестовым — конфликт с Laragon вернулся бы.
+#
+# Запуск только этим контуром (scripts/integration-smoke-run.mjs):
+#   docker compose -p swiftmatch-itest -f docker-compose.yml -f docker-compose.integration.yml up -d --wait db redis maildev
+# Имя проекта -p swiftmatch-itest изолирует volume'ы (swiftmatch-itest_db_data)
+# от основного проекта; уборка — `down -v` (смоук удаляет и контейнеры, и данные).
+services:
+  db:
+    ports: !override
+      - "3308:3306"
+    # Наследованный healthcheck (`mysqladmin ping -h localhost`, docker-compose.yml:48)
+    # ходит по сокету, а временный mysqld, которым entrypoint исполняет
+    # initdb-скрипты (импорт mysql_schema.sql), работает со skip-networking:
+    # контейнер объявляется healthy до подъёма TCP-порта, `--wait` возвращается
+    # раньше, чем MySQL принимает соединения по 3308 (гонка по времени — питфолл
+    # «падение 1 из 4 = гонка»). Пинг по 127.0.0.1 использует TCP: до готовности
+    # реального сервера — refused, healthcheck честно остаётся starting.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "127.0.0.1",
+          "-P",
+          "3306",
+          "-uroot",
+          "-proot",
+        ]
+
+  redis:
+    ports: !override
+      - "6380:6379"
+
+  maildev:
+    image: maildev/maildev:2.1.0
+    ports:
+      - "1125:1025"
+      - "1180:1080"
+    healthcheck:
+      # node в образе есть (maildev — node-приложение); wget/curl не гарантированы.
+      # 127.0.0.1, а не localhost: веб-сервер maildev слушает только IPv4, а
+      # localhost в контейнере резолвится в ::1 — healthcheck падал с ECONNREFUSED.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:1080/email',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
