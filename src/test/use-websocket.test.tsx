@@ -248,6 +248,143 @@ describe("useWebSocket", () => {
     }
   })
 
+  it("в нативной обёртке без VITE_WS_URL берёт wss://swiftmatch.app", async () => {
+    vi.stubEnv("VITE_WS_URL", "")
+    const win = window as unknown as { Capacitor?: { isNativePlatform: () => boolean } }
+    win.Capacitor = { isNativePlatform: () => true }
+    try {
+      vi.resetModules()
+      const { useWebSocket } = await import("@/hooks/use-websocket")
+      renderHook(() => useWebSocket())
+
+      expect(mockIo).toHaveBeenCalledWith("wss://swiftmatch.app", expect.objectContaining({ reconnection: true }))
+    } finally {
+      delete win.Capacitor
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it("в браузере без VITE_WS_URL берёт ws-адрес из location", async () => {
+    vi.stubEnv("VITE_WS_URL", "")
+    vi.resetModules()
+    try {
+      const { useWebSocket } = await import("@/hooks/use-websocket")
+      renderHook(() => useWebSocket())
+
+      const url = String(mockIo.mock.calls[0][0])
+      expect(url.startsWith("ws://")).toBe(true)
+      expect(url).toContain(window.location.host)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it("connect_error не-Error (строка) с auth-текстом тоже обновляет токен", async () => {
+    mockRefresh.refreshAuthToken.mockResolvedValue("fresh-token")
+    const { useWebSocket } = await import("@/hooks/use-websocket")
+    renderHook(() => useWebSocket())
+
+    await act(async () => {
+      trigger("connect_error", "Invalid token")
+    })
+
+    await waitFor(() => expect(mockSocket.connect).toHaveBeenCalledTimes(1))
+    expect(mockSocket.auth).toEqual({ token: "fresh-token" })
+  })
+
+  it("теряет соединение без объяснения — не трактует пустую ошибку как auth", async () => {
+    const { useWebSocket } = await import("@/hooks/use-websocket")
+    renderHook(() => useWebSocket())
+
+    await act(async () => {
+      trigger("connect_error", undefined)
+    })
+
+    expect(mockRefresh.refreshAuthToken).not.toHaveBeenCalled()
+    expect(mockAuth.logout).not.toHaveBeenCalled()
+  })
+
+  it("таймер молчит, пока предыдущий refresh ещё в полёте", async () => {
+    vi.useFakeTimers()
+    try {
+      mockRefresh.refreshAuthToken.mockReturnValue(new Promise(() => {}))
+      const { useWebSocket } = await import("@/hooks/use-websocket")
+      renderHook(() => useWebSocket())
+
+      await act(async () => {
+        trigger("connect_error", new Error("Invalid token"))
+      })
+      expect(mockRefresh.refreshAuthToken).toHaveBeenCalledTimes(1)
+
+      await act(async () => {
+        vi.advanceTimersByTime(5 * 60 * 1000)
+      })
+      await act(async () => {})
+
+      expect(mockRefresh.refreshAuthToken).toHaveBeenCalledTimes(1)
+      expect(mockSocket.connect).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("таймер не дёргает сокет, если токен не изменился", async () => {
+    vi.useFakeTimers()
+    try {
+      mockRefresh.refreshAuthToken.mockResolvedValue("same-token")
+      const { useWebSocket } = await import("@/hooks/use-websocket")
+      renderHook(() => useWebSocket())
+
+      mockSocket.auth = { token: "same-token" }
+
+      await act(async () => {
+        vi.advanceTimersByTime(5 * 60 * 1000)
+      })
+      await act(async () => {})
+
+      expect(mockRefresh.refreshAuthToken).toHaveBeenCalledTimes(1)
+      expect(mockSocket.disconnect).not.toHaveBeenCalled()
+      expect(mockSocket.connect).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("повторный auth:unauthorized во время refresh не запускает второй refresh", async () => {
+    mockRefresh.refreshAuthToken.mockReturnValue(new Promise(() => {}))
+    const { useWebSocket } = await import("@/hooks/use-websocket")
+    renderHook(() => useWebSocket())
+
+    await act(async () => {
+      trigger("auth:unauthorized")
+      trigger("auth:unauthorized")
+    })
+
+    expect(mockRefresh.refreshAuthToken).toHaveBeenCalledTimes(1)
+    expect(mockSocket.connect).not.toHaveBeenCalled()
+  })
+
+  it("таймер с неудачным refresh молчит: сокет не тронут, разлогина нет", async () => {
+    vi.useFakeTimers()
+    try {
+      mockRefresh.refreshAuthToken.mockResolvedValue(null)
+      const { useWebSocket } = await import("@/hooks/use-websocket")
+      renderHook(() => useWebSocket())
+
+      await act(async () => {
+        vi.advanceTimersByTime(5 * 60 * 1000)
+      })
+      await act(async () => {})
+
+      expect(mockRefresh.refreshAuthToken).toHaveBeenCalledTimes(1)
+      expect(mockSocket.disconnect).not.toHaveBeenCalled()
+      expect(mockSocket.connect).not.toHaveBeenCalled()
+      expect(mockAuth.logout).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it("таймер молчит без токена (не логинит впустую)", async () => {
     vi.useFakeTimers()
     try {

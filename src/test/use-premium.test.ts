@@ -90,6 +90,78 @@ describe("usePremium", () => {
     expect(result.current.subscription).toBeNull()
   })
 
+  it("отдаёт ответ из кэша в пределах TTL и не дёргает сеть второй раз", async () => {
+    vi.resetModules()
+    const premium = { tier: "gold", duration_months: 1, price: 699, started_at: "2025-01-01", expires_at: new Date(Date.now() + 30 * 86400000).toISOString(), is_active: 1 }
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(premium) })
+
+    const { usePremium } = await import("@/hooks/use-premium")
+
+    const first = renderHook(() => usePremium())
+    await waitFor(() => {
+      expect(first.result.current.loading).toBe(false)
+    })
+    first.unmount()
+
+    const second = renderHook(() => usePremium())
+
+    expect(second.result.current.loading).toBe(false)
+    expect(second.result.current.subscription).toEqual(premium)
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it("сбрасывает подписку, когда сервер ответил не-2xx", async () => {
+    vi.resetModules()
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      json: () => Promise.resolve({ message: "boom" }),
+    })
+
+    const { usePremium } = await import("@/hooks/use-premium")
+    const { result } = renderHook(() => usePremium())
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    expect(result.current.isPremium).toBe(false)
+    expect(result.current.subscription).toBeNull()
+    expect(result.current.tier).toBeNull()
+  })
+
+  it("не трогает состояние после размонтирования (поздний успешный ответ)", async () => {
+    vi.resetModules()
+    let resolveFetch: (value: unknown) => void = () => {}
+    mockFetch.mockReturnValueOnce(new Promise((resolve) => { resolveFetch = resolve }))
+
+    const premium = { tier: "silver", duration_months: 1, price: 299, started_at: "2025-01-01", expires_at: new Date(Date.now() + 86400000).toISOString(), is_active: 1 }
+    const { usePremium } = await import("@/hooks/use-premium")
+    const { unmount } = renderHook(() => usePremium())
+
+    unmount()
+    await act(async () => {
+      resolveFetch({ ok: true, json: () => Promise.resolve(premium) })
+    })
+
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it("не трогает состояние после размонтирования (поздняя ошибка сети)", async () => {
+    vi.resetModules()
+    let rejectFetch: (reason: unknown) => void = () => {}
+    mockFetch.mockReturnValueOnce(new Promise((_resolve, reject) => { rejectFetch = reject }))
+
+    const { usePremium } = await import("@/hooks/use-premium")
+    const { unmount } = renderHook(() => usePremium())
+
+    unmount()
+    await act(async () => {
+      rejectFetch(new Error("Network error"))
+    })
+
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
   it("refresh forces cache bypass", async () => {
     vi.resetModules()
     const premium = { tier: "platinum", duration_months: 3, price: 1499, started_at: "2025-01-01", expires_at: new Date(Date.now() + 90 * 86400000).toISOString(), is_active: 1 }
