@@ -137,4 +137,51 @@ test.describe('Premium: tiers + mock Stripe checkout flow', () => {
     await expect(page.locator('body')).toContainText(/Plus|Gold|Platinum|Премиум|Premium/i, { timeout: 10_000 })
     expect(errors).toEqual([])
   })
+
+  test('UI-джорни покупки: выбрать тариф → mock checkout → страница успеха → подписка активна и в API, и в интерфейсе', async ({ page, request }) => {
+    const user = await registerUser(request, 'uijourney')
+
+    await page.addInitScript((token) => {
+      window.localStorage.setItem('token', token)
+      document.cookie = `sm_token=${token}; path=/`
+    }, user.token)
+
+    const errors: string[] = []
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') errors.push(msg.text())
+    })
+    page.on('response', (res) => {
+      if (res.status() >= 500) errors.push(`API ${res.status()}: ${res.url()}`)
+    })
+
+    const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:8081'
+
+    // До покупки активность продаёт подписку (апселл-блок activity.premium_title)
+    await page.goto(`${baseUrl}/activity`)
+    await page.waitForLoadState('networkidle')
+    await expect(page.locator('body')).toContainText('Premium Доступ', { timeout: 10_000 })
+
+    // Тариф: выбираем Gold и жмём «Начать сейчас»
+    await page.goto(`${baseUrl}/premium`)
+    await page.waitForLoadState('networkidle')
+    await page.getByText('Gold', { exact: true }).click()
+    await page.getByRole('button', { name: 'Начать сейчас' }).click()
+
+    // Без STRIPE_SECRET_KEY сервер активирует mock-подписку, фронт уводит на страницу успеха
+    await page.waitForURL('**/premium/success', { timeout: 15_000 })
+    await expect(page.locator('body')).toContainText('Оплата прошла успешно!', { timeout: 10_000 })
+
+    // Сервер видит активную gold-подписку
+    const sub = await getMySubscription(request, user.token)
+    expect(sub.status).toBe(200)
+    expect(sub.body?.tier).toBe('gold')
+    expect(sub.body?.is_active).toBe(1)
+
+    // Интерфейс перестаёт продавать то, что уже куплено
+    await page.goto(`${baseUrl}/activity`)
+    await page.waitForLoadState('networkidle')
+    await expect(page.locator('body')).not.toContainText('Premium Доступ', { timeout: 10_000 })
+
+    expect(errors).toEqual([])
+  })
 })

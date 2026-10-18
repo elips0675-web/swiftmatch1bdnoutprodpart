@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-18T09:38:00.754Z",
+  "generated": "2026-10-18T10:50:57.501Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -844,14 +844,14 @@
   },
   "e2e": {
     "files": 22,
-    "tests": 205,
+    "tests": 206,
     "gate": {
       "files": 0,
       "tests": 0
     },
     "product": {
       "files": 22,
-      "tests": 205
+      "tests": 206
     },
     "perFile": [
       {
@@ -928,7 +928,7 @@
       },
       {
         "file": "e2e/premium.spec.ts",
-        "tests": 7
+        "tests": 8
       },
       {
         "file": "e2e/profile.spec.ts",
