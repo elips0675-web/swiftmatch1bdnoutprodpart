@@ -46,7 +46,7 @@
 
 ## Инфра/зависимости (детали)
 - **DEPS-01** `server/`: 28 moderate (`@sentry/node` 9→11, `firebase-admin`→14.5.0, `bull`→advisory в `uuid`); `npm audit fix --force` понижает `bull` до 1.1.3 — нельзя. 0 high/critical.
-- **INT-01** Внешние сервисы (S3/CDN, SMS/Twilio, AI-модерация/Rekognition, FCM, OpenAI) — только mock/fallback. Рекомендуется контрактные тесты с MinIO/maildev + алерты при работе в `mock` в `NODE_ENV=production`.
+- **INT-01** Внешние сервисы — ~~только mock/fallback, рекомендуются контрактные тесты с MinIO/maildev~~ — **закрыто 18.10.2026 (Stage 65-67):** почта — контрактный смоук против maildev (Stage 65-66), S3 — контрактный смоук против zenko/cloudserver (`docker-compose.integration.yml:69`, `server/scripts/s3-contract-smoke.mjs`: upload → варианты → presign → DELETE без сирот) + полнота init-данных (`server/scripts/init-data-smoke.mjs`, статический аудит в `scripts/schema-drift-audit.mjs`); живой прогон `npm run test:integration` зелёный по трём смоукам. Нереализуемая без ключей часть (RevenueCat/FCM/Twilio/OpenAI/Rekognition) и алерт «mock в `NODE_ENV=production`» — `Что доделать.txt:50`.
 
 ## Watch (детали)
 - **W-01** CI зелёный после правок 12.10.2026 (server-test/test-counters/e2e/Trivy) — проверить последний run на `main`.
