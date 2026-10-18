@@ -12,7 +12,7 @@
  * Всегда (офлайн): test-counter-audit, tsc --noEmit, lint, lint:server,
  * vite build, check:docs / enum-constraints / prod-mock / order-by / e2e /
  * n-plus-one / env / env-parity / swagger-coverage / headers / mysql-race /
- * ports, schema-drift --offline, check:mirrors.
+ * queue-smoke / backup-smoke / ports, schema-drift --offline, check:mirrors.
  *
  * Флаги:
  *   --skip-e2e — передаётся в test-counter-audit (прогон быстрее, E2E не сверяется);
@@ -43,6 +43,8 @@ export const OFFLINE_CHECKS = [
   { name: 'check:swagger-coverage', cmd: 'npm run check:swagger-coverage' },
   { name: 'check:headers', cmd: 'npm run check:headers' },
   { name: 'check:mysql-race', cmd: 'npm run check:mysql-race' },
+  { name: 'check:queue-smoke', cmd: 'npm run check:queue-smoke' },
+  { name: 'check:backup-smoke', cmd: 'npm run check:backup-smoke' },
   { name: 'check:ports', cmd: 'npm run check:ports' },
   { name: 'schema-drift --offline', cmd: 'node scripts/schema-drift-audit.mjs --offline' },
   { name: 'check:mirrors', cmd: 'npm run check:mirrors' },

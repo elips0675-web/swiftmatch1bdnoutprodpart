@@ -1,11 +1,37 @@
 #!/usr/bin/env node
-// Backup smoke test (Node.js, cross-platform).
-// Verifies: mysqldump available, schema can be dumped & restored, sanity checks pass.
-// Run: node scripts/verify-backup.mjs  (DB_* env or server/.env)
-// CI: deploy.yml server-test job, or manual.
+/**
+ * Backup/restore smoke — «резервная копия действительно восстанавливается» (TEST-02).
+ *
+ * Класс дыры. Шаг `Backup restore smoke test` в джобе `server-test` существовал, но
+ * снимал дамп с `--no-data`, то есть проверял восстановление ПУСТОЙ схемы: ни одна
+ * строка не сверялась, а «таблица существует» выполняется и на только что созданной
+ * базе. Такой прогон зелёный на базе, из которой потеряны все данные (питфолл
+ * «пустое хранилище выглядит как рабочее»). Вторая половина той же дыры —
+ * самодельный разбор дампа по `;\n` и `catch {}` вокруг восстановления: строка
+ * данных с `;\n` внутри ломала восстановление, а ошибка гасилась, поэтому падение
+ * выглядело как успешный прогон.
+ *
+ * Что делает прогон (каждый шаг обязателен, любой сбой — exit 1):
+ *   1. Находит `mysqldump` и клиент `mysql`. Нет инструмента — падение: «проверять
+ *      нечем» не должно выглядеть как «проверка пройдена».
+ *   2. Кладёт в бэкапируемую БД таблицу-канарейку `_backup_smoke_canary` со
+ *      строками, на которых ломается наивный разбор: кириллица, кавычки, обратный
+ *      слэш, `;` и перевод строки.
+ *   3. Снимает дамп С ДАННЫМИ (`--single-transaction --quick --routines --triggers`).
+ *   4. Требует, чтобы в дампе были `INSERT INTO` и `CREATE TABLE` проверяемых таблиц.
+ *   5. Создаёт пустую БД `…_verify_backup` и восстанавливает дамп реальным клиентом
+ *      (`mysql < dump`), а не разбором текста дампа.
+ *   6. Сверяет восстановленное: все таблицы источника на месте, канарейка совпадает
+ *      побайтово, число строк в ядре совпадает с источником.
+ *   7. Убирает за собой: канарейку из источника, scratch-БД, файл дампа.
+ *
+ * Запуск: `node scripts/verify-backup.mjs` (`DB_*` из окружения или `server/.env`).
+ * В CI — шаг `Backup restore smoke test` в джобе `server-test` (`deploy.yml`);
+ * структуру джобы и самого смоука держит гейт `npm run check:backup-smoke`.
+ */
 import fs from 'fs'
 import path from 'path'
-import { execSync } from 'child_process'
+import { execFileSync, spawnSync } from 'child_process'
 import mysql from 'mysql2/promise'
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1')), '..')
@@ -21,135 +47,282 @@ function loadEnv() {
 loadEnv()
 
 const DB_HOST = process.env.DB_HOST || 'localhost'
+const DB_PORT = Number(process.env.DB_PORT || 3306)
 const DB_USER = process.env.DB_USER || 'root'
 const DB_PASS = process.env.DB_PASSWORD || ''
 const DB_NAME = process.env.DB_NAME || 'swiftmatch'
 const VERIFY_DB = `${DB_NAME}_verify_backup`
-const DUMP_FILE = path.join(root, 'backups', `verify-${Date.now()}.sql`)
+const CANARY = '_backup_smoke_canary'
+const SANITY_TABLES = ['users', 'user_profiles', 'matches', 'messages', 'subscriptions', 'feature_flags']
+const DUMP_DIR = path.join(root, 'backups')
+const DUMP_FILE = path.join(DUMP_DIR, `verify-${Date.now()}.sql`)
+const MAX_BUFFER = 512 * 1024 * 1024
 
-function findMysqldump() {
-  // Try PATH first (Linux CI has mysql-client installed)
-  try { return execSync('which mysqldump 2>/dev/null || where mysqldump 2>nul', { encoding: 'utf8' }).trim() } catch {}
-  // Common Windows paths
-  const winPaths = [
-    'C:\\laragon\\bin\\mysql\\mysql-8.4.3-winx64\\bin\\mysqldump.exe',
-    'C:\\laragon\\bin\\mysql\\mysql-8.0.30-winx64\\bin\\mysqldump.exe',
+// Строки канарейки нарочно «неудобные»: наивный разбор дампа по `;\n` спотыкается
+// именно на них, а `json`-сверка после восстановления видит любую потерю байт.
+const CANARY_ROWS = [
+  { id: 1, note: 'кириллица', payload: 'строка; с точкой с запятой\nи переводом строки' },
+  { id: 2, note: "кавычки ' \" и слэш \\", payload: 'обратный слэш \\ и обе кавычки' },
+  { id: 3, note: 'emoji', payload: '🙂🚀 и таб\tвнутри' },
+]
+
+const problems = []
+
+function fail(message) {
+  problems.push(message)
+  console.error(`  [FAIL] ${message}`)
+}
+
+function ok(message) {
+  console.log(`  [OK] ${message}`)
+}
+
+function firstLine(text) {
+  return String(text || '').trim().split(/\r?\n/)[0] || '(пусто)'
+}
+
+function findTool(name) {
+  const exe = process.platform === 'win32' ? `${name}.exe` : name
+  try {
+    const out = execFileSync(process.platform === 'win32' ? 'where' : 'which', [name], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    const found = out
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)[0]
+    if (found) return found
+  } catch (err) {
+    // `where`/`which` возвращает 1, когда инструмента в PATH нет, — это штатный
+    // случай, ниже его ищут по известным путям установки. Всё остальное — не
+    // «нет инструмента», а сломанный поиск, и молчать об этом нельзя: смоук
+    // обязан падать с внятной причиной, а не выглядеть как «инструмент не найден».
+    if (err && err.status !== 1) {
+      console.warn(`  [warn] поиск ${name} через where/which: ${firstLine(err.message)}`)
+    }
+  }
+  const winDirs = [
+    'C:\\laragon\\bin\\mysql\\mysql-8.4.3-winx64\\bin',
+    'C:\\laragon\\bin\\mysql\\mysql-8.0.30-winx64\\bin',
   ]
-  for (const p of winPaths) if (fs.existsSync(p)) return p
+  for (const dir of winDirs) {
+    const candidate = path.join(dir, exe)
+    if (fs.existsSync(candidate)) return candidate
+  }
   return null
 }
 
-const SANITY_TABLES = ['users', 'user_profiles', 'matches', 'messages', 'subscriptions', 'feature_flags']
+function clientEnv() {
+  return { ...process.env, MYSQL_PWD: DB_PASS }
+}
 
-async function main() {
-  console.log(`[backup-verify] Starting backup smoke test for DB: ${DB_NAME}`)
-
-  // 1. Find mysqldump
-  const mysqldump = findMysqldump()
-
-  // 3. Connect to DB
-  const conn = await mysql.createConnection({
-    host: DB_HOST,
-    user: DB_USER,
-    password: DB_PASS,
-    database: DB_NAME,
+function runClient(bin, args) {
+  return spawnSync(bin, args, {
+    encoding: 'buffer',
+    env: clientEnv(),
+    maxBuffer: MAX_BUFFER,
+    windowsHide: true,
   })
+}
 
-  // 2. Create dump (mysqldump or SQL fallback)
-  const dumpDir = path.dirname(DUMP_FILE)
-  if (!fs.existsSync(dumpDir)) fs.mkdirSync(dumpDir, { recursive: true })
+function restoreDump(bin, args, dump) {
+  return spawnSync(bin, args, {
+    input: dump,
+    encoding: 'buffer',
+    env: clientEnv(),
+    maxBuffer: MAX_BUFFER,
+    windowsHide: true,
+  })
+}
 
-  let dumpContent = ''
-  if (mysqldump) {
-    const passFlag = DB_PASS ? `-p${DB_PASS}` : ''
-    const dumpCmd = `"${mysqldump}" -h${DB_HOST} -u${DB_USER} ${passFlag} --no-data --routines --triggers ${DB_NAME}`
-    try {
-      dumpContent = execSync(dumpCmd, { encoding: 'utf8', timeout: 30000 })
-      console.log(`[backup-verify] mysqldump: ${mysqldump}`)
-    } catch (err) {
-      console.error(`[backup-verify] mysqldump failed: ${err.message}, falling back to SQL schema dump`)
+async function listTables(conn, database) {
+  const [rows] = await conn.query(
+    `SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME`,
+    [database],
+  )
+  return rows.map((r) => r.name)
+}
+
+async function countRows(conn, database, table) {
+  const [[row]] = await conn.query(`SELECT COUNT(*) AS cnt FROM \`${database}\`.\`${table}\``)
+  return Number(row.cnt)
+}
+
+async function seedCanary(conn) {
+  await conn.query(`DROP TABLE IF EXISTS \`${CANARY}\``)
+  await conn.query(
+    `CREATE TABLE \`${CANARY}\` (
+      id INT NOT NULL PRIMARY KEY,
+      note VARCHAR(64) NOT NULL,
+      payload TEXT NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  )
+  for (const row of CANARY_ROWS) {
+    await conn.query(`INSERT INTO \`${CANARY}\` (id, note, payload) VALUES (?, ?, ?)`, [
+      row.id,
+      row.note,
+      row.payload,
+    ])
+  }
+  ok(`канарейка в источнике: ${CANARY_ROWS.length} строки с «неудобными» значениями`)
+}
+
+function dumpDatabase(mysqldump) {
+  const args = [
+    `--host=${DB_HOST}`,
+    `--port=${DB_PORT}`,
+    `--user=${DB_USER}`,
+    '--single-transaction',
+    '--quick',
+    '--routines',
+    '--triggers',
+    '--hex-blob',
+    '--default-character-set=utf8mb4',
+    DB_NAME,
+  ]
+  const result = runClient(mysqldump, args)
+  if (result.status !== 0) {
+    fail(`mysqldump упал (exit ${result.status}): ${firstLine(result.stderr)}`)
+    return null
+  }
+  fs.mkdirSync(DUMP_DIR, { recursive: true })
+  const dump = result.stdout
+  fs.writeFileSync(DUMP_FILE, dump)
+  return dump
+}
+
+function restoreDatabase(mysqlBin, dump) {
+  return restoreDump(
+    mysqlBin,
+    [`--host=${DB_HOST}`, `--port=${DB_PORT}`, `--user=${DB_USER}`, VERIFY_DB],
+    dump,
+  )
+}
+
+async function verifyRestore(conn, sourceTables, dumpText) {
+  for (const table of [...SANITY_TABLES, CANARY]) {
+    if (!new RegExp(`CREATE TABLE\\s+\`?${table}\`?`, 'i').test(dumpText)) {
+      fail(`в дампе нет CREATE TABLE для ${table} — таблица в бэкап не попала`)
     }
   }
-
-  // Fallback: generate schema dump via SQL
-  if (!dumpContent) {
-    console.log('[backup-verify] Using SQL schema dump (mysqldump not available)')
-    const [tables] = await conn.query(`SHOW TABLES`)
-    const tableNames = tables.map(r => Object.values(r)[0])
-    const stmts = [`CREATE DATABASE IF NOT EXISTS \`${VERIFY_DB}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`]
-    for (const t of tableNames) {
-      const [[{ 'Create Table': ct }]] = await conn.query(`SHOW CREATE TABLE \`${t}\``)
-      stmts.push(`CREATE TABLE IF NOT EXISTS \`${VERIFY_DB}\`.\`${t}\` ${ct};`)
-    }
-    dumpContent = stmts.join('\n')
+  const inserts = (dumpText.match(/INSERT INTO/gi) || []).length
+  if (inserts === 0) {
+    fail('в дампе нет INSERT INTO — это схема без данных, восстановление пустой базы ничего не доказывает')
+  } else {
+    ok(`дамп с данными: ${(dumpText.length / 1024).toFixed(1)} KB, вставок INSERT: ${inserts}`)
   }
 
-  fs.writeFileSync(DUMP_FILE, dumpContent)
-  console.log(`[backup-verify] Schema dump: ${DUMP_FILE} (${(dumpContent.length / 1024).toFixed(1)} KB)`)
+  const scratchTables = await listTables(conn, VERIFY_DB)
+  const missing = sourceTables.filter((t) => !scratchTables.includes(t))
+  if (missing.length) {
+    fail(
+      `в восстановленной БД нет ${missing.length} из ${sourceTables.length} таблиц: ${missing.slice(0, 8).join(', ')}${missing.length > 8 ? ' …' : ''}`,
+    )
+  } else {
+    ok(`все таблицы источника восстановлены: ${sourceTables.length}`)
+  }
 
-  // 4. Create scratch DB, restore, sanity check
-  try {
-    await conn.query(`DROP DATABASE IF EXISTS \`${VERIFY_DB}\``)
-    await conn.query(`CREATE DATABASE \`${VERIFY_DB}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
-    console.log(`[backup-verify] Scratch DB created: ${VERIFY_DB}`)
+  const [rows] = await conn.query(`SELECT id, note, payload FROM \`${VERIFY_DB}\`.\`${CANARY}\` ORDER BY id`)
+  const restored = rows.map((r) => ({ id: Number(r.id), note: r.note, payload: r.payload }))
+  if (JSON.stringify(restored) !== JSON.stringify(CANARY_ROWS)) {
+    fail(`канарейка восстановилась не побайтово: ожидали ${JSON.stringify(CANARY_ROWS)}, получили ${JSON.stringify(restored)}`)
+  } else {
+    ok(`канарейка после восстановления совпадает побайтово: ${restored.length} строки`)
+  }
 
-    // Restore dump (just schema since --no-data)
-    const dumpContent = fs.readFileSync(DUMP_FILE, 'utf8')
-    // Split by statements and execute
-    const statements = dumpContent.split(/;\s*\n/).filter(s => s.trim() && !s.trim().startsWith('--'))
-    let executed = 0
-    for (const stmt of statements) {
-      const trimmed = stmt.trim()
-      if (!trimmed || trimmed.startsWith('--') || trimmed.startsWith('/*')) continue
-      try {
-        await conn.query(`USE \`${VERIFY_DB}\``)
-        await conn.query(trimmed)
-        executed++
-      } catch {
-        // Skip warnings (e.g., table already exists)
-      }
+  for (const table of SANITY_TABLES) {
+    const src = await countRows(conn, DB_NAME, table)
+    const dst = await countRows(conn, VERIFY_DB, table)
+    if (src !== dst) {
+      fail(`${table}: в источнике ${src} строк, после восстановления ${dst} — данные потерялись`)
+    } else {
+      ok(`${table}: ${dst} строк — совпадает с источником`)
     }
-    console.log(`[backup-verify] Restored ${executed} statements into scratch DB`)
-
-    // Sanity checks
-    let fail = false
-    for (const table of SANITY_TABLES) {
-      try {
-        const [[{ cnt }]] = await conn.query(`SELECT COUNT(*) as cnt FROM \`${VERIFY_DB}\`.\`${table}\``)
-        console.log(`  [OK] ${table}: ${cnt} rows`)
-      } catch (e) {
-        // Table might not exist if schema-only dump
-        try {
-          await conn.query(`USE \`${VERIFY_DB}\``)
-          const [tables] = await conn.query(`SHOW TABLES LIKE '${table}'`)
-          if (tables.length === 0) {
-            console.log(`  [OK] ${table}: exists in schema (schema-only dump)`)
-          } else {
-            console.log(`  [FAIL] ${table}: ${e.message.split('\n')[0]}`)
-            fail = true
-          }
-        } catch (e2) {
-          console.log(`  [FAIL] ${table}: ${e2.message.split('\n')[0]}`)
-          fail = true
-        }
-      }
-    }
-
-    // 5. Cleanup
-    await conn.query(`DROP DATABASE IF EXISTS \`${VERIFY_DB}\``)
-    console.log(`[backup-verify] Scratch DB dropped`)
-
-    // Cleanup dump file
-    try { fs.unlinkSync(DUMP_FILE) } catch {}
-
-    if (fail) {
-      console.error('[backup-verify] FAIL: sanity checks did not pass')
-      process.exit(1)
-    }
-    console.log(`[backup-verify] PASS: backup schema restores cleanly, ${SANITY_TABLES.length} tables verified`)
-  } finally {
-    await conn.end()
   }
 }
 
-main().catch((e) => { console.error('[backup-verify] FATAL:', e.message); process.exit(1) })
+async function cleanup(conn) {
+  try {
+    await conn.query(`DROP TABLE IF EXISTS \`${CANARY}\``)
+    await conn.query(`DROP DATABASE IF EXISTS \`${VERIFY_DB}\``)
+    if (fs.existsSync(DUMP_FILE)) fs.unlinkSync(DUMP_FILE)
+    ok(`убрано за собой: канарейка, ${VERIFY_DB}, файл дампа`)
+  } catch (err) {
+    fail(`очистка не прошла: ${err.message}`)
+  }
+}
+
+function finish() {
+  console.log('')
+  if (problems.length) {
+    console.error(`[backup-verify] FAIL: находок ${problems.length} — восстановление бэкапа не доказано`)
+    process.exit(1)
+  }
+  console.log('[backup-verify] PASS: дамп с данными восстановлен клиентом mysql; канарейка побайтово, таблицы и число строк сверены')
+}
+
+async function main() {
+  console.log(`[backup-verify] Источник: ${DB_NAME}@${DB_HOST}:${DB_PORT}; scratch: ${VERIFY_DB}`)
+
+  const mysqldump = findTool('mysqldump')
+  const mysqlBin = findTool('mysql')
+  if (!mysqldump) fail('не найден mysqldump — снять дамп нечем, реальный путь бэкапа останется непроверенным')
+  if (!mysqlBin) fail('не найден клиент mysql — восстановить дамп нечем')
+  if (problems.length) {
+    finish()
+    return
+  }
+  console.log(`[backup-verify] Инструменты: ${mysqldump} | ${mysqlBin}`)
+
+  let conn
+  try {
+    conn = await mysql.createConnection({
+      host: DB_HOST,
+      port: DB_PORT,
+      user: DB_USER,
+      password: DB_PASS,
+      database: DB_NAME,
+    })
+  } catch (err) {
+    fail(`нет подключения к ${DB_NAME}@${DB_HOST}:${DB_PORT}: ${err.message}`)
+    finish()
+    return
+  }
+
+  try {
+    await seedCanary(conn)
+    const sourceTables = await listTables(conn, DB_NAME)
+    const missingCore = SANITY_TABLES.filter((t) => !sourceTables.includes(t))
+    if (!sourceTables.length) {
+      fail(`в ${DB_NAME} нет ни одной таблицы — бэкапить нечего`)
+    } else if (missingCore.length) {
+      fail(
+        `в ${DB_NAME} нет таблиц ядра (${missingCore.join(', ')}) — база не инициализирована, восстановление нечего проверять`,
+      )
+    } else {
+      const dump = dumpDatabase(mysqldump)
+      if (dump) {
+        await conn.query(`DROP DATABASE IF EXISTS \`${VERIFY_DB}\``)
+        await conn.query(`CREATE DATABASE \`${VERIFY_DB}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+        const restore = restoreDatabase(mysqlBin, dump)
+        if (restore.status !== 0) {
+          fail(`восстановление клиентом mysql упало (exit ${restore.status}): ${firstLine(restore.stderr)}`)
+        } else {
+          ok(`дамп восстановлен клиентом mysql в пустую БД ${VERIFY_DB}`)
+          await verifyRestore(conn, sourceTables, dump.toString('utf8'))
+        }
+      }
+    }
+  } finally {
+    await cleanup(conn)
+    await conn.end()
+  }
+
+  finish()
+}
+
+main().catch((err) => {
+  console.error('[backup-verify] FATAL:', err.message)
+  process.exit(1)
+})

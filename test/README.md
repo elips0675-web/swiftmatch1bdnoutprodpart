@@ -165,6 +165,7 @@ cd server && npm test            # серверные тесты
 | Раскладка документации | `npm run check:docs` | `Промты.txt` снова стал источником правил (шапка пропала, вернулись разделы 0–20 или 21–34); битая ссылка в таблице канона; `docs/product-roadmap.md` потерял один из 14 разделов идей, похудел или набрал чужих правил; запрещённые формулировки (правила `admin-auth-passive` и `zod-version-claim`, буквальные примеры — в `hint` гейта) в отслеживаемых `.md`/`.txt`; версия пакета в стековой таблице (`README.md`, `project-context.md`, `docs/AGENTS-system-prompt.md`, `docs/AGENTS-workflow.md`) не совпала с `package.json` или ряд стека пропал; в каноне снова написано «React Hook Form + Zod», хотя `zod` удалён 04.10.2026; архив `context.txt` без пометки «ИСТОРИЧЕСКИЙ СРЕЗ», без даты среза и без ссылки на канон; гейт не вызывается из `ci.yml`/`deploy.yml`, джоба переименована или помечена `continue-on-error`/`if: false` |
 | SQL внутри цикла | `npm run check:n-plus-one` | `pool.query`/`conn.execute` в теле цикла по коллекции → 51 запрос вместо 2 (рассылка уведомлений об отмене встречи делала по два запроса на участника, профиль — по INSERT на интерес); **протухшее оправдание** из `JUSTIFIED` (номер строки разошёлся с кодом, якорь `expect` не найден); оправдание без якоря; гейт не вызван из `ci.yml`/`deploy.yml` (этап 33) |
 | Живой тест на MySQL | `npm run check:mysql-race` | у джобы `test-server` нет сервиса БД (или у сервиса нет health-check, или он с чужим образом); не задан `REQUIRE_MYSQL: '1'` или `DB_HOST`/`DB_USER`/`DB_PASSWORD`; джоба может зеленеть при провале (`continue-on-error`, `npm test \|\| true`); тест-файл читает флаг не строго как `'1'`, условие пропуска его не учитывает, остался `skipIf(!admin)` или нет теста, падающего при `admin === null` (этап 36, N1) |
+| Смоук восстановления бэкапа | `npm run check:backup-smoke` | шаг `verify-backup` в `server-test` был заведён, но снимал дамп с `--no-data` и восстанавливал **пустую схему**: ни одна строка не сверялась, «таблица существует» верно и для свежесозданной базы, а самодельный разбор дампа по `;\n` и `catch {}` гасили ошибку восстановления (питфолл «пустое хранилище выглядит как рабочее»). Гейт требует от джобы шаг смоука с `DB_*` и создание схемы, а от смоука — дамп **с данными**, таблицу-канарейку со «сложными» значениями (кириллица, кавычки, слэш, `;`+перевод строки), сверку числа строк с источником, восстановление реальным клиентом `mysql`, `process.exit(1)` на любую находку и отсутствие пустых `catch` (TEST-02) |
 | CHECK/ENUM схемы ↔ валидаторы кода | `npm run check:enum-constraints` | код-валидатор `intField` шире CHECK схемы (клиент проходит код и получает 500 от MySQL); диапазонный CHECK не проверяется ни в одном файле, который пишет в таблицу; белый список кода разрешает значение, которого нет в ENUM (`OFFER_CATEGORIES = […,'bar']`); литерал в `INSERT`/`UPDATE` в ENUM-колонку, которого нет в ENUM; список объявлен и нигде не используется (мёртвая переменная = незакрытая функция) (этап 37, N4) |
 | Переменные окружения против эталонов | `npm run check:env` | «работает у меня»: `process.env.X` на сервере и `import.meta.env.X` на фронте читаются кодом, но не объявлены ни в `server/.env.example`, ни в корневом `.env.example`, ни в compose `environment` сервиса `app` — на VPS/CI переменная undefined и код молча уходит в fallback; compose-ключ, который код не читает и которого нет в эталоне, — мёртвая настройка (этап 45, N7; поймал `ALLOW_UNMODERATED_PHOTOS` и `API_URL`) |
 | Корневой `.env.example` против серверного | `npm run check:env-parity` | `docker-compose` (сервис `app`) читает **корневой** `.env` (`env_file`), поэтому ключ, задокументированный только в `server/.env.example`, оператор выставит в `server/.env` — а контейнер его не увидит, и прод молча уходит в fallback. Гейт требует, чтобы все ключи `server/.env.example` были и в корневом `.env.example` (P2 #34) |
@@ -180,7 +181,7 @@ cd server && npm test            # серверные тесты
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 1330 тестов, 111 файлов — **0 failures**
+- **Фронтенд (Vitest):** 1364 теста, 112 файлов — **0 failures**
 - **Сервер (Vitest):** 1260 тестов, 89 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 205 тестов, 22 spec-файла — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
@@ -206,19 +207,24 @@ cd server && npm test            # серверные тесты
 |-------|-----------|
 | `lint` | `tsc --noEmit` → `eslint src/` → `vite build` |
 | `lint-server` | `eslint` по `server/src` (этап 29) |
+| `typecheck-gate` | `npm run check:typecheck` — `scripts.typecheck` собирает `tsconfig.app.json` + `tsconfig.node.json` с `-p/--noEmit`, workflow не вызывает голый `tsc`, include проектов покрывают реальные файлы (иначе `tsc --noEmit` проверяет корневой `tsconfig.json` с `"files": []` — ноль файлов; P3 #37) |
 | `e2e` | **обязательный E2E на любом push/PR** (этап 30): MySQL 8.4 сервис → схема → `seed-migrations` → `migrate.js` → **`server/src/seed.js`** → API 3002 + `vite preview --strictPort` 8081 → `wait-for-url` → `npm run test:e2e` → `upload-artifact` при `always()` |
 | `e2e-gate` | `npm run check:e2e` — E2E-джоба обязательна, рецепт способен стать зелёным, команды Playwright в двух workflow совпадают |
 | `test` | фронт-тесты (vitest) |
 | `test-server` | серверные тесты (vitest, без БД) |
 | `schema-drift` | `schema-drift-audit.mjs --offline` |
+| `order-by` | `node scripts/order-by-audit.mjs` — пагинация детерминирована: последний термин `ORDER BY` замыкается по PRIMARY KEY/UNIQUE главной таблицы, неоднозначный `id` — находка (между страницами дубли и пропуски) |
 | `secrets-leak` | `secrets-leak-audit.mjs` |
 | `test-counters` | `test-counter-audit.mjs` (нужны оба `node_modules`) |
 | `deploy-persistence` | `deploy-persistence-audit.mjs` |
 | `deploy-rollout` | `npm run check:deploy-rollout` — структура безопасной выкладки: `--wait` + проба health из compose, снимок `:rollback` до сборки, отдельный шаг отката `if: failure()` с `--no-build` и пробой (этап 49) |
+| `dependency-integrity` | `npm run check:deps` — целостность зависимостей двусторонняя: импортируемое объявлено (иначе `ENOENT` на чистой машине, а локально спасает транзитивная установка) и объявленное в `dependencies` используется (иначе мёртвый пакет едет в образ); спецификаторы разбираются по AST, не регуляркой (этап 31, P1-B5) |
 | `dependency-audit` | `npm run audit:prod` в корне и в `server/` (без `npm ci` — аудиту нужен только lock-файл) |
 | `docs-canon` | `npm run check:docs` — раскладка документации: правила только в `docs/AGENTS-*.md`, идеи 21–34 в `docs/product-roadmap.md`, архив помечен, запрещённых формулировок в отслеживаемых `.md`/`.txt` нет, версии стека в таблицах сверены с `package.json`, упоминаний удалённого `zod` нет (этап 32) |
 | `n-plus-one` | `npm run check:n-plus-one` — SQL внутри цикла по коллекции (2N запросов вместо 2) + протухшие оправдания `JUSTIFIED` (этап 33, N5) |
 | `mysql-race` | `npm run check:mysql-race` — джоба `test-server` обязана объявлять сервис БД, `REQUIRE_MYSQL=1` и не иметь права зеленеть при провале; живой тест на MySQL обязан превращать пропуск в падение (этап 36, N1) |
+| `queue-smoke` | `npm run check:queue-smoke` — джоба обязана объявлять сервис `redis` с health-check, задавать `REQUIRE_REDIS=1`, а смоук — превращать отсутствие Redis в падение: иначе смоук очередей зеленеет, не выполнив ни одной джобы на живом движке |
+| `backup-smoke` | `npm run check:backup-smoke` — restore-смоук восстанавливает данные, а не пустую схему: шаг в `server-test` с `DB_*` после создания схемы, дамп с данными, канарейка, сверка числа строк, восстановление клиентом `mysql`, падение вместо пропуска (TEST-02) |
 | `enum-constraints` | `npm run check:enum-constraints` — CHECK/ENUM из `database/mysql_schema.sql` против валидаторов кода: код-валидатор шире CHECK, диапазонный CHECK не покрыт в пишущем файле, белый список кода разрешает значение вне ENUM, литерал в `INSERT`/`UPDATE` вне ENUM (этап 37, N4) |
 | `env-consistency` | `npm run check:env` — `process.env.*` сервера и `import.meta.env.*` фронта объявлены в `server/.env.example`/корневом `.env.example`/compose `environment`; compose не тащит мёртвых настроек (этап 45, N7) |
 | `env-parity` | `npm run check:env-parity` — все ключи `server/.env.example` задокументированы и в корневом `.env.example`; compose (сервис `app`) читает корневой `.env`, поэтому серверный ключ до контейнера не доедет (P2 #34) |
@@ -226,14 +232,18 @@ cd server && npm test            # серверные тесты
 | `prod-mock` | `npm run check:prod-mock` — каждый хендлер с платным стоком (`mock: true`, `'paid'`, `INSERT INTO … subscriptions`, `commission_rate = 15`) закрыт `refuseMockPayment(res)`; вебхуки исключены (N9-tail, после этапа 39) |
 | `security-headers` | `npm run check:headers` — security-заголовки на периметре: все три nginx-конфига (в образ едет `swiftmatch.http.conf`), наследование `add_header`, `vercel.json`, `index.html`, порядок `helmet()`/`express.static` (этап 38, подключён этапом 43) + лимиты и WS-таймаут периметра, проверка 6 (этап 44: `limit_req_zone` только http-уровень, api 60r/s / auth 10r/s, `client_max_body_size 20M`, `/socket.io/` ≥ 300s) |
 | `alerts` | `npm run check:alerts` — правила алертинга: `monitoring/alerts.yml` разобран (у каждого правила `alert`/`expr`/`for`/`severity`/`summary`/`description`), метрики из `expr` объявлены в `server/src/metrics.js`, файл подключён в `rule_files` и смонтирован в контейнер Prometheus (этап 48) |
+| `mirrors` | `npm run check:mirrors` — побайтовые зеркала `test/` (8 пар): отсутствие зеркала или расхождение — падение, а не пропуск |
+| `blocks-coverage` | `npm run check:blocks-coverage` — выборка чужого профиля/фото обязана быть под блок-предикатом (`notBlocked`/`blockFilter`), `@public` или `JUSTIFIED` с якорем (питфолл 46) |
+| `query-param` | `npm run check:query-param` — query-параметр прочитан и не забыт: `?premium=1` без использования значения — находка |
+| `migrations-lag` | `npm run check:migrations-lag` — БД, отставшая от миграций, обязана краснить дрейф-аудит: живой MySQL-сервис, `REQUIRE_MYSQL=1`, отсутствие БД — падение, а не зелёный пропуск (питфолл 99) |
 
 ### `.github/workflows/deploy.yml` — push в `main`/`develop`, PR в `main` (Node 22)
 
 | Джоба | Что делает |
 |-------|-----------|
-| `lint-and-typecheck` | `check:ports` → `lint` → `lint:server` → `tsc` → **`secrets-leak`**, **`deploy-persistence`**, **`audit:prod` ×2**, **`check:e2e`**, **`check:docs`**, **`check:headers`**, **`check:alerts`**, **`check:n-plus-one`**, **`check:mysql-race`**, **`check:enum-constraints`**, **`check:env`**, **`check:env-parity`**, **`check:swagger-coverage`**, **`check:prod-mock`** (блокируют деплой) |
+| `lint-and-typecheck` | `check:ports` → `lint` → `lint:server` → `typecheck` → `check:typecheck` → **`secrets-leak`**, **`deploy-persistence`**, **`check:deploy-rollout`**, **`check:order-by`**, **`audit:prod` ×2**, **`check:e2e`**, **`check:deps`**, **`check:docs`**, **`check:headers`**, **`check:n-plus-one`**, **`check:mysql-race`**, **`check:queue-smoke`**, **`check:backup-smoke`**, **`check:enum-constraints`**, **`check:env`**, **`check:env-parity`**, **`check:swagger-coverage`**, **`check:prod-mock`**, **`check:mirrors`**, **`check:blocks-coverage`**, **`check:query-param`**, **`check:alerts`** (блокируют деплой) |
 | `frontend-test` | витест + `check-native-config` + `vite build` |
-| `server-test` | MySQL 8.4 сервис: схема → `seed-migrations` → `migrate.js` → `schema-validate` → **live `schema-drift-audit`** → `sql-explain-audit` → `verify-backup` → витест с живой БД |
+| `server-test` | MySQL 8.4 сервис: схема → `seed-migrations` → `migrate.js` → `schema-validate` → **live `schema-drift-audit`** → `sql-explain-audit` → `verify-backup` (дамп **с данными** → restore в отдельную БД → канарейка и число строк) → витест с живой БД |
 | `test-counters` | сверка чисел с прогоном |
 | `e2e-test` | Playwright на поднятом стеке (needs: lint, frontend, server) + выгрузка отчёта; с этапа 30 рецепт идентичен `e2e` в `ci.yml` (сид демо-данных, `wait-for-url` вместо `sleep`, `vite preview --strictPort`) |
 | `docker-config-check` | `docker compose config` + сборка образов `server`/`web` + Trivy (сейчас `exit-code: 0`, режим baseline) |
@@ -519,8 +529,15 @@ REDIS_URL=redis://localhost:6379
 
 Бэкапы: `swiftmatch_YYYY-MM-DD_HHmmss.sql`, автоудаление по умолчанию через
 **30 дней** (`-RetentionDays` в PowerShell, 7-й позиционный аргумент в shell).
-Проверка восстановления — `scripts/verify-backup.mjs` (создаёт БД
-`swiftmatch_verify_backup`, гоняется в джобе `server-test` на тестовой БД).
+Проверка восстановления — `scripts/verify-backup.mjs` (джоба `server-test`,
+`deploy.yml`; локально — `node scripts/verify-backup.mjs` при живом MySQL):
+кладёт в БД таблицу-канарейку с «неудобными» значениями (кириллица, кавычки,
+слэш, `;` + перевод строки), снимает дамп **с данными**, восстанавливает его
+реальным клиентом `mysql` в отдельную БД `swiftmatch_verify_backup` и сверяет
+канарейку побайтово и число строк ядра с источником. Любая находка —
+`exit 1`; пустая схема без данных смоук не проходит (иначе «резервная копия
+восстанавливается» числится проверенной, не будучи проверенной). Структуру
+джобы и смоука держит гейт `npm run check:backup-smoke`.
 
 ---
 

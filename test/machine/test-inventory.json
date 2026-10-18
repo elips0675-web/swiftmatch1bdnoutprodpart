@@ -1,21 +1,25 @@
 {
-  "generated": "2026-10-18T08:27:42.018Z",
+  "generated": "2026-10-18T08:56:59.417Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 111,
-    "tests": 1330,
-    "passed": 1330,
+    "files": 112,
+    "tests": 1364,
+    "passed": 1364,
     "failed": 0,
     "gate": {
-      "files": 26,
-      "tests": 626
+      "files": 27,
+      "tests": 660
     },
     "product": {
       "files": 85,
       "tests": 704
     },
     "perFile": [
+      {
+        "file": "scripts/backup-smoke-gate.test.mjs",
+        "tests": 34
+      },
       {
         "file": "scripts/blocks-coverage-audit.test.mjs",
         "tests": 26
@@ -937,7 +941,7 @@
     ]
   },
   "total": {
-    "files": 200,
-    "tests": 2590
+    "files": 201,
+    "tests": 2624
   }
 }
