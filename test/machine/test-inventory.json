@@ -1,15 +1,15 @@
 {
-  "generated": "2026-10-18T19:28:52.562Z",
+  "generated": "2026-10-18T21:22:47.849Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
     "files": 113,
-    "tests": 1385,
-    "passed": 1385,
+    "tests": 1386,
+    "passed": 1386,
     "failed": 0,
     "gate": {
       "files": 27,
-      "tests": 669
+      "tests": 670
     },
     "product": {
       "files": 86,
@@ -26,7 +26,7 @@
       },
       {
         "file": "scripts/check-alerts.test.mjs",
-        "tests": 21
+        "tests": 22
       },
       {
         "file": "scripts/check-doc-mirrors.test.mjs",
@@ -471,17 +471,17 @@
     ]
   },
   "server": {
-    "files": 89,
-    "tests": 1265,
-    "passed": 1265,
+    "files": 90,
+    "tests": 1273,
+    "passed": 1273,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 122
     },
     "product": {
-      "files": 84,
-      "tests": 1143
+      "files": 85,
+      "tests": 1151
     },
     "perFile": [
       {
@@ -663,6 +663,10 @@
       {
         "file": "server/src/__tests__/mail.test.js",
         "tests": 14
+      },
+      {
+        "file": "server/src/__tests__/metrics-integration-mode.test.js",
+        "tests": 8
       },
       {
         "file": "server/src/__tests__/middleware.test.js",
@@ -945,7 +949,7 @@
     ]
   },
   "total": {
-    "files": 202,
-    "tests": 2650
+    "files": 203,
+    "tests": 2659
   }
 }
