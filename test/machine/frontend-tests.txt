@@ -1,5 +1,5 @@
 ===== Фронт (Vitest) =====
-1368 тестов в 112 файлах (зелёных 1368) (vitest --reporter=json)
+1376 тестов в 113 файлах (зелёных 1376) (vitest --reporter=json)
 
 # файл | тестов
 scripts/backup-smoke-gate.test.mjs | 34
@@ -63,6 +63,7 @@ src/test/events.test.tsx | 9
 src/test/example.test.ts | 1
 src/test/faq.test.tsx | 3
 src/test/feature-flags-context.test.tsx | 5
+src/test/filters-dialog.test.tsx | 4
 src/test/flower-order-dialog.test.tsx | 4
 src/test/forgot-password.test.tsx | 5
 src/test/groups-category.test.tsx | 7
@@ -99,7 +100,7 @@ src/test/rollout.test.ts | 6
 src/test/safety.test.tsx | 7
 src/test/schedule.test.tsx | 5
 src/test/search-filters.test.tsx | 7
-src/test/search.test.tsx | 11
+src/test/search.test.tsx | 15
 src/test/sessions-section.test.tsx | 17
 src/test/settings-privacy.test.tsx | 4
 src/test/settings.test.tsx | 12

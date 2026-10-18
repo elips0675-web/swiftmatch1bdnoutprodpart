@@ -12,6 +12,10 @@
  *     → storageState в `e2e/.auth/`, каталог в .gitignore);
  *   • русский текст («сырой» UI без перевода) — проверка как в Service Desk,
  *     но после фильтров: страница без единого русского слова = FAIL.
+ *   • /partner/dashboard требует партнёрского аккаунта: без него сервер
+ *     отдаёт 403 («Not a partner account», server/src/routes/partner-dashboard.js:34),
+ *     браузер пишет 403 в консоль, а страница уводит на главную. Партнёр для
+ *     пользователя смоука регистрируется сам после логина (идемпотентно).
  *
  * Локальный инструмент, в CI не заведён: CI закрыт полным Playwright E2E.
  * Требует живых серверов: preview `8081` + API `3002` (запуск-всего.bat).
@@ -68,6 +72,28 @@ async function saveStorageState(email, password) {
   mkdirSync(dirname(AUTH_PATH), { recursive: true })
   await page.context().storageState({ path: AUTH_PATH })
   await browser.close()
+  return token
+}
+
+async function ensurePartnerAccount(token) {
+  const headers = { Authorization: `Bearer ${token}` }
+  const dashboard = async () => {
+    const res = await fetch(`${API}/api/partner/dashboard`, { headers }).catch(() => null)
+    return res ? res.status : 0
+  }
+  if ((await dashboard()) === 200) return 'аккаунт уже есть'
+
+  const names = ['SwiftMatch Smoke Partner', `SwiftMatch Smoke Partner ${Date.now()}`]
+  for (const name of names) {
+    const res = await fetch(`${API}/api/partner/register`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, description: 'Аккаунт для смоука check:console', type: 'deeplink' }),
+    }).catch(() => null)
+    if (res && res.status === 201) return `создан «${name}»`
+    if (res && res.status === 409 && (await dashboard()) === 200) return 'аккаунт уже есть'
+  }
+  throw new Error('Не удалось обеспечить партнёрский аккаунт для /partner/dashboard — страница уйдёт в 403, проверь API 3002.')
 }
 
 function isIgnoredConsole(text) {
@@ -76,7 +102,8 @@ function isIgnoredConsole(text) {
 
 async function main() {
   console.log(`🔑 Логин ${'admin@mail.ru'} → storageState ${AUTH_PATH}`)
-  await saveStorageState('admin@mail.ru', 'demo123456')
+  const token = await saveStorageState('admin@mail.ru', 'demo123456')
+  console.log(`🤝 Партнёрский аккаунт: ${await ensurePartnerAccount(token)}`)
 
   const browser = await chromium.launch({ headless: true })
   const context = await browser.newContext({ storageState: AUTH_PATH })

@@ -231,6 +231,57 @@ describe('Страница search', () => {
     expect(await screen.findByTestId('filters-dialog')).toBeInTheDocument();
   });
 
+  it('обычный режим применяет фильтры, сохранённые на странице /search-filters', async () => {
+    localStorage.setItem('searchFilters', JSON.stringify({
+      ageRange: [30, 35],
+      distance: [50],
+      selectedCity: 'all',
+      selectedInterests: [],
+    }));
+    renderPage();
+
+    expect(await screen.findByText('Дмитрий, 32')).toBeInTheDocument();
+    expect(screen.getByText('1 / 4')).toBeInTheDocument();
+    expect(screen.getByText('home.nearby')).toBeInTheDocument();
+    expect(screen.queryByText('Александр, 26')).toBeNull();
+  });
+
+  it('фильтры без интересов не превращают ленту в «нет профилей»', async () => {
+    h.state.mode = 'autosearch';
+    autosearchFilters({ selectedInterests: [], selectedDatingGoal: 'all' });
+    renderPage();
+
+    expect(await screen.findByText('Егор, 25')).toBeInTheDocument();
+    expect(screen.queryByText('search.no_profiles')).toBeNull();
+  });
+
+  it('в обычном режиме кнопка фильтров уводит на /search-filters, а не открывает диалог', async () => {
+    renderPage();
+    await firstCard();
+
+    fireEvent.click(screen.getByTestId('open-filters'));
+
+    expect(h.push).toHaveBeenCalledWith('/search-filters');
+    expect(screen.queryByTestId('filters-dialog')).toBeNull();
+  });
+
+  it('в обычном режиме пустой экран ведёт на страницу фильтров', async () => {
+    localStorage.setItem('searchFilters', JSON.stringify({
+      ageRange: [99, 99],
+      distance: [50],
+      selectedCity: 'all',
+      selectedInterests: [],
+    }));
+    renderPage();
+
+    expect(await screen.findByText('search.no_profiles')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('change-filters'));
+
+    expect(h.push).toHaveBeenCalledWith('/search-filters');
+    expect(screen.queryByTestId('filters-dialog')).toBeNull();
+  });
+
   it('жалоба на кандидата уходит на сервер через POST /api/reports', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal('fetch', fetchMock);

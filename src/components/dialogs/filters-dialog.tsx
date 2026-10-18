@@ -46,7 +46,7 @@ export function FiltersDialog({
 
   const [ageRange, setAgeRange] = useState(currentFilters.ageRange || [18, 40]);
   const [distance, setDistance] = useState(currentFilters.distance || [50]);
-  const [selectedCity, setSelectedCity] = useState(currentFilters.selectedCity || "Все");
+  const [selectedCity, setSelectedCity] = useState(currentFilters.selectedCity || "all");
   const [selectedCountryFilters, setSelectedCountryFilters] = useState(currentFilters.selectedCountry || "");
   const [genderPref, setGenderPref] = useState(currentFilters.genderPref || "all");
   const [selectedDatingGoal, setSelectedDatingGoal] = useState(currentFilters.selectedDatingGoal || "all");
@@ -56,14 +56,14 @@ export function FiltersDialog({
   const [premiumDialogOpen, setPremiumDialogOpen] = useState(false);
 
   const cities = useMemo(() => {
-    if (!selectedCountryFilters || selectedCountryFilters === "Все") return ["Все"];
-    return ["Все", ...(POPULAR_CITIES[selectedCountryFilters] || [])];
+    if (!selectedCountryFilters || selectedCountryFilters === "all") return ["all"];
+    return ["all", ...(POPULAR_CITIES[selectedCountryFilters] || [])];
   }, [selectedCountryFilters]);
 
   const ALL_COUNTRIES = useMemo(() => Object.keys(POPULAR_CITIES).sort(), []);
 
   useEffect(() => {
-    if (selectedCity && selectedCity !== "Все" && !selectedCountryFilters) {
+    if (selectedCity && selectedCity !== "all" && !selectedCountryFilters) {
       for (const [country, cities] of Object.entries(POPULAR_CITIES)) {
         if (cities.includes(selectedCity)) {
           setSelectedCountryFilters(country);
@@ -170,10 +170,10 @@ export function FiltersDialog({
               {/* City */}
               <div className="space-y-3">
                 <Label className="font-bold">{t('filters.country_city')}</Label>
-                <Select value={selectedCountryFilters} onValueChange={(v) => { setSelectedCountryFilters(v); setSelectedCity("Все"); }}>
+                <Select value={selectedCountryFilters} onValueChange={(v) => { setSelectedCountryFilters(v); setSelectedCity("all"); }}>
                   <SelectTrigger className="rounded-xl h-12 font-medium"><SelectValue placeholder={t('filters.select_country')} /></SelectTrigger>
                   <SelectContent className="rounded-xl max-h-60">
-                    <SelectItem value="Все">{t('filters.all_countries')}</SelectItem>
+                    <SelectItem value="all">{t('filters.all_countries')}</SelectItem>
                     {ALL_COUNTRIES.map(country => <SelectItem key={country} value={country}>{country}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -181,7 +181,7 @@ export function FiltersDialog({
                   <Select value={selectedCity} onValueChange={setSelectedCity}>
                     <SelectTrigger className="rounded-xl h-12 font-medium"><SelectValue /></SelectTrigger>
                     <SelectContent className="rounded-xl max-h-60">
-                      {cities.map(city => <SelectItem key={city} value={city}>{city}</SelectItem>)}
+                      {cities.map(city => <SelectItem key={city} value={city}>{city === "all" ? t('filters.all_cities') : city}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 )}

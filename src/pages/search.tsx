@@ -75,6 +75,35 @@ interface SearchUser {
   boost?: { boostedUntil?: string };
 }
 
+interface SavedSearchFilters {
+  ageRange?: number[];
+  distance?: number[];
+  selectedCity?: string;
+  selectedInterests?: string[];
+}
+
+function fromSavedSearchFilters(raw: string | null): AutoSearchFilters | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as SavedSearchFilters;
+    if (!parsed || !Array.isArray(parsed.ageRange) || parsed.ageRange.length < 2) return null;
+    const city = parsed.selectedCity && parsed.selectedCity !== 'all' ? parsed.selectedCity : 'all';
+    const country = city === 'all'
+      ? ''
+      : Object.entries(POPULAR_CITIES).find(([, cities]) => cities.includes(city))?.[0] || '';
+    return {
+      ageRange: [parsed.ageRange[0], parsed.ageRange[1]],
+      selectedCity: city,
+      selectedCountry: country,
+      distance: [parsed.distance?.[0] ?? 50],
+      selectedDatingGoal: 'all',
+      selectedInterests: parsed.selectedInterests || [],
+    };
+  } catch {
+    return null;
+  }
+}
+
 function performAutosearch(filters: AutoSearchFilters, allUsers: SearchUser[], currentUser: SearchUser) {
     if (!filters || !currentUser) return [];
 
@@ -95,7 +124,7 @@ function performAutosearch(filters: AutoSearchFilters, allUsers: SearchUser[], c
             }
             
             const matchesAge = user.age >= ageRange[0] && user.age <= ageRange[1];
-            const matchesCity = selectedCity === "all" || selectedCity === "Все" || user.city === selectedCity;
+            const matchesCity = selectedCity === "all" || user.city === selectedCity;
             const matchesCountry = !countryCityList || countryCityList.includes(user.city);
             const matchesDistance = user.distance <= distance[0];
             return matchesAge && matchesCity && matchesCountry && matchesDistance;
@@ -107,7 +136,8 @@ function performAutosearch(filters: AutoSearchFilters, allUsers: SearchUser[], c
             const hasMatchingGoal = selectedDatingGoal !== "all" && user.goal === selectedDatingGoal;
             const hasMatchingCircadian = currentUser.circadian && user.circadian && currentUser.circadian === user.circadian;
             const attachmentCompatibility = calculateAttachmentCompatibility(currentUser.attachmentStyle, user.attachmentStyle);
-            const isCandidate = hasMatchingGoal || (commonInterests > 0);
+            const narrowsByInterests = normalizedSelectedInterests.length > 0 || selectedDatingGoal !== "all";
+            const isCandidate = !narrowsByInterests || hasMatchingGoal || (commonInterests > 0);
             return { ...user, isCandidate, commonInterests, hasMatchingGoal, hasMatchingCircadian, attachmentCompatibility };
         })
         .filter(user => user.isCandidate)
@@ -196,8 +226,14 @@ function SearchContent() {
         }
     } else {
         setPageTitle(t('home.nearby'));
-        initialUsers = ALL_DEMO_USERS.filter(u => u.id !== currentUser.id).slice(0, 10);
-        setSelectedInterests([]);
+        const savedFilters = fromSavedSearchFilters(localStorage.getItem('searchFilters'));
+        if (savedFilters) {
+            setSelectedInterests(savedFilters.selectedInterests);
+            initialUsers = performAutosearch(savedFilters, ALL_DEMO_USERS, currentUser);
+        } else {
+            setSelectedInterests([]);
+            initialUsers = ALL_DEMO_USERS.filter(u => u.id !== currentUser.id).slice(0, 10);
+        }
     }
     setUserList(initialUsers);
     setCurrentIndex(0);
@@ -226,6 +262,16 @@ function SearchContent() {
   }
 
   const user = userList[currentIndex] || null;
+
+  const isAutoSearch = searchParams.get('mode') === 'autosearch';
+
+  const openFilters = () => {
+      if (isAutoSearch) {
+          setIsFiltersOpen(true);
+      } else {
+          router.push('/search-filters');
+      }
+  };
 
   const handleNext = () => { 
     if (currentIndex < userList.length - 1) {
@@ -329,11 +375,9 @@ function SearchContent() {
         <div className="text-center mb-4 flex items-center gap-2">
             <Badge variant="outline" className="text-[8px] font-bold bg-white">{currentIndex + 1} / {userList.length}</Badge>
             <Badge variant="secondary" className="text-[8px] font-bold text-primary bg-primary/5">{pageTitle}</Badge>
-            {searchParams.get('mode') === 'autosearch' && (
-                <button data-testid="open-filters" onClick={() => setIsFiltersOpen(true)} className="p-2 bg-white rounded-full shadow-sm">
-                    <SlidersHorizontal size={14} className="text-primary" />
-                </button>
-            )}
+            <button data-testid="open-filters" onClick={openFilters} className="p-2 bg-white rounded-full shadow-sm">
+                <SlidersHorizontal size={14} className="text-primary" />
+            </button>
             {user && (
                 <button data-testid="report-profile" aria-label={t('button.report')} onClick={() => setIsReportDialogOpen(true)} className="p-2 bg-white rounded-full shadow-sm">
                     <Flag size={14} className="text-destructive" />
@@ -346,7 +390,7 @@ function SearchContent() {
                 <Sparkles size={48} className="text-muted-foreground opacity-20 mb-4" />
                 <h4 className="text-xl font-black uppercase">{t('search.no_profiles')}</h4>
                 <p className="text-sm text-muted-foreground mt-2">{t('search.no_profiles_desc')}</p>
-                <Button data-testid="change-filters" variant="outline" onClick={() => setIsFiltersOpen(true)} className="mt-8 rounded-full px-8 uppercase text-[10px] font-black">{t('button.change_filters')}</Button>
+                <Button data-testid="change-filters" variant="outline" onClick={openFilters} className="mt-8 rounded-full px-8 uppercase text-[10px] font-black">{t('button.change_filters')}</Button>
             </div>
         ) : (
           <>
