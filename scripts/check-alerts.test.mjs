@@ -286,12 +286,26 @@ describe("репозиторий", () => {
     })).toEqual([]);
   });
 
-  it("в файле правил восемь правил и три уровня важности", () => {
+  it("в файле правил девять правил и три уровня важности", () => {
     const { groups, errors } = parseRuleFile(read(RULES_FILE));
     expect(errors).toEqual([]);
     const rules = groups.flatMap((g) => g.rules);
-    expect(rules).toHaveLength(8);
+    expect(rules).toHaveLength(9);
     expect(new Set(rules.map((r) => r.labels.severity))).toEqual(new Set(ALLOWED_SEVERITIES));
     for (const r of rules) expect(metricsInExpr(r.expr).length).toBeGreaterThan(0);
+  });
+
+  it("правило на mock в production привязано к метрике integration_mode и фильтруется по env", () => {
+    const { groups } = parseRuleFile(read(RULES_FILE));
+    const rule = groups.flatMap((g) => g.rules)
+      .find((r) => r.alert === "SwiftMatchMockIntegrationInProduction");
+    expect(rule).toBeDefined();
+    expect(metricsInExpr(rule.expr)).toEqual(["integration_mode"]);
+    expect(rule.expr).toContain('mode="mock"');
+    expect(rule.expr).toContain('env="production"');
+    expect(rule.labels.severity).toBe("critical");
+    const metric = appMetricList(read("server/src/metrics.js"))
+      .find((m) => m.name === "integration_mode");
+    expect(metric).toEqual({ type: "gauge", name: "integration_mode" });
   });
 });

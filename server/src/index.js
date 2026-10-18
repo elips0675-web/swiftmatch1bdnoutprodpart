@@ -29,6 +29,7 @@ import { startPaymentReconcile, stopPaymentReconcile } from './payment-reconcile
 import { createGracefulShutdown } from './shutdown.js'
 import { resolveTrustProxy } from './trust-proxy.js'
 import { healthHandler, liveHandler, readyHandler } from './health.js'
+import { isProduction, nonLiveIntegrations } from './runtime.js'
 
 import adminDashboard from './routes/admin/dashboard.js'
 import adminUsers from './routes/admin/users.js'
@@ -362,6 +363,12 @@ initQueues()
 httpServer.listen(PORT, () => {
   rootLogger.info(`SwiftMatch API running on port ${PORT}`)
   getRedis() // lazy connect
+  if (isProduction()) {
+    const mocks = nonLiveIntegrations()
+    if (mocks.length > 0) {
+      rootLogger.warn(`Production is running with non-live integrations: ${mocks.join(', ')} — check server/.env keys`)
+    }
+  }
 })
 
 const shutdown = createGracefulShutdown({

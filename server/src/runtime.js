@@ -74,3 +74,9 @@ export function integrationModes() {
     moderation: mod,
   }
 }
+
+export function nonLiveIntegrations(modes = integrationModes()) {
+  return Object.entries(modes)
+    .filter(([, mode]) => mode !== 'live')
+    .map(([service, mode]) => `${service}=${mode}`)
+}

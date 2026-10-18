@@ -79,3 +79,12 @@ groups:
         annotations:
           summary: 'API жив, но не получает запросов'
           description: 'up равен единице, а трафика нет полчаса: похоже, сломан балансировщик, домен или прокси, а не само приложение. Проверить доступность снаружи.'
+
+      - alert: SwiftMatchMockIntegrationInProduction
+        expr: 'integration_mode{mode="mock",env="production"} == 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'В production сервис интеграции работает в mock — молчаливый отказ'
+          description: 'integration_mode держит mode=mock при env=production: платёж, письмо, SMS, пуш или Redis уходят в заглушку вместо реального сервиса. Проверить server/.env (scripts/check-keys.ps1) и /health по полю integrations. Один и тот же сервис может быть live в staging — алерт фильтруется по env-метке.'

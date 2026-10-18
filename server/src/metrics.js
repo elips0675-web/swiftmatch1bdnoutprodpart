@@ -1,4 +1,5 @@
 import client from 'prom-client'
+import { integrationModes } from './runtime.js'
 
 const register = new client.Registry()
 
@@ -62,6 +63,20 @@ export const queueJobsGauge = new client.Gauge({
       }
     } catch {
       // недоступный Redis не должен ронять /metrics
+    }
+  },
+})
+
+export const integrationModeGauge = new client.Gauge({
+  name: 'integration_mode',
+  help: 'Integration service mode (live/mock/unavailable) labeled with NODE_ENV',
+  labelNames: ['service', 'mode', 'env'],
+  registers: [register],
+  collect() {
+    const env = process.env.NODE_ENV || 'unknown'
+    this.reset()
+    for (const [service, mode] of Object.entries(integrationModes())) {
+      this.set({ service, mode, env }, 1)
     }
   },
 })
