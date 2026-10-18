@@ -1,15 +1,15 @@
 {
-  "generated": "2026-10-18T10:50:57.501Z",
+  "generated": "2026-10-18T19:28:52.562Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
     "files": 113,
-    "tests": 1376,
-    "passed": 1376,
+    "tests": 1385,
+    "passed": 1385,
     "failed": 0,
     "gate": {
       "files": 27,
-      "tests": 660
+      "tests": 669
     },
     "product": {
       "files": 86,
@@ -98,7 +98,7 @@
       },
       {
         "file": "scripts/schema-drift-audit.test.mjs",
-        "tests": 22
+        "tests": 31
       },
       {
         "file": "scripts/secrets-leak-audit.test.mjs",
@@ -472,8 +472,8 @@
   },
   "server": {
     "files": 89,
-    "tests": 1260,
-    "passed": 1260,
+    "tests": 1265,
+    "passed": 1265,
     "failed": 0,
     "gate": {
       "files": 5,
@@ -481,7 +481,7 @@
     },
     "product": {
       "files": 84,
-      "tests": 1138
+      "tests": 1143
     },
     "perFile": [
       {
@@ -822,7 +822,7 @@
       },
       {
         "file": "server/src/__tests__/upload.test.js",
-        "tests": 23
+        "tests": 28
       },
       {
         "file": "server/src/__tests__/webhook-journal.test.js",
@@ -946,6 +946,6 @@
   },
   "total": {
     "files": 202,
-    "tests": 2636
+    "tests": 2650
   }
 }

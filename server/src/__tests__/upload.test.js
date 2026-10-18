@@ -31,7 +31,7 @@ vi.mock('multer', () => {
 })
 
 import pool from '../db.js'
-import uploadRoutes from '../routes/upload.js'
+import uploadRoutes, { s3KeyFromUrl } from '../routes/upload.js'
 import { __mockSingle as mockSingle } from 'multer'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'test-secret'
@@ -387,5 +387,59 @@ describe('DELETE /api/photos/:id: след в audit_log', () => {
     expect(res.status).toBe(404)
     const audit = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO audit_log'))
     expect(audit).toBeUndefined()
+  })
+})
+
+// Stage 67 (INT-01): s3KeyFromUrl — без new URL(). У virtual-hosted url с
+// IP-эндпоинтом хост кончается числом, WHATWG-парсер уходит в IPv4-разбор и
+// бросает Invalid URL — DELETE фото отвечал 500 при S3_ENDPOINT на IP.
+describe('s3KeyFromUrl: ключ S3 из url', () => {
+  const BUCKET = 'swiftmatch-itest'
+
+  it('virtual-hosted url с IP-эндпоинтом (new URL падает — регрессия)', () => {
+    expect(s3KeyFromUrl(`http://${BUCKET}.127.0.0.1:19001/uploads/1-2.png`, BUCKET)).toBe('uploads/1-2.png')
+  })
+
+  it('path-style url — сегмент бакета срезается', () => {
+    expect(s3KeyFromUrl('http://127.0.0.1:19001/swiftmatch-itest/uploads/1-2.png', BUCKET)).toBe('uploads/1-2.png')
+  })
+
+  it('AWS virtual-hosted url — authority с бекетом не трогается', () => {
+    expect(s3KeyFromUrl(`https://${BUCKET}.s3.us-east-1.amazonaws.com/uploads/1-2.png`, BUCKET)).toBe('uploads/1-2.png')
+  })
+
+  it('относительный локальный url /uploads/…', () => {
+    expect(s3KeyFromUrl('/uploads/1-2.jpg', BUCKET)).toBe('uploads/1-2.jpg')
+  })
+})
+
+// Stage 67 (INT-01): раньше удалялся только оригинал — 4 варианта ресайза
+// (3 webp + avif) оставались сиротами навсегда.
+describe('DELETE /api/photos/:id: удаляются и варианты', () => {
+  const app = createApp()
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('с диска уходят оригинал + 4 варианта ресайза', async () => {
+    const unlink = vi.spyOn(fs, 'unlinkSync').mockImplementation(() => {})
+    try {
+      pool.query
+        .mockResolvedValueOnce([[{ url: '/uploads/pic123.jpg' }], []])
+        .mockResolvedValueOnce([[], []])
+      const res = await request(app).delete('/api/photos/1').set('Authorization', authHeader())
+      expect(res.status).toBe(200)
+      const removed = unlink.mock.calls.map((c) => path.basename(String(c[0])))
+      expect(removed).toEqual([
+        'pic123.jpg',
+        'pic123_800x800.webp',
+        'pic123_400x400.webp',
+        'pic123_200x200.webp',
+        'pic123_800x800.avif',
+      ])
+    } finally {
+      vi.restoreAllMocks()
+    }
   })
 })

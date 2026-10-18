@@ -1,8 +1,14 @@
 /**
- * Оркестратор интеграционного прогона TEST-03: поднимает контейнеры из
- * docker-compose.integration.yml (override поверх docker-compose.yml — db/redis
- * те же, что поедут на VPS, порты мимо Laragon), гоняет смоук против живого
- * server/src/index.js и убирает за собой.
+ * Оркестратор интеграционного прогона TEST-03 (+ INT-01): поднимает контейнеры
+ * из docker-compose.integration.yml (override поверх docker-compose.yml —
+ * db/redis те же, что поедут на VPS, порты мимо Laragon), гоняет смоуки против
+ * живого server/src/index.js и убирает за собой.
+ *
+ * Три смоука: init-data-smoke.mjs (полнота данных свежего init — до смоуков с API,
+ * те добавляют строки), integration-smoke.mjs (цепочка почты HTTP → MySQL → Bull/Redis →
+ * nodemailer → maildev) и s3-contract-smoke.mjs (контракт S3: upload → объекты
+ * в бакете → удаление оригинала и вариантов). Все три бегут при поднятом контуре;
+ * упавший первый не отменяет остальные.
  *
  * Ключевая обязанность — уборка в finally: `down -v` сносит и контейнеры, и
  * volume с тестовыми данными, даже когда смоук упал (требование проекта «после
@@ -65,23 +71,35 @@ async function main() {
 
   let code = 1
   try {
-    console.log(`[run] docker compose up (db, redis, maildev) — файл ${COMPOSE_FILE}`)
-    code = await run(docker, [...composeArgs, 'up', '-d', '--wait', 'db', 'redis', 'maildev'], {
-      timeoutMs: 300_000,
+    console.log(`[run] docker compose up (db, redis, maildev, s3) — файл ${COMPOSE_FILE}`)
+    code = await run(docker, [...composeArgs, 'up', '-d', '--wait', 'db', 'redis', 'maildev', 's3'], {
+      timeoutMs: 420_000,
     })
     if (code !== 0) {
       console.log(`FAIL  контейнеры не поднялись (exit ${code})`)
     } else {
-      console.log('[run] контейнеры healthy — запуск integration-smoke')
-      code = await run(process.execPath, ['server/scripts/integration-smoke.mjs'], {
+      // Общий env обоих смоуков: контур тот же, различаются только сервисные
+      // порты и API-порт (3102 занят первым смоуком, второй берёт 3103).
+      const smokeEnv = {
+        REQUIRE_INTEGRATION: '1',
+        DB_HOST: '127.0.0.1',
+        DB_PORT: '3308',
+        DB_USER: 'root',
+        DB_PASSWORD: 'root',
+        DB_NAME: 'swiftmatch1bd',
+        REDIS_URL: 'redis://127.0.0.1:6380',
+      }
+
+      console.log('[run] контейнеры healthy — проверка полноты init-данных (до смоуков с API: те добавляют строки)')
+      const initDataCode = await run(process.execPath, ['server/scripts/init-data-smoke.mjs'], {
+        env: smokeEnv,
+        timeoutMs: 120_000,
+      })
+
+      console.log('[run] контейнеры healthy — запуск integration-smoke (почта)')
+      const mailCode = await run(process.execPath, ['server/scripts/integration-smoke.mjs'], {
         env: {
-          REQUIRE_INTEGRATION: '1',
-          DB_HOST: '127.0.0.1',
-          DB_PORT: '3308',
-          DB_USER: 'root',
-          DB_PASSWORD: 'root',
-          DB_NAME: 'swiftmatch1bd',
-          REDIS_URL: 'redis://127.0.0.1:6380',
+          ...smokeEnv,
           SMTP_HOST: '127.0.0.1',
           SMTP_PORT: '1125',
           MAILDEV_URL: 'http://127.0.0.1:1180',
@@ -89,6 +107,21 @@ async function main() {
         },
         timeoutMs: 240_000,
       })
+
+      // Второй смоук бежит даже при падении первого: контракт S3 не зависит от
+      // почтовой цепочки, а диагностика полнее, когда оба результата на руках.
+      console.log('[run] контрактный прогон INT-01 (S3)')
+      const s3Code = await run(process.execPath, ['server/scripts/s3-contract-smoke.mjs'], {
+        env: {
+          ...smokeEnv,
+          SMOKE_S3_API_PORT: '3103',
+          S3_ENDPOINT: 'http://127.0.0.1:19001',
+          S3_BUCKET: 'swiftmatch-itest',
+        },
+        timeoutMs: 240_000,
+      })
+
+      code = [initDataCode, mailCode, s3Code].find((result) => result !== 0) ?? 0
     }
   } finally {
     console.log('[run] cleanup: docker compose down -v (контейнеры + volume)')

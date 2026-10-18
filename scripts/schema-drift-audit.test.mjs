@@ -22,6 +22,9 @@ import {
   extractSqlLiterals,
   extractColumnRefs,
   readCodeRefs,
+  auditInitDataValueCount,
+  auditInitDataTableRefs,
+  splitValueTuple,
 } from './schema-drift-audit.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -161,6 +164,83 @@ describe('parseReferenceSchema', () => {
       ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;',
     ].join('\n')
     expect(parseReferenceSchema(src).get('users')).toEqual(new Set(['id', 'email']))
+  })
+})
+
+describe('auditInitDataValueCount - init-данные против схемы', () => {
+  const reference = new Map([
+    ['feature_flags', new Set(['id', 'video_calls_enabled', 'updated_at'])],
+    ['messages', new Set(['id', 'text'])],
+  ])
+
+  it('ловит REPLACE без списка колонок, где значений меньше (ERROR 1136)', () => {
+    const problems = auditInitDataValueCount(
+      "REPLACE INTO `feature_flags` VALUES (1,0,0,'2026-09-08 19:00:58');",
+      reference,
+      'demo_data.sql',
+    )
+    expect(problems).toHaveLength(1)
+    expect(problems[0].table).toBe('feature_flags')
+    expect(problems[0].detail).toContain('demo_data.sql:1')
+    expect(problems[0].detail).toContain('значений 4')
+    expect(problems[0].detail).toContain('колонок в mysql_schema.sql 3')
+  })
+
+  it('явный список колонок снимает проверку (правка фикса невосприимчива к новым колонкам)', () => {
+    const sql = 'REPLACE INTO `feature_flags` (`id`,`updated_at`) VALUES (1,0)'
+    expect(auditInitDataValueCount(sql, reference, 'x')).toEqual([])
+  })
+
+  it('кортежи считаются по отдельности, одинаковые сводятся в одну строку', () => {
+    const problems = auditInitDataValueCount("REPLACE INTO `messages` VALUES (1,'a','x'),(2,'b','y'),(3,'c');", reference, 'x')
+    expect(problems).toHaveLength(1)
+    expect(problems[0].detail).toContain('кортежей 2')
+    expect(problems[0].detail).toContain('значений 3')
+  })
+
+  it('запятая в строке не сдвигает счёт (кириллица, экранированные кавычки)', () => {
+    const sql = "REPLACE INTO `messages` (`id`,`text`) VALUES (1,'привет, мир\\', сказал он'),(2,'второе, тоже')"
+    expect(auditInitDataValueCount(sql, reference, 'x')).toEqual([])
+    expect(splitValueTuple("'a,''b'', c'")).toEqual(["'a,''b'', c'"])
+  })
+
+  it('таблица вне mysql_schema.sql - находка, а не тишина', () => {
+    const problems = auditInitDataValueCount('INSERT INTO `ghost` VALUES (1)', reference, 'x')
+    expect(problems).toHaveLength(1)
+    expect(problems[0].kind).toBe('TABLE_MISSING')
+    expect(problems[0].detail).toContain('которой нет в mysql_schema.sql')
+  })
+
+  it('ловит пустой блок LOCK TABLES для удалённой таблицы (регресс user_sessions)', () => {
+    const sql = 'LOCK TABLES `user_sessions` WRITE;\n/*!40000 ALTER TABLE `user_sessions` DISABLE KEYS */;\nUNLOCK TABLES;'
+    const problems = auditInitDataTableRefs(sql, reference, 'demo_data.sql')
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toMatchObject({ kind: 'TABLE_MISSING', table: 'user_sessions' })
+    expect(problems[0].detail).toContain('LOCK TABLES')
+    expect(problems[0].detail).toContain('demo_data.sql:')
+  })
+
+  it('ловит колонку в явном списке, которой нет в схеме (ERROR 1054 на свежем деплое)', () => {
+    const sql = "REPLACE INTO `messages` (`id`,`text`,`ghost_col`) VALUES (1,'a','b')"
+    const problems = auditInitDataTableRefs(sql, reference, 'x')
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toMatchObject({ kind: 'COLUMN_MISSING', table: 'messages' })
+    expect(problems[0].detail).toContain('`ghost_col`')
+  })
+
+  it('не трогает известные таблицы и колонки', () => {
+    const sql = "REPLACE INTO `messages` (`id`,`text`) VALUES (1,'a');\nLOCK TABLES `feature_flags` WRITE;"
+    expect(auditInitDataTableRefs(sql, reference, 'x')).toEqual([])
+  })
+
+  it('инвариант: оба init-файла сходятся со схемой (иначе свежий деплой теряет данные)', () => {
+    const schema = parseReferenceSchema(fs.readFileSync(SCHEMA_FILE, 'utf8'))
+    for (const rel of ['database/demo_data.sql', 'database/03-e2e-seed.sql']) {
+      const sql = fs.readFileSync(path.join(ROOT, rel), 'utf8')
+      for (const problems of [auditInitDataValueCount(sql, schema, rel), auditInitDataTableRefs(sql, schema, rel)]) {
+        expect(problems, `${rel}: ${problems.map((p) => p.detail).join('; ')}`).toEqual([])
+      }
+    }
   })
 })
 

@@ -7,15 +7,28 @@ SET CHARACTER_SET_RESULTS=utf8mb4;
 -- Применяется docker-entrypoint-initdb.d ПОСЛЕ 02-data.sql при первом подъёме volume.
 -- Зачем: (а) админ-строчка из 02-data могла нести неверный bcrypt; (б) RU-тексты
 -- icebreaker_questions/профилей в live-дампе double-encoded mojibake; (в) гарантируем
--- нужных для .auth e2e юзеров. REPLACE по PK — идемпотентно, не дублирует.
+-- нужных для .auth e2e юзеров. Идемпотентность — upsert, НЕ REPLACE: REPLACE —
+-- это DELETE + INSERT, и при включённых FK (в 02-data они выключены, здесь уже нет)
+-- удаление родителя каскадом сносит детей. Замер на свежем volume: REPLACE
+-- `users` (id 1/3/5/6) удалял 22 сообщения и 376 refresh_tokens из 02-data,
+-- REPLACE `icebreaker_themes` — все вопросы. Здесь везде `ON DUPLICATE KEY UPDATE`.
 
 -- Пароль demo123456 (bcrypt, gen from seed.js).
-REPLACE INTO users (id, email, password_hash, role, is_active, created_at, updated_at)
+-- upsert, а не REPLACE: REPLACE удалил бы строку user id=1/3/5/6 и каскадом снёс
+-- её детей (messages, refresh_tokens, hangouts, likes, matches, user_profiles...).
+INSERT INTO users (id, email, password_hash, role, is_active, created_at, updated_at)
 VALUES
   (1, 'admin@mail.ru', '$2a$10$Mub8ccI8tHazrq0TLPJcDOL2KyeyP6YbCWxk//Er9cuzUC4E3D4v.', 'admin', 1, NOW(), NOW()),
   (3, 'user2@mail.ru', '$2a$10$Mub8ccI8tHazrq0TLPJcDOL2KyeyP6YbCWxk//Er9cuzUC4E3D4v.', 'user', 1, NOW(), NOW()),
   (5, 'user4@mail.ru', '$2a$10$Mub8ccI8tHazrq0TLPJcDOL2KyeyP6YbCWxk//Er9cuzUC4E3D4v.', 'user', 1, NOW(), NOW()),
-  (6, 'user5@mail.ru', '$2a$10$Mub8ccI8tHazrq0TLPJcDOL2KyeyP6YbCWxk//Er9cuzUC4E3D4v.', 'user', 1, NOW(), NOW());
+  (6, 'user5@mail.ru', '$2a$10$Mub8ccI8tHazrq0TLPJcDOL2KyeyP6YbCWxk//Er9cuzUC4E3D4v.', 'user', 1, NOW(), NOW())
+AS new
+ON DUPLICATE KEY UPDATE
+  email = new.email,
+  password_hash = new.password_hash,
+  role = new.role,
+  is_active = new.is_active,
+  updated_at = new.updated_at;
 
 -- Профили (правильный кириллический текст вместо mojibake из live-дампа).
 REPLACE INTO user_profiles
@@ -30,8 +43,8 @@ VALUES
 INSERT IGNORE INTO user_interests (user_id, interest_id) VALUES
   (1, 1), (1, 9), (3, 5), (3, 2), (5, 6), (5, 1), (6, 4), (6, 7);
 
--- Icebreaker: темы id 1..8
-REPLACE INTO icebreaker_themes (id, key_id, icon, color_class, sort_order) VALUES
+-- Icebreaker: темы id 1..8. upsert: REPLACE темы каскадом снёс бы все её вопросы.
+INSERT INTO icebreaker_themes (id, key_id, icon, color_class, sort_order) VALUES
   (1, 'romantic', 'Heart', 'text-rose-500', 1),
   (2, 'funny', 'Laugh', 'text-amber-500', 2),
   (3, 'hobbies', 'Palette', 'text-violet-500', 3),
@@ -39,10 +52,17 @@ REPLACE INTO icebreaker_themes (id, key_id, icon, color_class, sort_order) VALUE
   (5, 'food', 'UtensilsCrossed', 'text-orange-500', 5),
   (6, 'music', 'Music', 'text-emerald-500', 6),
   (7, 'movies', 'Clapperboard', 'text-indigo-500', 7),
-  (8, 'deep', 'MessageCircle', 'text-teal-500', 8);
+  (8, 'deep', 'MessageCircle', 'text-teal-500', 8)
+AS new
+ON DUPLICATE KEY UPDATE
+  key_id = new.key_id,
+  icon = new.icon,
+  color_class = new.color_class,
+  sort_order = new.sort_order;
 
 -- Вопросы с явными id 1..40: перезаписывают кривые RU-строки из live-дампа.
-REPLACE INTO icebreaker_questions (id, theme_id, text_ru, text_en, sort_order) VALUES
+-- upsert: REPLACE вопроса каскадом снёс бы ответы (icebreaker_answers).
+INSERT INTO icebreaker_questions (id, theme_id, text_ru, text_en, sort_order) VALUES
   (1, 1, 'Что для тебя идеальное первое свидание?', 'What does your perfect first date look like?', 1),
   (2, 1, 'Какое самое романтичное, что с тобой делали?', 'What is the most romantic thing someone has done for you?', 2),
   (3, 1, 'Где бы ты хотела, чтобы я увел тебя в будущем?', 'Where would you want me to take you in the future?', 3),
@@ -82,7 +102,13 @@ REPLACE INTO icebreaker_questions (id, theme_id, text_ru, text_en, sort_order) V
   (37, 8, 'Какая черта характера тебе нравится в людях больше всего?', 'What personality trait do you value most in people?', 2),
   (38, 8, 'О чем ты мечтаешь, когда смотришь в небо?', 'What do you dream about when you look at the sky?', 3),
   (39, 8, 'Что бы ты сказала себе десятилетней давности?', 'What would you tell yourself ten years ago?', 4),
-  (40, 8, 'Какое достижение в жизни тебя больше всего гордит?', 'What achievement in life are you most proud of?', 5);
+  (40, 8, 'Какое достижение в жизни тебя больше всего гордит?', 'What achievement in life are you most proud of?', 5)
+AS new
+ON DUPLICATE KEY UPDATE
+  theme_id = new.theme_id,
+  text_ru = new.text_ru,
+  text_en = new.text_en,
+  sort_order = new.sort_order;
 
 -- feature_flags / content_config — стандартный дефолт (как в seed.js).
 REPLACE INTO feature_flags (id, video_calls_enabled, ai_icebreakers_enabled, ai_compatibility_enabled, groups_page_enabled, contest_enabled, show_ads, autosearch_enabled)

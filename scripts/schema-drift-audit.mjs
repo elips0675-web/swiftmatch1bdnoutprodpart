@@ -24,6 +24,251 @@ export function parseReferenceSchema(src) {
   return tables
 }
 
+export const INIT_DATA_FILES = ['database/demo_data.sql', 'database/03-e2e-seed.sql']
+
+/** PRIMARY KEY по таблицам: нужен смоуку полноты init-данных, чтобы считать
+ *  ожидание по настоящему ключу, а не по первому столбцу (у chat_participants и
+ *  user_interests PK составной — сравнение по первому столбцу даёт 55 и 50
+ *  вместо 110 и 179 строк). */
+export function parseReferenceKeys(src) {
+  const keys = new Map()
+  const re = /CREATE TABLE(?: IF NOT EXISTS)?\s+`?(\w+)`?\s*\(([\s\S]*?)\n\)\s*ENGINE=/g
+  for (const m of src.matchAll(re)) {
+    const pk = m[2].match(/^\s*PRIMARY KEY\s*\(([^)]*)\)/m)
+    keys.set(
+      m[1],
+      pk
+        ? pk[1]
+            .split(',')
+            .map((c) => c.trim().replace(/^`|`$/g, ''))
+            .filter(Boolean)
+        : [],
+    )
+  }
+  return keys
+}
+
+export function splitValueTuple(tuple) {
+  const parts = []
+  let depth = 0
+  let quote = false
+  let buf = ''
+  for (let i = 0; i < tuple.length; i++) {
+    const ch = tuple[i]
+    if (quote) {
+      buf += ch
+      if (ch === '\\') {
+        buf += tuple[++i] ?? ''
+        continue
+      }
+      if (ch === "'") {
+        if (tuple[i + 1] === "'") {
+          buf += tuple[++i]
+          continue
+        }
+        quote = false
+      }
+      continue
+    }
+    if (ch === "'") {
+      quote = true
+      buf += ch
+      continue
+    }
+    if (ch === '(') depth++
+    if (ch === ')') depth = Math.max(0, depth - 1)
+    if (ch === ',' && depth === 0) {
+      parts.push(buf.trim())
+      buf = ''
+      continue
+    }
+    buf += ch
+  }
+  if (buf.trim()) parts.push(buf.trim())
+  return parts
+}
+
+function readValueTuples(sql, from) {
+  const tuples = []
+  let i = from
+  while (i < sql.length) {
+    while (i < sql.length && /\s/.test(sql[i])) i++
+    if (sql[i] !== '(') break
+    let depth = 0
+    let quote = false
+    const start = i
+    for (; i < sql.length; i++) {
+      const ch = sql[i]
+      if (quote) {
+        if (ch === '\\') i++
+        else if (ch === "'") {
+          if (sql[i + 1] === "'") i++
+          else quote = false
+        }
+        continue
+      }
+      if (ch === "'") quote = true
+      else if (ch === '(') depth++
+      else if (ch === ')') {
+        depth--
+        if (depth === 0) break
+      }
+    }
+    tuples.push(sql.slice(start + 1, i))
+    i++
+    while (i < sql.length && /\s/.test(sql[i])) i++
+    if (sql[i] === ',') {
+      i++
+      continue
+    }
+    break
+  }
+  return tuples
+}
+
+function lineAt(src, index) {
+  return src.slice(0, index).split('\n').length
+}
+
+/** Сканер стейтментов данных init-файлов. Один на два потребителя: статический
+ *  аудит (арность, ссылки на таблицы/колонки) и смоук полноты
+ *  (`server/scripts/init-data-smoke.mjs` сверяет число кортежей с живой БД после
+ *  свежего init). `INSERT IGNORE` — тоже стейтмент данных: без его учёта
+ *  `user_interests` (03-e2e-seed.sql) тихо выпадала бы из обеих проверок. */
+export function readInitDataStatements(sql, label) {
+  const statements = []
+  const re = /\b(INSERT\s+(?:IGNORE\s+|LOW_PRIORITY\s+|HIGH_PRIORITY\s+)?INTO|REPLACE\s+(?:LOW_PRIORITY\s+|HIGH_PRIORITY\s+)?INTO)\s+`?(\w+)`?\s*(\([^)]*\))?\s*VALUES\b/gi
+  for (const m of sql.matchAll(re)) {
+    statements.push({
+      label,
+      line: lineAt(sql, m.index),
+      keyword: m[1].replace(/\s+/g, ' ').toUpperCase(),
+      table: m[2].toLowerCase(),
+      columns: m[3]
+        ? m[3]
+            .slice(1, -1)
+            .split(',')
+            .map((c) => c.trim().replace(/^`|`$/g, ''))
+        : null,
+      tuples: readValueTuples(sql, m.index + m[0].length),
+    })
+  }
+  return statements
+}
+
+/** Init-скрипты (`01-schema` → `02-data` → `03-e2e-seed`) выполняет entrypoint
+ *  MySQL: INSERT/REPLACE без списка колонок сверяется по позициям. Если значений
+ *  меньше/больше, чем колонок в mysql_schema.sql, сервер отвечает ERROR 1136,
+ *  entrypoint обрывает init (остальные файлы и миграции не применяются), а
+ *  контейнер уходит в перезапуск - свежий деплой получает половину данных.
+ *  Схема и данные лежат в разных файлах, поэтому расхождение видно только
+ *  статически - здесь. Явный список колонок делает стейтмент к этому невосприимчивым. */
+export function auditInitDataValueCount(sql, reference, label) {
+  const problems = []
+  for (const statement of readInitDataStatements(sql, label)) {
+    const at = `${label}:${statement.line}`
+    if (statement.columns) continue
+    const columns = reference.get(statement.table)
+    if (!columns) {
+      problems.push({
+        kind: 'TABLE_MISSING',
+        table: statement.table,
+        detail: `${at} - ${statement.keyword} в таблицу, которой нет в mysql_schema.sql`,
+      })
+      continue
+    }
+    if (statement.tuples.length === 0) {
+      problems.push({
+        kind: 'VALUE_COUNT',
+        table: statement.table,
+        detail: `${at} - у VALUES не разобран ни один кортеж`,
+      })
+      continue
+    }
+    const counts = new Map()
+    for (const tuple of statement.tuples) {
+      const values = splitValueTuple(tuple).length
+      counts.set(values, (counts.get(values) ?? 0) + 1)
+    }
+    for (const [values, rows] of counts) {
+      if (values !== columns.size) {
+        problems.push({
+          kind: 'VALUE_COUNT',
+          table: statement.table,
+          detail: `${at} - кортежей ${rows}: значений ${values}, колонок в mysql_schema.sql ${columns.size}`,
+        })
+      }
+    }
+  }
+  return problems
+}
+
+const INIT_TABLE_RE =
+  /(?:INSERT\s+(?:IGNORE\s+|LOW_PRIORITY\s+|HIGH_PRIORITY\s+)?INTO|REPLACE\s+(?:LOW_PRIORITY\s+|HIGH_PRIORITY\s+)?INTO|DELETE\s+FROM|(?<!\bKEY\s)UPDATE\b(?!\s+OF\b)|TRUNCATE\s+TABLE|ALTER\s+TABLE|CREATE\s+TABLE)\s+`?(\w+)`?/gi
+
+const INIT_LOCK_TABLES_RE = /\bLOCK\s+TABLES\s+([\s\S]*?);/gi
+
+/** Вторая половина того же класса: дамп ссылается на таблицу, которой нет в
+ *  mysql_schema.sql. `LOCK TABLES user_sessions WRITE` для удалённой миграцией
+ *  053 таблицы валит init с ERROR 1146 - и это не видно ни по числу значений,
+ *  ни в живой БД (таблицы нет и там). Плюс явный список колонок сверяется со
+ *  схемой: он защищает от ERROR 1136, но сам может назвать несуществующую
+ *  колонку. */
+export function auditInitDataTableRefs(sql, reference, label) {
+  const problems = []
+  const refs = new Map()
+  const add = (table, index, kind) => {
+    const t = table.toLowerCase()
+    if (!refs.has(t)) refs.set(t, { line: lineAt(sql, index), kinds: new Set() })
+    refs.get(t).kinds.add(kind)
+  }
+  for (const m of sql.matchAll(INIT_TABLE_RE)) {
+    const keyword = m[0].trim().split(/\s+/).slice(0, 2).join(' ').toUpperCase()
+    add(m[1], m.index + m[0].lastIndexOf(m[1]), keyword)
+  }
+  for (const m of sql.matchAll(INIT_LOCK_TABLES_RE)) {
+    for (const item of splitTopLevel(m[1])) {
+      const table = item.trim().match(/^`?(\w+)`?/)
+      if (table) add(table[1], m.index, 'LOCK TABLES')
+    }
+  }
+  for (const [table, info] of refs) {
+    if (reference.has(table)) continue
+    problems.push({
+      kind: 'TABLE_MISSING',
+      table,
+      detail: `${label}:${info.line} - ${[...info.kinds].sort().join('+')} для таблицы, которой нет в mysql_schema.sql`,
+    })
+  }
+
+  for (const statement of readInitDataStatements(sql, label)) {
+    if (!statement.columns) continue
+    const columns = reference.get(statement.table)
+    if (!columns) continue
+    for (const column of statement.columns) {
+      if (!column || columns.has(column)) continue
+      problems.push({
+        kind: 'COLUMN_MISSING',
+        table: statement.table,
+        detail: `${label}:${statement.line} - колонка \`${column}\` не объявлена в mysql_schema.sql`,
+      })
+    }
+  }
+  return problems
+}
+
+export function readInitDataProblems(reference) {
+  const problems = []
+  for (const rel of INIT_DATA_FILES) {
+    const file = path.join(ROOT, rel)
+    if (!fs.existsSync(file)) continue
+    const sql = fs.readFileSync(file, 'utf8')
+    problems.push(...auditInitDataValueCount(sql, reference, rel))
+    problems.push(...auditInitDataTableRefs(sql, reference, rel))
+  }
+  return problems
+}
+
 export function listJsFiles(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name === 'node_modules' || entry.name === '__tests__') continue
@@ -319,6 +564,10 @@ async function main() {
     }
   }
 
+  for (const p of readInitDataProblems(reference)) {
+    problems.push({ kind: `INIT_DATA_${p.kind}`, table: p.table, detail: p.detail })
+  }
+
   const schemaOnly = [...reference.keys()].filter((t) => !live.has(t))
   const dbOnly = [...live.keys()].filter((t) => !reference.has(t))
   const codeTablesMissing = [...new Set([...tables, ...perTable.keys()])].filter((t) => !live.has(t) && !SQL_KEYWORDS.has(t))
@@ -347,7 +596,7 @@ async function main() {
     for (const p of list) console.log(`  [${p.kind}] ${p.detail}`)
   }
   console.log('')
-  console.log(`TOTAL: ${problems.length} mismatch(es). Every COLUMN_MISSING_IN_CODE is a live 500.`)
+  console.log(`TOTAL: ${problems.length} mismatch(es). Every COLUMN_MISSING_IN_CODE is a live 500, every INIT_DATA_* breaks the DB init.`)
   process.exit(1)
 }
 

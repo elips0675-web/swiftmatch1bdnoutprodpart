@@ -1,7 +1,8 @@
 # Override для интеграционного прогона TEST-03: реальный server/src/index.js
 # против тех же сервисов, что и в docker-compose.yml (db: mysql:8.4, redis:
 # redis:7-alpine), плюс maildev — SMTP-ловушка вместо реального почтового
-# сервера. Прогон идёт против основного compose-файла, а не против его копии:
+# сервера, и s3 — S3-совместимый сервер для контрактного прогона INT-01.
+# Прогон идёт против основного compose-файла, а не против его копии:
 # схема, initdb-скрипты и healthcheck те же, что поедут на VPS.
 #
 # Порты сдвинуты мимо занятых на машине разработчика (канон —
@@ -12,7 +13,7 @@
 # публиковался бы наряду с тестовым — конфликт с Laragon вернулся бы.
 #
 # Запуск только этим контуром (scripts/integration-smoke-run.mjs):
-#   docker compose -p swiftmatch-itest -f docker-compose.yml -f docker-compose.integration.yml up -d --wait db redis maildev
+#   docker compose -p swiftmatch-itest -f docker-compose.yml -f docker-compose.integration.yml up -d --wait db redis maildev s3
 # Имя проекта -p swiftmatch-itest изолирует volume'ы (swiftmatch-itest_db_data)
 # от основного проекта; уборка — `down -v` (смоук удаляет и контейнеры, и данные).
 services:
@@ -64,3 +65,30 @@ services:
       timeout: 3s
       retries: 12
       start_period: 5s
+
+  s3:
+    # Zenko CloudServer — S3-совместимый сервер для контрактного прогона
+    # INT-01 (MinIO-образы удалены из публичных реестров, сент. 2026). Креды
+    # accessKey1/verySecretKey1 — публичные дефолты образа (conf/authdata.json),
+    # не секреты; S3BACKEND: mem — данные в памяти, volume не нужен (down -v
+    # уносит контейнер целиком). Образ закреплён digest'ом: тег :latest уплывёт.
+    image: zenko/cloudserver@sha256:b53e57829cf7df357323e60a19c9f98d2218f1b7ccb1d7cea5761a5a227a9ee3
+    environment:
+      S3BACKEND: mem
+    ports:
+      - "19001:8000"
+    healthcheck:
+      # Health-эндпоинта нет: GET / без авторизации отдаёт 403 — признак живого
+      # сервера. node в образе старый (без fetch), поэтому healthcheck на
+      # require('http'); 127.0.0.1, а не localhost (IPv6-резолв — ECONNREFUSED).
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:8000/',r=>process.exit(r.statusCode?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s

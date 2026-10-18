@@ -7,7 +7,7 @@ import os from 'os'
 import pool from '../db.js'
 import { auth } from '../middleware.js'
 import logger from '../logger.js'
-import { processImage } from '../image-pipeline.js'
+import { processImage, getImageUrls } from '../image-pipeline.js'
 import { moderateImage } from '../ai-moderation.js'
 import { requirePhotoModerationOrRefuse, initialPhotoModerationStatus } from '../runtime.js'
 import { auditLog } from '../audit.js'
@@ -227,10 +227,21 @@ router.post('/api/upload', auth, async (req, res) => {
   }
 })
 
-// Удаление фото из S3/диска по фактическому ключу (url может быть абсолютным S3-URL)
-async function s3KeyFromUrl(url) {
+// Ключ S3 из url фото (url может быть абсолютным S3-URL). new URL() не
+// использовать: у virtual-hosted url с IP-эндпоинтом
+// (http://bucket.127.0.0.1:19001/...) хост кончается числом, WHATWG-парсер
+// уходит в IPv4-разбор и бросает Invalid URL — DELETE отвечал 500.
+// path-style url несёт сегмент бакета первым сегментом пути — ключ он не
+// является; virtual-hosted (authority начинается с `bucket.`) несёт его в хосте.
+export function s3KeyFromUrl(url, bucket = process.env.S3_BUCKET) {
   if (/^https?:\/\//.test(url)) {
-    return new URL(url).pathname.replace(/^\//, '')
+    const match = url.match(/^https?:\/\/([^/]+)\/(.+)$/)
+    if (!match) return url.replace(/^https?:\/\/[^/]+\/?/, '')
+    const [, authority, key] = match
+    if (bucket && !authority.startsWith(`${bucket}.`) && key.startsWith(`${bucket}/`)) {
+      return key.slice(bucket.length + 1)
+    }
+    return key
   }
   return url.replace(/^\/uploads\//, 'uploads/')
 }
@@ -251,14 +262,19 @@ router.delete('/api/photos/:id', auth, async (req, res) => {
     const [rows] = await pool.query('SELECT url FROM user_photos WHERE id = ? AND user_id = ?', [req.params.id, req.userId])
     if (rows.length === 0) return res.status(404).json({ message: 'Photo not found' })
 
+    // Оригинал и 4 варианта (3 webp + avif, суффиксы — getImageUrls) живут
+    // отдельными ключами/файлами: без перебора каждый DELETE оставлял 4 сироты.
+    const photoUrls = Object.values(getImageUrls(rows[0].url))
     if (USE_S3) {
       const { DeleteObjectCommand } = await import('@aws-sdk/client-s3')
       const s3 = await getS3Client()
-      const key = await s3KeyFromUrl(rows[0].url)
-      await s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key }))
+      for (const photoUrl of photoUrls) {
+        await s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET, Key: s3KeyFromUrl(photoUrl) }))
+      }
     } else {
-      const filePath = path.join(UPLOAD_DIR, path.basename(rows[0].url))
-      try { fs.unlinkSync(filePath) } catch {}
+      for (const photoUrl of photoUrls) {
+        try { fs.unlinkSync(path.join(UPLOAD_DIR, path.basename(photoUrl))) } catch {}
+      }
     }
 
     await pool.query('DELETE FROM user_photos WHERE id = ? AND user_id = ?', [req.params.id, req.userId])
