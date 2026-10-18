@@ -12,6 +12,12 @@ vi.mock("@/lib/token", () => ({
   clearToken: () => clearTokenMock(),
 }));
 
+const toastMock = vi.hoisted(() => vi.fn());
+vi.mock("@/hooks/use-toast", () => ({
+  toast: toastMock,
+  useToast: () => ({ toast: toastMock, toasts: [] }),
+}));
+
 const authState = { token: "test-token" as string | null, isLoading: false };
 vi.mock("@/context/auth-context", () => ({
   useAuth: () => authState,
@@ -324,6 +330,55 @@ describe("ProfileEditPage: потерянная сессия", () => {
     await waitFor(() => {
       expect(clearTokenMock).toHaveBeenCalled();
       expect(routerMock.replace).toHaveBeenCalledWith("/login");
+    });
+  });
+});
+
+describe("ProfileEditPage: AI-био", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockReset();
+    localStorage.clear();
+    meOverrides = {};
+    authState.token = "test-token";
+    authState.isLoading = false;
+    mockFetch.mockImplementation((url: string, opts?: { method?: string }) => routeFetch(url, opts));
+  });
+
+  it("пустой ответ генератора не стирает био и не выдаёт успех", async () => {
+    const { generateProfileBio } = await import("@/shims/ai-flows");
+    (generateProfileBio as ReturnType<typeof vi.fn>).mockResolvedValue({ bio: "" });
+
+    await renderEditPage();
+    fireEvent.click(screen.getByText("profile.ai_improve"));
+
+    await waitFor(() =>
+      expect(toastMock).toHaveBeenCalledWith({
+        variant: "destructive",
+        title: "toast.ai_error",
+        description: "toast.ai_error_desc",
+      }),
+    );
+    expect(toastMock).not.toHaveBeenCalledWith({
+      title: "profile.ai_improve",
+      description: "toast.bio_improved",
+    });
+    expect((screen.getByTestId("profile-bio") as HTMLTextAreaElement).value).toBe(ME_DEFAULTS.bio);
+  });
+
+  it("сгенерированный текст подставляется в поле и подтверждается тостом", async () => {
+    const { generateProfileBio } = await import("@/shims/ai-flows");
+    (generateProfileBio as ReturnType<typeof vi.fn>).mockResolvedValue({ bio: "Люблю кофе и музыку" });
+
+    await renderEditPage();
+    fireEvent.click(screen.getByText("profile.ai_improve"));
+
+    await waitFor(() =>
+      expect((screen.getByTestId("profile-bio") as HTMLTextAreaElement).value).toBe("Люблю кофе и музыку"),
+    );
+    expect(toastMock).toHaveBeenCalledWith({
+      title: "profile.ai_improve",
+      description: "toast.bio_improved",
     });
   });
 });

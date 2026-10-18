@@ -129,7 +129,7 @@ export default function OnboardingPage() {
 
   const handleGenerateBio = async () => {
     if (formData.interests.length === 0) {
-      toast({ title: t('onboarding.step4.desc') });
+      toast({ title: t('onboarding.toast.bio_needs_interests') });
       return;
     }
     setIsGeneratingBio(true);
@@ -138,9 +138,12 @@ export default function OnboardingPage() {
       if (result && result.bio) {
         setFormData(prev => ({ ...prev, bio: result.bio }));
         toast({ title: t('onboarding.toast.bio_ai') });
+      } else {
+        toast({ variant: "destructive", title: t('toast.ai_error'), description: t('toast.ai_error_desc') });
       }
     } catch (error) {
       if (import.meta.env.DEV) console.error("AI Bio error:", error);
+      toast({ variant: "destructive", title: t('toast.ai_error'), description: t('toast.ai_error_desc') });
     } finally {
       setIsGeneratingBio(false);
     }
@@ -364,7 +367,7 @@ export default function OnboardingPage() {
               <div className="flex justify-between items-center">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">{t('onboarding.step5.bio_label')}</Label>
                 <button onClick={handleGenerateBio} disabled={isGeneratingBio} className="text-[9px] font-black text-primary flex items-center gap-1.5 uppercase tracking-widest bg-muted/50 px-3 py-1.5 rounded-full shadow-sm">
-                  <Sparkles size={12} className={cn(isGeneratingBio && "animate-spin")} /> AI {t('button.save')}
+                  <Sparkles size={12} className={cn(isGeneratingBio && "animate-spin")} /> AI {t('onboarding.step5.bio_generate')}
                 </button>
               </div>
               <Textarea value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} placeholder={t('onboarding.step5.bio_placeholder')} className="min-h-[120px] rounded-xl bg-muted/30 border-0 text-sm font-medium p-4 resize-none" />

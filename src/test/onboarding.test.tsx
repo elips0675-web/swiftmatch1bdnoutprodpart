@@ -224,10 +224,10 @@ describe('Страница onboarding', () => {
     renderPage();
 
     await advanceToStep(user, 5);
-    await user.click(screen.getByText('AI button.save'));
+    await user.click(screen.getByText('AI onboarding.step5.bio_generate'));
 
     expect(h.generateBio).not.toHaveBeenCalled();
-    expect(h.toast).toHaveBeenCalledWith({ title: 'onboarding.step4.desc' });
+    expect(h.toast).toHaveBeenCalledWith({ title: 'onboarding.toast.bio_needs_interests' });
   });
 
   it('AI-био с интересами подставляет сгенерированный текст', async () => {
@@ -238,13 +238,55 @@ describe('Страница onboarding', () => {
     await advanceToStep(user, 4);
     await user.click(screen.getByText('interest.music'));
     await user.click(screen.getByText('button.continue'));
-    await user.click(screen.getByText('AI button.save'));
+    await user.click(screen.getByText('AI onboarding.step5.bio_generate'));
 
     expect(h.generateBio).toHaveBeenCalledWith({ keywords: ['interest.music'] });
     await waitFor(() =>
       expect(screen.getByPlaceholderText('onboarding.step5.bio_placeholder')).toHaveValue('Люблю музыку и спорт'),
     );
     expect(h.toast).toHaveBeenCalledWith({ title: 'onboarding.toast.bio_ai' });
+  });
+
+  it('пустой ответ генератора не выдаётся за успех: ошибка вместо «био создано»', async () => {
+    h.generateBio.mockResolvedValue({ bio: '' });
+    const user = userEvent.setup();
+    renderPage();
+
+    await advanceToStep(user, 4);
+    await user.click(screen.getByText('interest.sport'));
+    await user.click(screen.getByText('button.continue'));
+    await user.click(screen.getByText('AI onboarding.step5.bio_generate'));
+
+    await waitFor(() =>
+      expect(h.toast).toHaveBeenCalledWith({
+        variant: 'destructive',
+        title: 'toast.ai_error',
+        description: 'toast.ai_error_desc',
+      }),
+    );
+    expect(h.toast).not.toHaveBeenCalledWith({ title: 'onboarding.toast.bio_ai' });
+    expect(screen.getByPlaceholderText('onboarding.step5.bio_placeholder')).toHaveValue('');
+  });
+
+  it('падение генератора AI показывает ошибку, а не молчит', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    h.generateBio.mockRejectedValue(new Error('boom'));
+    const user = userEvent.setup();
+    renderPage();
+
+    await advanceToStep(user, 4);
+    await user.click(screen.getByText('interest.sport'));
+    await user.click(screen.getByText('button.continue'));
+    await user.click(screen.getByText('AI onboarding.step5.bio_generate'));
+
+    await waitFor(() =>
+      expect(h.toast).toHaveBeenCalledWith({
+        variant: 'destructive',
+        title: 'toast.ai_error',
+        description: 'toast.ai_error_desc',
+      }),
+    );
+    errorSpy.mockRestore();
   });
 
   it('кнопка «домой» и «пропустить» без Supabase ведут на главную и на логин', async () => {

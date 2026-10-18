@@ -398,8 +398,12 @@ export default function EditProfilePage() {
     setIsGeneratingBio(true);
     try {
       const result = await generateProfileBio({ keywords: profile.interests, description: profile.bio });
-      setProfile((prev: any) => ({ ...prev, bio: result.bio }));
-      toast({ title: t('profile.ai_improve'), description: t('toast.bio_improved') });
+      if (result && result.bio && result.bio.trim()) {
+        setProfile((prev: any) => ({ ...prev, bio: result.bio }));
+        toast({ title: t('profile.ai_improve'), description: t('toast.bio_improved') });
+      } else {
+        toast({ variant: "destructive", title: t('toast.ai_error'), description: t('toast.ai_error_desc') });
+      }
     } catch (error) {
       toast({ variant: "destructive", title: t('toast.ai_error'), description: t('toast.ai_error_desc') });
     } finally {
