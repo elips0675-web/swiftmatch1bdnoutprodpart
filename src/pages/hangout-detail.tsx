@@ -321,6 +321,7 @@ export default function HangoutDetailPage() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         if (err.message === "CAPACITY_FULL") toast.error(t("hangout.ticket.full"));
+        else if (err.code === "STRIPE_NOT_CONFIGURED") toast.error(t("hangout.stripe_unavailable"));
         else toast.error(err.message || t("hangout.error.load"));
         return;
       }
