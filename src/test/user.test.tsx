@@ -258,6 +258,7 @@ describe('Страница user', () => {
     await user.click(screen.getByTestId('invite-user'));
     await user.click(screen.getByText('invite.option.custom'));
 
+    await waitFor(() => expect(screen.queryByText('invite.option.coffee')).toBeNull());
     expect(screen.getByText('invite.custom_title')).toBeInTheDocument();
     expect(screen.getByText('button.send')).toBeDisabled();
 

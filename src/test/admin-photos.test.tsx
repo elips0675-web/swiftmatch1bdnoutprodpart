@@ -86,14 +86,14 @@ describe('Страница admin-photos', () => {
     expect(screen.getByText('pending')).toBeInTheDocument();
   });
 
-  it('по умолчанию фильтр «все»: кнопок модерации нет, в фильтре «на модерации» уходит другой эндпоинт', async () => {
+  it('по умолчанию фильтр «все»: модерация доступна и в нём, фильтр «на модерации» уходит на свой эндпоинт', async () => {
     mockFetch.mockImplementation((url: string) =>
       jsonResponse([{ ...photo, moderation_status: url.endsWith('/pending') ? 'pending' : 'approved' }]),
     );
     await renderLoaded();
 
-    expect(screen.queryByText('admin.photos.approve')).toBeNull();
-    expect(screen.queryByText('admin.photos.reject')).toBeNull();
+    expect(screen.getByText('admin.photos.approve')).toBeInTheDocument();
+    expect(screen.getByText('admin.photos.reject')).toBeInTheDocument();
 
     await userEvent.click(screen.getByText('admin.photos.pending'));
 

@@ -490,7 +490,7 @@ function UserProfileContent() {
               })}
               <div className="border-t border-border/30 my-1" />
               <button
-                onClick={() => setShowCustomInvite(true)}
+                onClick={() => { setShowInviteDialog(false); setShowCustomInvite(true); }}
                 className="flex items-center gap-3 px-4 py-3 rounded-2xl border-2 border-dashed border-border/60 text-muted-foreground hover:border-pink-300 hover:text-pink-500 hover:bg-pink-50 active:scale-[0.98] transition-all font-bold text-sm"
               >
                 <div className="w-8 h-8 rounded-lg bg-pink-50 flex items-center justify-center shadow-sm">

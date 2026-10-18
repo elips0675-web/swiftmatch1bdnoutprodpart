@@ -333,7 +333,10 @@ export default function HangoutDetailPage() {
       if (data.paid) {
         toast.success(t("hangout.ticket.purchased"));
         load();
+        return;
       }
+      toast.error(t("hangout.ticket.not_confirmed"));
+      load();
     } catch {
       toast.error(t("hangout.error.load"));
     } finally {

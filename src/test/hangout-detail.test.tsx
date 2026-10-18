@@ -1025,7 +1025,7 @@ describe("HangoutDetailPage (COV-02 часть 7: ветки ошибок и щ�
     expect(toast.error).not.toHaveBeenCalledWith("Stripe not configured for production");
   });
 
-  it("билет: ответ без оплаты и без ссылки ничего не подтверждает", async () => {
+  it("билет: ответ без оплаты и без ссылки не подтверждает покупку и говорит об этом тостом", async () => {
     mockApi({ ...baseHangout, price: 500, my_ticket_status: null }, [
       (u) => (u.includes("/purchase") ? ok({ paid: false }) : undefined),
     ]);
@@ -1033,9 +1033,7 @@ describe("HangoutDetailPage (COV-02 часть 7: ветки ошибок и щ�
 
     renderDetail(<HangoutDetail />);
     fireEvent.click(await screen.findByTestId("buy-hangout-ticket"));
-    await waitFor(() =>
-      expect(mockFetch.mock.calls.some((c) => String(c[0]).includes("/purchase"))).toBe(true),
-    );
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("hangout.ticket.not_confirmed"));
     expect(toast.success).not.toHaveBeenCalledWith("hangout.ticket.purchased");
   });
 

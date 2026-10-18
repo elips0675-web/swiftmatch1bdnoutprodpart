@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Search, ChevronLeft, Send, MoveVertical as MoreVertical, Smile, Heart, Laugh, Zap, Flame, Star, Ghost, Rocket, Crown, Music, Phone, Video, Flag, Info, ChevronRight, Trash2, ThumbsUp, PartyPopper, Eye, Frown, Award, Compass, Coffee, MessageSquareQuote, PawPrint, Globe, Film, BookOpen, Baby, Sun, Timer, Clock, Calendar, CornerUpLeft, Loader2, X } from "lucide-react";
+import { Search, ChevronLeft, Send, MoveVertical as MoreVertical, Smile, Heart, Laugh, Zap, Flame, Star, Ghost, Rocket, Crown, Music, Phone, Video, Flag, Info, ChevronRight, Trash2, ThumbsUp, PartyPopper, Eye, Frown, Award, Compass, Coffee, MessageSquareQuote, PawPrint, Globe, Film, BookOpen, Baby, Sun, Timer, Clock, Calendar, CornerUpLeft, X } from "lucide-react";
 import Image from "@/shims/next-image";
 import { useSearchParams, useRouter } from "@/shims/next-navigation";
 import dynamic from "@/shims/next-dynamic";
@@ -19,7 +19,6 @@ import { useLanguage } from "@/context/language-context";
 import { toast } from "@/hooks/use-toast";
 import { useFeatureFlags } from "@/context/feature-flags-context";
 import { useAuth } from "@/context/auth-context";
-import { getToken } from '@/lib/token';
 import { GROUP_CATEGORIES } from '@/lib/demo-data';
 import { containsForbiddenWords, isGibberish } from "@/lib/word-filter";
 import { useAntiScreenshot } from "@/hooks/useAntiScreenshot";
@@ -69,8 +68,6 @@ function toChatMessage(m: any, myId?: number) {
     reply_image_url: m.reply_image_url ?? null,
   };
 }
-
-const Upload = ({ size }: { size: number }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
 
 const GroupFeed = dynamic(() => import('@/components/feeds/category-feed').then(m => ({ default: m.CategoryFeed })), { ssr: false });
 
@@ -254,7 +251,6 @@ function ChatsContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [apiChats, setApiChats] = useState<any[]>([]);
   const [isChatsLoading, setIsChatsLoading] = useState(true);
-  const [uploadingImage, setUploadingImage] = useState(false);
   const [icebreakerSuggestions, setIcebreakerSuggestions] = useState<string[]>([]);
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
   const [historyCursor, setHistoryCursor] = useState<number | null>(null);
@@ -480,41 +476,6 @@ function ChatsContent() {
     }
     setIsScheduling(false)
   }
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedChat) return;
-    setUploadingImage(true);
-    try {
-      const formData = new FormData();
-      formData.append('photo', file);
-      formData.append('user_id', '1');
-      const token = getToken();
-      const uploadRes = await fetch('/api/upload', {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData,
-      });
-      if (!uploadRes.ok) throw new Error('Upload failed');
-      const uploadData = await uploadRes.json();
-      const imageUrl = uploadData.url || uploadData.path || '';
-
-      const msgRes = await fetch(`/api/chats/${selectedChat.id}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ text: '', image_url: imageUrl }),
-      });
-      if (msgRes.ok) {
-        const msg = await msgRes.json();
-        setMessages(prev => [...prev, { id: msg.id, text: '', image_url: imageUrl, sender: 'me', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), reactions: [] }]);
-      }
-    } catch {
-      toast({ variant: 'destructive', title: 'Upload failed' });
-    } finally {
-      setUploadingImage(false);
-      e.target.value = '';
-    }
-  };
 
   const handleSendMessage = (textOverride?: string) => {
     const textToSend = textOverride || inputValue;
@@ -811,22 +772,12 @@ function ChatsContent() {
                   </PopoverContent>
                 </Popover>
               </div>
-              {selectedChat?.isGroup && (
-                <>
-                  <input id="group-image-upload" type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                  <label htmlFor="group-image-upload" className="cursor-pointer text-muted-foreground hover:text-primary transition-colors">
-                    {uploadingImage ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
-                  </label>
-                </>
-              )}
             </div>
             <Button data-testid="send-button" size="icon" onClick={() => handleSendMessage()} disabled={!inputValue.trim()} className="h-11 w-11 rounded-2xl gradient-bg text-white shadow-xl shadow-primary/30 active:scale-95 transition-all shrink-0"><Send size={18} className="ml-0.5" /></Button>
           </div>
         </div>
         {selectedChat && !selectedChat.isGroup && isVideoCall && <VideoCallDialog open={isVideoCall} onOpenChange={setIsVideoCall} user={selectedChat} localStream={webrtc.localStream} remoteStream={webrtc.remoteStream} callState={webrtc.callState} endCall={webrtc.endCall} isMuted={isCallMuted} isVideoOff={isVideoOff} onToggleMute={() => setIsCallMuted(p => !p)} onToggleVideo={() => setIsVideoOff(p => !p)} />}
         {selectedChat && !selectedChat.isGroup && isVoiceCall && <VoiceCallDialog open={isVoiceCall} onOpenChange={setIsVoiceCall} user={selectedChat} localStream={webrtc.localStream} callState={webrtc.callState} endCall={webrtc.endCall} isMuted={isCallMuted} onToggleMute={() => setIsCallMuted(p => !p)} />}
-        {selectedChat && selectedChat.isGroup && isVideoCall && <VideoCallDialog open={isVideoCall} onOpenChange={setIsVideoCall} user={selectedChat} localStream={webrtc.localStream} remoteStream={webrtc.remoteStream} callState={webrtc.callState} endCall={webrtc.endCall} isMuted={isCallMuted} isVideoOff={isVideoOff} onToggleMute={() => setIsCallMuted(p => !p)} onToggleVideo={() => setIsVideoOff(p => !p)} />}
-        {selectedChat && selectedChat.isGroup && isVoiceCall && <VoiceCallDialog open={isVoiceCall} onOpenChange={setIsVoiceCall} user={selectedChat} localStream={webrtc.localStream} callState={webrtc.callState} endCall={webrtc.endCall} isMuted={isCallMuted} onToggleMute={() => setIsCallMuted(p => !p)} />}
 
         <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
           <DialogContent className="max-w-sm rounded-2xl border-0 p-6 bg-white app-shadow">

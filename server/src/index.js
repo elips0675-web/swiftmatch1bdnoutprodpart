@@ -101,9 +101,13 @@ app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }))
 app.use(helmet())
 app.use(cookieParser())
 // CSRF double-submit: раздача токена (безопасно на любой точке).
-// Активация guard (блокировка мутирующих запросов без x-csrf-token) — после
-// выноса API на поддомен: вернуть в импорт `csrfGuard` и раскомментировать
-// app.use(csrfGuard) ниже.
+// Решение (Stage 63, SEC-01): guard включается только вместе с выносом API на
+// отдельный домен — в same-origin схеме (nginx отдаёт и SPA, и API, cookie
+// SameSite=lax) атака не эксплуатируется, а фронт сейчас нигде не шлёт заголовок
+// x-csrf-token: guard, включённый как есть, вернул бы 403 на каждом мутирующем
+// запросе. Порядок активации: (1) фронт читает cookie и шлёт заголовок в общем
+// fetch-хелпере, (2) вернуть `csrfGuard` в импорт и раскомментировать
+// app.use(csrfGuard) ниже, (3) живой E2E-флоу.
 app.use(csrf)
 // app.use(csrfGuard)
 

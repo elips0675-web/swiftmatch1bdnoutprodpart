@@ -1,13 +1,11 @@
-import { useSearchParams, useRouter } from "@/shims/next-navigation";
+import { useRouter } from "@/shims/next-navigation";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/language-context";
-import { CheckCircle, Flower2 } from "lucide-react";
+import { Flower2 } from "lucide-react";
 
 export default function PartnerOrderSuccess() {
   const { t } = useLanguage();
   const router = useRouter();
-  const params = useSearchParams();
-  const sessionId = params?.get("session_id");
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-b from-pink-50 to-white">

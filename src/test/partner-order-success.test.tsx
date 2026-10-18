@@ -6,12 +6,10 @@ globalThis.fetch = mockFetch;
 
 const h = vi.hoisted(() => ({
   router: { push: vi.fn(), back: vi.fn(), replace: vi.fn() },
-  params: new URLSearchParams('session_id=cs_partner_777'),
 }));
 
 vi.mock('@/shims/next-navigation', () => ({
   useRouter: () => h.router,
-  useSearchParams: () => h.params,
 }));
 
 vi.mock('@/context/language-context', () => ({
