@@ -235,6 +235,30 @@ jobs:
           node-version: 22
       - run: node scripts/backup-smoke-gate.mjs
 
+  # Интеграционный прогон TEST-03: настоящий server/src/index.js против живых
+  # контейнеров mysql:8.4 + redis:7-alpine + maildev (SMTP-ловушка). Ни один
+  # мок не проверяет путь целиком: HTTP → MySQL (INSERT users) → Bull/Redis →
+  # nodemailer → реальный SMTP-сервер → письмо в maildev → login → /auth/me.
+  # Контур поднимается override'ом поверх docker-compose.yml (docker-comp-
+  # ose.integration.yml: те же db/redis, что поедут на VPS, порты !override
+  # мимо занятых), REQUIRE_INTEGRATION=1 превращает отсутствие любой
+  # зависимости в падение, а runner убирает контейнеры и volume в finally
+  # (down -v — уборка не побочный эффект). Структуру держит гейт
+  # scripts/integration-smoke-gate.mjs. Docker на ubuntu-latest предустановлен.
+  integration-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # смоук импортирует mysql2/promise из server/node_modules
+      - run: npm ci --prefix server
+      - run: node scripts/integration-smoke-gate.mjs
+      - run: node scripts/integration-smoke-run.mjs
+        env:
+          REQUIRE_INTEGRATION: '1'
+
   # Дрейф схемы: каждая колонка, которую читает код в server/src, должна
   # существовать в эталоне database/mysql_schema.sql. Здесь — offline-половина
   # (MySQL не нужен). Live-режим (`node scripts/schema-drift-audit.mjs`) сверяет

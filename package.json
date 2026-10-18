@@ -30,6 +30,7 @@
     "check:mysql-race": "node scripts/mysql-race-gate.mjs",
     "check:queue-smoke": "node scripts/queue-smoke-gate.mjs",
     "check:backup-smoke": "node scripts/backup-smoke-gate.mjs",
+    "check:integration-smoke": "node scripts/integration-smoke-gate.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
