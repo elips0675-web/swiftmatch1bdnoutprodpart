@@ -158,7 +158,7 @@ UPDATE users SET is_active=1 WHERE role='admin';   -- вернуть всех а
 
 **Задача:** не копить очередь запросов к внешним API (Stripe/OpenAI/S3) при их недоступности/деградации.
 
-- Механизм: `server/src/circuit-breaker.js` (opossum), экспорты `createBreaker`, `stripeBreaker`, `wrapExternalCall`. Дефолты: timeout 10s, errorThresholdPercentage 50, resetTimeout 30s, volumeThreshold 5.
+- Механизм: `server/src/circuit-breaker.js` (opossum), экспорт `createBreaker` (+ событийное логирование open/halfOpen/close/fallback). Дефолты: timeout 10s, errorThresholdPercentage 50, resetTimeout 30s, volumeThreshold 5.
 - **Stripe** — обёрнут `stripe-checkout` (premium.js:112, timeout 15s). При отказе checkout → осмысленная ошибка клиенту, без зависания.
 - **OpenAI** (AI icebreakers, icebreakers.js) — модульный breaker `openai-icebreakers` (timeout 9s, volumeThreshold 3). При ошибке/таймауте/открытом breaker → DB-fallback (icebreaker_questions). Без `OPENAI_API_KEY` — сразу DB, без breaker.
 - **S3** — N/A: проект не внедрил S3 (upload на локальный диск). При внедрении S3 обернуть загрузку breaker'ом по тому же паттерну.

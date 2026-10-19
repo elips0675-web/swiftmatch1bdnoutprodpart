@@ -32,18 +32,4 @@ export function createBreaker(fn, name, opts = {}) {
   return breaker
 }
 
-export const stripeBreaker = createBreaker(
-  async (...args) => {
-    const mod = await import('stripe')
-    const stripe = new mod.default(process.env.STRIPE_SECRET_KEY)
-    return stripe.checkout.sessions.create(...args)
-  },
-  'stripe-checkout',
-  { timeout: 15_000 },
-)
-
-export function wrapExternalCall(fn, name, opts) {
-  return createBreaker(fn, name, opts).fire.bind(createBreaker(fn, name, opts))
-}
-
-export default { stripeBreaker, createBreaker, wrapExternalCall }
+export default { createBreaker }
