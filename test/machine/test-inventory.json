@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-19T17:14:21.682Z",
+  "generated": "2026-10-19T17:35:05.669Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -507,17 +507,17 @@
     ]
   },
   "server": {
-    "files": 98,
-    "tests": 1424,
-    "passed": 1424,
+    "files": 100,
+    "tests": 1500,
+    "passed": 1500,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 122
     },
     "product": {
-      "files": 93,
-      "tests": 1302
+      "files": 95,
+      "tests": 1378
     },
     "perFile": [
       {
@@ -555,6 +555,10 @@
       {
         "file": "server/src/__tests__/admin-moderation.test.js",
         "tests": 14
+      },
+      {
+        "file": "server/src/__tests__/admin-monetization.test.js",
+        "tests": 18
       },
       {
         "file": "server/src/__tests__/admin-queues.test.js",
@@ -626,7 +630,7 @@
       },
       {
         "file": "server/src/__tests__/date-checkin.test.js",
-        "tests": 3
+        "tests": 30
       },
       {
         "file": "server/src/__tests__/date-only.test.js",
@@ -909,6 +913,10 @@
         "tests": 14
       },
       {
+        "file": "server/src/__tests__/ws-realtime.test.js",
+        "tests": 31
+      },
+      {
         "file": "server/src/__tests__/zip.test.js",
         "tests": 4
       }
@@ -1017,7 +1025,7 @@
     ]
   },
   "total": {
-    "files": 220,
-    "tests": 2987
+    "files": 222,
+    "tests": 3063
   }
 }
