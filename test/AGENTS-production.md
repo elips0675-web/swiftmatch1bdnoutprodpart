@@ -80,7 +80,7 @@ Security-заголовки периметра: `npm run check:headers` — ге
 
 ### 7. File Upload Security (если touched /api/upload)
 
-- [ ] Ограничение размера: `limits: { fileSize: 5 * 1024 * 1024 }` (5 MB)
+- [ ] Ограничение размера: `limits: { fileSize: 10 * 1024 * 1024 }` (10 MB — фактическое значение `server/src/routes/upload.js:76`, сверять с кодом)
 - [ ] Фильтр типа: `file.mimetype.startsWith('image/')`
 - [ ] В проде файлы идут на S3 (Selectel/R2/Yandex), а не на локальный диск. Если диск — добавить anti-virus сканирование (ClamAV) или хотя бы расширение whitelist
 - [ ] Имя файла — uuid + оригинальное расширение, никаких `../` или оригинального name

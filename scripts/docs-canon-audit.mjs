@@ -19,7 +19,7 @@
  *     одному гейту: `docs/roadmap.md` оказался журналом этапов, а не списком
  *     идей, поэтому они перенесены в `docs/product-roadmap.md` дословно.
  *
- * Гейт проверяет семь вещей, каждую — на обоих концах (и «плохо», и «хорошо»):
+ * Гейт проверяет восемь вещей, каждую — на обоих концах (и «плохо», и «хорошо»):
  *
  *  1. **`Промты.txt` — указатель, а не источник правил.** Есть шапка со словами
  *     «больше не источник правил», нет разделов `## 0.`–`## 20.`, нет
@@ -52,6 +52,14 @@
  *     `zod` — тоже. Класс тот же, что у счётчиков тестов (питфолл 93): число
  *     в доке протухает молча и читается как факт — `react-router-dom` 6 → 7
  *     закрыт 11.10.2026, а таблицы держали 6 сразу в четырёх файлах.
+ *  8. **Числа и ссылки согласованы с реальными файлами** (Stage 79): число
+ *     джоб CI/CD в `test/Для анализа.txt` ↔ число `runs-on:` в workflow-файлах,
+ *     лимит загрузки в `docs/AGENTS-security.md`/`docs/AGENTS-production.md` ↔
+ *     литерал `fileSize` в `upload.js`, число миграций ↔ `*.sql` в
+ *     `database/migrations/`, и `docs/AGENTS-workflow.md` без ссылок на архив
+ *     `context.txt`. Класс тот же, что у счётчиков: протухшее число читается
+ *     как факт (23 джобы при факте 32, 5MB при коде на 10MB, 60 миграций при
+ *     71 — сверено 19.10.2026). Отсутствие якоря — находка, а не пропуск.
  *
  * Файлы берутся из `git ls-files`, а не обходом дерева: в рабочем дереве могут
  * лежать чужие удаления (отслеживаемый, но отсутствующий файл) и чужие
@@ -173,6 +181,21 @@ export const STACK_ABSENCES = [
  * ссылка в таблице канона прошла бы как «проверенная».
  */
 export const FILE_LINK_RE = /`([\p{L}\p{N}._/@-]+\.(?:md|txt|json|example|mjs|cjs|js|ts|tsx|sql|yml|yaml|ps1|bat|sh))`/gu
+
+/** Согласованность чисел документации с реальными файлами (пункт 8 гейта). */
+export const ANALYSIS_FILE = 'test/Для анализа.txt'
+export const UPLOAD_ROUTE = 'server/src/routes/upload.js'
+export const SECURITY_DOC = 'docs/AGENTS-security.md'
+export const PRODUCTION_DOC = 'docs/AGENTS-production.md'
+export const WORKFLOW_DOC = 'docs/AGENTS-workflow.md'
+export const MIGRATIONS_DIR = 'database/migrations'
+
+export const CI_JOBS_CLAIM_RE = /(\d+)\s+джобы\s+`ci\.yml`/
+export const DEPLOY_JOBS_CLAIM_RE = /(\d+)\s+`deploy\.yml`/
+export const MIGRATIONS_CLAIM_RE = /`database\/migrations\/`\s*\|\s*(\d+)\s+нумерованн/i
+export const UPLOAD_CODE_RE = /fileSize:\s*(\d+)\s*\*\s*1024\s*\*\s*1024/
+export const UPLOAD_MB_CLAIM_RE = /ограничение\s+(\d+)\s*MB/i
+export const WORKFLOW_ARCHIVE_RE = /context\.txt/
 
 const RULE_HEADING_RE = /^##\s+(\d{1,2})\.\s/
 const MIRROR_PREFIX = 'test/'
@@ -663,6 +686,98 @@ function finishWiring(findings, deployYaml) {
   return findings
 }
 
+/** Число джоб в workflow: по одной строке `runs-on:` на джобу (внешние вызовы `uses:` без runner не считаются). */
+export function countWorkflowJobs(yaml) {
+  if (!yaml) return 0
+  return (yaml.match(/^ {4}runs-on:/gm) || []).length
+}
+
+/** Число нумерованных миграций (`*.sql` в `database/migrations/`); `null` — каталог не найден. */
+export function countMigrations(root) {
+  try {
+    return fs.readdirSync(path.join(root, MIGRATIONS_DIR)).filter(f => f.endsWith('.sql')).length
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Сверка чисел и ссылок документации с реальными файлами (Stage 79, пункт 8).
+ *
+ * Прежний гейт проверял форму текста, но не числа вне таблиц стека: ручная
+ * сверка 19.10.2026 нашла четыре протухших утверждения, которых не видел ни
+ * один гейт (23 джобы `ci.yml` при факте 32, «ограничение 5MB» при коде на
+ * 10MB, 60 миграций при факте 71, пошаговый workflow со ссылкой на архив
+ * `context.txt`). Источники истины — реальные файлы, а не константы гейта
+ * (питфолл «гейт сверяет реальность с собственной константой»): workflow-файлы
+ * считаются по строкам `runs-on:`, миграции — по `*.sql` в каталоге, лимит —
+ * по литералу `fileSize` в `upload.js`. Отсутствие якоря (утверждение пропало
+ * из дока, в коде нет литерала, каталог не найден) — находка, а не пропуск.
+ */
+export function collectConsistencyFindings({ analysisText, ciYaml, deployYaml, uploadJs, securityText, productionText, workflowText, migrationCount }) {
+  const findings = []
+
+  if (analysisText) {
+    const ciClaim = CI_JOBS_CLAIM_RE.exec(analysisText)
+    if (!ciClaim) {
+      findings.push({ id: 'consistency-ci-jobs-claim', file: ANALYSIS_FILE, line: 1, text: 'нет утверждения «N джобы ci.yml» — гейт не может сверить число джоб CI' })
+    } else if (ciYaml && Number(ciClaim[1]) !== countWorkflowJobs(ciYaml)) {
+      findings.push({ id: 'consistency-ci-jobs', file: ANALYSIS_FILE, line: lineAt(analysisText, ciClaim.index), text: `заявлено «${ciClaim[1]} джобы ci.yml», а в ${CI_WORKFLOW} ${countWorkflowJobs(ciYaml)} (считается по строкам runs-on:)` })
+    }
+
+    const deployClaim = DEPLOY_JOBS_CLAIM_RE.exec(analysisText)
+    if (!deployClaim) {
+      findings.push({ id: 'consistency-deploy-jobs-claim', file: ANALYSIS_FILE, line: 1, text: 'нет утверждения «N `deploy.yml`» рядом с числом джоб — гейт не может сверить число джоб деплоя' })
+    } else if (deployYaml && Number(deployClaim[1]) !== countWorkflowJobs(deployYaml)) {
+      findings.push({ id: 'consistency-deploy-jobs', file: ANALYSIS_FILE, line: lineAt(analysisText, deployClaim.index), text: `заявлено «${deployClaim[1]} deploy.yml», а в ${DEPLOY_WORKFLOW} ${countWorkflowJobs(deployYaml)} (считается по строкам runs-on:)` })
+    }
+
+    const migClaim = MIGRATIONS_CLAIM_RE.exec(analysisText)
+    if (!migClaim) {
+      findings.push({ id: 'consistency-migrations-claim', file: ANALYSIS_FILE, line: 1, text: 'нет строки «`database/migrations/` | N нумерованная миграция» — гейт не может сверить число миграций' })
+    } else if (migrationCount === null) {
+      findings.push({ id: 'consistency-migrations-anchor', file: MIGRATIONS_DIR, line: 1, text: 'каталог не найден — источник истины по числу миграций отсутствует' })
+    } else if (Number(migClaim[1]) !== migrationCount) {
+      findings.push({ id: 'consistency-migrations', file: ANALYSIS_FILE, line: lineAt(analysisText, migClaim.index), text: `заявлено «${migClaim[1]} нумерованных миграций», а в ${MIGRATIONS_DIR} ${migrationCount} *.sql` })
+    }
+  }
+
+  const code = uploadJs ? UPLOAD_CODE_RE.exec(uploadJs) : null
+  if (!uploadJs) {
+    findings.push({ id: 'consistency-upload-source', file: UPLOAD_ROUTE, line: 1, text: 'файл не найден — источник истины по лимиту загрузки отсутствует' })
+  } else if (!code) {
+    findings.push({ id: 'consistency-upload-source', file: UPLOAD_ROUTE, line: 1, text: 'не найден литерал fileSize: N * 1024 * 1024 — сверка лимита с доками потеряла якорь' })
+  } else {
+    const mb = Number(code[1])
+    const sec = securityText ? UPLOAD_MB_CLAIM_RE.exec(securityText) : null
+    if (!securityText) {
+      findings.push({ id: 'consistency-upload-security', file: SECURITY_DOC, line: 1, text: 'файл не найден — сверка лимита загрузки невозможна' })
+    } else if (!sec) {
+      findings.push({ id: 'consistency-upload-security', file: SECURITY_DOC, line: 1, text: 'нет строки «ограничение NMB» — сверка лимита загрузки потеряла якорь' })
+    } else if (Number(sec[1]) !== mb) {
+      findings.push({ id: 'consistency-upload-security', file: SECURITY_DOC, line: lineAt(securityText, sec.index), text: `заявлено «ограничение ${sec[1]}MB», а код даёт ${mb}MB (${UPLOAD_ROUTE})` })
+    }
+
+    const prod = productionText ? UPLOAD_CODE_RE.exec(productionText) : null
+    if (!productionText) {
+      findings.push({ id: 'consistency-upload-production', file: PRODUCTION_DOC, line: 1, text: 'файл не найден — сверка лимита загрузки невозможна' })
+    } else if (!prod) {
+      findings.push({ id: 'consistency-upload-production', file: PRODUCTION_DOC, line: 1, text: 'нет литерала fileSize: N * 1024 * 1024 в чек-листе — сверка лимита потеряла якорь' })
+    } else if (Number(prod[1]) !== Number(code[1])) {
+      findings.push({ id: 'consistency-upload-production', file: PRODUCTION_DOC, line: lineAt(productionText, prod.index), text: `в чек-листе fileSize: ${prod[1]} * 1024 * 1024, а в коде ${code[1]} (${UPLOAD_ROUTE})` })
+    }
+  }
+
+  if (workflowText) {
+    const m = WORKFLOW_ARCHIVE_RE.exec(workflowText)
+    if (m) {
+      findings.push({ id: 'consistency-workflow-archive', file: WORKFLOW_DOC, line: lineAt(workflowText, m.index), text: 'ссылка на архив context.txt — архив среза не обновляется на этапах, канон — project-context.md и docs/AGENTS-*.md' })
+    }
+  }
+
+  return findings
+}
+
 /** Отслеживаемые `.md`/`.txt`, существующие в дереве. */
 export function collectTrackedDocs(root) {
   let tracked = []
@@ -752,6 +867,16 @@ export function audit(root) {
   const pkgVersions = { ...(pkgJson && pkgJson.dependencies), ...(pkgJson && pkgJson.devDependencies) }
   findings.push(...collectStackFindings(docs, pkgVersions))
   findings.push(...collectWiringFindings({ pkgJson, ciYaml: read(CI_WORKFLOW), deployYaml: read(DEPLOY_WORKFLOW) }))
+  findings.push(...collectConsistencyFindings({
+    analysisText: read(ANALYSIS_FILE),
+    ciYaml: read(CI_WORKFLOW),
+    deployYaml: read(DEPLOY_WORKFLOW),
+    uploadJs: read(UPLOAD_ROUTE),
+    securityText: read(SECURITY_DOC),
+    productionText: read(PRODUCTION_DOC),
+    workflowText: read(WORKFLOW_DOC),
+    migrationCount: countMigrations(root),
+  }))
 
   return { findings, docs, missing, source, promptsCheck, roadmapCheck }
 }
@@ -759,11 +884,16 @@ export function audit(root) {
 function main() {
   const root = path.resolve(process.argv[2] || process.cwd())
   const { findings, docs, missing, source, promptsCheck, roadmapCheck } = audit(root)
+  const read = rel => {
+    const abs = path.join(root, rel)
+    return fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : null
+  }
 
   console.log(`docs-canon audit: ${docs.length} отслеживаемых .md/.txt (список: ${source}${missing.length ? `, пропущено отсутствующих: ${missing.length}` : ''})`)
   for (const m of missing) console.log(`  [SKIP] ${m} — отслеживается в git, но отсутствует в дереве`)
   console.log(`Канон-указатель: ${PROMPTS_INDEX} (ссылок: ${promptsCheck.links.length}); идеи: ${ROADMAP_FILE} (${roadmapCheck.nonEmptyLines} непустых строк); архив: ${ARCHIVE_FILE}; бэклог: ${TODO_JOURNAL} (структура), хроника: ${DONE_JOURNAL}, архив срезов: ${AGENDA_ARCHIVE}`)
   console.log(`Стек: ${STACK_VERSION_ROWS.length} версий сверяется с package.json, ${STACK_ABSENCES.length} запрета на удалённую зависимость`)
+  console.log(`Согласованность: джобы CI/CD ↔ runs-on (${countWorkflowJobs(read(CI_WORKFLOW))}/${countWorkflowJobs(read(DEPLOY_WORKFLOW))}), лимит загрузки ↔ ${UPLOAD_ROUTE}, миграции ↔ ${MIGRATIONS_DIR} (${countMigrations(root) ?? 'нет'}), ${WORKFLOW_DOC} без архивных ссылок`)
   console.log(`\nНаходок: ${findings.length}\n`)
 
   if (!findings.length) {
@@ -784,6 +914,7 @@ function main() {
   console.log(`  5) исключение для журналов задано в FORBIDDEN_EXEMPT_FILES (${FORBIDDEN_EXEMPT_FILES.join(', ')}) и проверяется тестом;`)
   console.log(`  6) структура бэклога (${TODO_JOURNAL}) — уникальные ID и заголовки, закрытие с хроникой в ${DONE_JOURNAL}, записи этапов — только там.`)
   console.log('  7) версии стека и упоминания `zod` — привести к `package.json`: источник истины — зависимости, а не проза.')
+  console.log('  8) числа в доках (джобы, лимиты, миграции) — править по реальному файлу-источнику, а не по другому доку.')
   process.exit(1)
 }
 

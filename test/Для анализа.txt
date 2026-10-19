@@ -32,9 +32,9 @@ Node.js/Express + MySQL (mysql2) бэкенд, Socket.IO real-time, Capacitor An
 Локальная тестовая копия с реальной БД (50 демо-юзеров). Порты: фронт 8081
 (vite proxy /api→3002), API+WS 3002, MySQL 3306, Redis 6379.
 
-## Статус проверок (17.10.2026, всё зелёное)
+## Статус проверок (19.10.2026, всё зелёное)
 
-- Тесты **2875/2875**: сервер 1324/1324 (92 файла), фронт 1551/1551 (122 файлов: 716 продуктовых тестов в 86 файлах + 660 тестов гейтов в 27 файлах `scripts/`), E2E 206 в 22 спеках (живой полный прогон 18.10.2026 — 206 passed). Гейты: все зелёные — 23 джобы `ci.yml` + 7 `deploy.yml` (на 12.10.2026) + локальные `check:console`/`check:bundle`.
+- Тесты **2887/2887**: сервер 1324/1324 (92 файла), фронт 1563/1563 (122 файла: 881 продуктовый тест в 95 файлах + 682 теста гейтов в 27 файлах `scripts/`), E2E 206 в 22 спеках (живой полный прогон 18.10.2026 — 206 passed). Гейты: все зелёные — 32 джобы `ci.yml` + 7 `deploy.yml` (на 19.10.2026) + локальные `check:console`/`check:bundle`.
 - vite build ✅, tsc --noEmit 0 ошибок, eslint 0 errors (197 warnings — стилевые), Swagger ✅
 - E2E: Playwright, storageState из global-setup (.auth/*.json), аудит console-errors на каждой странице, screenshot/video/trace на падение; независимая очистка БД `scripts/e2e-cleanup.mjs` шагом с `if: always()`.
 - Pre-flight: `npm run check:ports`, `node scripts/schema-drift-audit.mjs --offline`, `npm run check:docs`, `npm run check:enum-constraints`, `npm run check:prod-mock`, `npm run check:headers`, `node scripts/test-counter-audit.mjs`.
@@ -186,7 +186,7 @@ i18n RU/EN, push VAPID + FCM hook, deep links hook, рефералка.
 | `src/context/auth-context.tsx` | restore через /me → dev-login fallback, logout через API |
 | `src/lib/native.ts` | нативный адаптер fetch/WS (Bearer вместо cookie) |
 | `e2e/setup/global-setup.ts` | health-check API + сеет storageState (localStorage.token!) |
-| `database/migrations/` | 60 нумерованных миграций + migrate.js |
+| `database/migrations/` | 71 нумерованная миграция + migrate.js |
 
 ## Демо-доступы
 

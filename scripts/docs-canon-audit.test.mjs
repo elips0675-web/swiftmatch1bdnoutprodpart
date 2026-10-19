@@ -54,7 +54,17 @@ import {
   collectAgendaFindings,
   collectChangelogFindings,
   collectWiringFindings,
+  collectConsistencyFindings,
+  countWorkflowJobs,
+  countMigrations,
   collectTrackedDocs,
+  ANALYSIS_FILE,
+  UPLOAD_ROUTE,
+  SECURITY_DOC,
+  PRODUCTION_DOC,
+  WORKFLOW_DOC,
+  CI_WORKFLOW,
+  DEPLOY_WORKFLOW,
   tableIds,
   getJobBlock,
   getStepBlock,
@@ -618,5 +628,88 @@ describe('agenda-archive.md остаётся архивом', () => {
 
   it('без метки «архив/снимок» в шапке — находка', () => {
     expect(ids(collectAgendaFindings('# Заметки\n\nтекст\n'))).toContain('agenda-archive-role')
+  })
+})
+
+describe('согласованность чисел документации с реальными файлами', () => {
+  const good = {
+    analysisText: '- Гейты: 3 джобы `ci.yml` + 2 `deploy.yml` (на 19.10.2026).\n| `database/migrations/` | 2 нумерованная миграция + migrate.js |\n',
+    ciYaml: 'jobs:\n  a:\n    runs-on: ubuntu-latest\n  b:\n    runs-on: ubuntu-latest\n  c:\n    runs-on: ubuntu-latest\n',
+    deployYaml: 'jobs:\n  d:\n    runs-on: ubuntu-latest\n  e:\n    runs-on: ubuntu-latest\n',
+    uploadJs: 'app.use("/api/upload", upload({ limits: { fileSize: 10 * 1024 * 1024 } }))\n',
+    securityText: '- Server-side только uuid, ограничение 10MB (`upload.js:76`), только image/*\n',
+    productionText: '- [ ] Ограничение размера: `limits: { fileSize: 10 * 1024 * 1024 }`\n',
+    workflowText: '## Этап 5 — обновить документацию\n1. project-context.md\n',
+    migrationCount: 2,
+  }
+  const run = over => collectConsistencyFindings({ ...good, ...over })
+
+  it('текущий репозиторий проходит все четыре сверки', () => {
+    expect(collectConsistencyFindings({
+      analysisText: read(ANALYSIS_FILE),
+      ciYaml: read(CI_WORKFLOW),
+      deployYaml: read(DEPLOY_WORKFLOW),
+      uploadJs: read(UPLOAD_ROUTE),
+      securityText: read(SECURITY_DOC),
+      productionText: read(PRODUCTION_DOC),
+      workflowText: read(WORKFLOW_DOC),
+      migrationCount: countMigrations(ROOT),
+    })).toEqual([])
+  })
+
+  it('каталог миграций существует и не пуст (якорь сверки на месте)', () => {
+    expect(countMigrations(ROOT)).toBeGreaterThan(0)
+  })
+
+  it('countWorkflowJobs считает джобы по строкам runs-on: с отступом 4', () => {
+    expect(countWorkflowJobs(good.ciYaml)).toBe(3)
+    expect(countWorkflowJobs(good.deployYaml)).toBe(2)
+    expect(countWorkflowJobs('')).toBe(0)
+    expect(countWorkflowJobs(null)).toBe(0)
+  })
+
+  it('расхождение числа джоб CI с фактическим runs-on — находка', () => {
+    const list = ids(run({ analysisText: good.analysisText.replace('3 джобы', '23 джобы') }))
+    expect(list).toContain('consistency-ci-jobs')
+    expect(list).not.toContain('consistency-ci-jobs-claim')
+  })
+
+  it('пропавшее утверждение «N джобы ci.yml» — находка, а не молчаливый пропуск', () => {
+    expect(ids(run({ analysisText: '- просто текст без утверждений\n' }))).toEqual(
+      expect.arrayContaining(['consistency-ci-jobs-claim', 'consistency-deploy-jobs-claim', 'consistency-migrations-claim']),
+    )
+  })
+
+  it('расхождение числа джоб деплоя — отдельная находка', () => {
+    expect(ids(run({ analysisText: good.analysisText.replace('2 `deploy.yml`', '7 `deploy.yml`') }))).toContain('consistency-deploy-jobs')
+  })
+
+  it('дрейф лимита в AGENTS-security.md (10MB в коде, 5MB в доке) — находка', () => {
+    const f = run({ securityText: good.securityText.replace('10MB', '5MB') })
+    expect(ids(f)).toContain('consistency-upload-security')
+    expect(f.find(x => x.id === 'consistency-upload-security').file).toBe(SECURITY_DOC)
+  })
+
+  it('дрейф литерала fileSize в AGENTS-production.md — находка', () => {
+    expect(ids(run({ productionText: good.productionText.replace('10 * 1024', '5 * 1024') }))).toContain('consistency-upload-production')
+  })
+
+  it('потеря якоря в upload.js (нет литерала fileSize) — находка, а не пропуск', () => {
+    expect(ids(run({ uploadJs: 'app.use("/api/upload", multer())\n' }))).toContain('consistency-upload-source')
+    expect(ids(run({ uploadJs: null }))).toContain('consistency-upload-source')
+  })
+
+  it('ссылка на архив context.txt в AGENTS-workflow.md — находка', () => {
+    const f = run({ workflowText: 'Шаг 5: обновить context.txt\n' })
+    expect(ids(f)).toContain('consistency-workflow-archive')
+    expect(f.find(x => x.id === 'consistency-workflow-archive').file).toBe(WORKFLOW_DOC)
+  })
+
+  it('дрейф числа миграций с фактическим числом *.sql — находка', () => {
+    expect(ids(run({ analysisText: good.analysisText.replace('2 нумерованная', '60 нумерованная') }))).toContain('consistency-migrations')
+  })
+
+  it('отсутствующий каталог миграций — находка-якорь, а не тихий зелёный', () => {
+    expect(ids(run({ migrationCount: null }))).toContain('consistency-migrations-anchor')
   })
 })
