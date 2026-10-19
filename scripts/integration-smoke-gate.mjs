@@ -37,7 +37,13 @@
  *     после них «свежесть» БД уже не проверить. Без него класс потерь, который
  *     не роняет init (REPLACE на таблице-родителе = DELETE+INSERT, при
  *     включённых FK каскад уносит детей), остаётся невидимым.
- *  7. Шаг check:integration-smoke есть в deploy.yml и в package.json —
+ *  7. Четвёртый смоук (server/scripts/push-sms-contract-smoke.mjs) держит
+ *     половину INT-01, достижимую без ключей провайдеров: форма запроса FCM
+ *     (путь, Authorization key=…, тело) и Twilio (путь /2010-04-01/Accounts/…,
+ *     Basic-auth, form-urlencoded тело) сверяется против локальной HTTP-ловушки
+ *     (node:http), поднятой в процессе. Юнит-мок принимает любую форму, поэтому
+ *     потеря заголовка/опечатка в поле доходят до живого провайдера незамеченными.
+ *  8. Шаг check:integration-smoke есть в deploy.yml и в package.json —
  *     блокирует деплой той же структурой.
  *
  * Гейт зелёный на машине без Docker — это нормально: он проверяет структуру,
@@ -55,6 +61,7 @@ const RUNNER = 'scripts/integration-smoke-run.mjs'
 const SMOKE = 'server/scripts/integration-smoke.mjs'
 const SMOKE_S3 = 'server/scripts/s3-contract-smoke.mjs'
 const SMOKE_INIT_DATA = 'server/scripts/init-data-smoke.mjs'
+const SMOKE_PUSH_SMS = 'server/scripts/push-sms-contract-smoke.mjs'
 const COMPOSE_OVERRIDE = 'docker-compose.integration.yml'
 const JOB = 'integration-smoke'
 
@@ -136,8 +143,12 @@ export function auditRunner(source) {
     problems.push(`${RUNNER}: смоук полноты init-данных бежит после смоуков с API — те регистрируют юзеров и добавляют строки, «свежесть» БД проверить уже нельзя`)
   }
 
-  if (!/code\s*=\s*\[\s*initDataCode\s*,\s*mailCode\s*,\s*s3Code\s*\]\.find\(/.test(code)) {
-    problems.push(`${RUNNER}: итог не сводит три прогона (code = [initDataCode, mailCode, s3Code].find(...)) — падение любого смоука может затереться`)
+  if (!code.includes(SMOKE_PUSH_SMS)) {
+    problems.push(`${RUNNER}: контрактный смоук FCM/Twilio ${SMOKE_PUSH_SMS} не вызывается — половина INT-01, достижимая без ключей провайдеров, остаётся локальной командой`)
+  }
+
+  if (!/code\s*=\s*\[\s*initDataCode\s*,\s*mailCode\s*,\s*s3Code\s*,\s*pushSmsCode\s*\]\.find\(/.test(code)) {
+    problems.push(`${RUNNER}: итог не сводит четыре прогона (code = [initDataCode, mailCode, s3Code, pushSmsCode].find(...)) — падение контрактного смоука FCM/Twilio может затереться`)
   }
 
   if (!/finally\s*\{/.test(code)) {
@@ -222,6 +233,47 @@ export function auditS3Smoke(source) {
 
   if (!/DELETE FROM users WHERE email/.test(code)) {
     problems.push(`${SMOKE_S3}: тест-юзер не убирается (DELETE FROM users) — после прогона останется мусор`)
+  }
+
+  return problems
+}
+
+/** Проверки контрактного смоука FCM/Twilio (половина INT-01 без ключей):
+ *  флаг = падение, локальная ловушка, сверка формы запроса, уход в mock без ключей. */
+export function auditPushSmsSmoke(source) {
+  const code = stripComments(source)
+  const problems = []
+
+  if (!/process\.env\.REQUIRE_INTEGRATION === '1'/.test(code)) {
+    problems.push(`${SMOKE_PUSH_SMS}: REQUIRE_INTEGRATION не читается строго как '1' — переменная в workflow/раннере не влияет на поведение файла`)
+  }
+
+  if (!/process\.exit\(1\)/.test(code)) {
+    problems.push(`${SMOKE_PUSH_SMS}: нет выхода с кодом 1 — расхождение формы запроса не станет падением`)
+  }
+
+  if (!/createServer\(/.test(code)) {
+    problems.push(`${SMOKE_PUSH_SMS}: ловушка не поднимается (node:http createServer) — сверять форму запроса не с чем`)
+  }
+
+  if (!/FCM_ENDPOINT/.test(code)) {
+    problems.push(`${SMOKE_PUSH_SMS}: эндпоинт FCM не переопределяется (FCM_ENDPOINT) — запрос уйдёт в настоящий fcm.googleapis.com без ключа = живая сеть вместо контура`)
+  }
+
+  if (!/TWILIO_API_BASE_URL/.test(code)) {
+    problems.push(`${SMOKE_PUSH_SMS}: базовый url Twilio не переопределяется (TWILIO_API_BASE_URL) — SDK ходит на жёстко зашитый api.twilio.com, ловушка его не увидит`)
+  }
+
+  if (!/Authorization/.test(code) || !/key=\$\{FCM_KEY\}/.test(code)) {
+    problems.push(`${SMOKE_PUSH_SMS}: заголовок Authorization key=<FCM_SERVER_KEY> не сверяется — потеря ключа в заголовке доходит до живого провайдера незамеченной`)
+  }
+
+  if (!/2010-04-01\\\/Accounts/.test(code) && !/2010-04-01\/Accounts/.test(code)) {
+    problems.push(`${SMOKE_PUSH_SMS}: путь Twilio REST (/2010-04-01/Accounts/...) не сверяется — неверный путь всплывёт только на живом ключе`)
+  }
+
+  if (!/application\/x-www-form-urlencoded/.test(code)) {
+    problems.push(`${SMOKE_PUSH_SMS}: форма тела Twilio (form-urlencoded) не сверяется — Twilio REST не принимает JSON, юнит-мок этого не видит`)
   }
 
   return problems
@@ -361,6 +413,7 @@ export function audit(root) {
       ...auditRunner(readRepoFile(root, RUNNER)),
       ...auditSmoke(readRepoFile(root, SMOKE)),
       ...auditS3Smoke(readRepoFile(root, SMOKE_S3)),
+      ...auditPushSmsSmoke(readRepoFile(root, SMOKE_PUSH_SMS)),
       ...auditInitDataSmoke(readRepoFile(root, SMOKE_INIT_DATA)),
       ...auditComposeOverride(readRepoFile(root, COMPOSE_OVERRIDE)),
       ...auditDeploy(readRepoFile(root, DEPLOY_WORKFLOW)),
@@ -374,15 +427,15 @@ function main() {
   const { facts, problems } = audit(root)
 
   console.log(`джоба ${JOB} в ${CI_WORKFLOW}: ${facts.jobFound ? 'найдена' : 'НЕ НАЙДЕНА'}`)
-  console.log(`раннер: ${RUNNER}, смоуки: ${SMOKE_INIT_DATA}, ${SMOKE}, ${SMOKE_S3}, контур: ${COMPOSE_OVERRIDE}`)
+  console.log(`раннер: ${RUNNER}, смоуки: ${SMOKE_INIT_DATA}, ${SMOKE}, ${SMOKE_S3}, ${SMOKE_PUSH_SMS}, контур: ${COMPOSE_OVERRIDE}`)
 
   if (problems.length) {
     console.log('')
     for (const p of problems) console.log(`FAIL: ${p}`)
-    console.log('\nИтог: джоба есть? REQUIRE_INTEGRATION=1? runner делает down -v в finally? три смоука запускаются и итог сводится? смоуки спавнят src/index.js? порты !override, s3 по digest? deploy блокирует?')
+    console.log('\nИтог: джоба есть? REQUIRE_INTEGRATION=1? runner делает down -v в finally? четыре смоука запускаются и итог сводится? смоуки спавнят src/index.js? форма FCM/Twilio сверяется против ловушки? порты !override, s3 по digest? deploy блокирует?')
     process.exit(1)
   }
-  console.log('\nИтог: джоба выполняет runner с REQUIRE_INTEGRATION=1, runner убирает контейнеры и volume в finally, три смоука поднимают реальный src/index.js (полнота init-данных, почта, S3-контракт), деплой блокируется гейтом.')
+  console.log('\nИтог: джоба выполняет runner с REQUIRE_INTEGRATION=1, runner убирает контейнеры и volume в finally, четыре смоука держат полноту init-данных, почтовую цепочку, S3-контракт и форму запроса FCM/Twilio (INT-01 без ключей), деплой блокируется гейтом.')
 }
 
 if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]))) main()

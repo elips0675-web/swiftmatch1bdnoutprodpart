@@ -41,9 +41,11 @@ beforeEach(() => {
   savedEnv = {
     FCM_SERVER_KEY: process.env.FCM_SERVER_KEY,
     FCM_SERVICE_ACCOUNT: process.env.FCM_SERVICE_ACCOUNT,
+    FCM_ENDPOINT: process.env.FCM_ENDPOINT,
   }
   delete process.env.FCM_SERVER_KEY
   delete process.env.FCM_SERVICE_ACCOUNT
+  delete process.env.FCM_ENDPOINT
   adminMock.apps.length = 0
   adminMock.initializeApp.mockImplementation(() => ({ name: '[DEFAULT]' }))
   adminMock.credential.cert.mockImplementation((sa) => sa)
@@ -220,6 +222,14 @@ describe('sendFcmToUser — legacy HTTP-ветка', () => {
     const res = await fcm.sendFcmToUser('tok', 'T', 'B')
     expect(res).toEqual({ success: false, error: 'network down' })
     expect(rootLog.error).toHaveBeenCalledWith('FCM HTTP send error:', expect.any(Error))
+  })
+
+  it('FCM_ENDPOINT переопределяет адрес (контрактный смоук — ловушка вместо fcm.googleapis.com)', async () => {
+    fetchMock.mockResolvedValue({ json: async () => ({ success: 1 }) })
+    adminMock.initializeApp.mockImplementation(() => { throw new Error('no firebase') })
+    const fcm = await freshFcm({ FCM_SERVER_KEY: 'legacy-key', FCM_ENDPOINT: 'http://127.0.0.1:9999/fcm/send' })
+    await fcm.sendFcmToUser('tok', 'T', 'B')
+    expect(fetchMock.mock.calls[0][0]).toBe('http://127.0.0.1:9999/fcm/send')
   })
 })
 

@@ -101,4 +101,25 @@ describe('sendSMS с ключами: клиент Twilio', () => {
 
     expect(factory).toHaveBeenCalledTimes(1)
   })
+
+  it('TWILIO_API_BASE_URL переопределяет базовый url домена api (контрактный смоук — ловушка вместо api.twilio.com)', async () => {
+    const client = { api: { baseUrl: 'https://api.twilio.com' }, messages: { create: vi.fn(async () => ({ sid: 'S' })) } }
+    vi.doMock('twilio', () => ({ default: vi.fn(() => client) }))
+    process.env.TWILIO_API_BASE_URL = 'http://127.0.0.1:9999'
+    try {
+      const sms = await freshSms({ sid: 'AC1', token: 'tok' })
+      await sms.sendSMS('+1', 'a')
+      expect(client.api.baseUrl).toBe('http://127.0.0.1:9999')
+    } finally {
+      delete process.env.TWILIO_API_BASE_URL
+    }
+  })
+
+  it('без TWILIO_API_BASE_URL базовый url не трогается (прод-ветка ходит на api.twilio.com)', async () => {
+    const client = { api: { baseUrl: 'https://api.twilio.com' }, messages: { create: vi.fn(async () => ({ sid: 'S' })) } }
+    vi.doMock('twilio', () => ({ default: vi.fn(() => client) }))
+    const sms = await freshSms({ sid: 'AC1', token: 'tok' })
+    await sms.sendSMS('+1', 'a')
+    expect(client.api.baseUrl).toBe('https://api.twilio.com')
+  })
 })

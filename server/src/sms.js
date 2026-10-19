@@ -3,6 +3,7 @@ import { rootLogger } from './logger.js'
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN
 const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER
+const TWILIO_API_BASE_URL = process.env.TWILIO_API_BASE_URL
 
 let twilioClient = null
 let initAttempted = false
@@ -17,6 +18,7 @@ async function getClient() {
   try {
     const twilio = await import('twilio')
     twilioClient = twilio.default(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+    if (TWILIO_API_BASE_URL) twilioClient.api.baseUrl = TWILIO_API_BASE_URL
   } catch (err) {
     rootLogger.warn('SMS: Twilio client init failed:', err.message)
   }

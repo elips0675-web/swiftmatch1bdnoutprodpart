@@ -4,10 +4,12 @@
  * db/redis те же, что поедут на VPS, порты мимо Laragon), гоняет смоуки против
  * живого server/src/index.js и убирает за собой.
  *
- * Три смоука: init-data-smoke.mjs (полнота данных свежего init — до смоуков с API,
+ * Четыре смоука: init-data-smoke.mjs (полнота данных свежего init — до смоуков с API,
  * те добавляют строки), integration-smoke.mjs (цепочка почты HTTP → MySQL → Bull/Redis →
- * nodemailer → maildev) и s3-contract-smoke.mjs (контракт S3: upload → объекты
- * в бакете → удаление оригинала и вариантов). Все три бегут при поднятом контуре;
+ * nodemailer → maildev), s3-contract-smoke.mjs (контракт S3: upload → объекты
+ * в бакете → удаление оригинала и вариантов) и push-sms-contract-smoke.mjs
+ * (форма запроса FCM/Twilio против локальной ловушки — половина INT-01, не
+ * требующая ключей провайдеров). Все четыре бегут при поднятом контуре;
  * упавший первый не отменяет остальные.
  *
  * Ключевая обязанность — уборка в finally: `down -v` сносит и контейнеры, и
@@ -121,7 +123,16 @@ async function main() {
         timeoutMs: 240_000,
       })
 
-      code = [initDataCode, mailCode, s3Code].find((result) => result !== 0) ?? 0
+      // Половина INT-01 без ключей: форма запроса FCM/Twilio против локальной
+      // ловушки. Контейнер не нужен (ловушка поднимается в процессе), но ключи
+      // провайдеров не требуются — поэтому смоук и проходит в CI.
+      console.log('[run] контрактный прогон INT-01 (FCM/Twilio, форма запроса)')
+      const pushSmsCode = await run(process.execPath, ['server/scripts/push-sms-contract-smoke.mjs'], {
+        env: smokeEnv,
+        timeoutMs: 120_000,
+      })
+
+      code = [initDataCode, mailCode, s3Code, pushSmsCode].find((result) => result !== 0) ?? 0
     }
   } finally {
     console.log('[run] cleanup: docker compose down -v (контейнеры + volume)')

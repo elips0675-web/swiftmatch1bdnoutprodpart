@@ -2,6 +2,7 @@ import { rootLogger } from './logger.js'
 
 const FCM_SERVER_KEY = process.env.FCM_SERVER_KEY
 const FCM_SERVICE_ACCOUNT = process.env.FCM_SERVICE_ACCOUNT
+const FCM_ENDPOINT = process.env.FCM_ENDPOINT || 'https://fcm.googleapis.com/fcm/send'
 let fcmConfigured = false
 let firebaseApp = null
 
@@ -81,7 +82,7 @@ export async function sendFcmToUser(fcmToken, title, body, data = {}) {
   if (!FCM_SERVER_KEY) return { success: false, error: 'FCM_SERVER_KEY not set' }
 
   try {
-    const res = await fetch('https://fcm.googleapis.com/fcm/send', {
+    const res = await fetch(FCM_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
