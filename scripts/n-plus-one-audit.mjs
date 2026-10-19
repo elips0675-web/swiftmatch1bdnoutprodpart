@@ -29,13 +29,13 @@ export const JUSTIFIED = [
   { file: 'seed.js', reason: 'сидинг, не рантайм' },
   {
     file: 'jobs/push.job.js',
-    lines: [46],
+    lines: [51],
     expect: 'DELETE',
     reason: 'удаление мёртвой push-подписки по коду 410/404 — сам delete идёт только для отваливших, их единицы',
   },
   {
     file: 'routes/push.js',
-    lines: [179, 205],
+    lines: [184, 212],
     expect: 'DELETE',
     reason: 'то же: чистка подписок по 410/404, а не по каждой подписке',
   },

@@ -5,6 +5,7 @@ import logger from '../logger.js'
 import {
   getPrefs, savePrefs, normalizePrefs, defaultPrefs, describeMatrix, CHANNELS,
 } from '../notification-prefs.js'
+import { getQuiet, saveQuiet, normalizeQuiet } from '../quiet-hours.js'
 
 const router = Router()
 
@@ -68,6 +69,68 @@ router.put('/api/notifications/preferences', auth, async (req, res) => {
   } catch (err) {
     logger.error('Notification prefs write error:', err)
     res.status(500).json({ message: 'Failed to save notification preferences' })
+  }
+})
+
+/**
+ * GET /api/notifications/quiet-hours
+ * Тихие часы (DND): push не приходит в окне, in-app уведомления не гасятся.
+ * Отдельный эндпоинт от матрицы: тишину хранят колонки, а не JSON prefs —
+ * PUT матрицы её не затирает. Нет строки в БД = дефолт (тишина выключена).
+ */
+/**
+ * @openapi
+ * /api/notifications/quiet-hours:
+ *   get:
+ *     tags: [Notifications]
+ *     summary: Get quiet hours (DND) settings for push
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Quiet hours settings }
+ */
+router.get('/api/notifications/quiet-hours', auth, async (req, res) => {
+  try {
+    const quiet = await getQuiet(req.userId)
+    res.json({ quiet })
+  } catch (err) {
+    logger.error('Quiet hours read error:', err)
+    res.status(500).json({ message: 'Failed to fetch quiet hours' })
+  }
+})
+
+/**
+ * PUT /api/notifications/quiet-hours
+ * Полная замена настроек тишины. Непереданные поля = дефолт, невалидные
+ * значения отклоняются 400 со списком полей — иначе опечатка в часах
+ * молча выключала бы тишину пользователя.
+ */
+/**
+ * @openapi
+ * /api/notifications/quiet-hours:
+ *   put:
+ *     tags: [Notifications]
+ *     summary: Replace quiet hours (DND) settings
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Updated quiet hours settings }
+ */
+router.put('/api/notifications/quiet-hours', auth, async (req, res) => {
+  const input = req.body?.quiet !== undefined ? req.body.quiet : req.body
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+    return res.status(400).json({ message: 'quiet must be an object' })
+  }
+  try {
+    const { quiet, invalid } = normalizeQuiet(input)
+    if (invalid.length > 0) {
+      return res.status(400).json({ message: 'Invalid quiet hours values', invalid })
+    }
+    await saveQuiet(req.userId, quiet)
+    res.json({ quiet })
+  } catch (err) {
+    logger.error('Quiet hours write error:', err)
+    res.status(500).json({ message: 'Failed to save quiet hours' })
   }
 })
 

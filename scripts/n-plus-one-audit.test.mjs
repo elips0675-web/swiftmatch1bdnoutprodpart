@@ -152,10 +152,10 @@ describe('collectFiles — границы обхода', () => {
 describe('justifiedFor — файл + строка', () => {
   it('оправдание действует только на свой файл и свою строку', () => {
     expect(justifiedFor('server/src/seed.js', 999)).toBeTruthy()
-    expect(justifiedFor('server/src/routes/push.js', 179)).toBeTruthy()
-    expect(justifiedFor('server/src/routes/push.js', 205)).toBeTruthy()
-    expect(justifiedFor('server/src/routes/push.js', 180)).toBeFalsy()
-    expect(justifiedFor('server/src/routes/profile.js', 179)).toBeFalsy()
+    expect(justifiedFor('server/src/routes/push.js', 184)).toBeTruthy()
+    expect(justifiedFor('server/src/routes/push.js', 212)).toBeTruthy()
+    expect(justifiedFor('server/src/routes/push.js', 185)).toBeFalsy()
+    expect(justifiedFor('server/src/routes/profile.js', 184)).toBeFalsy()
   })
 
   it('каждое оправдание обязано нести причину', () => {

@@ -17,6 +17,7 @@ export interface FeatureFlags {
   hangoutRelationsEnabled: boolean;
   userWatchesEnabled: boolean;
   emailUnsubscribeEnabled: boolean;
+  quietHoursEnabled: boolean;
   rolloutEnabled: boolean;
 }
 
@@ -34,6 +35,7 @@ const defaultFlags: FeatureFlags = {
   hangoutRelationsEnabled: true,
   userWatchesEnabled: true,
   emailUnsubscribeEnabled: true,
+  quietHoursEnabled: false,
   rolloutEnabled: true,
 };
 
@@ -51,6 +53,7 @@ const mapApiFlags = (data: Record<string, boolean>): FeatureFlags => ({
   hangoutRelationsEnabled: data.hangoutRelations ?? true,
   userWatchesEnabled: data.userWatches ?? true,
   emailUnsubscribeEnabled: data.emailUnsubscribe ?? true,
+  quietHoursEnabled: data.quietHours ?? false,
   rolloutEnabled: true,
 });
 
@@ -72,6 +75,7 @@ const applyRollout = (data: Record<string, unknown>): FeatureFlags => {
     hangoutRelationsEnabled: raw.hangoutRelationsEnabled && rolloutEnabled,
     userWatchesEnabled: raw.userWatchesEnabled && rolloutEnabled,
     emailUnsubscribeEnabled: raw.emailUnsubscribeEnabled && rolloutEnabled,
+    quietHoursEnabled: raw.quietHoursEnabled && rolloutEnabled,
     rolloutEnabled,
   }
 }

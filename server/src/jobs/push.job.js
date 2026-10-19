@@ -2,6 +2,7 @@ import webpush from 'web-push'
 import pool from '../db.js'
 import { rootLogger } from '../logger.js'
 import { isFCMConfigured, sendFcmToAll } from '../fcm.js'
+import { quietUserSet } from '../quiet-hours.js'
 
 const vapidPublic = process.env.VAPID_PUBLIC_KEY || ''
 const vapidPrivate = process.env.VAPID_PRIVATE_KEY || ''
@@ -28,13 +29,17 @@ export default async function processPush(job) {
       )
     } else {
       [rows] = await pool.query(
-        "SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE platform = 'web'",
+        "SELECT endpoint, p256dh, auth, user_id FROM push_subscriptions WHERE platform = 'web'",
       )
     }
+
+    const isBroadcast = !userId && (!userIds || userIds.length === 0)
+    const quiet = isBroadcast ? await quietUserSet(rows.map((r) => r.user_id)) : new Set()
 
     let sent = 0
     if (vapidPublic && vapidPrivate) {
       for (const sub of rows) {
+        if (quiet.has(Number(sub.user_id))) continue
         try {
           await webpush.sendNotification(
             { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
@@ -64,7 +69,8 @@ export default async function processPush(job) {
           [userId],
         )
       } else {
-        ;[fcmTokens] = await pool.query('SELECT token FROM fcm_tokens')
+        ;[fcmTokens] = await pool.query('SELECT token, user_id FROM fcm_tokens')
+        fcmTokens = fcmTokens.filter((r) => !quiet.has(Number(r.user_id)))
       }
       if (fcmTokens.length > 0) {
         const result = await sendFcmToAll(fcmTokens.map((r) => r.token), title, body, { url: url || '/' })

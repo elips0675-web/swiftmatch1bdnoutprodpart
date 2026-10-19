@@ -412,6 +412,7 @@ CREATE TABLE `feature_flags` (
   `hangout_relations_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `user_watches_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `email_unsubscribe_enabled` tinyint(1) NOT NULL DEFAULT '1',
+  `quiet_hours_enabled` tinyint(1) NOT NULL DEFAULT '0',
   `rollout_percent` tinyint unsigned NOT NULL DEFAULT '100',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -892,6 +893,10 @@ DROP TABLE IF EXISTS `notification_preferences`;
 CREATE TABLE `notification_preferences` (
   `user_id` int unsigned NOT NULL,
   `prefs` json NOT NULL,
+  `quiet_enabled` tinyint(1) NOT NULL DEFAULT '0',
+  `quiet_start` varchar(5) NOT NULL DEFAULT '22:00',
+  `quiet_end` varchar(5) NOT NULL DEFAULT '08:00',
+  `quiet_timezone` varchar(64) NOT NULL DEFAULT 'UTC',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`user_id`),
   CONSTRAINT `notification_preferences_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE

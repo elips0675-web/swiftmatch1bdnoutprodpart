@@ -27,6 +27,7 @@ router.get('/features', async (req, res) => {
         openingLines: true, activityPrivacy: true,
         hangoutRelations: true, userWatches: true,
         emailUnsubscribe: true,
+        quietHours: false,
         rolloutPercent: 100,
       })
     }
@@ -46,6 +47,7 @@ router.get('/features', async (req, res) => {
       hangoutRelations: Boolean(row.hangout_relations_enabled ?? true),
       userWatches: Boolean(row.user_watches_enabled ?? true),
       emailUnsubscribe: Boolean(row.email_unsubscribe_enabled ?? true),
+      quietHours: Boolean(row.quiet_hours_enabled ?? false),
       rolloutPercent: Number(row.rollout_percent ?? 100),
     })
   } catch (err) {
@@ -68,7 +70,7 @@ router.get('/features', async (req, res) => {
 router.put('/features', async (req, res) => {
   try {
     const flags = req.body
-    const knownKeys = ['videoCalls', 'aiIcebreakers', 'aiCompatibility', 'groupsPage', 'contest', 'showAds', 'autosearch', 'hangouts', 'partnerOffers', 'profileActivity', 'openingLines', 'activityPrivacy', 'hangoutRelations', 'userWatches', 'emailUnsubscribe', 'rolloutPercent']
+    const knownKeys = ['videoCalls', 'aiIcebreakers', 'aiCompatibility', 'groupsPage', 'contest', 'showAds', 'autosearch', 'hangouts', 'partnerOffers', 'profileActivity', 'openingLines', 'activityPrivacy', 'hangoutRelations', 'userWatches', 'emailUnsubscribe', 'quietHours', 'rolloutPercent']
     if (!flags || Object.keys(flags).length === 0 || !knownKeys.some(k => k in flags)) {
       return res.status(400).json({ message: 'At least one known flag key required' })
     }
@@ -84,7 +86,7 @@ router.put('/features', async (req, res) => {
         profile_activity_enabled = ?, rollout_percent = ?,
         opening_lines_enabled = ?, activity_privacy_enabled = ?,
         hangout_relations_enabled = ?, user_watches_enabled = ?,
-        email_unsubscribe_enabled = ?
+        email_unsubscribe_enabled = ?, quiet_hours_enabled = ?
        WHERE id = 1`,
       [
         Boolean(flags.videoCalls), Boolean(flags.aiIcebreakers),
@@ -94,7 +96,7 @@ router.put('/features', async (req, res) => {
         Boolean(flags.profileActivity), rolloutValue,
         Boolean(flags.openingLines), Boolean(flags.activityPrivacy),
         Boolean(flags.hangoutRelations), Boolean(flags.userWatches),
-        Boolean(flags.emailUnsubscribe),
+        Boolean(flags.emailUnsubscribe), Boolean(flags.quietHours),
       ],
     )
     res.json({ message: 'Feature flags updated' })

@@ -5,6 +5,7 @@ import { auth } from '../middleware.js'
 import logger from '../logger.js'
 import { pushQueue } from '../queue.js'
 import { isFCMConfigured, sendFcmToAll } from '../fcm.js'
+import { isQuietNow, quietUserSet } from '../quiet-hours.js'
 
 const router = Router()
 
@@ -97,6 +98,7 @@ router.delete('/api/push/subscribe', auth, async (req, res) => {
 })
 
 export async function sendPushToUser(userId, title, body, url = '/') {
+  if (await isQuietNow(userId)) return 0
   if (pushQueue) {
     await pushQueue.add({ userId, title, body, url })
     return 1
@@ -141,11 +143,14 @@ async function sendPushFcmAll(title, body, url) {
   if (!isFCMConfigured()) return 0
   try {
     const [rows] = await pool.query(
-      "SELECT endpoint FROM push_subscriptions WHERE platform = 'fcm'",
+      "SELECT endpoint, user_id FROM push_subscriptions WHERE platform = 'fcm'",
     )
     if (rows.length === 0) return 0
+    const quiet = await quietUserSet(rows.map((r) => r.user_id))
+    const targets = rows.filter((r) => !quiet.has(Number(r.user_id)))
+    if (targets.length === 0) return 0
     const result = await sendFcmToAll(
-      rows.map((r) => r.endpoint),
+      targets.map((r) => r.endpoint),
       title, body, { url },
     )
     return result.sent || 0
@@ -190,10 +195,12 @@ async function sendPushDirect(userId, title, body, url) {
 async function sendPushAllDirect(title, body, url) {
   try {
     const [rows] = await pool.query(
-      "SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE platform = 'web'",
+      "SELECT endpoint, p256dh, auth, user_id FROM push_subscriptions WHERE platform = 'web'",
     )
+    const quiet = await quietUserSet(rows.map((r) => r.user_id))
     let sent = 0
     for (const sub of rows) {
+      if (quiet.has(Number(sub.user_id))) continue
       try {
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },

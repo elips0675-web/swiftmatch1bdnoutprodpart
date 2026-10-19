@@ -1,11 +1,11 @@
 {
-  "generated": "2026-10-18T21:22:47.849Z",
+  "generated": "2026-10-19T04:23:10.753Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
     "files": 113,
-    "tests": 1386,
-    "passed": 1386,
+    "tests": 1393,
+    "passed": 1393,
     "failed": 0,
     "gate": {
       "files": 27,
@@ -13,7 +13,7 @@
     },
     "product": {
       "files": 86,
-      "tests": 716
+      "tests": 723
     },
     "perFile": [
       {
@@ -326,7 +326,7 @@
       },
       {
         "file": "src/test/notification-preferences-section.test.tsx",
-        "tests": 12
+        "tests": 19
       },
       {
         "file": "src/test/onboarding.test.tsx",
@@ -471,17 +471,17 @@
     ]
   },
   "server": {
-    "files": 90,
-    "tests": 1273,
-    "passed": 1273,
+    "files": 92,
+    "tests": 1324,
+    "passed": 1324,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 122
     },
     "product": {
-      "files": 85,
-      "tests": 1151
+      "files": 87,
+      "tests": 1202
     },
     "perFile": [
       {
@@ -749,12 +749,20 @@
         "tests": 10
       },
       {
+        "file": "server/src/__tests__/push-quiet-gates.test.js",
+        "tests": 8
+      },
+      {
         "file": "server/src/__tests__/push.test.js",
         "tests": 6
       },
       {
         "file": "server/src/__tests__/queue-monitor.test.js",
         "tests": 19
+      },
+      {
+        "file": "server/src/__tests__/quiet-hours.test.js",
+        "tests": 43
       },
       {
         "file": "server/src/__tests__/race.mysql.test.js",
@@ -949,7 +957,7 @@
     ]
   },
   "total": {
-    "files": 203,
-    "tests": 2659
+    "files": 205,
+    "tests": 2717
   }
 }
