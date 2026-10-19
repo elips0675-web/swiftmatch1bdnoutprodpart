@@ -1,5 +1,5 @@
 ===== Сервер (Vitest) =====
-1654 тестов в 112 файлах (зелёных 1654) (vitest --reporter=json)
+1674 тестов в 114 файлах (зелёных 1674) (vitest --reporter=json)
 
 # файл | тестов
 server/src/__tests__/active-user.test.js | 33
@@ -65,6 +65,7 @@ server/src/__tests__/mail.test.js | 14
 server/src/__tests__/metrics-integration-mode.test.js | 8
 server/src/__tests__/metrics.test.js | 12
 server/src/__tests__/middleware.test.js | 22
+server/src/__tests__/moderation-review-profile.test.js | 5
 server/src/__tests__/moderation-teams.test.js | 10
 server/src/__tests__/moderation.test.js | 11
 server/src/__tests__/notification-gates.test.js | 13
@@ -110,6 +111,7 @@ server/src/__tests__/totp.test.js | 10
 server/src/__tests__/trust-proxy.test.js | 6
 server/src/__tests__/upload.test.js | 28
 server/src/__tests__/webhook-journal.test.js | 6
+server/src/__tests__/webhooks-list.test.js | 15
 server/src/__tests__/weekly-report.test.js | 12
 server/src/__tests__/ws-auth-reverify.test.js | 14
 server/src/__tests__/ws-realtime.test.js | 31
