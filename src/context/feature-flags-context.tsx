@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useMemo, useEffect, useState } from 'react';
-import { getSupabase } from '@/lib/supabase';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { getToken } from '@/lib/token';
 import { getRolloutBucket, tokenUserId } from '@/lib/rollout';
 
@@ -86,31 +85,13 @@ export const FeatureFlagsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [flags, setFlags] = useState<FeatureFlags>(defaultFlags);
 
   useEffect(() => {
-    const supabase = getSupabase()
-    const url = import.meta.env.VITE_SUPABASE_URL
-
-    if (supabase && url && !url.includes('your-project.supabase.co')) {
-      Promise.resolve(
-        supabase
-          .from('feature_flags')
-          .select('*')
-          .maybeSingle(),
-      )
-        .then(({ data }) => {
-          if (data) {
-            setFlags(prev => ({ ...prev, ...data }))
-          }
-        })
-        .catch(() => {})
-    } else {
-      const token = getToken()
-      fetch('/api/admin/features', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-        .then(r => { if (!r.ok) throw new Error(); return r.json() })
-        .then(data => setFlags(applyRollout(data)))
-        .catch(() => {})
-    }
+    const token = getToken()
+    fetch('/api/admin/features', {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(r => { if (!r.ok) throw new Error(); return r.json() })
+      .then(data => setFlags(applyRollout(data)))
+      .catch(() => {})
   }, [])
 
   return (
