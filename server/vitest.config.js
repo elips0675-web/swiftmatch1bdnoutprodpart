@@ -12,10 +12,10 @@ export default defineConfig({
       include: ['src/**/*.js'],
       exclude: ['src/**/*.test.js'],
       thresholds: {
-        statements: 77,
+        statements: 78,
         branches: 73,
         functions: 82,
-        lines: 79,
+        lines: 80,
       },
     },
   },
