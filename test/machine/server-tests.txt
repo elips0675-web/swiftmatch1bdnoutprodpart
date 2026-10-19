@@ -1,5 +1,5 @@
 ===== Сервер (Vitest) =====
-1373 тестов в 95 файлах (зелёных 1373) (vitest --reporter=json)
+1424 тестов в 98 файлах (зелёных 1424) (vitest --reporter=json)
 
 # файл | тестов
 server/src/__tests__/active-user.test.js | 33
@@ -18,6 +18,7 @@ server/src/__tests__/admin-users-merge.test.js | 8
 server/src/__tests__/admin-webhooks.test.js | 8
 server/src/__tests__/admin.test.js | 49
 server/src/__tests__/affiliate.test.js | 5
+server/src/__tests__/ai-moderation-clients.test.js | 17
 server/src/__tests__/ai-moderation.test.js | 1
 server/src/__tests__/api-contract.test.js | 14
 server/src/__tests__/audit-action-enum.test.js | 6
@@ -33,6 +34,7 @@ server/src/__tests__/deploy-persistence-audit.test.js | 18
 server/src/__tests__/email-unsubscribe.test.js | 16
 server/src/__tests__/events.test.js | 14
 server/src/__tests__/experiments.test.js | 21
+server/src/__tests__/fcm-send.test.js | 17
 server/src/__tests__/fcm.test.js | 10
 server/src/__tests__/gdpr-erase.test.js | 3
 server/src/__tests__/gdpr-export.test.js | 11
@@ -45,6 +47,7 @@ server/src/__tests__/icebreakers.test.js | 3
 server/src/__tests__/idor.test.js | 21
 server/src/__tests__/image-pipeline.test.js | 8
 server/src/__tests__/jwt-rotation.test.js | 12
+server/src/__tests__/lockout-redis.test.js | 17
 server/src/__tests__/lockout.test.js | 6
 server/src/__tests__/log-buffer.test.js | 4
 server/src/__tests__/mail.test.js | 14

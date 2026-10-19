@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-19T14:31:21.518Z",
+  "generated": "2026-10-19T17:14:21.682Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -507,17 +507,17 @@
     ]
   },
   "server": {
-    "files": 95,
-    "tests": 1373,
-    "passed": 1373,
+    "files": 98,
+    "tests": 1424,
+    "passed": 1424,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 122
     },
     "product": {
-      "files": 90,
-      "tests": 1251
+      "files": 93,
+      "tests": 1302
     },
     "perFile": [
       {
@@ -585,6 +585,10 @@
         "tests": 5
       },
       {
+        "file": "server/src/__tests__/ai-moderation-clients.test.js",
+        "tests": 17
+      },
+      {
         "file": "server/src/__tests__/ai-moderation.test.js",
         "tests": 1
       },
@@ -645,6 +649,10 @@
         "tests": 21
       },
       {
+        "file": "server/src/__tests__/fcm-send.test.js",
+        "tests": 17
+      },
+      {
         "file": "server/src/__tests__/fcm.test.js",
         "tests": 10
       },
@@ -691,6 +699,10 @@
       {
         "file": "server/src/__tests__/jwt-rotation.test.js",
         "tests": 12
+      },
+      {
+        "file": "server/src/__tests__/lockout-redis.test.js",
+        "tests": 17
       },
       {
         "file": "server/src/__tests__/lockout.test.js",
@@ -1005,7 +1017,7 @@
     ]
   },
   "total": {
-    "files": 217,
-    "tests": 2936
+    "files": 220,
+    "tests": 2987
   }
 }
