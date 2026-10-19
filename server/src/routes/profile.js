@@ -495,7 +495,7 @@ router.get('/api/profile/verification', auth, async (req, res) => {
       'SELECT id, photo_url, status, created_at, reviewed_at FROM user_verifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 5',
       [req.userId],
     )
-    res.json({ verified: profile?.photo_verified || false, submissions })
+    res.json({ verified: Boolean(profile?.photo_verified), submissions })
   } catch (err) {
     logger.error('Verification GET error:', err)
     res.status(500).json({ message: 'Failed to get verification status' })
