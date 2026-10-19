@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-19T11:03:35.799Z",
+  "generated": "2026-10-19T11:45:53.453Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 121,
-    "tests": 1536,
-    "passed": 1536,
+    "files": 122,
+    "tests": 1551,
+    "passed": 1551,
     "failed": 0,
     "gate": {
       "files": 27,
       "tests": 670
     },
     "product": {
-      "files": 94,
-      "tests": 866
+      "files": 95,
+      "tests": 881
     },
     "perFile": [
       {
@@ -305,6 +305,10 @@
         "tests": 2
       },
       {
+        "file": "src/test/home.test.tsx",
+        "tests": 8
+      },
+      {
         "file": "src/test/i18n-parity.test.ts",
         "tests": 11
       },
@@ -398,7 +402,7 @@
       },
       {
         "file": "src/test/restaurant-booking-dialog.test.tsx",
-        "tests": 3
+        "tests": 10
       },
       {
         "file": "src/test/rollout.test.ts",
@@ -989,7 +993,7 @@
     ]
   },
   "total": {
-    "files": 213,
-    "tests": 2860
+    "files": 214,
+    "tests": 2875
   }
 }

@@ -13,7 +13,7 @@ import { useLanguage } from "@/context/language-context";
 import { useFeatureFlags } from "@/context/feature-flags-context";
 import { ALL_DEMO_USERS, GROUP_CATEGORIES } from "@/lib/demo-data";
 import { toast } from "@/hooks/use-toast";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const iconMap: Record<string, React.ElementType> = {
@@ -32,7 +32,6 @@ export default function Home() {
   const { t, language } = useLanguage();
   const { hangoutsEnabled } = useFeatureFlags();
   const [showAutosearchDialog, setShowAutosearchDialog] = useState(false);
-  const [isMounted, setIsMounted] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [popularGroups, setPopularGroups] = useState<any[]>([]);
   const [view, setView] = useState<'top-users' | 'popular-groups'>('top-users');
@@ -79,30 +78,6 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen bg-[#f8f9fb] relative">
-      <AnimatePresence>
-        {!isMounted && (
-          <motion.div 
-            key="splash"
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
-            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white"
-          >
-            <div className="w-20 h-20 rounded-3xl gradient-bg flex items-center justify-center shadow-2xl shadow-primary/20 mb-6">
-              <Zap className="text-white" size={40} fill="currentColor" />
-            </div>
-            <h1 className="text-4xl font-black font-headline tracking-tighter gradient-text">
-              SwiftMatch
-            </h1>
-            <div className="mt-8 flex gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-primary animate-bounce"></div>
-              <div className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:0.2s] text-transparent">.</div>
-              <div className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:0.4s] text-transparent">.</div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <AppHeader />
       {localStorage.getItem('email_verified') === '0' && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between">
