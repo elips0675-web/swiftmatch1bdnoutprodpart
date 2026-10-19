@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-19T08:40:13.998Z",
+  "generated": "2026-10-19T09:08:26.303Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 115,
-    "tests": 1441,
-    "passed": 1441,
+    "files": 119,
+    "tests": 1474,
+    "passed": 1474,
     "failed": 0,
     "gate": {
       "files": 27,
       "tests": 670
     },
     "product": {
-      "files": 88,
-      "tests": 771
+      "files": 92,
+      "tests": 804
     },
     "perFile": [
       {
@@ -329,6 +329,10 @@
         "tests": 4
       },
       {
+        "file": "src/test/native.test.ts",
+        "tests": 6
+      },
+      {
         "file": "src/test/notification-preferences-section.test.tsx",
         "tests": 19
       },
@@ -417,6 +421,10 @@
         "tests": 15
       },
       {
+        "file": "src/test/sentry.test.ts",
+        "tests": 7
+      },
+      {
         "file": "src/test/sessions-section.test.tsx",
         "tests": 17
       },
@@ -449,8 +457,16 @@
         "tests": 15
       },
       {
+        "file": "src/test/use-content-config.test.tsx",
+        "tests": 9
+      },
+      {
         "file": "src/test/use-premium.test.ts",
         "tests": 9
+      },
+      {
+        "file": "src/test/use-toast.test.tsx",
+        "tests": 11
       },
       {
         "file": "src/test/use-websocket-url.test.tsx",
@@ -965,7 +981,7 @@
     ]
   },
   "total": {
-    "files": 207,
-    "tests": 2765
+    "files": 211,
+    "tests": 2798
   }
 }
