@@ -990,12 +990,13 @@ router.post('/api/chats/:chatId/messages', auth, chatMessageLimiter, async (req,
     }
 
     const ttl = ttl_seconds > 0 ? ttl_seconds : null
+    const cleanText = stripHtml(text) || null
     const [result] = await pool.query(
       'INSERT INTO messages (chat_id, sender_id, text, image_url, ttl_seconds, reply_to) VALUES (?, ?, ?, ?, ?, ?)',
-      [req.params.chatId, req.userId, stripHtml(text) || null, image_url || null, ttl, replyTo],
+      [req.params.chatId, req.userId, cleanText, image_url || null, ttl, replyTo],
     )
 
-    const preview = image_url ? '📷 Photo' : (text || '')
+    const preview = image_url ? '📷 Photo' : (cleanText || '')
     await pool.query(
       `UPDATE chats SET last_message = ?, last_sender_id = ?, updated_at = NOW() WHERE id = ?`,
       [preview, req.userId, req.params.chatId],
@@ -1023,7 +1024,7 @@ router.post('/api/chats/:chatId/messages', auth, chatMessageLimiter, async (req,
       const [[sender]] = await pool.query('SELECT display_name FROM user_profiles WHERE id = ?', [req.userId])
       const recipientId = otherParticipant[0].user_id
       if (await isAllowed(recipientId, 'chat_message', 'push')) {
-        sendPushToUser(recipientId, sender?.display_name || 'New message', text.substring(0, 100), `/chats?matchId=${recipientId}`)
+        sendPushToUser(recipientId, sender?.display_name || 'New message', (cleanText || '').substring(0, 100), `/chats?matchId=${recipientId}`)
       }
       try {
         const io = getIO()
