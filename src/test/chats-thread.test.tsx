@@ -447,6 +447,17 @@ describe("Страница чатов (переписка)", () => {
     await waitFor(() => expect(screen.queryByText("Удали меня")).toBeNull())
   })
 
+  it("не трогает тред при удалении несуществующего сообщения", async () => {
+    await openThread([chat(1, "Аня")], {
+      pages: { first: { messages: [message(11, "Осталось")], has_more: false, next_before: null } },
+    })
+    expect(screen.getByText("Осталось")).toBeInTheDocument()
+
+    ws.send("chat:message-deleted", { chatId: 1, messageIds: [999] })
+
+    expect(screen.getByText("Осталось")).toBeInTheDocument()
+  })
+
   it("отправляет подсказку-айсбрейкер и пересчитывает высоту при resize", async () => {
     aiFlows.aiChatIcebreakerSuggestions.mockResolvedValue({ suggestions: ["Как прошёл день?"] })
     await openThread()
@@ -468,5 +479,123 @@ describe("Страница чатов (переписка)", () => {
 
     const wrapper = screen.getByTestId("messages-scroll").parentElement as HTMLElement
     await waitFor(() => expect(wrapper.style.height).toContain("900px"))
+  })
+
+  it("возвращается на предыдущую страницу списка", async () => {
+    mockApi({ chats: Array.from({ length: 9 }, (_, i) => chat(i + 1, `Чат ${i + 1}`)) })
+    render(<ChatsPage />)
+    await screen.findByTestId("chat-row-1")
+
+    fireEvent.click(screen.getByRole("button", { name: "2" }))
+    expect(screen.getByTestId("chat-row-9")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "chats.page_prev" }))
+
+    expect(screen.getByTestId("chat-row-1")).toBeInTheDocument()
+    expect(screen.queryByTestId("chat-row-9")).toBeNull()
+  })
+
+  it("показывает аватар собеседника в шапке переписки", async () => {
+    await openThread([chat(1, "Аня", { avatar_url: "https://cdn.example/a.png", online: true })])
+
+    expect(screen.getByAltText("Аня")).toBeInTheDocument()
+  })
+
+  it("открывает диалоги видеозвонка и аудиозвонка из шапки переписки", async () => {
+    await openThread()
+
+    const video = screen.getByRole("button", { name: "chats.video_call" })
+    const voice = screen.getByRole("button", { name: "chats.voice_call" })
+
+    fireEvent.click(video)
+    fireEvent.click(voice)
+
+    expect(video).toBeInTheDocument()
+    expect(voice).toBeInTheDocument()
+  })
+
+  it("раскрывает и закрывает пикер быстрых реакций кликом по сообщению", async () => {
+    await openThread([chat(1, "Аня")], {
+      pages: { first: { messages: [message(11, "Привет")], has_more: false, next_before: null } },
+    })
+
+    expect(screen.queryByTestId("reaction-quick-heart")).toBeNull()
+
+    fireEvent.click(screen.getByText("Привет"))
+    expect(screen.getByTestId("reaction-quick-heart")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText("Привет"))
+    expect(screen.queryByTestId("reaction-quick-heart")).toBeNull()
+  })
+
+  it("снимает реакцию кликом по бейджу под сообщением", async () => {
+    await openThread([chat(1, "Аня")], {
+      pages: {
+        first: { messages: [message(11, "Привет", { reactions: [{ emoji: "🔥" }] })], has_more: false, next_before: null },
+      },
+      reaction: { action: "removed", emoji: "🔥" },
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "🔥" }))
+
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/chats/1/messages/11/reactions",
+        expect.objectContaining({ method: "POST", body: JSON.stringify({ emoji: "🔥" }) }),
+      ),
+    )
+    await waitFor(() => expect(screen.queryByRole("button", { name: "🔥" })).toBeNull())
+  })
+
+  it("отменяет ответ и отправляет сообщение по Enter", async () => {
+    await openThread([chat(1, "Аня")], {
+      pages: { first: { messages: [message(11, "Привет")], has_more: false, next_before: null } },
+    })
+
+    fireEvent.click(screen.getByTestId("reply-button"))
+    expect(screen.getByTestId("reply-bar")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "chats.cancel_reply" }))
+    expect(screen.queryByTestId("reply-bar")).toBeNull()
+
+    const input = screen.getByTestId("message-input")
+    fireEvent.focus(input)
+    fireEvent.change(input, { target: { value: "Пока" } })
+    fireEvent.keyDown(input, { key: "Enter" })
+
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/chats/1/messages",
+        expect.objectContaining({ method: "POST", body: JSON.stringify({ text: "Пока" }) }),
+      ),
+    )
+  })
+
+  it("показывает аватар, бейдж непрочитанного и старую метку времени в списке", async () => {
+    const old = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
+    mockApi({
+      chats: [
+        chat(1, "С фото", { avatar_url: "https://cdn.example/a.png", unread_count: 3 }),
+        chat(2, "Старый", { updated_at: old }),
+      ],
+    })
+    render(<ChatsPage />)
+
+    const row = await screen.findByTestId("chat-row-1")
+    expect(row.querySelector("img")).not.toBeNull()
+    expect(within(row).getByText("3")).toBeInTheDocument()
+    expect(await screen.findByTestId("chat-row-2")).toBeInTheDocument()
+  })
+
+  it("вводит описание жалобы и закрывает диалог по отмене", async () => {
+    await openThread()
+
+    fireEvent.click(screen.getByTestId("chat-report-open"))
+    fireEvent.change(screen.getByTestId("report-description"), { target: { value: "Детали жалобы" } })
+    expect(screen.getByTestId("report-description")).toHaveValue("Детали жалобы")
+
+    fireEvent.click(screen.getByTestId("report-cancel"))
+
+    await waitFor(() => expect(screen.queryByTestId("report-description")).toBeNull())
   })
 })
