@@ -587,7 +587,7 @@ jobs:
           remote_key: ${{ secrets.DEPLOY_SSH_KEY }}
           remote_port: 22
       - name: Build & migrate & deploy via Docker
-        uses: appleboy/ssh-action@v1.1.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
@@ -651,7 +651,7 @@ jobs:
       # до ручного вмешательства.
       - name: Rollback on failed deploy
         if: failure()
-        uses: appleboy/ssh-action@v1.1.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
