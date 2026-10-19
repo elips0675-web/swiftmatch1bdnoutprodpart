@@ -1,5 +1,5 @@
 ===== Фронт (Vitest) =====
-1474 тестов в 119 файлах (зелёных 1474) (vitest --reporter=json)
+1508 тестов в 121 файлах (зелёных 1508) (vitest --reporter=json)
 
 # файл | тестов
 scripts/backup-smoke-gate.test.mjs | 34
@@ -51,7 +51,7 @@ src/test/admin-teams.test.tsx | 14
 src/test/admin-users-merge.test.tsx | 3
 src/test/admin-webhooks.test.tsx | 2
 src/test/api.test.ts | 17
-src/test/auth-context.test.tsx | 21
+src/test/auth-context.test.tsx | 34
 src/test/auth-refresh.test.ts | 8
 src/test/chat-partner-actions.test.tsx | 3
 src/test/chats-history.test.tsx | 14
@@ -98,7 +98,7 @@ src/test/profile-watching.test.tsx | 4
 src/test/register.test.tsx | 9
 src/test/reset-password.test.tsx | 7
 src/test/restaurant-booking-dialog.test.tsx | 3
-src/test/rollout.test.ts | 6
+src/test/rollout.test.ts | 11
 src/test/safety.test.tsx | 7
 src/test/schedule.test.tsx | 5
 src/test/search-filters.test.tsx | 7
@@ -108,11 +108,13 @@ src/test/sessions-section.test.tsx | 17
 src/test/settings-privacy.test.tsx | 4
 src/test/settings.test.tsx | 12
 src/test/support-chat.test.tsx | 7
+src/test/token.test.ts | 7
 src/test/two-fa-settings.test.tsx | 2
 src/test/unsubscribe-page.test.tsx | 5
 src/test/unsubscribe.test.tsx | 6
 src/test/use-api.test.ts | 15
 src/test/use-content-config.test.tsx | 9
+src/test/use-experiment.test.tsx | 9
 src/test/use-premium.test.ts | 9
 src/test/use-toast.test.tsx | 11
 src/test/use-websocket-url.test.tsx | 1

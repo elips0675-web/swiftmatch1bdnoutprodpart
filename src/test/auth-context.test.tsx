@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { renderHook, act, waitFor } from "@testing-library/react"
 import { AuthProvider, useAuth } from "@/context/auth-context"
+import { getToken } from "@/lib/token"
 import { type ReactNode } from "react"
 
 const supabaseRef = vi.hoisted(() => ({ client: null as unknown }))
@@ -76,6 +77,20 @@ describe("AuthContext", () => {
 
     expect(result.current.user?.id).toBe(7)
     expect(result.current.user?.email).toBe("user7@mail.ru")
+  })
+
+  it("восстанавливает сессию из cookie с аватаром и без имени", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ id: 8, email: "u8@mail.ru", avatar: "pic.png" }),
+    })
+
+    const { result } = renderHook(() => useAuth(), { wrapper: Wrapper })
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    expect(result.current.user?.name).toBe("")
+    expect(result.current.user?.avatar).toBe("pic.png")
   })
 
   it("handles dev-login failure gracefully", async () => {
@@ -374,5 +389,180 @@ describe("AuthContext (с Supabase)", () => {
     expect(client.auth.signOut).toHaveBeenCalled()
     expect(mockFetch).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" })
     expect(result.current.user).toBeNull()
+  })
+})
+
+describe("AuthContext (восстановление из сохранённого токена)", () => {
+  afterEach(() => {
+    vi.mocked(getToken).mockReturnValue(null)
+    vi.unstubAllEnvs()
+  })
+
+  it("валидный JWT без Supabase → AUTH_SUCCESS из payload, сеть не трогается", () => {
+    const jwt = `h.${btoa(JSON.stringify({ userId: 7 }))}.s`
+    vi.mocked(getToken).mockReturnValue(jwt)
+
+    const { result } = renderHook(() => useAuth(), { wrapper: Wrapper })
+
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.user).toEqual({ id: 7, name: "", email: "", avatar: "" })
+    expect(result.current.token).toBe(jwt)
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it("битый JWT → AUTH_LOGOUT, сеть не трогается", () => {
+    vi.mocked(getToken).mockReturnValue("garbage")
+
+    const { result } = renderHook(() => useAuth(), { wrapper: Wrapper })
+
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.user).toBeNull()
+    expect(result.current.token).toBeNull()
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it("PROD: без кук-сессии → AUTH_LOGOUT без dev-login", async () => {
+    vi.stubEnv("PROD", "true")
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401, json: () => Promise.resolve({}) })
+
+    const { result } = renderHook(() => useAuth(), { wrapper: Wrapper })
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    expect(result.current.user).toBeNull()
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(mockFetch).toHaveBeenCalledWith("/api/auth/me")
+  })
+})
+
+describe("AuthContext (ветки сессий и ошибок Supabase)", () => {
+  let client: ReturnType<typeof createSupabaseClient>
+
+  beforeEach(() => {
+    authCbRef.current = null
+    client = createSupabaseClient()
+    supabaseRef.client = client
+    vi.mocked(getToken).mockReturnValue(null)
+  })
+
+  afterEach(() => {
+    vi.mocked(getToken).mockReturnValue(null)
+    supabaseRef.client = null
+  })
+
+  it("SIGNED_IN без email: name и email уходят в пустые строки", async () => {
+    const { result } = renderHook(() => useAuth(), { wrapper: Wrapper })
+    await waitFor(() => expect(client.auth.onAuthStateChange).toHaveBeenCalled())
+
+    act(() => {
+      authCbRef.current?.("SIGNED_IN", {
+        user: { id: "5", user_metadata: {} },
+        access_token: "tok5",
+      })
+    })
+
+    expect(result.current.user).toEqual({ id: 5, name: "", email: "", avatar: "" })
+    expect(result.current.token).toBe("tok5")
+  })
+
+  it("getSession без email: name и email уходят в пустые строки", async () => {
+    client.auth.getSession.mockResolvedValueOnce({
+      data: { session: { user: { id: "6", user_metadata: {} }, access_token: "t6" } },
+    })
+
+    const { result } = renderHook(() => useAuth(), { wrapper: Wrapper })
+
+    await waitFor(() => expect(result.current.token).toBe("t6"))
+    expect(result.current.user).toEqual({ id: 6, name: "", email: "", avatar: "" })
+  })
+
+  it("onAuthStateChange после размонтирования гаснет через cancelled", async () => {
+    const { unmount } = renderHook(() => useAuth(), { wrapper: Wrapper })
+    await waitFor(() => expect(client.auth.onAuthStateChange).toHaveBeenCalled())
+
+    unmount()
+
+    expect(() =>
+      authCbRef.current?.("SIGNED_IN", {
+        user: { id: "7", email: "u@mail.ru", user_metadata: {} },
+        access_token: "tok",
+      }),
+    ).not.toThrow()
+    expect(unsubscribeSpy).toHaveBeenCalled()
+  })
+
+  it("getSession после размонтирования гаснет через cancelled", async () => {
+    let release: ((value: { data: { session: unknown } }) => void) | null = null
+    client.auth.getSession.mockReturnValueOnce(
+      new Promise<{ data: { session: unknown } }>((resolve) => {
+        release = resolve
+      }),
+    )
+
+    const { unmount } = renderHook(() => useAuth(), { wrapper: Wrapper })
+    unmount()
+
+    expect(release).not.toBeNull()
+    release?.({ data: { session: null } })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(unsubscribeSpy).toHaveBeenCalled()
+  })
+
+  it("login: ошибка без message уходит в дефолтный текст", async () => {
+    client.auth.signInWithPassword.mockResolvedValueOnce({ error: new Error("") })
+
+    const { result } = renderHook(() => useAuth(), { wrapper: Wrapper })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    await act(async () => {
+      await expect(result.current.login("a@b.c", "pw")).rejects.toThrow()
+    })
+
+    expect(result.current.error).toBe("Login failed")
+  })
+
+  it("loginWithGoogle: ошибка без message уходит в дефолтный текст", async () => {
+    client.auth.signInWithOAuth.mockResolvedValueOnce({ error: new Error("") })
+
+    const { result } = renderHook(() => useAuth(), { wrapper: Wrapper })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    await act(async () => {
+      await expect(result.current.loginWithGoogle()).rejects.toThrow()
+    })
+
+    expect(result.current.error).toBe("Google login failed")
+  })
+
+  it("register: ошибка без message уходит в дефолтный текст", async () => {
+    client.auth.signUp.mockResolvedValueOnce({ error: new Error("") })
+
+    const { result } = renderHook(() => useAuth(), { wrapper: Wrapper })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    await act(async () => {
+      await expect(result.current.register("e@mail.ru", "pw", "Имя")).rejects.toThrow()
+    })
+
+    expect(result.current.error).toBe("Registration failed")
+  })
+
+  it("logout переживает падение signOut", async () => {
+    client.auth.signOut.mockRejectedValueOnce(new Error("offline"))
+
+    const { result } = renderHook(() => useAuth(), { wrapper: Wrapper })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    await act(async () => {
+      await result.current.logout()
+    })
+
+    expect(result.current.user).toBeNull()
+    expect(mockFetch).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" })
+  })
+})
+
+describe("useAuth вне провайдера", () => {
+  it("бросает ошибку", () => {
+    expect(() => renderHook(() => useAuth())).toThrow("useAuth must be used within AuthProvider")
   })
 })

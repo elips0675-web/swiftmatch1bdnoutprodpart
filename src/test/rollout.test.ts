@@ -47,4 +47,29 @@ describe('tokenUserId', () => {
     token.value = `h.${btoa(JSON.stringify({ userId: '7' }))}.s`
     expect(tokenUserId()).toBe(7)
   })
+
+  it('payload без userId → null', () => {
+    token.value = `h.${btoa(JSON.stringify({ role: 'admin' }))}.s`
+    expect(tokenUserId()).toBeNull()
+  })
+
+  it('userId — строка не из цифр → null', () => {
+    token.value = `h.${btoa(JSON.stringify({ userId: 'abc' }))}.s`
+    expect(tokenUserId()).toBeNull()
+  })
+
+  it('payload не в формате JSON → null', () => {
+    token.value = `h.${btoa('plain-text')}.s`
+    expect(tokenUserId()).toBeNull()
+  })
+
+  it('некорректный base64 в payload → null', () => {
+    token.value = 'h.%%%.s'
+    expect(tokenUserId()).toBeNull()
+  })
+
+  it('пустой токен → null до разбора JWT', () => {
+    token.value = ''
+    expect(tokenUserId()).toBeNull()
+  })
 })
