@@ -1,5 +1,5 @@
 ===== Сервер (Vitest) =====
-1324 тестов в 92 файлах (зелёных 1324) (vitest --reporter=json)
+1373 тестов в 95 файлах (зелёных 1373) (vitest --reporter=json)
 
 # файл | тестов
 server/src/__tests__/active-user.test.js | 33
@@ -32,6 +32,7 @@ server/src/__tests__/date-only.test.js | 6
 server/src/__tests__/deploy-persistence-audit.test.js | 18
 server/src/__tests__/email-unsubscribe.test.js | 16
 server/src/__tests__/events.test.js | 14
+server/src/__tests__/experiments.test.js | 21
 server/src/__tests__/fcm.test.js | 10
 server/src/__tests__/gdpr-erase.test.js | 3
 server/src/__tests__/gdpr-export.test.js | 11
@@ -70,11 +71,13 @@ server/src/__tests__/profile.test.js | 42
 server/src/__tests__/push-job.test.js | 10
 server/src/__tests__/push-quiet-gates.test.js | 8
 server/src/__tests__/push.test.js | 6
+server/src/__tests__/queue-init.test.js | 11
 server/src/__tests__/queue-monitor.test.js | 19
 server/src/__tests__/quiet-hours.test.js | 43
 server/src/__tests__/race.mysql.test.js | 6
 server/src/__tests__/race.test.js | 8
 server/src/__tests__/ratelimit.test.js | 4
+server/src/__tests__/redis-client.test.js | 17
 server/src/__tests__/redis-fallback.test.js | 7
 server/src/__tests__/referral.test.js | 12
 server/src/__tests__/sanitize.test.js | 7

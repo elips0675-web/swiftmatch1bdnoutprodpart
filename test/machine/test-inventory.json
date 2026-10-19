@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-19T14:16:49.000Z",
+  "generated": "2026-10-19T14:31:21.518Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -507,17 +507,17 @@
     ]
   },
   "server": {
-    "files": 92,
-    "tests": 1324,
-    "passed": 1324,
+    "files": 95,
+    "tests": 1373,
+    "passed": 1373,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 122
     },
     "product": {
-      "files": 87,
-      "tests": 1202
+      "files": 90,
+      "tests": 1251
     },
     "perFile": [
       {
@@ -639,6 +639,10 @@
       {
         "file": "server/src/__tests__/events.test.js",
         "tests": 14
+      },
+      {
+        "file": "server/src/__tests__/experiments.test.js",
+        "tests": 21
       },
       {
         "file": "server/src/__tests__/fcm.test.js",
@@ -793,6 +797,10 @@
         "tests": 6
       },
       {
+        "file": "server/src/__tests__/queue-init.test.js",
+        "tests": 11
+      },
+      {
         "file": "server/src/__tests__/queue-monitor.test.js",
         "tests": 19
       },
@@ -811,6 +819,10 @@
       {
         "file": "server/src/__tests__/ratelimit.test.js",
         "tests": 4
+      },
+      {
+        "file": "server/src/__tests__/redis-client.test.js",
+        "tests": 17
       },
       {
         "file": "server/src/__tests__/redis-fallback.test.js",
@@ -993,7 +1005,7 @@
     ]
   },
   "total": {
-    "files": 214,
-    "tests": 2887
+    "files": 217,
+    "tests": 2936
   }
 }
