@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-19T17:35:05.669Z",
+  "generated": "2026-10-19T17:48:59.636Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -507,17 +507,17 @@
     ]
   },
   "server": {
-    "files": 100,
-    "tests": 1500,
-    "passed": 1500,
+    "files": 106,
+    "tests": 1559,
+    "passed": 1559,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 122
     },
     "product": {
-      "files": 95,
-      "tests": 1378
+      "files": 101,
+      "tests": 1437
     },
     "perFile": [
       {
@@ -539,6 +539,10 @@
       {
         "file": "server/src/__tests__/admin-backup.test.js",
         "tests": 10
+      },
+      {
+        "file": "server/src/__tests__/admin-dashboard.test.js",
+        "tests": 14
       },
       {
         "file": "server/src/__tests__/admin-health.test.js",
@@ -581,6 +585,10 @@
         "tests": 8
       },
       {
+        "file": "server/src/__tests__/admin-weekly-report.test.js",
+        "tests": 6
+      },
+      {
         "file": "server/src/__tests__/admin.test.js",
         "tests": 49
       },
@@ -607,6 +615,10 @@
       {
         "file": "server/src/__tests__/auth.test.js",
         "tests": 22
+      },
+      {
+        "file": "server/src/__tests__/banned-words.test.js",
+        "tests": 14
       },
       {
         "file": "server/src/__tests__/blocks.test.js",
@@ -693,6 +705,10 @@
         "tests": 3
       },
       {
+        "file": "server/src/__tests__/idempotency.test.js",
+        "tests": 6
+      },
+      {
         "file": "server/src/__tests__/idor.test.js",
         "tests": 21
       },
@@ -703,6 +719,10 @@
       {
         "file": "server/src/__tests__/jwt-rotation.test.js",
         "tests": 12
+      },
+      {
+        "file": "server/src/__tests__/location.test.js",
+        "tests": 11
       },
       {
         "file": "server/src/__tests__/lockout-redis.test.js",
@@ -877,6 +897,10 @@
         "tests": 5
       },
       {
+        "file": "server/src/__tests__/sms-client.test.js",
+        "tests": 8
+      },
+      {
         "file": "server/src/__tests__/sms.test.js",
         "tests": 11
       },
@@ -1025,7 +1049,7 @@
     ]
   },
   "total": {
-    "files": 222,
-    "tests": 3063
+    "files": 228,
+    "tests": 3122
   }
 }

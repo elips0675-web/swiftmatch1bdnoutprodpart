@@ -1,5 +1,5 @@
 ===== Сервер (Vitest) =====
-1500 тестов в 100 файлах (зелёных 1500) (vitest --reporter=json)
+1559 тестов в 106 файлах (зелёных 1559) (vitest --reporter=json)
 
 # файл | тестов
 server/src/__tests__/active-user.test.js | 33
@@ -7,6 +7,7 @@ server/src/__tests__/activity-privacy-coverage.test.js | 4
 server/src/__tests__/activity-privacy.test.js | 19
 server/src/__tests__/admin-auth.test.js | 5
 server/src/__tests__/admin-backup.test.js | 10
+server/src/__tests__/admin-dashboard.test.js | 14
 server/src/__tests__/admin-health.test.js | 8
 server/src/__tests__/admin-impersonate.test.js | 4
 server/src/__tests__/admin-logs.test.js | 4
@@ -17,6 +18,7 @@ server/src/__tests__/admin-teams.test.js | 26
 server/src/__tests__/admin-users-ban.test.js | 5
 server/src/__tests__/admin-users-merge.test.js | 8
 server/src/__tests__/admin-webhooks.test.js | 8
+server/src/__tests__/admin-weekly-report.test.js | 6
 server/src/__tests__/admin.test.js | 49
 server/src/__tests__/affiliate.test.js | 5
 server/src/__tests__/ai-moderation-clients.test.js | 17
@@ -24,6 +26,7 @@ server/src/__tests__/ai-moderation.test.js | 1
 server/src/__tests__/api-contract.test.js | 14
 server/src/__tests__/audit-action-enum.test.js | 6
 server/src/__tests__/auth.test.js | 22
+server/src/__tests__/banned-words.test.js | 14
 server/src/__tests__/blocks.test.js | 16
 server/src/__tests__/chat-ai-limiters.test.js | 2
 server/src/__tests__/cleanup.test.js | 10
@@ -45,9 +48,11 @@ server/src/__tests__/hangouts-watchers-relations.test.js | 33
 server/src/__tests__/hangouts.test.js | 65
 server/src/__tests__/iap-webhook.test.js | 14
 server/src/__tests__/icebreakers.test.js | 3
+server/src/__tests__/idempotency.test.js | 6
 server/src/__tests__/idor.test.js | 21
 server/src/__tests__/image-pipeline.test.js | 8
 server/src/__tests__/jwt-rotation.test.js | 12
+server/src/__tests__/location.test.js | 11
 server/src/__tests__/lockout-redis.test.js | 17
 server/src/__tests__/lockout.test.js | 6
 server/src/__tests__/log-buffer.test.js | 4
@@ -91,6 +96,7 @@ server/src/__tests__/secrets-leak-audit.test.js | 24
 server/src/__tests__/security.headers.test.js | 7
 server/src/__tests__/sessions-auth.test.js | 20
 server/src/__tests__/shutdown.test.js | 5
+server/src/__tests__/sms-client.test.js | 8
 server/src/__tests__/sms.test.js | 11
 server/src/__tests__/social.test.js | 32
 server/src/__tests__/subscription-expiry.test.js | 11
