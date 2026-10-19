@@ -215,4 +215,28 @@ describe('GET /api/data/export', () => {
     expect(res.status).toBe(500)
     expect(res.body.message).toBe('Failed to export data')
   })
+
+  it('Accept: application/zip тоже отдаёт архив (без ?format)', async () => {
+    mockDbQueries(baseRows)
+    const res = await request(app)
+      .get('/api/data/export')
+      .set('Accept', 'application/zip')
+      .buffer(true)
+      .parse((r, cb) => {
+        const chunks = []
+        r.on('data', (c) => chunks.push(c))
+        r.on('end', () => cb(null, Buffer.concat(chunks)))
+      })
+
+    expect(res.status).toBe(200)
+    expect(res.headers['content-type']).toContain('application/zip')
+    expect(res.body.subarray(0, 2).toString('ascii')).toBe('PK')
+  })
+
+  it('ZIP + отсутствующий пользователь → 404 (не 500)', async () => {
+    mockDbQueries({ users: [] })
+    const res = await request(app).get('/api/data/export?format=zip')
+    expect(res.status).toBe(404)
+    expect(res.body.message).toBe('User not found')
+  })
 })
