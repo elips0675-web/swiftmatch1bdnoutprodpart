@@ -422,7 +422,7 @@ describe("AuthContext (восстановление из сохранённог�
   })
 
   it("PROD: без кук-сессии → AUTH_LOGOUT без dev-login", async () => {
-    vi.stubEnv("PROD", "true")
+    vi.stubEnv("PROD", true)
     mockFetch.mockResolvedValueOnce({ ok: false, status: 401, json: () => Promise.resolve({}) })
 
     const { result } = renderHook(() => useAuth(), { wrapper: Wrapper })
@@ -491,18 +491,18 @@ describe("AuthContext (ветки сессий и ошибок Supabase)", () =>
   })
 
   it("getSession после размонтирования гаснет через cancelled", async () => {
-    let release: ((value: { data: { session: unknown } }) => void) | null = null
+    const releaseBox: { resolve: ((value: { data: { session: unknown } }) => void) | null } = { resolve: null }
     client.auth.getSession.mockReturnValueOnce(
       new Promise<{ data: { session: unknown } }>((resolve) => {
-        release = resolve
+        releaseBox.resolve = resolve
       }),
     )
 
     const { unmount } = renderHook(() => useAuth(), { wrapper: Wrapper })
     unmount()
 
-    expect(release).not.toBeNull()
-    release?.({ data: { session: null } })
+    expect(releaseBox.resolve).not.toBeNull()
+    releaseBox.resolve?.({ data: { session: null } })
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(unsubscribeSpy).toHaveBeenCalled()
   })

@@ -1,5 +1,9 @@
+vi.hoisted(() => {
+  delete process.env.REDIS_URL
+})
+
 // Этап 40 (слепые зоны, аудит kimi): rate-limit spec — 61-й запрос к auth -> 429
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import request from 'supertest'
 import express from 'express'
 import rateLimit from 'express-rate-limit'

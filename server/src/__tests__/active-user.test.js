@@ -8,6 +8,7 @@ import jwt from 'jsonwebtoken'
 
 vi.hoisted(() => {
   process.env.JWT_SECRET = 'test-secret'
+  delete process.env.REDIS_URL
 })
 
 vi.mock('../db.js', () => ({

@@ -1,3 +1,7 @@
+vi.hoisted(() => {
+  delete process.env.REDIS_URL
+})
+
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { rootLogger } from '../logger.js'
 

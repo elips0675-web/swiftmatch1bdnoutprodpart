@@ -1,4 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+vi.hoisted(() => {
+  delete process.env.REDIS_URL
+})
+
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { isLocked, recordFailure, recordSuccess, _resetLockout } from '../lockout.js'
 
 beforeEach(() => {

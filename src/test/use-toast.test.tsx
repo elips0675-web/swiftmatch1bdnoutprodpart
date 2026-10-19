@@ -65,7 +65,7 @@ describe("toast() и useToast", () => {
     expect(result.current.toasts).toHaveLength(1)
     expect(result.current.toasts[0].title).toBe("A")
     expect(result.current.toasts[0].open).toBe(true)
-    act(() => { handle?.update({ description: "B" }) })
+    act(() => { if (handle) handle.update({ ...handle, description: "B" }) })
     expect(result.current.toasts[0].title).toBe("A")
     expect(result.current.toasts[0].description).toBe("B")
     act(() => { handle?.dismiss() })

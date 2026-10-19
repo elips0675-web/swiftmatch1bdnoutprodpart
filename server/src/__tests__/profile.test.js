@@ -1,5 +1,6 @@
 vi.hoisted(() => {
   process.env.JWT_SECRET = 'test-secret'
+  delete process.env.REDIS_URL
 })
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'

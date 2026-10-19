@@ -193,7 +193,7 @@ function startServer() {
   const env = {
     ...process.env,
     PORT: String(API_PORT),
-    JWT_SECRET: 's3-contract-smoke-secret-not-for-production',
+    JWT_SECRET: 'test-s3-contract-smoke-secret-not-for-production',
     DB_HOST: DB.host,
     DB_PORT: String(DB.port),
     DB_USER: DB.user,
