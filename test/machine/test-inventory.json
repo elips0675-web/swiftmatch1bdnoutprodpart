@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-19T18:18:44.814Z",
+  "generated": "2026-10-19T18:28:48.579Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -507,17 +507,17 @@
     ]
   },
   "server": {
-    "files": 106,
-    "tests": 1562,
-    "passed": 1562,
+    "files": 109,
+    "tests": 1612,
+    "passed": 1612,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 122
     },
     "product": {
-      "files": 101,
-      "tests": 1440
+      "files": 104,
+      "tests": 1490
     },
     "perFile": [
       {
@@ -531,6 +531,10 @@
       {
         "file": "server/src/__tests__/activity-privacy.test.js",
         "tests": 19
+      },
+      {
+        "file": "server/src/__tests__/admin-analytics.test.js",
+        "tests": 10
       },
       {
         "file": "server/src/__tests__/admin-auth.test.js",
@@ -567,6 +571,10 @@
       {
         "file": "server/src/__tests__/admin-queues.test.js",
         "tests": 7
+      },
+      {
+        "file": "server/src/__tests__/admin-reports.test.js",
+        "tests": 28
       },
       {
         "file": "server/src/__tests__/admin-teams.test.js",
@@ -743,6 +751,10 @@
       {
         "file": "server/src/__tests__/metrics-integration-mode.test.js",
         "tests": 8
+      },
+      {
+        "file": "server/src/__tests__/metrics.test.js",
+        "tests": 12
       },
       {
         "file": "server/src/__tests__/middleware.test.js",
@@ -1049,7 +1061,7 @@
     ]
   },
   "total": {
-    "files": 228,
-    "tests": 3125
+    "files": 231,
+    "tests": 3175
   }
 }

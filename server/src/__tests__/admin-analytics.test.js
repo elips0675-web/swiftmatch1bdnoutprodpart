@@ -1,0 +1,117 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import request from 'supertest'
+import express from 'express'
+
+vi.mock('../db.js', () => ({
+  default: { query: vi.fn(), execute: vi.fn() },
+}))
+
+vi.mock('../logger.js', () => ({
+  default: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+  rootLogger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}))
+
+import pool from '../db.js'
+import analyticsRoutes from '../routes/admin/analytics.js'
+
+function createApp() {
+  const app = express()
+  app.use(express.json())
+  app.use('/api/admin', analyticsRoutes)
+  return app
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
+describe('GET /api/admin/analytics/overview', () => {
+  it('считает конверсию и ARPU при ненулевом числе юзеров', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ total: 200 }]])
+      .mockResolvedValueOnce([[{ premium: 30 }]])
+    const res = await request(createApp()).get('/api/admin/analytics/overview')
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ mau: '200', conversionRate: '15.0%', arpu: '0.00' })
+  })
+
+  it('ноль юзеров — конверсия 0% и ARPU 0 (ветка total falsy)', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ total: 0 }]])
+      .mockResolvedValueOnce([[{ premium: 0 }]])
+    const res = await request(createApp()).get('/api/admin/analytics/overview')
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ mau: '0', conversionRate: '0%', arpu: '0' })
+  })
+
+  it('падение запроса — wrap отдаёт пустой массив, а не 500', async () => {
+    pool.query.mockRejectedValueOnce(new Error('db down'))
+    const res = await request(createApp()).get('/api/admin/analytics/overview')
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual([])
+  })
+})
+
+describe('GET /api/admin/analytics/retention', () => {
+  it('день сдвигается на +1 и rate округляется, отсутствующий rate → 0', async () => {
+    pool.query.mockResolvedValueOnce([
+      [{ day: 0, rate: 42.6 }, { day: 5, rate: null }],
+    ])
+    const res = await request(createApp()).get('/api/admin/analytics/retention')
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual([
+      { day: 'Day 1', rate: 43 },
+      { day: 'Day 6', rate: 0 },
+    ])
+  })
+
+  it('падение запроса — wrap отдаёт пустой массив', async () => {
+    pool.query.mockRejectedValueOnce(new Error('db down'))
+    const res = await request(createApp()).get('/api/admin/analytics/retention')
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual([])
+  })
+})
+
+describe('GET /api/admin/analytics/revenue-mix', () => {
+  it('раскладывает тарифы в проценты с цветом и именем', async () => {
+    pool.query.mockResolvedValueOnce([[{ tier: 'gold', cnt: 3 }, { tier: 'plus', cnt: 1 }]])
+    const res = await request(createApp()).get('/api/admin/analytics/revenue-mix')
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual([
+      { name: 'Gold', value: 75, color: '#f59e0b' },
+      { name: 'Plus', value: 25, color: '#3b82f6' },
+    ])
+  })
+
+  it('неизвестный тариф сохраняет имя и получает серый цвет; пусто — делитель 1', async () => {
+    pool.query.mockResolvedValueOnce([[{ tier: 'custom', cnt: 0 }]])
+    const res = await request(createApp()).get('/api/admin/analytics/revenue-mix')
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual([{ name: 'custom', value: 0, color: '#94a3b8' }])
+  })
+
+  it('пустой список — пустой ответ', async () => {
+    pool.query.mockResolvedValueOnce([[]])
+    const res = await request(createApp()).get('/api/admin/analytics/revenue-mix')
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual([])
+  })
+})
+
+describe('GET /api/admin/analytics/registrations', () => {
+  it('отдаёт строки как есть', async () => {
+    const rows = [{ day: '2026-10-01', users: 5 }]
+    pool.query.mockResolvedValueOnce([rows])
+    const res = await request(createApp()).get('/api/admin/analytics/registrations')
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual(rows)
+  })
+
+  it('падение запроса — wrap отдаёт пустой массив', async () => {
+    pool.query.mockRejectedValueOnce(new Error('db down'))
+    const res = await request(createApp()).get('/api/admin/analytics/registrations')
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual([])
+  })
+})

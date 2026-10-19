@@ -1,10 +1,11 @@
 ===== Сервер (Vitest) =====
-1562 тестов в 106 файлах (зелёных 1562) (vitest --reporter=json)
+1612 тестов в 109 файлах (зелёных 1612) (vitest --reporter=json)
 
 # файл | тестов
 server/src/__tests__/active-user.test.js | 33
 server/src/__tests__/activity-privacy-coverage.test.js | 4
 server/src/__tests__/activity-privacy.test.js | 19
+server/src/__tests__/admin-analytics.test.js | 10
 server/src/__tests__/admin-auth.test.js | 5
 server/src/__tests__/admin-backup.test.js | 10
 server/src/__tests__/admin-dashboard.test.js | 14
@@ -14,6 +15,7 @@ server/src/__tests__/admin-logs.test.js | 4
 server/src/__tests__/admin-moderation.test.js | 14
 server/src/__tests__/admin-monetization.test.js | 18
 server/src/__tests__/admin-queues.test.js | 7
+server/src/__tests__/admin-reports.test.js | 28
 server/src/__tests__/admin-teams.test.js | 26
 server/src/__tests__/admin-users-ban.test.js | 5
 server/src/__tests__/admin-users-merge.test.js | 8
@@ -58,6 +60,7 @@ server/src/__tests__/lockout.test.js | 6
 server/src/__tests__/log-buffer.test.js | 4
 server/src/__tests__/mail.test.js | 14
 server/src/__tests__/metrics-integration-mode.test.js | 8
+server/src/__tests__/metrics.test.js | 12
 server/src/__tests__/middleware.test.js | 22
 server/src/__tests__/moderation-teams.test.js | 10
 server/src/__tests__/moderation.test.js | 11
