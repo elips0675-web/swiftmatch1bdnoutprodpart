@@ -523,5 +523,5 @@ router.get('/api/auth/me', async (req, res) => {
   }
 })
 
-export { createRefreshToken }
+export { createRefreshToken, makeFingerprint }
 export default router

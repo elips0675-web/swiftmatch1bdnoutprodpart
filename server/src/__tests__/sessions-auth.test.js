@@ -367,6 +367,34 @@ describe('createRefreshToken пишет ip_address и user_agent (миграци
     expect(call[1][5]).toBeNull()
   })
 
+  it('фолбэк на req.connection.remoteAddress, когда req.ip пуст', async () => {
+    const { createRefreshToken } = await import('../routes/auth.js')
+    await createRefreshToken(ALICE, undefined, 'fp', { ip: '', connection: { remoteAddress: '10.0.0.5' }, headers: {} })
+
+    const call = pool.query.mock.calls.find(c => String(c[0]).includes('INSERT INTO refresh_tokens'))
+    expect(call[1][4]).toBe('10.0.0.5')
+  })
+
+  it('без req и без fingerprint пишет пустые строки как NULL', async () => {
+    const { createRefreshToken } = await import('../routes/auth.js')
+    await createRefreshToken(ALICE, undefined, null)
+
+    const call = pool.query.mock.calls.find(c => String(c[0]).includes('INSERT INTO refresh_tokens'))
+    expect(call[1][3]).toBeNull()
+    expect(call[1][4]).toBeNull()
+    expect(call[1][5]).toBeNull()
+  })
+
+  it('без req.ip фолбэк идёт на connection (req без express-ip)', async () => {
+    const { makeFingerprint } = await import('../routes/auth.js')
+    expect(makeFingerprint({ connection: { remoteAddress: '10.9.9.9' }, headers: {} })).toBeTruthy()
+  })
+
+  it('без req.ip и без connection хэширует пустую строку, а не падает', async () => {
+    const { makeFingerprint } = await import('../routes/auth.js')
+    expect(makeFingerprint({ headers: { 'user-agent': 'UA' } })).toHaveLength(32)
+  })
+
   it('проброс req и в регистрацию, и в логин (единая воронка)', async () => {
     const { createRefreshToken } = await import('../routes/auth.js')
     await createRefreshToken(ALICE, ALICE_DESKTOP, 'fp', { ip: REQ_IP, headers: { 'user-agent': CHROME } })
