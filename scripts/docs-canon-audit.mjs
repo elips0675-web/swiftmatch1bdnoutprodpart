@@ -407,13 +407,20 @@ export const DONE_JOURNAL = 'Что сделано.txt'
 export const AGENDA_ARCHIVE = 'docs/agenda-archive.md'
 export const CHANGELOG_FILE = 'CHANGELOG.md'
 export const AGENDA_BANNER_RE = /(архив|снимок)/i
-export const CLOSURE_DATE_RE = /ЗАКРЫТО[^\d]{0,20}(\d{2}\.\d{2}\.\d{4})/g
+export const CLOSURE_DATE_RE = /ЗАКРЫТО[^\d]{0,20}(\d{2}\.\d{2}\.\d{4})/gi
 export const CHRONICLE_HEADER_RE = /^##\s+[^\n]*\(\d{2}\.\d{2}\.\d{4}\)[):]/
 export const CHANGELOG_HEAD_RE = /Keep a Changelog/
 export const CHANGELOG_UNRELEASED_RE = /^##\s+\[Unreleased\]/im
 export const CHANGELOG_RELEASE_RE = /^##\s+\[[0-9]+\.[0-9]+\.[0-9]+\][^\n]*\d{4}-\d{2}-\d{2}/m
-export const CLOSED_HEADING_RE = /(?:ЗАКРЫТО\s*\d{2}\.\d{2}\.\d{4}|✅)\s*$/
-export const CLOSED_LINE_RE = /(?:✅|ЗАКРЫТО\s*\d{2}\.\d{2}\.\d{4})/
+export const CLOSED_HEADING_RE = /(?:ЗАКРЫТО\s*\d{2}\.\d{2}\.\d{4}|✅)\s*$/i
+export const CLOSED_LINE_RE = /(?:✅|ЗАКРЫТО\s*\d{2}\.\d{2}\.\d{4})/i
+/** Зачёркнутый ID/текст закрытого пункта (строка таблицы или пункт списка). */
+export const STRIKETHROUGH_RE = /~~/
+/**
+ * Явный маркер «пункт снова открыт»: зачёркнутый черновик с таким маркером —
+ * не закрытие (бэклог так фиксирует переоткрытый пункт).
+ */
+export const REOPENED_MARKER_RE = /открыт[оа]\s*:/i
 export const RULES_SECTION_RE = /^##\s+Правила работы с журналами/
 
 /** Объём бэклога: сигнал, что в него снова пишут историю, а не открытые пункты. */
@@ -498,8 +505,8 @@ export function collectBacklogFindings(todoText, doneText) {
     const inRulesSection = rulesAt >= 0 && i >= rulesAt && i < rulesEnd
     const isBacklogItem = line.startsWith('|') || /^\s*(?:[-*]|\d+\.)\s/.test(line)
     if (isBacklogItem && !inRulesSection) {
-      const firstCell = line.startsWith('|') ? (line.split('|')[1] || '') : ''
-      if (CLOSED_LINE_RE.test(line) || /~~/.test(firstCell)) {
+      const struck = STRIKETHROUGH_RE.test(line) && !REOPENED_MARKER_RE.test(line)
+      if (CLOSED_LINE_RE.test(line) || struck) {
         findings.push({ id: 'backlog-closed-line', file: TODO_JOURNAL, line: i + 1, text: 'закрытая строка таблицы / пункт в бэклоге — закрытый пункт живёт в «Что сделано.txt», в бэклоге остаётся только заголовок-маркер без тела' })
       }
     }

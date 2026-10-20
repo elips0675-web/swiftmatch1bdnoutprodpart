@@ -549,6 +549,32 @@ describe('структурный гейт бэклога (Что доделат�
     expect(collectBacklogFindings(text, '')).toEqual([])
   })
 
+  it('строчное «закрыто» + дата в пункте списка — находка (GATE-01: регистронезависимо)', () => {
+    const text = '- **ADM-05:** закрыто 20.10.2026 — вынесено в хронику\n'
+    expect(ids(collectBacklogFindings(text, '') )).toContain('backlog-closed-line')
+  })
+
+  it('строчное «закрыто» + дата в строке таблицы — находка', () => {
+    const text = '| ID | Пункт | Проверено |\n|---|---|---|\n| DOC-07 | закрыто 20.10.2026 | 20.10.2026 |\n'
+    expect(ids(collectBacklogFindings(text, ''))).toContain('backlog-closed-line')
+  })
+
+  it('зачёркнутый ID в пункте списка — находка даже без `✅` (GATE-01: вторая слепая зона)', () => {
+    const text = '- **USER-02:** ~~псевдонимы~~ — вынесено в хронику\n'
+    expect(ids(collectBacklogFindings(text, ''))).toContain('backlog-closed-line')
+  })
+
+  it('открытый пункт списка без зачёркивания и без «закрыто» — тишина', () => {
+    const text = '- **GATE-01:** гейт `backlog-closed-line` имеет две слепые зоны\n'
+    expect(collectBacklogFindings(text, '')).toEqual([])
+  })
+
+  it('строчное «закрыто» + дата требует хроники наравне с заглавным', () => {
+    const todo = '- **X:** закрыто 05.05.2028 — в хронику\n'
+    expect(ids(collectBacklogFindings(todo, ''))).toContain('backlog-closure-unchronicled')
+    expect(ids(collectBacklogFindings(todo, 'хроника 05.05.2028'))).not.toContain('backlog-closure-unchronicled')
+  })
+
   it('`✅` в цитате-шапке и в пункте правил — не находка (проверка смотрит пункты вне правил)', () => {
     const text = '> **Как читать.** Пункт с ✅ закрыт и в бэклоге не живёт.\n\n## Правила работы с журналами и бэклогом\n\n- **Бэклог ≠ история.** закрытый пункт удаляется, либо помечается ✅ как маркер.\n'
     expect(collectBacklogFindings(text, '')).toEqual([])
