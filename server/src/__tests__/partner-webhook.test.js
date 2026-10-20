@@ -49,6 +49,8 @@ vi.mock('stripe', () => ({
 }))
 
 import partnerDashboard from '../routes/partner-dashboard.js'
+import pool from '../db.js'
+import logger from '../logger.js'
 
 const constructEvent = stripeWebhooks.constructEvent
 
@@ -148,5 +150,76 @@ describe('POST /api/partner/webhook', () => {
     const sqls = conn.query.mock.calls.map((c) => String(c[0]))
     expect(sqls.some((s) => s.includes('INSERT INTO partner_subscriptions'))).toBe(false)
     expect(conn.beginTransaction).not.toHaveBeenCalled()
+  })
+
+  it('событие без metadata -> received true без транзакции', async () => {
+    constructEvent.mockReturnValue({
+      id: 'evt_partner_004',
+      type: 'checkout.session.completed',
+      data: { object: { id: 'cs_004', payment_status: 'paid' } },
+    })
+    const res = await request(createApp())
+      .post('/api/partner/webhook')
+      .set('stripe-signature', 't=1,v1=ok')
+      .send({ fake: true })
+    expect(res.status).toBe(200)
+    expect(res.body.received).toBe(true)
+    expect(conn.beginTransaction).not.toHaveBeenCalled()
+  })
+
+  it('неоплаченная сессия -> received true без транзакции', async () => {
+    constructEvent.mockReturnValue({
+      id: 'evt_partner_005',
+      type: 'checkout.session.completed',
+      data: { object: { id: 'cs_005', payment_status: 'unpaid', metadata: { partner_id: '7', tier: 'pro' } } },
+    })
+    const res = await request(createApp())
+      .post('/api/partner/webhook')
+      .set('stripe-signature', 't=1,v1=ok')
+      .send({ fake: true })
+    expect(res.status).toBe(200)
+    expect(res.body.received).toBe(true)
+    expect(conn.beginTransaction).not.toHaveBeenCalled()
+    expect(pool.query).not.toHaveBeenCalled()
+  })
+
+  it('другой тип события -> received true и никаких записей', async () => {
+    constructEvent.mockReturnValue({
+      id: 'evt_partner_006',
+      type: 'payment_intent.succeeded',
+      data: { object: { id: 'pi_006' } },
+    })
+    const res = await request(createApp())
+      .post('/api/partner/webhook')
+      .set('stripe-signature', 't=1,v1=ok')
+      .send({ fake: true })
+    expect(res.status).toBe(200)
+    expect(res.body.received).toBe(true)
+    expect(conn.beginTransaction).not.toHaveBeenCalled()
+    expect(pool.query).not.toHaveBeenCalled()
+  })
+
+  it('падение обработки -> rollback, журнал failed и 200', async () => {
+    constructEvent.mockReturnValue({
+      id: 'evt_partner_007',
+      type: 'checkout.session.completed',
+      data: { object: { id: 'cs_007', payment_status: 'paid', metadata: { partner_id: '7', tier: 'pro' } } },
+    })
+    conn.query.mockImplementation((sql) => {
+      const text = String(sql)
+      if (text.includes('INSERT INTO partner_subscriptions')) return Promise.reject(new Error('db fail'))
+      return Promise.resolve([{ affectedRows: 1 }, []])
+    })
+    const res = await request(createApp())
+      .post('/api/partner/webhook')
+      .set('stripe-signature', 't=1,v1=ok')
+      .send({ fake: true })
+    expect(res.status).toBe(200)
+    expect(res.body.received).toBe(true)
+    expect(conn.rollback).toHaveBeenCalled()
+    expect(conn.commit).not.toHaveBeenCalled()
+    expect(logger.error).toHaveBeenCalledWith('Partner subscribe webhook processing error:', expect.any(Error))
+    const sqls = pool.query.mock.calls.map((c) => String(c[0]))
+    expect(sqls.some((s) => s.includes("status = 'failed'"))).toBe(true)
   })
 })

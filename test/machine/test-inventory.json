@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-19T23:43:16.010Z",
+  "generated": "2026-10-20T05:44:12.341Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -508,8 +508,8 @@
   },
   "server": {
     "files": 131,
-    "tests": 2192,
-    "passed": 2192,
+    "tests": 2249,
+    "passed": 2249,
     "failed": 0,
     "gate": {
       "files": 5,
@@ -517,7 +517,7 @@
     },
     "product": {
       "files": 126,
-      "tests": 2070
+      "tests": 2127
     },
     "perFile": [
       {
@@ -846,11 +846,11 @@
       },
       {
         "file": "server/src/__tests__/partner-dashboard.test.js",
-        "tests": 12
+        "tests": 65
       },
       {
         "file": "server/src/__tests__/partner-webhook.test.js",
-        "tests": 6
+        "tests": 10
       },
       {
         "file": "server/src/__tests__/partners-booking.test.js",
@@ -1150,6 +1150,6 @@
   },
   "total": {
     "files": 253,
-    "tests": 3755
+    "tests": 3812
   }
 }
