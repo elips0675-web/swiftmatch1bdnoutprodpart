@@ -1,5 +1,5 @@
 ===== Сервер (Vitest) =====
-2504 тестов в 144 файлах (зелёных 2504) (vitest --reporter=json)
+2519 тестов в 146 файлах (зелёных 2519) (vitest --reporter=json)
 
 # файл | тестов
 server/src/__tests__/active-user.test.js | 33
@@ -74,9 +74,11 @@ server/src/__tests__/location.test.js | 11
 server/src/__tests__/lockout-redis.test.js | 17
 server/src/__tests__/lockout.test.js | 6
 server/src/__tests__/log-buffer.test.js | 4
+server/src/__tests__/logger.test.js | 3
 server/src/__tests__/mail.test.js | 14
 server/src/__tests__/metrics-integration-mode.test.js | 8
 server/src/__tests__/metrics.test.js | 12
+server/src/__tests__/middleware-dev-secret.test.js | 4
 server/src/__tests__/middleware.test.js | 22
 server/src/__tests__/moderation-review-profile.test.js | 5
 server/src/__tests__/moderation-teams.test.js | 10
@@ -111,7 +113,7 @@ server/src/__tests__/push-novapid.test.js | 2
 server/src/__tests__/push-quiet-gates.test.js | 8
 server/src/__tests__/push.test.js | 6
 server/src/__tests__/queue-init.test.js | 12
-server/src/__tests__/queue-monitor.test.js | 19
+server/src/__tests__/queue-monitor.test.js | 27
 server/src/__tests__/queue-swagger-limiters.test.js | 7
 server/src/__tests__/quiet-hours.test.js | 43
 server/src/__tests__/race.mysql.test.js | 6

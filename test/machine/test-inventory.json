@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-20T17:55:37.789Z",
+  "generated": "2026-10-20T18:52:00.060Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -515,17 +515,17 @@
     ]
   },
   "server": {
-    "files": 144,
-    "tests": 2504,
-    "passed": 2504,
+    "files": 146,
+    "tests": 2519,
+    "passed": 2519,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 122
     },
     "product": {
-      "files": 139,
-      "tests": 2382
+      "files": 141,
+      "tests": 2397
     },
     "perFile": [
       {
@@ -817,6 +817,10 @@
         "tests": 4
       },
       {
+        "file": "server/src/__tests__/logger.test.js",
+        "tests": 3
+      },
+      {
         "file": "server/src/__tests__/mail.test.js",
         "tests": 14
       },
@@ -827,6 +831,10 @@
       {
         "file": "server/src/__tests__/metrics.test.js",
         "tests": 12
+      },
+      {
+        "file": "server/src/__tests__/middleware-dev-secret.test.js",
+        "tests": 4
       },
       {
         "file": "server/src/__tests__/middleware.test.js",
@@ -966,7 +974,7 @@
       },
       {
         "file": "server/src/__tests__/queue-monitor.test.js",
-        "tests": 19
+        "tests": 27
       },
       {
         "file": "server/src/__tests__/queue-swagger-limiters.test.js",
@@ -1209,7 +1217,7 @@
     ]
   },
   "total": {
-    "files": 268,
-    "tests": 4113
+    "files": 270,
+    "tests": 4128
   }
 }

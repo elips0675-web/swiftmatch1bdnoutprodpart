@@ -10,6 +10,12 @@ vi.mock('../logger.js', () => ({
   rootLogger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }))
 
+vi.mock('../mail.js', () => ({
+  sendCustomEmail: vi.fn(),
+}))
+
+import { rootLogger } from '../logger.js'
+import { sendCustomEmail } from '../mail.js'
 import {
   QUEUE_NAMES,
   resolveQueues,
@@ -21,6 +27,7 @@ import {
   createBackpressureAlerter,
   startQueueBackpressureMonitor,
   stopQueueBackpressureMonitor,
+  queueNames,
   QUEUE_ALERT_THRESHOLD,
 } from '../queue-monitor.js'
 
@@ -111,6 +118,10 @@ describe('queue-monitor (N6)', () => {
     const result = await retryFailed('email', { emailQueue: null })
     expect(result).toEqual({ name: 'email', available: false, total: 0, retried: 0, failed: 0 })
   })
+
+  it('queueNames отдаёт канонический список очередей', () => {
+    expect(queueNames()).toEqual(['email', 'push', 'image'])
+  })
 })
 
 describe('queue backpressure (P2 #21)', () => {
@@ -138,6 +149,11 @@ describe('queue backpressure (P2 #21)', () => {
       { name: 'image', enabled: false, counts: null, failed: [] },
     ]
     expect(backloggedQueues(stats, 1000)).toEqual([{ name: 'email', waiting: 900, delayed: 200, failed: 0 }])
+  })
+
+  it('backloggedQueues трактует отсутствующее waiting как ноль, а не NaN', () => {
+    const stats = [{ name: 'email', enabled: true, counts: { delayed: 1500, failed: 7 }, failed: [] }]
+    expect(backloggedQueues(stats, 1000)).toEqual([{ name: 'email', waiting: 0, delayed: 1500, failed: 7 }])
   })
 
   it('без REDIS_URL монитор молчит (disabled)', async () => {
@@ -238,5 +254,90 @@ describe('queue backpressure (P2 #21)', () => {
     expect(typeof timer.unref).toBe('function')
     stopQueueBackpressureMonitor()
     expect(() => stopQueueBackpressureMonitor()).not.toThrow()
+  })
+
+  it('повторный startQueueBackpressureMonitor возвращает тот же таймер', () => {
+    const first = startQueueBackpressureMonitor({ intervalMs: 1000 })
+    const second = startQueueBackpressureMonitor({ intervalMs: 1000 })
+    expect(second).toBe(first)
+  })
+
+  it('таймер монитора реально гоняет проверку по интервалу', async () => {
+    vi.useFakeTimers()
+    const send = vi.fn().mockResolvedValue(undefined)
+    startQueueBackpressureMonitor({
+      intervalMs: 5000,
+      source: busySource({ waiting: 5000, delayed: 0, failed: 0 }),
+      threshold: 1000,
+      send,
+    })
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(send).toHaveBeenCalledTimes(1)
+  })
+
+  it('исключение внутри таймерной проверки ловится catch-ом и пишется в лог', async () => {
+    vi.useFakeTimers()
+    const source = {
+      get redisConfigured() { throw new Error('probe down') },
+    }
+    startQueueBackpressureMonitor({ intervalMs: 5000, source })
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(rootLogger.error).toHaveBeenCalledWith('[queue] backpressure timer failed: probe down')
+  })
+
+  it('дефолтный send без ADMIN_EMAIL предупреждает и не шлёт письмо', async () => {
+    const saved = process.env.ADMIN_EMAIL
+    delete process.env.ADMIN_EMAIL
+    try {
+      const check = createBackpressureAlerter({
+        source: busySource({ waiting: 5000, delayed: 0, failed: 0 }),
+        threshold: 1000,
+      })
+      expect(await check()).toEqual({
+        alerted: true,
+        reason: 'sent',
+        queues: [{ name: 'email', waiting: 5000, delayed: 0, failed: 0 }],
+      })
+      expect(rootLogger.warn).toHaveBeenCalledWith(
+        '[queue] backlog detected but ADMIN_EMAIL is not set — alert skipped',
+      )
+      expect(sendCustomEmail).not.toHaveBeenCalled()
+    } finally {
+      if (saved === undefined) delete process.env.ADMIN_EMAIL
+      else process.env.ADMIN_EMAIL = saved
+    }
+  })
+
+  it('дефолтный send с ADMIN_EMAIL шлёт письмо через sendCustomEmail', async () => {
+    const saved = process.env.ADMIN_EMAIL
+    process.env.ADMIN_EMAIL = 'root@swiftmatch.test'
+    try {
+      const check = createBackpressureAlerter({
+        source: busySource({ waiting: 5000, delayed: 0, failed: 0 }),
+        threshold: 1000,
+      })
+      const result = await check()
+      expect(result.alerted).toBe(true)
+      expect(sendCustomEmail).toHaveBeenCalledWith(
+        'root@swiftmatch.test',
+        expect.stringContaining('backlog'),
+        expect.stringContaining('email'),
+      )
+    } finally {
+      if (saved === undefined) delete process.env.ADMIN_EMAIL
+      else process.env.ADMIN_EMAIL = saved
+    }
+  })
+
+  it('QUEUE_ALERT_THRESHOLD читается из env при загрузке модуля', async () => {
+    vi.stubEnv('QUEUE_ALERT_THRESHOLD', '250')
+    vi.resetModules()
+    try {
+      const fresh = await import('../queue-monitor.js')
+      expect(fresh.QUEUE_ALERT_THRESHOLD).toBe(250)
+    } finally {
+      vi.unstubAllEnvs()
+      vi.resetModules()
+    }
   })
 })
