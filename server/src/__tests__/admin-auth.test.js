@@ -16,6 +16,7 @@ vi.mock('../logger.js', () => ({
 }))
 
 import pool from '../db.js'
+import { rootLogger } from '../logger.js'
 import { adminAuth } from '../middleware/adminAuth.js'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'test-secret'
@@ -88,5 +89,42 @@ describe('adminAuth middleware', () => {
     await adminAuth(req, res, next)
     expect(res.status).toHaveBeenCalledWith(403)
     expect(next).not.toHaveBeenCalled()
+  })
+
+  it('passes valid Bearer when request has no cookies at all', async () => {
+    const bearerToken = jwt.sign({ userId: 7, role: 'admin' }, JWT_SECRET, { expiresIn: '1h' })
+    pool.query.mockResolvedValueOnce([[{ id: 7, email: 'a@b.c', role: 'admin' }], []])
+    pool.query.mockResolvedValueOnce([[{ team_id: 3 }], []])
+    const { req, res, next } = mockReqRes()
+    req.headers.authorization = `Bearer ${bearerToken}`
+    await adminAuth(req, res, next)
+    expect(res.status).not.toHaveBeenCalled()
+    expect(next).toHaveBeenCalled()
+    expect(req.admin.id).toBe(7)
+    expect(req.admin.teams).toEqual([3])
+  })
+
+  it('degrades to empty teams when teams lookup returns null rows', async () => {
+    const cookieToken = jwt.sign({ userId: 7, role: 'admin' }, JWT_SECRET, { expiresIn: '1h' })
+    pool.query.mockResolvedValueOnce([[{ id: 7, email: 'a@b.c', role: 'admin' }], []])
+    pool.query.mockResolvedValueOnce([null, []])
+    const { req, res, next } = mockReqRes()
+    req.cookies = { sm_token: cookieToken }
+    await adminAuth(req, res, next)
+    expect(next).toHaveBeenCalled()
+    expect(req.admin.teams).toEqual([])
+    expect(rootLogger.warn).not.toHaveBeenCalled()
+  })
+
+  it('returns 500 ADMIN_CHECK_FAILED on DB error', async () => {
+    const cookieToken = jwt.sign({ userId: 7, role: 'admin' }, JWT_SECRET, { expiresIn: '1h' })
+    pool.query.mockRejectedValueOnce(new Error('db down'))
+    const { req, res, next } = mockReqRes()
+    req.cookies = { sm_token: cookieToken }
+    await adminAuth(req, res, next)
+    expect(res.status).toHaveBeenCalledWith(500)
+    expect(res.json).toHaveBeenCalledWith({ message: 'ADMIN_CHECK_FAILED' })
+    expect(next).not.toHaveBeenCalled()
+    expect(rootLogger.error).toHaveBeenCalledWith('adminAuth DB error:', expect.any(Error))
   })
 })
