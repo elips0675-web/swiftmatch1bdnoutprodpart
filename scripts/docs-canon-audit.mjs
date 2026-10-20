@@ -189,10 +189,13 @@ export const SECURITY_DOC = 'docs/AGENTS-security.md'
 export const PRODUCTION_DOC = 'docs/AGENTS-production.md'
 export const WORKFLOW_DOC = 'docs/AGENTS-workflow.md'
 export const MIGRATIONS_DIR = 'database/migrations'
+export const README_FILE = 'README.md'
 
 export const CI_JOBS_CLAIM_RE = /(\d+)\s+джобы\s+`ci\.yml`/
 export const DEPLOY_JOBS_CLAIM_RE = /(\d+)\s+`deploy\.yml`/
 export const MIGRATIONS_CLAIM_RE = /`database\/migrations\/`\s*\|\s*(\d+)\s+нумерованн/i
+export const README_MIGRATIONS_COUNT_RE = /(\d+)\s+пронумерованных\s+`\.sql`/i
+export const README_MIGRATIONS_SQL_RE = /`migrations\/`\s*\((\d+)\s+SQL\)/i
 export const UPLOAD_CODE_RE = /fileSize:\s*(\d+)\s*\*\s*1024\s*\*\s*1024/
 export const UPLOAD_MB_CLAIM_RE = /ограничение\s+(\d+)\s*MB/i
 export const WORKFLOW_ARCHIVE_RE = /context\.txt/
@@ -714,8 +717,18 @@ export function countMigrations(root) {
  * по литералу `fileSize` в `upload.js`. Отсутствие якоря (утверждение пропало
  * из дока, в коде нет литерала, каталог не найден) — находка, а не пропуск.
  */
-export function collectConsistencyFindings({ analysisText, ciYaml, deployYaml, uploadJs, securityText, productionText, workflowText, migrationCount }) {
+export function collectConsistencyFindings({ analysisText, readmeText, ciYaml, deployYaml, uploadJs, securityText, productionText, workflowText, migrationCount }) {
   const findings = []
+
+  if (readmeText && migrationCount !== null) {
+    for (const re of [README_MIGRATIONS_COUNT_RE, README_MIGRATIONS_SQL_RE]) {
+      const m = re.exec(readmeText)
+      if (!m) continue
+      if (Number(m[1]) !== migrationCount) {
+        findings.push({ id: 'consistency-readme-migrations', file: README_FILE, line: lineAt(readmeText, m.index), text: `заявлено «${m[1]}» миграций, а в ${MIGRATIONS_DIR} ${migrationCount} *.sql` })
+      }
+    }
+  }
 
   if (analysisText) {
     const ciClaim = CI_JOBS_CLAIM_RE.exec(analysisText)
@@ -869,6 +882,7 @@ export function audit(root) {
   findings.push(...collectWiringFindings({ pkgJson, ciYaml: read(CI_WORKFLOW), deployYaml: read(DEPLOY_WORKFLOW) }))
   findings.push(...collectConsistencyFindings({
     analysisText: read(ANALYSIS_FILE),
+    readmeText: read(README_FILE),
     ciYaml: read(CI_WORKFLOW),
     deployYaml: read(DEPLOY_WORKFLOW),
     uploadJs: read(UPLOAD_ROUTE),

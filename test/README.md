@@ -181,7 +181,7 @@ cd server && npm test            # серверные тесты
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 1601 тест, 124 файла — **0 failures**
+- **Фронтенд (Vitest):** 1604 теста, 124 файла — **0 failures**
 - **Сервер (Vitest):** 2423 теста, 139 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 206 тестов, 22 spec-файла — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
@@ -191,9 +191,10 @@ cd server && npm test            # серверные тесты
 обязательны: без `--omit=dev` считается dev-дерево, которого в проде нет, без
 `--audit-level=high` гейт краснеет на moderate/low, которые чинятся только
 мажорными обновлениями. Сейчас: **0 critical, 0 high** (корень — 0 уязвимостей,
-`server/` — 28 moderate: `@opentelemetry/instrumentation-tedious` и `uuid` через
-`bull`/`gaxios`/`google-gax`/`firebase-admin`). Аудить надо **оба** lock-файла: в контейнер едут обе
-половины.
+`server/` — единицы moderate: `@opentelemetry/instrumentation-tedious` и `uuid` через
+`bull`/`gaxios`/`google-gax`/`firebase-admin`). Точное число moderate не фиксируется
+в доке: база advisory меняется между прогонами — сверять живым `npm run audit:prod`.
+Аудить надо **оба** lock-файла: в контейнер едут обе половины.
 
 ---
 
@@ -319,7 +320,7 @@ cd server && npm test            # серверные тесты
 
 ### 🗄️ База данных
 - MySQL через mysql2, пул соединений
-- **Миграции:** `database/migrations/` — 57 пронумерованных `.sql` + `migrate.js` (таблица `_migrations`)
+- **Миграции:** `database/migrations/` — 71 пронумерованных `.sql` + `migrate.js` (таблица `_migrations`)
 - Эталон схемы: `database/mysql_schema.sql` (его и сверяет дрейф-аудит)
 
 ### 📧 Коммуникации
@@ -434,7 +435,7 @@ cd server && npm test            # серверные тесты
 | `server/src/redis.js` | ioredis lazy client (main/pub/sub) |
 | `server/src/audit.js` | soft delete + audit log |
 | `server/src/seed.js` | Генератор демо-данных (50 users, 30 matches, 200 msgs) |
-| `database/` | `mysql_schema.sql` + `demo_data.sql` + `migrations/` (57 SQL) |
+| `database/` | `mysql_schema.sql` + `demo_data.sql` + `migrations/` (71 SQL) |
 | `scripts/` | Гейты и утилиты (аудит схемы/секретов/счётчиков/персистентности, бэкап, EXPLAIN) |
 | `e2e/` | Playwright-спеки (19) |
 | `android/` | Capacitor/Gradle-проект |

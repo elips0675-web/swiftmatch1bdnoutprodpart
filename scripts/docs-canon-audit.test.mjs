@@ -63,6 +63,7 @@ import {
   SECURITY_DOC,
   PRODUCTION_DOC,
   WORKFLOW_DOC,
+  README_FILE,
   CI_WORKFLOW,
   DEPLOY_WORKFLOW,
   tableIds,
@@ -634,6 +635,7 @@ describe('agenda-archive.md остаётся архивом', () => {
 describe('согласованность чисел документации с реальными файлами', () => {
   const good = {
     analysisText: '- Гейты: 3 джобы `ci.yml` + 2 `deploy.yml` (на 19.10.2026).\n| `database/migrations/` | 2 нумерованная миграция + migrate.js |\n',
+    readmeText: '- **Миграции:** `database/migrations/` — 2 пронумерованных `.sql` + `migrate.js` (таблица `_migrations`)\n| `database/` | `mysql_schema.sql` + `demo_data.sql` + `migrations/` (2 SQL) |\n',
     ciYaml: 'jobs:\n  a:\n    runs-on: ubuntu-latest\n  b:\n    runs-on: ubuntu-latest\n  c:\n    runs-on: ubuntu-latest\n',
     deployYaml: 'jobs:\n  d:\n    runs-on: ubuntu-latest\n  e:\n    runs-on: ubuntu-latest\n',
     uploadJs: 'app.use("/api/upload", upload({ limits: { fileSize: 10 * 1024 * 1024 } }))\n',
@@ -644,9 +646,10 @@ describe('согласованность чисел документации с 
   }
   const run = over => collectConsistencyFindings({ ...good, ...over })
 
-  it('текущий репозиторий проходит все четыре сверки', () => {
+  it('текущий репозиторий проходит все сверки', () => {
     expect(collectConsistencyFindings({
       analysisText: read(ANALYSIS_FILE),
+      readmeText: read(README_FILE),
       ciYaml: read(CI_WORKFLOW),
       deployYaml: read(DEPLOY_WORKFLOW),
       uploadJs: read(UPLOAD_ROUTE),
@@ -711,5 +714,19 @@ describe('согласованность чисел документации с 
 
   it('отсутствующий каталог миграций — находка-якорь, а не тихий зелёный', () => {
     expect(ids(run({ migrationCount: null }))).toContain('consistency-migrations-anchor')
+  })
+
+  it('дрейф числа миграций в README («N пронумерованных .sql») — находка', () => {
+    const f = run({ readmeText: good.readmeText.replace('2 пронумерованных', '57 пронумерованных') })
+    expect(ids(f)).toContain('consistency-readme-migrations')
+    expect(f.find(x => x.id === 'consistency-readme-migrations').file).toBe(README_FILE)
+  })
+
+  it('дрейф числа миграций во второй форме README («migrations/ (N SQL)») — находка', () => {
+    expect(ids(run({ readmeText: good.readmeText.replace('(2 SQL)', '(57 SQL)') }))).toContain('consistency-readme-migrations')
+  })
+
+  it('README без числа миграций — тишина, а не выдуманная находка', () => {
+    expect(ids(run({ readmeText: '- **Миграции:** каталог `database/migrations/` + `migrate.js`\n' }))).not.toContain('consistency-readme-migrations')
   })
 })

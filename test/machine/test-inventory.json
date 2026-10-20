@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-20T07:58:32.918Z",
+  "generated": "2026-10-20T12:58:08.721Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 122,
-    "tests": 1563,
-    "passed": 1563,
+    "files": 124,
+    "tests": 1604,
+    "passed": 1604,
     "failed": 0,
     "gate": {
       "files": 27,
-      "tests": 682
+      "tests": 685
     },
     "product": {
-      "files": 95,
-      "tests": 881
+      "files": 97,
+      "tests": 919
     },
     "perFile": [
       {
@@ -58,7 +58,7 @@
       },
       {
         "file": "scripts/docs-canon-audit.test.mjs",
-        "tests": 101
+        "tests": 104
       },
       {
         "file": "scripts/e2e-cleanup.test.mjs",
@@ -393,6 +393,10 @@
         "tests": 4
       },
       {
+        "file": "src/test/pwa-install-banner.test.tsx",
+        "tests": 18
+      },
+      {
         "file": "src/test/register.test.tsx",
         "tests": 9
       },
@@ -407,6 +411,10 @@
       {
         "file": "src/test/rollout.test.ts",
         "tests": 11
+      },
+      {
+        "file": "src/test/route-guards.test.tsx",
+        "tests": 20
       },
       {
         "file": "src/test/safety.test.tsx",
@@ -507,17 +515,17 @@
     ]
   },
   "server": {
-    "files": 137,
-    "tests": 2389,
-    "passed": 2389,
+    "files": 139,
+    "tests": 2423,
+    "passed": 2423,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 122
     },
     "product": {
-      "files": 132,
-      "tests": 2267
+      "files": 134,
+      "tests": 2301
     },
     "perFile": [
       {
@@ -639,6 +647,10 @@
       {
         "file": "server/src/__tests__/auth.test.js",
         "tests": 22
+      },
+      {
+        "file": "server/src/__tests__/backup.test.js",
+        "tests": 27
       },
       {
         "file": "server/src/__tests__/banned-words.test.js",
@@ -997,6 +1009,10 @@
         "tests": 7
       },
       {
+        "file": "server/src/__tests__/sentry.test.js",
+        "tests": 7
+      },
+      {
         "file": "server/src/__tests__/sessions-auth.test.js",
         "tests": 24
       },
@@ -1173,7 +1189,7 @@
     ]
   },
   "total": {
-    "files": 259,
-    "tests": 3952
+    "files": 263,
+    "tests": 4027
   }
 }
