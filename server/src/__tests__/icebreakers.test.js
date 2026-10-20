@@ -121,4 +121,140 @@ describe('POST /api/icebreakers/suggest — OpenAI breaker + DB fallback', () =>
     expect(res.status).toBe(200)
     expect(res.body.source).toBe('db')
   })
+
+  it('нечисловой chat_user_id -> 400 MISSING_CHAT_USER_ID', async () => {
+    const res = await request(createApp())
+      .post('/api/icebreakers/suggest')
+      .send({})
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('MISSING_CHAT_USER_ID')
+    expect(dbQuery).not.toHaveBeenCalled()
+  })
+
+  it('темы есть, а вопросов нет -> source=db с пустым списком', async () => {
+    openaiCreate.mockRejectedValue(new Error('down'))
+
+    dbQuery
+      .mockResolvedValueOnce([[{ display_name: 'Аня', age: 25, bio: 'био', city: 'Москва', dating_goal: 'serious', zodiac: 'Лев' }]])
+      .mockResolvedValueOnce([[{ id: 1, key_id: 'k1', icon: 'x' }]])
+      .mockResolvedValueOnce([[]])
+
+    const res = await request(createApp())
+      .post('/api/icebreakers/suggest')
+      .send({ chat_user_id: 5 })
+
+    expect(res.status).toBe(200)
+    expect(res.body.source).toBe('db')
+    expect(res.body.suggestions).toEqual([])
+    expect(openaiCreate).toHaveBeenCalledTimes(1)
+  })
+
+  it('темы пусты -> статический набор из трёх фраз', async () => {
+    openaiCreate.mockRejectedValue(new Error('down'))
+
+    dbQuery
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+
+    const res = await request(createApp())
+      .post('/api/icebreakers/suggest')
+      .send({ chat_user_id: 5 })
+
+    expect(res.status).toBe(200)
+    expect(res.body.source).toBe('static')
+    expect(res.body.suggestions).toHaveLength(3)
+  })
+
+  it('language=en -> берётся text_en', async () => {
+    openaiCreate.mockRejectedValue(new Error('down'))
+
+    dbQuery
+      .mockResolvedValueOnce([[{ display_name: 'Ann', age: 30, bio: '', city: '', dating_goal: '', zodiac: '' }]])
+      .mockResolvedValueOnce([[{ id: 1, key_id: 'k1', icon: 'x' }]])
+      .mockResolvedValueOnce([[
+        { id: 10, theme_id: 1, text_ru: 'Хобби?', text_en: 'Hobby?' },
+      ]])
+
+    const res = await request(createApp())
+      .post('/api/icebreakers/suggest')
+      .send({ chat_user_id: 5, language: 'en' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.source).toBe('db')
+    expect(res.body.suggestions).toEqual(['Hobby?'])
+  })
+
+  it('неизвестный язык трактуется как ru (text_ru)', async () => {
+    openaiCreate.mockRejectedValue(new Error('down'))
+
+    dbQuery
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ id: 1, key_id: 'k1', icon: 'x' }]])
+      .mockResolvedValueOnce([[
+        { id: 10, theme_id: 1, text_ru: 'Хобби?', text_en: 'Hobby?' },
+      ]])
+
+    const res = await request(createApp())
+      .post('/api/icebreakers/suggest')
+      .send({ chat_user_id: 5, language: 'de' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.suggestions).toEqual(['Хобби?'])
+  })
+
+  it('без OPENAI_API_KEY OpenAI не вызывается', async () => {
+    vi.resetModules()
+    const savedKey = process.env.OPENAI_API_KEY
+    delete process.env.OPENAI_API_KEY
+    try {
+      const fresh = await import('../routes/icebreakers.js')
+      const app = express()
+      app.use(express.json())
+      app.use(fresh.default)
+      dbQuery
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]])
+      const res = await request(app)
+        .post('/api/icebreakers/suggest')
+        .send({ chat_user_id: 5 })
+      expect(res.status).toBe(200)
+      expect(res.body.source).toBe('static')
+      expect(openaiCreate).not.toHaveBeenCalled()
+    } finally {
+      process.env.OPENAI_API_KEY = savedKey
+      vi.resetModules()
+    }
+  })
+
+  it('пустой ответ модели -> JSON.parse даёт []', async () => {
+    openaiCreate.mockResolvedValue({ choices: [] })
+
+    dbQuery
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ id: 1, key_id: 'k1', icon: 'x' }]])
+      .mockResolvedValueOnce([[
+        { id: 10, theme_id: 1, text_ru: 'Хобби?', text_en: 'Hobby?' },
+      ]])
+
+    const res = await request(createApp())
+      .post('/api/icebreakers/suggest')
+      .send({ chat_user_id: 5 })
+
+    expect(res.status).toBe(200)
+    expect(res.body.source).toBe('db')
+    expect(res.body.suggestions).toEqual(['Хобби?'])
+  })
+
+  it('сбой запроса профиля -> 500 SERVER_ERROR и запись в лог', async () => {
+    dbQuery.mockRejectedValue(new Error('db down'))
+
+    const res = await request(createApp())
+      .post('/api/icebreakers/suggest')
+      .send({ chat_user_id: 5 })
+
+    expect(res.status).toBe(500)
+    expect(res.body.error).toBe('SERVER_ERROR')
+    expect(rootLog.error).toHaveBeenCalledWith('Icebreakers suggest error:', expect.any(Error))
+  })
 })

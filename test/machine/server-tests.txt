@@ -1,5 +1,5 @@
 ===== Сервер (Vitest) =====
-2477 тестов в 143 файлах (зелёных 2477) (vitest --reporter=json)
+2485 тестов в 143 файлах (зелёных 2485) (vitest --reporter=json)
 
 # файл | тестов
 server/src/__tests__/active-user.test.js | 33
@@ -64,7 +64,7 @@ server/src/__tests__/hangouts-tickets-activity.test.js | 50
 server/src/__tests__/hangouts-watchers-relations.test.js | 33
 server/src/__tests__/hangouts.test.js | 65
 server/src/__tests__/iap-webhook.test.js | 14
-server/src/__tests__/icebreakers.test.js | 3
+server/src/__tests__/icebreakers.test.js | 11
 server/src/__tests__/idempotency.test.js | 6
 server/src/__tests__/idor.test.js | 21
 server/src/__tests__/image-pipeline.test.js | 8
