@@ -198,6 +198,22 @@ describe('POST /api/email/unsubscribe', () => {
     expect(res.status).toBe(500)
     expect(res.body.code).toBe('UNSUBSCRIBE_FAILED')
   })
+
+  it('тело не распарсено (req.body undefined) → 400 без запроса в БД', async () => {
+    const app = express()
+    app.use(unsubscribeRoutes)
+    const res = await request(app).post('/api/email/unsubscribe').set('Content-Type', 'application/json').send('{"u":5,"t":"x"}')
+    expect(res.status).toBe(400)
+    expect(res.body.code).toBe('UNSUBSCRIBE_INVALID')
+    expect(pool.query).not.toHaveBeenCalled()
+  })
+
+  it('t не строка → 400 без запроса в БД', async () => {
+    const res = await request(userApp()).post('/api/email/unsubscribe').send({ u: USER.id, t: 42 })
+    expect(res.status).toBe(400)
+    expect(res.body.code).toBe('UNSUBSCRIBE_INVALID')
+    expect(pool.query).not.toHaveBeenCalled()
+  })
 })
 
 describe('рассылка email-кампаний', () => {
