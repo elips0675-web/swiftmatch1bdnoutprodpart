@@ -230,3 +230,192 @@ describe('POST /api/admin/reports/:id/assign', () => {
     expect(res.status).toBe(404)
   })
 })
+
+describe('пробелы покрытия: валидации и 500-ветки', () => {
+  it('GET members: сбой БД → 500 с логом', async () => {
+    pool.query.mockRejectedValueOnce(new Error('boom'))
+    const res = await request(adminApp([])).get('/api/admin/teams/1/members')
+    expect(res.status).toBe(500)
+    expect(res.body.message).toBe('Failed to fetch team members')
+  })
+
+  it('POST teams: сбой БД (не дубликат) → 500', async () => {
+    pool.query.mockRejectedValueOnce(new Error('boom'))
+    const res = await request(adminApp([])).post('/api/admin/teams').send({ name: 'Норм' })
+    expect(res.status).toBe(500)
+    expect(res.body.message).toBe('Failed to create team')
+  })
+
+  it('POST teams: имя не строка (число) → 400 (parseName)', async () => {
+    const res = await request(adminApp([])).post('/api/admin/teams').send({ name: 123 })
+    expect(res.status).toBe(400)
+    expect(pool.query).not.toHaveBeenCalled()
+  })
+
+  it('PATCH: скоуп-модератор → 403 SUPER_ADMIN_REQUIRED', async () => {
+    const res = await request(adminApp([3])).patch('/api/admin/teams/1').send({ name: 'x' })
+    expect(res.status).toBe(403)
+    expect(res.body.message).toBe('SUPER_ADMIN_REQUIRED')
+  })
+
+  it('PATCH: нечисловой id → 400', async () => {
+    const res = await request(adminApp([])).patch('/api/admin/teams/abc').send({ name: 'x' })
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('Invalid team id')
+  })
+
+  it('PATCH: пустое имя → 400 Invalid team name', async () => {
+    const res = await request(adminApp([])).patch('/api/admin/teams/1').send({ name: '  ' })
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('Invalid team name')
+    expect(pool.query).not.toHaveBeenCalled()
+  })
+
+  it('PATCH: только isActive → UPDATE только флага (true → 1)', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 1 }], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await request(adminApp([])).patch('/api/admin/teams/1').send({ isActive: true })
+    expect(res.status).toBe(200)
+    const [sql, params] = pool.query.mock.calls[1]
+    expect(String(sql)).toMatch(/UPDATE moderation_teams SET is_active = \? WHERE id = \?/)
+    expect(params).toEqual([1, 1])
+  })
+
+  it('PATCH: isActive false → 0', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 1 }], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await request(adminApp([])).patch('/api/admin/teams/1').send({ isActive: false })
+    expect(res.status).toBe(200)
+    expect(pool.query.mock.calls[1][1]).toEqual([0, 1])
+  })
+
+  it('PATCH: пустое тело → 400 Nothing to update', async () => {
+    const res = await request(adminApp([])).patch('/api/admin/teams/1').send({})
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('Nothing to update')
+    expect(pool.query).not.toHaveBeenCalled()
+  })
+
+  it('PATCH: дубликат имени → 409, а не 500', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 1 }], []])
+      .mockRejectedValueOnce(Object.assign(new Error('dup'), { code: 'ER_DUP_ENTRY' }))
+    const res = await request(adminApp([])).patch('/api/admin/teams/1').send({ name: 'Основная' })
+    expect(res.status).toBe(409)
+    expect(res.body.message).toBe('Team name already exists')
+  })
+
+  it('PATCH: сбой БД (не дубликат) → 500', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 1 }], []])
+      .mockRejectedValueOnce(new Error('boom'))
+    const res = await request(adminApp([])).patch('/api/admin/teams/1').send({ name: 'Новое' })
+    expect(res.status).toBe(500)
+    expect(res.body.message).toBe('Failed to update team')
+  })
+
+  it('DELETE: скоуп-модератор чужой команды → 403', async () => {
+    const res = await request(adminApp([3])).delete('/api/admin/teams/1')
+    expect(res.status).toBe(403)
+    expect(res.body.message).toBe('SUPER_ADMIN_REQUIRED')
+  })
+
+  it('DELETE: нечисловой id → 400', async () => {
+    const res = await request(adminApp([])).delete('/api/admin/teams/abc')
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('Invalid team id')
+  })
+
+  it('DELETE: сбой БД → 500', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 1 }], []])
+      .mockRejectedValueOnce(new Error('boom'))
+    const res = await request(adminApp([])).delete('/api/admin/teams/1')
+    expect(res.status).toBe(500)
+    expect(res.body.message).toBe('Failed to delete team')
+  })
+
+  it('POST members: нечисловой teamId → 400', async () => {
+    const res = await request(adminApp([])).post('/api/admin/teams/abc/members').send({ userId: 9 })
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('Invalid team id')
+  })
+
+  it('POST members: нечисловой userId → 400', async () => {
+    const res = await request(adminApp([])).post('/api/admin/teams/1/members').send({ userId: 'x' })
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('Invalid user id')
+  })
+
+  it('POST members: несуществующий пользователь → 404', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 1 }], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await request(adminApp([])).post('/api/admin/teams/1/members').send({ userId: 9 })
+    expect(res.status).toBe(404)
+    expect(res.body.message).toBe('User not found')
+  })
+
+  it('POST members: сбой БД → 500', async () => {
+    pool.query.mockRejectedValueOnce(new Error('boom'))
+    const res = await request(adminApp([])).post('/api/admin/teams/1/members').send({ userId: 9 })
+    expect(res.status).toBe(500)
+    expect(res.body.message).toBe('Failed to add member')
+  })
+
+  it('DELETE members: нечисловой id → 400', async () => {
+    const res = await request(adminApp([])).delete('/api/admin/teams/abc/members/9')
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('Invalid id')
+  })
+
+  it('DELETE members: сбой БД → 500', async () => {
+    pool.query.mockRejectedValueOnce(new Error('boom'))
+    const res = await request(adminApp([])).delete('/api/admin/teams/1/members/9')
+    expect(res.status).toBe(500)
+    expect(res.body.message).toBe('Failed to remove member')
+  })
+
+  it('assign: скоуп-модератор уже покрыт, но нечисловой report id → 400', async () => {
+    const res = await request(adminApp([])).post('/api/admin/reports/abc/assign').send({ teamId: 1 })
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('Invalid report id')
+  })
+
+  it('assign: нечисловой teamId → 400', async () => {
+    const res = await request(adminApp([])).post('/api/admin/reports/1/assign').send({ teamId: 'x' })
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('Invalid team id')
+  })
+
+  it('assign: сбой БД → 500', async () => {
+    pool.query.mockRejectedValueOnce(new Error('boom'))
+    const res = await request(adminApp([])).post('/api/admin/reports/1/assign').send({ teamId: 2 })
+    expect(res.status).toBe(500)
+    expect(res.body.message).toBe('Failed to assign report')
+  })
+})
+
+describe('superAdminOnly: req.admin.teams не массив', () => {
+  function oddApp(teams) {
+    const app = express()
+    app.use(express.json())
+    app.use('/api/admin', (req, res, next) => { req.admin = { id: 9, role: 'admin', teams }; next() })
+    app.use('/api/admin', adminTeams)
+    return app
+  }
+
+  it('teams = undefined → трактуется как супер-админ (200)', async () => {
+    pool.query.mockResolvedValueOnce([{ insertId: 7 }, []])
+    const res = await request(oddApp(undefined)).post('/api/admin/teams').send({ name: 'Ok' })
+    expect(res.status).toBe(201)
+  })
+
+  it('teams = строка → непустой массив-ожидание ложно, но Array.isArray отсекает → супер-админ', async () => {
+    pool.query.mockResolvedValueOnce([{ insertId: 8 }, []])
+    const res = await request(oddApp('3')).post('/api/admin/teams').send({ name: 'Ok2' })
+    expect(res.status).toBe(201)
+  })
+})
