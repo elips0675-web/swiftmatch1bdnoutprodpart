@@ -37,29 +37,30 @@ export function PwaInstallBanner() {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
+    let showTimer: ReturnType<typeof setTimeout> | undefined;
+
     const tryShow = () => {
       if (isStandaloneMode) return;
       const dismissed = sessionStorage.getItem('pwa-install-dismissed');
       if (dismissed) return;
-      setTimeout(() => setIsVisible(true), isIosDevice ? 4000 : 2000);
+      showTimer = setTimeout(() => setIsVisible(true), isIosDevice ? 4000 : 2000);
     };
 
     const cookieConsent = localStorage.getItem('cookie-consent');
     if (cookieConsent) {
       tryShow();
-    } else {
-      const onConsent = () => {
-        setTimeout(() => setIsVisible(true), isIosDevice ? 4000 : 2000);
-      };
-      window.addEventListener('cookie-consent-accepted', onConsent);
       return () => {
+        if (showTimer) clearTimeout(showTimer);
         window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-        window.removeEventListener('cookie-consent-accepted', onConsent);
       };
     }
 
+    const onConsent = () => tryShow();
+    window.addEventListener('cookie-consent-accepted', onConsent);
     return () => {
+      if (showTimer) clearTimeout(showTimer);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('cookie-consent-accepted', onConsent);
     };
   }, []);
 
