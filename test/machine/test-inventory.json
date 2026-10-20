@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-20T13:31:59.952Z",
+  "generated": "2026-10-20T13:57:41.445Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -515,17 +515,17 @@
     ]
   },
   "server": {
-    "files": 140,
-    "tests": 2437,
-    "passed": 2437,
+    "files": 142,
+    "tests": 2458,
+    "passed": 2458,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 122
     },
     "product": {
-      "files": 135,
-      "tests": 2315
+      "files": 137,
+      "tests": 2336
     },
     "perFile": [
       {
@@ -889,8 +889,16 @@
         "tests": 13
       },
       {
+        "file": "server/src/__tests__/premium-checkout-stripe.test.js",
+        "tests": 5
+      },
+      {
         "file": "server/src/__tests__/premium-refund.test.js",
         "tests": 11
+      },
+      {
+        "file": "server/src/__tests__/premium-webhook-metadata.test.js",
+        "tests": 9
       },
       {
         "file": "server/src/__tests__/premium-webhook.test.js",
@@ -898,7 +906,7 @@
       },
       {
         "file": "server/src/__tests__/premium.test.js",
-        "tests": 17
+        "tests": 19
       },
       {
         "file": "server/src/__tests__/presence.test.js",
@@ -1058,7 +1066,7 @@
       },
       {
         "file": "server/src/__tests__/upload-s3.test.js",
-        "tests": 13
+        "tests": 18
       },
       {
         "file": "server/src/__tests__/upload.test.js",
@@ -1193,7 +1201,7 @@
     ]
   },
   "total": {
-    "files": 264,
-    "tests": 4046
+    "files": 266,
+    "tests": 4067
   }
 }

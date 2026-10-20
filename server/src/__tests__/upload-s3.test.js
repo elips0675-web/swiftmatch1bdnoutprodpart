@@ -1,18 +1,70 @@
 vi.hoisted(() => {
   process.env.JWT_SECRET = 'test-secret'
-  process.env.S3_BUCKET = 'swiftmatch-test'
-  process.env.AWS_ACCESS_KEY_ID = 'test-key'
-  process.env.AWS_SECRET_ACCESS_KEY = 'test-secret-key'
-  process.env.AWS_REGION = 'us-east-1'
-  process.env.S3_ENDPOINT = 'http://127.0.0.1:19001'
-})
+  process.env.S3_BUCKET = 'swiftmatch-test-bucket'
+  process.env.AWS_ACCESS_KEY_ID = 'AKIATEST'
+  process.env.AWS_SECRET_ACCESS_KEY = 'secret'
+  process.env.AWS_REGION = 'eu-central-1'
+  delete process.env.S3_ENDPOINT})
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 import request from 'supertest'
 import express from 'express'
 import jwt from 'jsonwebtoken'
 import fs from 'fs'
+import os from 'os'
 import path from 'path'
+
+const h = vi.hoisted(() => ({
+  sent: [],
+  sendImpl: null,
+  s3Configs: [],
+  storageOpts: [],
+}))
+
+class S3Client {
+  constructor(config) {
+    this.config = config
+    h.s3Configs.push(config)
+  }
+
+  send(cmd) {
+    h.sent.push(cmd)
+    if (h.sendImpl) return h.sendImpl(cmd)
+    return Promise.resolve({})
+  }
+}
+
+class GetObjectCommand {
+  constructor(input) {
+    this.__type = 'Get'
+    this.input = input
+  }
+}
+
+class PutObjectCommand {
+  constructor(input) {
+    this.__type = 'Put'
+    this.input = input
+  }
+}
+
+class DeleteObjectCommand {
+  constructor(input) {
+    this.__type = 'Delete'
+    this.input = input
+  }
+}
+
+vi.mock('@aws-sdk/client-s3', () => ({ S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand }))
+
+vi.mock('multer-s3', () => {
+  const factory = (opts) => {
+    h.storageOpts.push(opts)
+    return { __s3StorageOptions: opts }
+  }
+  factory.AUTO_CONTENT_TYPE = 'AUTO_CONTENT_TYPE'
+  return { default: factory }
+})
 
 vi.mock('../db.js', () => ({
   default: { query: vi.fn() },
@@ -30,57 +82,50 @@ vi.mock('../audit.js', () => ({
   softDeleteWhere: vi.fn(async () => {}),
 }))
 
-const { sendMock, GetObjectCommandMock, PutObjectCommandMock, DeleteObjectCommandMock } = vi.hoisted(() => {
-  const send = vi.fn(async () => ({}))
-  return {
-    sendMock: send,
-    GetObjectCommandMock: vi.fn(function (input) { this.input = input; this.kind = 'Get' }),
-    PutObjectCommandMock: vi.fn(function (input) { this.input = input; this.kind = 'Put' }),
-    DeleteObjectCommandMock: vi.fn(function (input) { this.input = input; this.kind = 'Delete' }),
-  }
-})
-
-vi.mock('@aws-sdk/client-s3', () => ({
-  S3Client: vi.fn(function () { this.send = sendMock }),
-  GetObjectCommand: GetObjectCommandMock,
-  PutObjectCommand: PutObjectCommandMock,
-  DeleteObjectCommand: DeleteObjectCommandMock,
-}))
-
-vi.mock('multer-s3', () => ({
-  default: Object.assign(
-    vi.fn(() => ({ s3: true })),
-    { AUTO_CONTENT_TYPE: 'binary/octet-stream' },
-  ),
-}))
-
-const { mockSingle } = vi.hoisted(() => {
-  const single = vi.fn()
-  return { mockSingle: single }
-})
-
-vi.mock('multer', () => ({
-  default: Object.assign(() => ({ single: () => mockSingle }), { diskStorage: vi.fn(() => ({})) }),
-}))
-
-const { processImageMock } = vi.hoisted(() => ({ processImageMock: vi.fn() }))
 vi.mock('../image-pipeline.js', () => ({
-  processImage: processImageMock,
-  getImageUrls: vi.fn((url) => ({ original: url, large: url + '_800x800.webp' })),
+  processImage: vi.fn(async () => []),
+  getImageUrls: vi.fn((url) => ({
+    original: url,
+    large: url + '_800x800.webp',
+    medium: url + '_400x400.webp',
+    small: url + '_200x200.webp',
+    thumbnail: url + '_100x100.webp',
+  })),
 }))
 
-const { moderateImageMock } = vi.hoisted(() => ({ moderateImageMock: vi.fn() }))
-vi.mock('../ai-moderation.js', () => ({ moderateImage: moderateImageMock }))
+vi.mock('../ai-moderation.js', () => ({
+  moderateImage: vi.fn(async () => ({ safe: true, source: 'ai', reasons: [] })),
+}))
+
+vi.mock('multer', () => {
+  const stub = () => ({
+    single: () => (req, _res, next) => {
+      req.file = {
+        filename: '1699999999999-123.jpg',
+        location: 'https://swiftmatch-test-bucket.s3.eu-central-1.amazonaws.com/uploads/1699999999999-123.jpg',
+        key: 'uploads/1699999999999-123.jpg',
+        originalname: 'me.jpg',
+        mimetype: 'image/jpeg',
+        size: 1024,
+      }
+      next()
+    },
+  })
+  return { default: stub }
+})
 
 import pool from '../db.js'
 import logger from '../logger.js'
-import { auditLog } from '../audit.js'
+import { processImage } from '../image-pipeline.js'
 import { moderateImage } from '../ai-moderation.js'
-import { processImage, getImageUrls } from '../image-pipeline.js'
+import { auditLog } from '../audit.js'
 import uploadRoutes, { s3KeyFromUrl } from '../routes/upload.js'
-const JWT_SECRET = process.env.JWT_SECRET
 
-const authHeader = (userId = 1) => 'Bearer ' + jwt.sign({ userId, role: 'user' }, JWT_SECRET, { expiresIn: '1h' })
+const JWT_SECRET = process.env.JWT_SECRET || 'test-secret'
+
+function authHeader(userId = 1) {
+  return 'Bearer ' + jwt.sign({ userId, role: 'user' }, JWT_SECRET, { expiresIn: '1h' })
+}
 
 function createApp() {
   const app = express()
@@ -89,176 +134,229 @@ function createApp() {
   return app
 }
 
-const app = createApp()
+function postPhoto(app) {
+  return request(app)
+    .post('/api/upload')
+    .set('Authorization', authHeader())
+    .attach('photo', Buffer.from('fake'), { filename: 'me.jpg', contentType: 'image/jpeg' })
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
-  process.env.NODE_ENV = 'test'
-  delete process.env.PHOTO_MODERATION_MODE
-  sendMock.mockImplementation(async (cmd) => {
-    if (cmd && cmd.kind === 'Get') return { Body: { transformToByteArray: async () => new Uint8Array([1, 2, 3]) } }
-    return {}
-  })
-  processImage.mockImplementation(async (filePath) => {
-    const dir = path.dirname(filePath)
-    const out = []
-    for (const name of ['out_800x800.webp', 'out.avif']) {
-      const p = path.join(dir, name)
-      fs.writeFileSync(p, 'x')
-      out.push({ path: p, format: name.endsWith('avif') ? 'avif' : 'webp' })
-    }
-    return out
-  })
-  moderateImage.mockResolvedValue({ safe: true, source: 'ai', reasons: [] })
+  pool.query.mockResolvedValue([{ insertId: 77 }, []])
+  h.sendImpl = null
+  h.sent.length = 0
 })
 
-function uploadWithFile(file = {}) {
-  mockSingle.mockImplementationOnce((req, res, cb) => {
-    req.file = {
-      key: 'uploads/1700000000-123.jpg',
-      location: 'http://swiftmatch-test.127.0.0.1:19001/uploads/1700000000-123.jpg',
-      filename: '1700000000-123.jpg',
-      ...file,
-    }
-    cb(null)
-  })
-  return request(app)
-    .post('/api/upload')
-    .set('Authorization', authHeader(3))
-    .attach('photo', Buffer.from('x'), { filename: 'a.jpg', contentType: 'image/jpeg' })
-}
+afterAll(() => {
+  vi.restoreAllMocks()
+})
 
-describe('USE_S3: загрузка (S3-ветка)', () => {
-  it('INSERT пишет S3 location как url, дальше качает оригинал и кладёт варианты', async () => {
-    pool.query.mockResolvedValue([{ insertId: 55 }])
-    const res = await uploadWithFile()
+describe('S3-режим upload.js: клиент, хранилище и пайплайн', () => {
+  const app = createApp()
+
+  it('при S3_BUCKET + ключах initStorage строится на multerS3, а не на диске', async () => {
+    const res = await postPhoto(app)
+
     expect(res.status).toBe(200)
-    expect(res.body.url).toBe('http://swiftmatch-test.127.0.0.1:19001/uploads/1700000000-123.jpg')
+    expect(res.body.url).toBe('https://swiftmatch-test-bucket.s3.eu-central-1.amazonaws.com/uploads/1699999999999-123.jpg')
 
-    const insert = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO user_photos'))
-    expect(insert[1][1]).toBe('http://swiftmatch-test.127.0.0.1:19001/uploads/1700000000-123.jpg')
+    const opts = h.storageOpts[0]
+    expect(opts.bucket).toBe('swiftmatch-test-bucket')
+    expect(opts.contentType).toBe('AUTO_CONTENT_TYPE')
+    expect(typeof opts.key).toBe('function')
+
+    expect(h.s3Configs[0]).toMatchObject({
+      region: 'eu-central-1',
+      credentials: { accessKeyId: 'AKIATEST', secretAccessKey: 'secret' },
+    })
+    expect(h.s3Configs[0].endpoint).toBeUndefined()
+
+    const generated = await new Promise((resolve) => opts.key({}, { originalname: '../../evil.PNG' }, (_e, value) => resolve(value)))
+    expect(generated).toMatch(/^uploads\/\d+-\d+\.PNG$/)
+    expect(generated).not.toContain('..')
   })
 
-  it('S3-обработка падает: ошибка логируется, ответ всё равно 200 (фото уже вставлено)', async () => {
-    pool.query.mockResolvedValue([{ insertId: 56 }])
-    sendMock.mockRejectedValueOnce(new Error('s3 down'))
-    const res = await uploadWithFile()
+  it('клиент S3 создаётся один раз на процесс (кэш s3ClientPromise)', async () => {
+    const res = await postPhoto(app)
+    expect(res.status).toBe(200)
+    expect(h.s3Configs.length).toBe(1)
+    expect(h.storageOpts.length).toBe(1)
+  })
+
+  it('S3-путь: GET оригинала, PUT вариантов и модерация', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sm-s3-variants-'))
+    const v1 = path.join(dir, 'v1.webp')
+    const v2 = path.join(dir, 'v2.avif')
+    fs.writeFileSync(v1, Buffer.from('webp-bytes'))
+    fs.writeFileSync(v2, Buffer.from('avif-bytes'))
+    processImage.mockResolvedValue([{ path: v1, format: 'webp' }, { path: v2, format: 'avif' }])
+    h.sendImpl = async (cmd) => {
+      if (cmd.__type === 'Get') return { Body: { transformToByteArray: async () => new Uint8Array([1, 2, 3]) } }
+      return {}
+    }
+
+    const res = await postPhoto(app)
+
+    expect(res.status).toBe(200)
+    expect(processImage).toHaveBeenCalled()
+    const types = h.sent.map((c) => c.__type)
+    expect(types[0]).toBe('Get')
+    expect(types.filter((t) => t === 'Put').length).toBe(2)
+    expect(h.sent[0].input).toMatchObject({ Bucket: 'swiftmatch-test-bucket', Key: 'uploads/1699999999999-123.jpg' })
+
+    const putWebp = h.sent.find((c) => c.__type === 'Put' && c.input.Key === 'uploads/v1.webp')
+    expect(putWebp.input.ContentType).toBe('image/webp')
+    const putAvif = h.sent.find((c) => c.__type === 'Put' && c.input.Key === 'uploads/v2.avif')
+    expect(putAvif.input.ContentType).toBe('image/avif')
+    expect(moderateImage).toHaveBeenCalled()
+
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('S3: падение GET логируется, ответ всё равно 200', async () => {
+    h.sendImpl = async () => {
+      throw new Error('s3 boom')
+    }
+
+    const res = await postPhoto(app)
+
     expect(res.status).toBe(200)
     expect(logger.error).toHaveBeenCalledWith('S3 file process error:', expect.any(Error))
   })
-})
 
-describe('updateModeration: вердикт AI после INSERT (S3)', () => {
-  it('safe=null / source=none → статус не трогается, только warn', async () => {
-    pool.query.mockResolvedValue([{ insertId: 60 }])
-    moderateImage.mockResolvedValueOnce({ safe: null, source: 'none', reasons: [] })
-    const res = await uploadWithFile()
-    expect(res.status).toBe(200)
-    const upd = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes("moderation_status = 'flagged'"))
-    expect(upd).toBeUndefined()
-    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('left unmoderated'))
-  })
+  it('S3: rejected-варианты логируются по индексу (пайплайн/модерация)', async () => {
+    processImage.mockRejectedValue(new Error('sharp boom'))
+    moderateImage.mockRejectedValue(new Error('ai boom'))
+    h.sendImpl = async (cmd) => {
+      if (cmd.__type === 'Get') return { Body: { transformToByteArray: async () => new Uint8Array([1]) } }
+      return {}
+    }
 
-  it('safe=false → flagged с причинами, аудит', async () => {
-    pool.query.mockResolvedValue([{ insertId: 61 }])
-    moderateImage.mockResolvedValueOnce({ safe: false, source: 'ai', reasons: ['nudity', 'violence'] })
-    const res = await uploadWithFile()
-    expect(res.status).toBe(200)
-    const upd = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes("moderation_status = 'flagged'"))
-    expect(upd).toBeTruthy()
-    expect(upd[1]).toEqual(['nudity, violence', 61])
-    expect(auditLog).toHaveBeenCalledWith(expect.objectContaining({
-      tableName: 'user_photos',
-      recordId: 61,
-      action: 'update',
-      newValues: { moderation_status: 'flagged', moderation_reason: 'nudity, violence' },
-      userId: 3,
-    }))
-  })
+    const res = await postPhoto(app)
 
-  it('safe=true → approved без причины', async () => {
-    pool.query.mockResolvedValue([{ insertId: 62 }])
-    moderateImage.mockResolvedValueOnce({ safe: true, source: 'ai', reasons: [] })
-    const res = await uploadWithFile()
-    expect(res.status).toBe(200)
-    const upd = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes("moderation_status = 'approved'"))
-    expect(upd).toBeTruthy()
-    expect(upd[1]).toEqual([62])
-    expect(auditLog).toHaveBeenCalledWith(expect.objectContaining({
-      tableName: 'user_photos',
-      recordId: 62,
-      action: 'update',
-      newValues: { moderation_status: 'approved', moderation_reason: null },
-    }))
-  })
-
-  it('пайплайн картинок падает, модерация ок → ошибка глотается, статус всё равно пишется', async () => {
-    pool.query.mockResolvedValue([{ insertId: 63 }])
-    processImage.mockRejectedValueOnce(new Error('sharp boom'))
-    moderateImage.mockResolvedValueOnce({ safe: true, source: 'ai', reasons: [] })
-    const res = await uploadWithFile()
     expect(res.status).toBe(200)
     expect(logger.error).toHaveBeenCalledWith('Image pipeline error:', expect.any(Error))
-    const upd = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].includes("moderation_status = 'approved'"))
-    expect(upd).toBeTruthy()
-  })
-
-  it('модерация падает → ошибка глотается, INSERT уже сделан', async () => {
-    pool.query.mockResolvedValue([{ insertId: 64 }])
-    moderateImage.mockRejectedValueOnce(new Error('ai boom'))
-    const res = await uploadWithFile()
-    expect(res.status).toBe(200)
     expect(logger.error).toHaveBeenCalledWith('AI moderation error:', expect.any(Error))
   })
-})
 
-describe('DELETE /api/photos/:id (S3-ветка)', () => {
-  it('удаляет оригинал и варианты через DeleteObjectCommand с ключами из s3KeyFromUrl', async () => {
+  it('S3: вердикт AI «небезопасно» помечает фото flagged, ответ 200', async () => {
+    moderateImage.mockResolvedValue({ safe: false, source: 'ai', reasons: ['nudity'] })
+    h.sendImpl = async (cmd) => {
+      if (cmd.__type === 'Get') return { Body: { transformToByteArray: async () => new Uint8Array([1]) } }
+      return {}
+    }
+
+    const res = await postPhoto(app)
+
+    expect(res.status).toBe(200)
+    const flagged = pool.query.mock.calls.find((c) => /moderation_status = 'flagged'/.test(String(c[0])))
+    expect(flagged).toBeTruthy()
+    expect(flagged[1]).toEqual(['nudity', 77])
+    expect(auditLog).toHaveBeenCalledTimes(2)
+  })
+
+  it('второй запрос использует уже готовый storage (ранний выход initStorage)', async () => {
+    const first = await postPhoto(app)
+    const second = await postPhoto(app)
+    expect(first.status).toBe(200)
+    expect(second.status).toBe(200)
+    expect(h.storageOpts.length).toBe(1)
+  })
+
+  it('S3-DELETE фото: объект и его варианты удаляются из бакета', async () => {
     pool.query
-      .mockResolvedValueOnce([[{ url: 'http://swiftmatch-test.127.0.0.1:19001/uploads/pic9.jpg' }]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }])
-    const res = await request(app).delete('/api/photos/9').set('Authorization', authHeader(3))
+      .mockResolvedValueOnce([[{ url: 'https://swiftmatch-test-bucket.s3.eu-central-1.amazonaws.com/uploads/7.jpg' }], []])
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []])
+    h.sendImpl = async () => ({})
+
+    const res = await request(app)
+      .delete('/api/photos/7')
+      .set('Authorization', authHeader())
+
     expect(res.status).toBe(200)
     expect(res.body).toEqual({ success: true })
-
-    const deleteCalls = sendMock.mock.calls.filter((c) => c[0] && c[0].kind === 'Delete')
-    expect(deleteCalls.length).toBe(2)
-    expect(deleteCalls[0][0].input.Key).toBe('uploads/pic9.jpg')
-    expect(deleteCalls[1][0].input.Key).toBe('uploads/pic9.jpg_800x800.webp')
-
-    const del = pool.query.mock.calls.find((c) => typeof c[0] === 'string' && c[0].startsWith('DELETE FROM user_photos'))
-    expect(del[1]).toEqual(['9', 3])
+    const deletes = h.sent.filter((c) => c.__type === 'Delete')
+    expect(deletes.length).toBe(5)
+    for (const cmd of deletes) expect(cmd.input.Bucket).toBe('swiftmatch-test-bucket')
+    expect(deletes[0].input.Key).toBe('uploads/7.jpg')
   })
 
-  it('падение S3 → 500', async () => {
-    pool.query.mockResolvedValueOnce([[{ url: 'http://swiftmatch-test.127.0.0.1:19001/uploads/pic9.jpg' }]])
-    sendMock.mockRejectedValueOnce(new Error('s3 down'))
-    const res = await request(app).delete('/api/photos/9').set('Authorization', authHeader(3))
+  it('S3-DELETE: нет своей фотографии -> 404, объекты не трогаются', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+
+    const res = await request(app)
+      .delete('/api/photos/999')
+      .set('Authorization', authHeader())
+
+    expect(res.status).toBe(404)
+    expect(h.sent.filter((c) => c.__type === 'Delete').length).toBe(0)
+  })
+
+  it('S3-DELETE: сбой удаления объекта -> 500', async () => {
+    pool.query.mockResolvedValueOnce([[{ url: 'uploads/8.jpg' }], []])
+    h.sendImpl = async () => {
+      throw new Error('s3 delete boom')
+    }
+
+    const res = await request(app)
+      .delete('/api/photos/8')
+      .set('Authorization', authHeader())
+
     expect(res.status).toBe(500)
-    expect(res.body.message).toBe('Delete failed')
+    expect(logger.error).toHaveBeenCalledWith('Delete photo error:', expect.any(Error))
+  })
+
+  it('GET /api/photos/:userId отдаёт одобренные фото', async () => {
+    const rows = [{ id: 3, url: '/uploads/a.jpg', sort_order: 0, is_avatar: 0 }]
+    pool.query.mockResolvedValueOnce([rows, []])
+
+    const res = await request(app)
+      .get('/api/photos/5')
+      .set('Authorization', authHeader())
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual(rows)
+  })
+
+  it('GET /api/photos/:userId при сбое БД -> 500', async () => {
+    pool.query.mockRejectedValueOnce(new Error('db down'))
+
+    const res = await request(app)
+      .get('/api/photos/5')
+      .set('Authorization', authHeader())
+
+    expect(res.status).toBe(500)
+    expect(logger.error).toHaveBeenCalledWith('Photos GET error:', expect.any(Error))
   })
 })
 
-describe('s3KeyFromUrl: дополнительные ветки', () => {
-  it('url без бакета в хосте и без ключа-бакета — ключ как есть', () => {
-    expect(s3KeyFromUrl('https://cdn.example.com/other/x.jpg', 'swiftmatch-test')).toBe('other/x.jpg')
+describe('s3KeyFromUrl — ключ из URL без WHATWG-парсера', () => {
+  it('virtual-hosted URL: ключ после хоста бакета', () => {
+    expect(s3KeyFromUrl('https://swiftmatch-test-bucket.s3.eu-central-1.amazonaws.com/uploads/7.jpg'))
+      .toBe('uploads/7.jpg')
   })
 
-  it('пустой bucket → path-style не срезает сегмент', () => {
-    expect(s3KeyFromUrl('http://127.0.0.1:19001/b/uploads/x.jpg', '')).toBe('b/uploads/x.jpg')
+  it('path-style URL: сегмент бакета в пути отбрасывается', () => {
+    expect(s3KeyFromUrl('http://127.0.0.1:19001/swiftmatch-test-bucket/uploads/7.jpg'))
+      .toBe('uploads/7.jpg')
   })
 
-  it('url без пути после хоста → ключ пустой строкой', () => {
-    expect(s3KeyFromUrl('http://example.com', 'swiftmatch-test')).toBe('')
+  it('path-style с IP и не-бакетным первым сегментом отдаёт путь как есть', () => {
+    expect(s3KeyFromUrl('http://127.0.0.1:19001/uploads/7.jpg', 'other-bucket'))
+      .toBe('uploads/7.jpg')
   })
-})
 
-describe('fileFilter (S3-ветка модуля)', () => {
-  it('getImageUrls вызывается с url из БД при удалении', async () => {
-    pool.query
-      .mockResolvedValueOnce([[{ url: '/uploads/z.jpg' }]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }])
-    await request(app).delete('/api/photos/1').set('Authorization', authHeader(3))
-    expect(getImageUrls).toHaveBeenCalledWith('/uploads/z.jpg')
+  it('без бакета (пустой аргумент) ключ берётся из пути', () => {
+    expect(s3KeyFromUrl('https://cdn.example.com/uploads/7.jpg', ''))
+      .toBe('uploads/7.jpg')
+  })
+
+  it('относительный /uploads/ приводится к ключу бакета', () => {
+    expect(s3KeyFromUrl('/uploads/7.jpg')).toBe('uploads/7.jpg')
+  })
+
+  it('URL без пути после хоста не бросает Invalid URL', () => {
+    expect(s3KeyFromUrl('http://bucket.127.0.0.1:19001')).toBe('')
   })
 })

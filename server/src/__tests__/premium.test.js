@@ -126,6 +126,26 @@ describe('POST /api/premium/create-checkout', () => {
   })
 })
 
+describe('ошибки БД на premium-роутах не отдают 200', () => {
+  it('GET /api/premium/my при сбое БД → 500', async () => {
+    pool.query.mockRejectedValue(new Error('db down'))
+    const res = await request(app)
+      .get('/api/premium/my')
+      .set('Authorization', `Bearer ${authToken()}`)
+    expect(res.status).toBe(500)
+    expect(res.body.message).toMatch(/failed to check/i)
+  })
+
+  it('POST /api/premium/cancel при сбое БД → 500', async () => {
+    pool.query.mockRejectedValue(new Error('db down'))
+    const res = await request(app)
+      .post('/api/premium/cancel')
+      .set('Authorization', `Bearer ${authToken()}`)
+    expect(res.status).toBe(500)
+    expect(res.body.message).toMatch(/failed to cancel/i)
+  })
+})
+
 describe('POST /api/premium/cancel', () => {
   it('requires auth', async () => {
     const res = await request(app).post('/api/premium/cancel')
