@@ -393,6 +393,25 @@ describe('POST /api/admin/hangouts/:id/merge', () => {
     expect(conn.release).toHaveBeenCalledTimes(1)
   })
 
+  it('без req.admin аудит пишет null в user_id, а не падает', async () => {
+    pool.query.mockResolvedValueOnce([[{ id: 2, merged_into: null }, { id: 1, merged_into: null }], []])
+    const conn = mockTransaction()
+    const bare = express()
+    bare.use(express.json())
+    bare.use('/api/admin', (req, res, next) => {
+      Object.defineProperty(req, 'ip', { value: '127.0.0.1', configurable: true })
+      next()
+    })
+    bare.use('/api/admin', adminHangouts)
+    const res = await request(bare).post('/api/admin/hangouts/2/merge').send({ mergeIntoId: 1 })
+    expect(res.status).toBe(200)
+
+    const audit = conn.query.mock.calls.find((c) => String(c[0]).startsWith('INSERT INTO audit_log'))
+    expect(audit).toBeDefined()
+    expect(audit[1][5]).toBeNull()
+    expect(audit[1][6]).toBe('127.0.0.1')
+  })
+
   it('ошибка в транзакции → 500 и rollback', async () => {
     pool.query.mockResolvedValueOnce([[{ id: 2, merged_into: null }, { id: 1, merged_into: null }], []])
     const conn = mockTransaction()

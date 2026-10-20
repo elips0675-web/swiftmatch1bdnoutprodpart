@@ -810,6 +810,36 @@ describe('Admin moderation', () => {
     expect(res.body[0].status).toBe('blocked')
   })
 
+  it('rejects a non-numeric id', async () => {
+    const res = await request(adminApp)
+      .put('/api/admin/hangouts/abc')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ status: 'blocked' })
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('Invalid id')
+    expect(pool.query).not.toHaveBeenCalled()
+  })
+
+  it('404 when the hangout does not exist (affectedRows 0)', async () => {
+    pool.query.mockResolvedValueOnce([{ affectedRows: 0 }, []])
+    const res = await request(adminApp)
+      .put('/api/admin/hangouts/999')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ status: 'blocked' })
+    expect(res.status).toBe(404)
+    expect(res.body.message).toBe('Hangout not found')
+  })
+
+  it('500 on DB error during update', async () => {
+    pool.query.mockRejectedValueOnce(new Error('db down'))
+    const res = await request(adminApp)
+      .put('/api/admin/hangouts/7')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ status: 'active' })
+    expect(res.status).toBe(500)
+    expect(res.body.message).toBe('Failed to update hangout')
+  })
+
   it('rejects invalid status', async () => {
     const res = await request(adminApp)
       .put('/api/admin/hangouts/7')
@@ -825,6 +855,15 @@ describe('Admin moderation', () => {
       .set('Authorization', `Bearer ${adminToken()}`)
     expect(res.status).toBe(200)
     expect(Array.isArray(res.body)).toBe(true)
+  })
+
+  it('GET отдаёт [], когда БД вернула null-строки', async () => {
+    pool.query.mockResolvedValueOnce([null, []])
+    const res = await request(adminApp)
+      .get('/api/admin/hangouts')
+      .set('Authorization', `Bearer ${adminToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual([])
   })
 })
 
