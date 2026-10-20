@@ -39,6 +39,7 @@ import {
   buildUnsubscribeUrl,
   listEmailRecipients,
   isUnsubscribeFeatureEnabled,
+  recordUnsubscribe,
 } from '../email-unsubscribe.js'
 
 const USER = { id: 5, email: 'User@Example.com' }
@@ -99,6 +100,36 @@ describe('токен отписки', () => {
     const url = buildUnsubscribeUrl(USER.id, USER.email)
     expect(url).toContain('/unsubscribe?u=5&t=')
     expect(url).toContain(unsubscribeToken(USER.id, USER.email))
+  })
+
+  it('отсутствующий email трактуется как пустая строка, токен всё равно детерминирован', () => {
+    const fromNull = unsubscribeToken(USER.id, null)
+    const fromUndefined = unsubscribeToken(USER.id, undefined)
+    const fromEmpty = unsubscribeToken(USER.id, '')
+    expect(fromNull).toBe(fromEmpty)
+    expect(fromUndefined).toBe(fromEmpty)
+    expect(fromNull).toMatch(/^[a-f0-9]{64}$/)
+  })
+})
+
+describe('запись отписки (recordUnsubscribe напрямую)', () => {
+  it('без userId и без причины пишет null и нормализованный email', async () => {
+    respond({ 'INSERT INTO email_unsubscribes': [[{ affectedRows: 1 }], []] })
+    await recordUnsubscribe({ email: '  Mixed@Case.COM ', reason: undefined })
+    const insert = pool.query.mock.calls.find(([sql]) => sql.includes('INSERT INTO email_unsubscribes'))
+    expect(insert[1]).toEqual([null, 'mixed@case.com', null])
+  })
+
+  it('пустая строка причины и не-строка дают null, длинная причина обрезается до 64', async () => {
+    respond({ 'INSERT INTO email_unsubscribes': [[{ affectedRows: 1 }], []] })
+    await recordUnsubscribe({ userId: 7, email: 'a@b.com', reason: '' })
+    expect(pool.query.mock.calls.at(-1)[1][2]).toBeNull()
+
+    await recordUnsubscribe({ userId: 7, email: 'a@b.com', reason: 12345 })
+    expect(pool.query.mock.calls.at(-1)[1][2]).toBeNull()
+
+    await recordUnsubscribe({ userId: 7, email: 'a@b.com', reason: 'x'.repeat(200) })
+    expect(pool.query.mock.calls.at(-1)[1][2]).toHaveLength(64)
   })
 })
 
