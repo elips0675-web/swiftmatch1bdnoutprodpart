@@ -1,0 +1,208 @@
+# Имитация ключей для локального Docker-прогона SwiftMatch
+> Дата: 20.10.2026. Назначение: поднять `docker compose` без реальных секретов
+> (Stripe/SMTP/Sentry/S3/Twilio/OpenAI/FCM/RevenueCat) и получить рабочий
+> стенд в режиме graceful-fallback / fail-closed. Файл НЕ для прода — только
+> для локальной проверки сборки/миграций/E2E в контейнерах.
+>
+> Правило: реальные секреты в репозиторий не коммитятся (`AGENTS.md`, раздел
+> "Никогда не коммитить .env с секретами"). Этот файл — шаблон + команды
+> генерации; итоговый `.env` попадает в `.gitignore`.
+
+=====================================================================
+1. ЧТО ДЕЛАЕТ КОД БЕЗ КЛЮЧЕЙ (справка, чтобы не гадать)
+=====================================================================
+- STRIPE_SECRET_KEY отсутствует → refuseMockPayment() отдаёт
+  503 {code:'STRIPE_NOT_CONFIGURED'} (server/src/routes/premium.js, hangouts.js).
+- SMTP_* отсутствует → mail.js деградирует в no-op, письмо не уходит,
+  но auth-роуты не падают (notify-failure.test.js:7).
+- SENTRY_DSN отсутствует → initSentry = false, capture* — no-op
+  (src/lib/sentry.ts).
+- AWS_*/S3_BUCKET отсутствуют → upload.js пишет на диск в
+  /app/server/uploads (том uploads_data в docker-compose.yml).
+- OPENAI_API_KEY отсутствует → icebreakers.js и ai-flows.ts идут в
+  DB-fallback.
+- FCM_SERVER_KEY отсутствует → push.job.js шлёт только web-push.
+- REVENUECAT_WEBHOOK_SECRET отсутствует → iap.js fail-closed,
+  вебхук отвечает 503 (питфолл 106).
+- TWILIO_* отсутствует → sms/send-code в mock-режиме.
+- REDIS_URL отсутствует → Bull-очереди (email/push/image) выключаются,
+  Socket.IO adapter — in-memory (питфолл 104).
+- JWT_SECRET < 32 символов или из списка INSECURE_JWT_SECRETS →
+  middleware.js в NODE_ENV=production бросает на старте.
+
+=====================================================================
+2. ГЕНЕРАЦИЯ СЛУЧАЙНЫХ ЗНАЧЕНИЙ (один раз)
+=====================================================================
+PowerShell (из корня репо):
+
+  # JWT_SECRET — минимум 32 символа, не из banned-списка
+  $jwt = -join ((65..90) + (97..122) + (48..57) | Get-Random -Count 64 | % {[char]$_})
+  Write-Host "JWT_SECRET=$jwt"
+
+  # VAPID — пара для web-push (публичный можно светить, приватный — нет)
+  npx web-push generate-vapid-keys
+  # Скопировать Public Key и Private Key из вывода.
+  # ВНИМАНИЕ: прежний VAPID_PRIVATE_KEY скомпрометирован (коммит e8b26bf,
+  # питфолл 47). Для локального Docker — любая свежая пара; для прода —
+  # только ротация на VPS (решение владельца, L1).
+
+  # REVENUECAT_WEBHOOK_SECRET — любая случайная строка ≥ 24 символов
+  # (для локального E2E iap-webhook.spec.ts, питфолл 106)
+  $rc = -join ((65..90) + (97..122) + (48..57) | Get-Random -Count 32 | % {[char]$_})
+  Write-Host "REVENUECAT_WEBHOOK_SECRET=$rc"
+
+=====================================================================
+3. ШАБЛОН .env (корень репо, рядом с docker-compose.yml)
+=====================================================================
+Создать файл `.env` в корне (НЕ коммитить — он в .gitignore).
+Значения ниже — безопасные mock/локальные; комментарии поясняют, где
+реальные ключи нужны обязательно.
+
+# ---- База данных (совпадает с docker-compose.yml: db-сервис) ----
+DB_HOST=db
+DB_PORT=3306
+DB_USER=swiftmatch
+DB_PASSWORD=swiftmatch_dev_password
+DB_NAME=swiftmatch
+MYSQL_ROOT_PASSWORD=swiftmatch_root_password
+
+# ---- Redis (совпадает с docker-compose.yml: redis-сервис) ----
+REDIS_URL=redis://redis:6379
+
+# ---- JWT (обязательно ≥ 32 символов, не change-me/meetup/...) ----
+JWT_SECRET=<вставить сгенерированный в п.2>
+JWT_REFRESH_EXPIRES_DAYS=7
+JWT_ACCESS_EXPIRES_MIN=15
+
+# ---- VAPID (web-push, сгенерировать в п.2) ----
+VAPID_PUBLIC_KEY=<вставить>
+VAPID_PRIVATE_KEY=<вставить>
+VAPID_MAILTO=mailto:noreply@swiftmatch.local
+
+# ---- IAP / RevenueCat (локальный E2E, любое ≥ 24 символов) ----
+REVENUECAT_WEBHOOK_SECRET=<вставить сгенерированный в п.2>
+
+# ---- Stripe: намеренно НЕ задаём → fail-closed 503 ----
+# STRIPE_SECRET_KEY=
+# STRIPE_WEBHOOK_SECRET=
+# STRIPE_LIVE=false
+
+# ---- SMTP: намеренно НЕ задаём → mail.js no-op ----
+# SMTP_HOST=
+# SMTP_PORT=587
+# SMTP_USER=
+# SMTP_PASS=
+# SMTP_FROM=noreply@swiftmatch.local
+
+# ---- Sentry: намеренно НЕ задаём → no-op ----
+# SENTRY_DSN=
+
+# ---- S3: намеренно НЕ задаём → локальный /app/server/uploads ----
+# S3_BUCKET=
+# AWS_ACCESS_KEY_ID=
+# AWS_SECRET_ACCESS_KEY=
+# AWS_REGION=eu-central-1
+
+# ---- OpenAI / Rekognition / FCM / Twilio: намеренно НЕ задаём ----
+# OPENAI_API_KEY=
+# AWS_REKOGNITION_REGION=
+# FCM_SERVER_KEY=
+# TWILIO_ACCOUNT_SID=
+# TWILIO_AUTH_TOKEN=
+# TWILIO_VERIFY_SERVICE_SID=
+
+# ---- CORS / доверие прокси (для nginx в docker) ----
+CORS_ORIGIN=http://localhost:8081
+TRUST_PROXY=uniquelocal
+NODE_ENV=production
+
+# ---- Админ (первый вход после seed.js) ----
+ADMIN_EMAIL=admin@mail.ru
+
+=====================================================================
+4. ЗАПУСК
+=====================================================================
+Из корня репо:
+
+  # 1. Собрать и поднять
+  docker compose up -d --build
+
+  # 2. Дождаться health (compose использует --wait в deploy.yml,
+  #    локально — руками)
+  docker compose ps
+  docker compose logs -f app
+  # Ждать строку: "Server listening on 3002" и "redis: live" в /health
+
+  # 3. Проверить, что миграции применились
+  docker compose exec app node database/migrations/migrate.js
+
+  # 4. Проверить, что сид демо-данных накатился
+  docker compose exec app node server/src/seed.js
+
+  # 5. Health-check
+  curl -sS http://localhost:3002/health | python -m json.tool
+  # Ожидаемо: db=ok, redis=live, integrations={stripe:mock, smtp:mock, ...}
+
+  # 6. Фронт
+  curl -sS -o /dev/null -w "%{http_code}\n" http://localhost:8081/
+  # 200
+
+=====================================================================
+5. ПРОВЕРКА, ЧТО FALLBACK РАБОТАЕТ (а не молча сломан)
+=====================================================================
+  # Stripe fail-closed: покупка без ключа → 503 с code, не сырой message
+  curl -sS -X POST http://localhost:3002/api/premium/checkout \
+    -H "Authorization: Bearer <токен>" \
+    -H "Content-Type: application/json" \
+    -d '{"tier":"gold","duration_months":1}'
+  # Ожидаемо: 503 {"code":"STRIPE_NOT_CONFIGURED"}
+
+  # IAP webhook без секрета → 401 (а не 500)
+  curl -sS -X POST http://localhost:3002/api/iap/webhook \
+    -H "Content-Type: application/json" -d '{}'
+  # Ожидаемо: 401
+
+  # Очереди живы (REDIS_URL задан)
+  curl -sS http://localhost:3002/api/admin/queues \
+    -H "Authorization: Bearer <admin-токен>"
+  # Ожидаемо: redisConfigured:true, три очереди enabled
+
+=====================================================================
+6. ЧТО ОСТАЁТСЯ В MOCK (и это ОК для локального прогона)
+=====================================================================
+- Платежи (Stripe, RevenueCat) — refuseMockPayment, 503.
+- Почта — no-op, письма не уходят, но auth не падает.
+- Push FCM — только web-push через VAPID.
+- AI-модерация фото — эвристика fallback, Rekognition не вызывается.
+- SMS — mock-режим, код пишется в лог, не уходит.
+- S3 — фото на диске в томе uploads_data (переживёт `docker compose down`).
+- Sentry — capture* no-op, ошибки только в stdout контейнера.
+
+Для полноценного E2E с реальными платежами/почтой/SMS — подставить
+настоящие ключи из "Ждёт действий пользователя" (`Что доделать.txt`).
+
+=====================================================================
+7. ОЧИСТКА
+=====================================================================
+  docker compose down -v        # удалит контейнеры + volumes (db_data,
+                                # redis_data, uploads_data) — демо-данные
+                                # потеряются, при следующем up seed.js
+                                # накатит заново.
+  rm .env                       # если больше не нужно
+
+=====================================================================
+8. ЛОВУШКИ (из питфоллов проекта)
+=====================================================================
+- Не использовать `JWT_SECRET=change-me-to-a-long-random-secret` —
+  middleware.js в production бросит на INSECURE_JWT_SECRETS.
+- Не писать `REDIS_URL=redis://localhost:6379` — внутри Docker сеть
+  своя, хост Redis называется `redis` (имя сервиса в compose).
+- Не коммитить `.env` — только `.env.example` (публичные плейсхолдеры).
+- Не путать с `server/.env` — compose читает корневой `.env` через
+  `env_file: - .env` (docker-compose.yml:83-84).
+- Если API стартует, но `/health` показывает `redis: "mock"` — значит
+  REDIS_URL не попал в контейнер (проверить `docker compose config`).
+- VAPID_PRIVATE_KEY из этого файла — для локального теста; если
+  браузер уже подписан на старый публичный ключ — подписки перестанут
+  приходить, нужно переподписаться (это и есть причина, почему в
+  проде ключ ротируют один раз и навсегда).

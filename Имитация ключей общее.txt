@@ -1,0 +1,345 @@
+# Имитация ключей для локального Docker-прогона SwiftMatch — свод (Qwen + дипсик)
+
+> Дата: **20.10.2026**. Назначение: поднять `docker compose` **без реальных секретов**
+> (Stripe / SMTP / Sentry / S3 / Twilio / OpenAI / FCM / RevenueCat / VAPID) и получить
+> рабочий стенд в режиме graceful-fallback / fail-closed — только для локальной
+> проверки сборки, миграций и E2E в контейнерах. **Файл не для прода.**
+>
+> Источники: «Имитация ключей Qwen.txt» (шаблон `.env` + команды) и «Имитация ключей
+> дипсик.txt» (режимы dev/prod, таблица сервисов, чек-лист). Расхождения сведены по
+> коду (см. раздел 10 «Расхождения, снятые кодом») — там, где файлы противоречат друг
+> другу, выбран вариант, подтверждённый `docker-compose.yml` и `server/src/middleware.js`.
+>
+> Правило проекта: реальные секреты в репозиторий не коммитятся (`AGENTS.md`,
+> «Никогда не коммитить `.env` с секретами»). Этот файл — шаблон + команды генерации;
+> сам `.env` попадает в `.gitignore`. Этот txt в репозиторий тоже не коммитить:
+> правдоподобные значения ловит `secrets-leak-audit` (канал «значения в текстах»).
+>
+> Связь с «Оценка доработка общее.txt» — раздел 6 той оценки и раздел 11 здесь.
+
+=====================================================================
+0. КОРОТКО
+=====================================================================
+«Имитация ключей» для Docker — это **не подстановка фейковых токенов**. Фейковый
+Stripe/OpenAI-ключ всё равно уйдёт в сеть и вернёт 401/403 от чужого API — это
+не имитация, а шум, и диагностика становится хуже, чем при пустом значении.
+
+**Правильная имитация — оставить переменную ПУСТОЙ.** Приложение само уйдёт в
+mock/fallback, а в проде — в честный fail-closed-отказ с кодом.
+
+Исключений ровно два:
+  1) **JWT_SECRET** — без него сервер не стартует в production: `server/src/middleware.js:35-48`
+     отвергает плейсхолдеры (`INSECURE_JWT_SECRETS`, включая `change-me-to-a-long-random-secret`
+     и `change-me-in-production`) и секреты короче 32 символов;
+  2) **VAPID_*** — только если нужен **реальный** web-push. Если не нужен — тоже можно
+     оставить пустыми (push уйдёт в mock, подписки не создаются, ошибок не будет).
+
+Всё остальное: пусто = mock (dev) / fail-closed (prod).
+
+=====================================================================
+1. ГДЕ ЖИВЁТ .env ДЛЯ DOCKER (проверено по коду)
+=====================================================================
+`docker-compose.yml`, сервис `app`:
+  env_file:            (строки 89-90) — читается КОРНЕВОЙ `.env` (в корне репо)
+  environment:         (строки 91-104) — перекрывает env_file:
+      PORT: 3002
+      DB_HOST: db
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: swiftmatch1bd
+      NODE_ENV: production
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
+      REDIS_URL: redis://redis:6379
+
+Следствия (все — по коду, а не по памяти):
+  - **Корневой `.env` и `server/.env` — два разных файла.** Docker читает корневой
+    (compose, `docker-compose.yml:90`); локальный запуск (`node server/src/index.js`)
+    читает `server/.env`. В контейнер `server/.env` не едет. Не путать.
+  - **`DB_*`, `NODE_ENV`, `REDIS_URL`, `CORS_ORIGIN` (частично) compose задаёт сам**
+    (`environment:`, строки 91-104) и перекрывает то, что лежит в корневом `.env`.
+    Писать их в `.env` можно, но они не действуют так, как выглядит.
+  - **`NODE_ENV` в корневом `.env` НЕ переключает режим** — compose жёстко ставит
+    `NODE_ENV: production` (строка 98). Чтобы получить dev-режим контейнера, нужно
+    править `docker-compose.yml`, а не `.env`. (дипсик предлагал «меняется только
+    NODE_ENV» — код это опровергает, см. раздел 10.)
+  - **`CORS_ORIGIN` в проде задавать обязательно** (fail-fast без него); для nginx в
+    compose фронт слушает хост-порт **8080** (`docker-compose.yml:124` `"8080:80"`),
+    значит `CORS_ORIGIN=http://localhost:8080`. Порт **8081** — это локальный Vite
+    preview (`запуск-всего.bat`), не Docker.
+  - `.env` — в `.gitignore`. Коммитить нельзя.
+
+=====================================================================
+2. ДВА РЕЖИМА: DEV-МОК И PROD-FAIL-CLOSED
+=====================================================================
+Режим A (NODE_ENV=development — вне Docker, локальный `server/.env`):
+  - mock-платежи живы: checkout без Stripe выдаёт подписку;
+  - OpenAI -> fallback из БД; почта -> лог; push/SMS -> mock;
+  - S3 -> локальный диск (volume `uploads_data`); Redis недоступен -> in-memory, без 500.
+  Подходит, чтобы гонять UI и сквозные флоу без ключей.
+
+Режим B (NODE_ENV=production — так контейнер и стартует, `docker-compose.yml:98`):
+  - Stripe: fail-closed, `502/503` с `code:STRIPE_NOT_CONFIGURED` (в т.ч. при
+    `STRIPE_LIVE=true` без ключа);
+  - RevenueCat webhook: `503` без секрета;
+  - SMTP/OpenAI/S3/FCM/Twilio/Sentry: тихий mock/fallback;
+  - метрика `integration_mode{service,mode,env}` показывает `mock`/`live`/`unavailable`.
+  Подходит, чтобы проверить «как в проде, но без ключей».
+
+В Docker всегда режим B (compose ставит `NODE_ENV=production`). Один и тот же
+корневой `.env`; чтобы сменить режим контейнера — править `docker-compose.yml`.
+
+=====================================================================
+3. ШАБЛОН КОРНЕВОГО .env ДЛЯ DOCKER
+=====================================================================
+Скопировать в файл `.env` в корне репо (НЕ коммитить — он в `.gitignore`).
+Пустое значение после `=` — это и есть имитация. Комментарии поясняют, где нужен
+реальный ключ.
+
+# ---- Обязательное (единственное) ----
+JWT_SECRET=<сгенерировать в п.4: randomBytes(32).toString('hex')>
+
+# ---- Перекрывается compose, но полезно видеть глазами ----
+# NODE_ENV=production        # compose ставит сам (docker-compose.yml:98)
+# PORT=3002
+# CORS_ORIGIN=http://localhost:8080   # для nginx в compose (порт 8080)
+# REDIS_URL=redis://redis:6379
+# DB_HOST=db
+# DB_USER=root
+# DB_PASSWORD=root
+# DB_NAME=swiftmatch1bd
+
+# ---- Платежи: пусто = mock (dev) / fail-closed (prod) ----
+# STRIPE_SECRET_KEY=
+# STRIPE_WEBHOOK_SECRET=
+# STRIPE_LIVE=false
+
+# ---- Почта: пусто = письма в лог ----
+# SMTP_HOST=
+# SMTP_PORT=
+# SMTP_USER=
+# SMTP_PASS=
+# SMTP_FROM=noreply@swiftmatch.local
+
+# ---- Ошибки: пусто = no-op (initSentry=false) ----
+# SENTRY_DSN=
+
+# ---- Фото/S3: пусто = локальный диск + volume uploads_data ----
+# AWS_ACCESS_KEY_ID=
+# AWS_SECRET_ACCESS_KEY=
+# AWS_REGION=
+# S3_BUCKET=
+# S3_ENDPOINT=
+
+# ---- AI: пусто = fallback из БД ----
+# OPENAI_API_KEY=
+
+# ---- Push Android: пусто = mock ----
+# FCM_SERVER_KEY=
+# FCM_SERVICE_ACCOUNT=       # принимает base64/JSON/путь к файлу
+
+# ---- IAP: пусто = 503 на webhook ----
+# REVENUECAT_WEBHOOK_SECRET=
+# Для живого локального E2E iap-webhook.spec.ts — сгенерировать ≥24 символов (п.4).
+
+# ---- SMS: пусто = mock ----
+# TWILIO_ACCOUNT_SID=
+# TWILIO_AUTH_TOKEN=
+# TWILIO_VERIFY_SERVICE_SID=
+# TWILIO_PHONE_NUMBER=
+
+# ---- Web-push: пусто = mock. Нужен реальный — см. п.5 ----
+# VAPID_PUBLIC_KEY=
+# VAPID_PRIVATE_KEY=
+# VITE_VAPID_PUBLIC_KEY=     # тот же публичный ключ, для фронта
+
+Важно: не вписывать «sk_test_fake», «AKIAFAKE» и т.п. — приложение сходит с ними
+в сеть и получит 401/403; пустое значение — штатный режим mock, задокументированный
+в README.
+
+=====================================================================
+4. ГЕНЕРАЦИЯ СЛУЧАЙНЫХ ЗНАЧЕНИЙ (один раз)
+=====================================================================
+JWT_SECRET — минимум 32 символа, не из banned-списка:
+
+Windows (cmd/PowerShell, Node 22+):
+  node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+Linux/macOS:
+  node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+Обычный `randomBytes(32).toString('hex')` = 64 символа — проходит. Требования
+`server/src/middleware.js:35-48` в production: длина >= 32; не плейсхолдер
+(`change-me*`, `example*`, `your-*`, `dummy`, `sample`); не из `INSECURE_JWT_SECRETS`
+(в т.ч. `change-me-to-a-long-random-secret` из `.env.example`).
+
+REVENUECAT_WEBHOOK_SECRET — любая случайная строка ≥ 24 символов (для локального
+E2E `iap-webhook.spec.ts`, питфолл 106):
+  node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
+
+=====================================================================
+5. VAPID — только если нужен реальный web-push
+=====================================================================
+Ключи нельзя «нафантазировать»: браузер проверяет подпись.
+  npx web-push generate-vapid-keys
+Вывод: Public Key / Private Key (длинные base64url-строки). Куда:
+  VAPID_PUBLIC_KEY=<Public Key>
+  VITE_VAPID_PUBLIC_KEY=<Public Key>   (тот же публичный, для фронта)
+  VAPID_PRIVATE_KEY=<Private Key>
+  VAPID_MAILTO=mailto:noreply@swiftmatch.local
+Если push не нужен — оставить все пустыми (приложение уйдёт в mock).
+
+ВНИМАНИЕ: прежний `VAPID_PRIVATE_KEY` скомпрометирован (коммит `e8b26bf`, питфолл 47).
+Для локального Docker — любая свежая пара; для прода — **только ротация на VPS**
+(решение владельца, L1). История git не переписывается.
+
+=====================================================================
+6. ЗАПУСК
+=====================================================================
+Из корня репо:
+  # 1. Собрать и поднять (ждать health — локально --wait помогает)
+  docker compose up -d --build --wait
+
+  # 2. Статус и логи
+  docker compose ps
+  docker compose logs -f app
+  # Ждать: "Server listening on 3002" и redis: live в /health
+
+  # 3. Миграции и сид демо-данных
+  docker compose exec app node database/migrations/migrate.js
+  docker compose exec app node server/src/seed.js
+
+  # 4. Health API и nginx
+  curl -sS http://localhost:3002/health
+  curl -sS http://localhost:8080/healthz        # nginx, location = /healthz (nginx/swiftmatch.http.conf:36)
+  # Ожидаемо: db=ok, redis=live, integrations={stripe:mock, smtp:mock, ...}
+
+  # 5. Фронт через nginx
+  curl -sS -o /dev/null -w "%{http_code}\n" http://localhost:8080/
+  # 200
+
+=====================================================================
+7. ПРОВЕРКА, ЧТО ИМИТАЦИЯ ВКЛЮЧИЛАСЬ (а не молча сломан)
+=====================================================================
+  # Что реально уедет в контейнер (без секретов в выводе)
+  docker compose config
+
+  # Stripe fail-closed: покупка без ключа → 503 с code, не сырой message
+  curl -sS -X POST http://localhost:3002/api/premium/checkout \
+    -H "Authorization: Bearer <токен>" -H "Content-Type: application/json" \
+    -d '{"tier":"gold","duration_months":1}'
+  # Ожидаемо: 503 {"code":"STRIPE_NOT_CONFIGURED"}
+
+  # IAP webhook без секрета → 401 (а не 500)
+  curl -sS -X POST http://localhost:3002/api/iap/webhook \
+    -H "Content-Type: application/json" -d '{}'
+  # Ожидаемо: 401
+
+  # Очереди живы (REDIS_URL задан)
+  curl -sS http://localhost:3002/api/admin/queues -H "Authorization: Bearer <admin-токен>"
+  # Ожидаемо: redisConfigured:true, три очереди enabled
+
+  # Дашборд интеграций (под adminAuth)
+  curl -sS http://localhost:3002/api/admin/health -H "Authorization: Bearer <admin-токен>"
+  # Показывает MySQL/Redis/SMTP/Stripe/OpenAI/FCM и режим каждого
+
+  # Prometheus (если поднят, :9090)
+  # integration_mode{service="stripe",mode="mock"} — имена из server/src/metrics.js
+
+  # Логи: если "Redis not configured" — REDIS_URL не подхватился (тихий fallback, не 500)
+  docker compose logs app | findstr /I "queue redis mock fallback"
+
+=====================================================================
+8. ЧТО ОСТАЁТСЯ В MOCK (и это ОК для локального прогона)
+=====================================================================
+- Платежи (Stripe, RevenueCat) — refuseMockPayment, 503.
+- Почта — no-op, письма не уходят, но auth-роуты не падают.
+- Push FCM — только web-push через VAPID.
+- AI-модерация фото — эвристика fallback, Rekognition не вызывается.
+- SMS — mock-режим, код в лог, не уходит.
+- S3 — фото на диске в томе `uploads_data` (переживёт `docker compose down`).
+- Sentry — capture* no-op, ошибки только в stdout контейнера.
+
+Для полноценного E2E с реальными платежами/почтой/SMS — подставить настоящие ключи
+из «Ждёт действий пользователя» (`Что доделать.txt`, ENV-01).
+
+=====================================================================
+9. ОЖИДАЕМОЕ ПОВЕДЕНИЕ ПО СЕРВИСАМ
+=====================================================================
+Сервис        | Переменные              | Без ключа
+--------------|-------------------------|--------------------------------------------
+Stripe        | STRIPE_SECRET_KEY       | dev: mock checkout выдаёт подписку
+              |                         | prod: 502/503 STRIPE_NOT_CONFIGURED
+Stripe hook   | STRIPE_WEBHOOK_SECRET   | prod: отказ; dev: вебхук не нужен
+RevenueCat    | REVENUECAT_WEBHOOK_...  | 503 на webhook
+SMTP          | SMTP_*                  | письма в лог, регистрация жива
+OpenAI        | OPENAI_API_KEY          | fallback из БД (icebreakers)
+S3            | AWS_*/S3_BUCKET         | локальный диск + volume uploads_data
+FCM           | FCM_*                   | mock
+Twilio        | TWILIO_*                | mock
+Sentry        | SENTRY_DSN              | no-op (init вернёт false)
+Redis         | REDIS_URL               | in-memory, очереди выключены молча
+VAPID         | VAPID_*                 | push mock, подписки не создаются
+JWT           | JWT_SECRET              | prod: сервер НЕ стартует
+              |                         | dev: стартует с dev-секретом
+
+=====================================================================
+10. РАСХОЖДЕНИЯ, СНЯТЫЕ КОДОМ (Qwen vs дипсик)
+=====================================================================
+1. DB_USER/DB_NAME: qwen писал `swiftmatch`/`swiftmatch`; дипсик — `root`/`swiftmatch1bd`
+   (и добавлял «compose перекроет сам»). Факт: `docker-compose.yml:94,96` —
+   `DB_USER: root`, `DB_NAME: swiftmatch1bd`. **Прав дипсик.**
+2. NODE_ENV: qwen ставил `production`, дипсик предлагал переключать режим через
+   `NODE_ENV` в `.env`. Факт: `docker-compose.yml:98` жёстко ставит `NODE_ENV: production`
+   и перекрывает `env_file` — **режим контейнера через `.env` не переключить**, правы
+   оба частично: контейнер всегда prod-режим.
+3. CORS_ORIGIN/порт: qwen — `8081`, дипсик — `8080`. Факт: nginx в compose слушает
+   хост-порт `8080` (`docker-compose.yml:124` `"8080:80"`); `8081` — локальный Vite
+   preview. Для Docker верно `http://localhost:8080`. **Прав дипсик** для Docker;
+   qwen прав для локального запуска (`server/.env`, порт 8081).
+4. `.env.example` держит `DB_NAME=swiftmatch` и `change-me-to-a-long-random-secret` —
+   это плейсхолдер локального (не docker) контура; для Docker всё перекрывает compose.
+5. Оба файла верны в главном: **пустое значение = имитация; фейковый токен — нет.**
+
+=====================================================================
+11. ЛОВУШКИ (из питфоллов проекта)
+=====================================================================
+- Не использовать `JWT_SECRET=change-me-to-a-long-random-secret` — `middleware.js`
+  в production бросит на `INSECURE_JWT_SECRETS`.
+- Не писать `REDIS_URL=redis://localhost:6379` — внутри Docker сеть своя, хост Redis
+  называется `redis` (имя сервиса в compose).
+- Не коммитить `.env` — только `.env.example` (публичные плейсхолдеры).
+- Не путать `server/.env` (локальный `node src/index.js`) и корневой `.env` (compose,
+  `docker-compose.yml:90`).
+- Если `/health` показывает `redis: "mock"` — `REDIS_URL` не попал в контейнер
+  (проверить `docker compose config`).
+- `check-keys.ps1` читает `server/.env`, а не корневой — на docker-контуре выйдет 1,
+  это ожидаемо.
+- Не ставить `STRIPE_LIVE=true` без ключа: тоже fail-closed, просто с другим сообщением.
+- VAPID_PRIVATE_KEY — для локального теста; в проде ротируют один раз и навсегда.
+
+=====================================================================
+12. БЫСТРЫЙ ЧЕК-ЛИСТ
+=====================================================================
+[ ] `.env` в корне репозитория (не `server/.env`)
+[ ] `JWT_SECRET` сгенерирован `randomBytes(32)` и вставлен (>= 32, не плейсхолдер)
+[ ] Все остальные ключи — пустые (это и есть имитация)
+[ ] Понимаю, что контейнер стартует в `NODE_ENV=production` (compose), а не из `.env`
+[ ] `CORS_ORIGIN=http://localhost:8080` (nginx в compose)
+[ ] `REDIS_URL=redis://redis:6379` (иначе очередь молчит)
+[ ] `docker compose config` — глазами проверить, что не уехало
+[ ] `docker compose up -d --build --wait`
+[ ] `curl /health` на 3002 и `/healthz` на 8080
+[ ] `/api/admin/health` — дашборд интеграций
+[ ] В логах нет неожиданных "not configured" там, где ждёшь mock
+[ ] `.env` не в `git status`
+
+=====================================================================
+13. СВЯЗЬ С «ОЦЕНКА ДОРАБОТКА ОБЩЕЕ»
+=====================================================================
+- «Оценка доработка общее.txt» (раздел 6) ссылается на этот свод: правильная имитация
+  = пустая переменная, исключения — `JWT_SECRET` (и VAPID при живом push).
+- Что дописать в «Что доделать»: (1) ENV-01 — приложить этот файл как «как поднять
+  стенд без ключей»; (2) отдельной строкой — правило «имитация = пустая переменная,
+  фейковый токен не имитация» с `file:line` на `refuseMockPayment`; (3) CI-01 —
+  подтвердить зелёный `ci.yml`/`deploy.yml` на `main` после проброса секретов.
+
+Конец файла. Сохранить как DOCKER-MOCK-KEYS.txt (UTF-8), в репозиторий не коммитить.
