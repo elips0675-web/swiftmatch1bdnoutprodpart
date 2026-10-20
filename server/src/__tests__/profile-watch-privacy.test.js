@@ -278,3 +278,183 @@ describe('GET /api/users/watching', () => {
     expect(logger.error).toHaveBeenCalledWith('Watching list error:', expect.any(Error))
   })
 })
+
+describe('PUT /api/profile/:id: ники и локация в историю и UPDATE (ветки :723-739)', () => {
+  function auditInsertCall() {
+    return pool.query.mock.calls.find(
+      (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO audit_log'),
+    )
+  }
+
+  it('все текстовые поля и гео доезжают до UPDATE, а в историю попадает только they были присланы', async () => {
+    const before = {
+      id: 1,
+      name: 'OldName',
+      city: 'OldCity',
+      country: 'OldCountry',
+      education: null,
+      dating_goal: null,
+      zodiac: null,
+      circadian: null,
+      attachment_style: null,
+      passport_city: null,
+      passport_lat: null,
+      passport_lng: null,
+    }
+    pool.query
+      .mockResolvedValueOnce([[before], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ id: 1, display_name: 'Test' }], []])
+
+    const res = await request(app)
+      .put('/api/profile/1')
+      .set(as())
+      .send({
+        name: 'NewName',
+        city: 'NewCity',
+        country: 'NewCountry',
+        education: 'MSU',
+        dating_goal: 'serious',
+        zodiac: 'leo',
+        circadian: 'owl',
+        attachment_style: 'secure',
+        passport_city: 'Berlin',
+        passport_lat: 52.5,
+        passport_lng: 13.4,
+      })
+    expect(res.status).toBe(200)
+
+    const update = pool.query.mock.calls.find((c) => String(c[0]).includes('UPDATE user_profiles SET'))
+    expect(update[1].slice(0, 21)).toEqual([
+      undefined,
+      'NewName',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'serious',
+      undefined,
+      'NewCity',
+      undefined,
+      undefined,
+      'Berlin',
+      52.5,
+      13.4,
+      'NewCountry',
+      'leo',
+      'owl',
+      'secure',
+      'MSU',
+      '1',
+    ])
+
+    const call = auditInsertCall()
+    expect(JSON.parse(call[1][4])).toEqual({
+      name: 'NewName',
+      city: 'NewCity',
+      country: 'NewCountry',
+      education: 'MSU',
+      dating_goal: 'serious',
+      zodiac: 'leo',
+      circadian: 'owl',
+      attachment_style: 'secure',
+      passport_city: 'Berlin',
+      passport_lat: 52.5,
+      passport_lng: 13.4,
+    })
+  })
+
+  it('неприсланные текстовые поля уезжают в UPDATE как undefined (COALESCE сохраняет прежнее), а в историю не попадают', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 1, display_name: 'Test', name: 'KeepName', city: 'KeepCity' }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ id: 1, display_name: 'Test', name: 'KeepName', city: 'KeepCity' }], []])
+
+    const res = await request(app)
+      .put('/api/profile/1')
+      .set(as())
+      .send({ display_name: 'Test' })
+    expect(res.status).toBe(200)
+
+    const update = pool.query.mock.calls.find((c) => String(c[0]).includes('UPDATE user_profiles SET'))
+    expect(update[1][0]).toBe('Test')
+    expect(update[1][1]).toBeUndefined()
+    expect(update[1][9]).toBeUndefined()
+    expect(update[1][15]).toBeUndefined()
+
+    const call = auditInsertCall()
+    expect(call).toBeUndefined()
+  })
+
+  it('бинарные incognito/passport_mode доезжают до истории как 0/1', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 1, incognito: 0, passport_mode: 0 }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ id: 1 }], []])
+
+    const res = await request(app)
+      .put('/api/profile/1')
+      .set(as())
+      .send({ incognito: 1, passport_mode: 1 })
+    expect(res.status).toBe(200)
+    const call = auditInsertCall()
+    expect(JSON.parse(call[1][4])).toEqual({ incognito: 1, passport_mode: 1 })
+  })
+
+  it('gender и looking_for доезжают до UPDATE и истории', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 1, gender: null, looking_for: null }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ id: 1 }], []])
+
+    const res = await request(app)
+      .put('/api/profile/1')
+      .set(as())
+      .send({ gender: 'male', looking_for: 'female' })
+    expect(res.status).toBe(200)
+    const update = pool.query.mock.calls.find((c) => String(c[0]).includes('UPDATE user_profiles SET'))
+    expect(update[1][5]).toBe('male')
+    expect(update[1][6]).toBe('female')
+    const call = auditInsertCall()
+    expect(JSON.parse(call[1][4])).toEqual({ gender: 'male', looking_for: 'female' })
+  })
+})
+
+describe('GET /api/profile/activity: NULL в истории', () => {
+  it('old_values/new_values = null отдаются как null, а не падают на JSON.parse', async () => {
+    pool.query.mockResolvedValueOnce([[
+      { id: 1, table_name: 'user_profiles', record_id: 1, action: 'update', old_values: null, new_values: null, created_at: '2026-01-01' },
+    ], []])
+    const res = await request(app).get('/api/profile/activity').set(as())
+    expect(res.status).toBe(200)
+    expect(res.body[0].old_values).toBeNull()
+    expect(res.body[0].new_values).toBeNull()
+  })
+})
+
+describe('PUT /api/settings/privacy: остальные поля приватности (ветки :324-328)', () => {
+  it('passport_city/lat/lng и show_last_seen сохраняются и пишутся в историю', async () => {
+    const before = { incognito: 0, passport_mode: 0, passport_city: null, passport_lat: null, passport_lng: null, show_online: 1, show_last_seen: 1 }
+    pool.query
+      .mockResolvedValueOnce([[{ id: 7 }], []])
+      .mockResolvedValueOnce([[before], []])
+      .mockResolvedValueOnce([[], []])
+
+    const res = await request(app)
+      .put('/api/settings/privacy')
+      .set(as())
+      .send({ passport_mode: 1, passport_city: 'Berlin', passport_lat: 52.5, passport_lng: 13.4, show_last_seen: false })
+    expect(res.status).toBe(200)
+    const update = pool.query.mock.calls.find((c) => String(c[0]).includes('UPDATE user_profiles SET'))
+    expect(update[1]).toEqual([undefined, 1, 'Berlin', 52.5, 13.4, undefined, false, 1])
+    const call = pool.query.mock.calls.find((c) => String(c[0]).includes('INSERT INTO audit_log'))
+    expect(JSON.parse(call[1][4])).toEqual({
+      passport_mode: 1,
+      passport_city: 'Berlin',
+      passport_lat: 52.5,
+      passport_lng: 13.4,
+      show_last_seen: 0,
+    })
+  })
+})
