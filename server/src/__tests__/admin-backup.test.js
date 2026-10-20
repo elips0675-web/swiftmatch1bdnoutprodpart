@@ -20,6 +20,7 @@ const backupMocks = vi.hoisted(() => ({
 vi.mock('../backup.js', () => backupMocks)
 
 import adminBackup from '../routes/admin/backup.js'
+import logger from '../logger.js'
 
 const JWT_SECRET = 'change-me-in-production'
 
@@ -156,5 +157,40 @@ describe('admin backup route', () => {
     expect(res.status).toBe(200)
     expect(res.headers['content-type']).toContain('application/zip')
     expect(res.headers['content-disposition']).toContain('attachment')
+  })
+
+  it('POST / returns generic message when the thrown value is not an Error', async () => {
+    backupMocks.createBackup.mockRejectedValue('string failure')
+
+    const res = await request(app)
+      .post('/api/admin/backup')
+      .set('Authorization', `Bearer ${adminToken()}`)
+
+    expect(res.status).toBe(500)
+    expect(res.body.message).toBe('Failed to create backup')
+  })
+
+  it('POST / returns generic message for a non-mysqldump Error', async () => {
+    backupMocks.createBackup.mockRejectedValue(new Error('disk full'))
+
+    const res = await request(app)
+      .post('/api/admin/backup')
+      .set('Authorization', `Bearer ${adminToken()}`)
+
+    expect(res.status).toBe(500)
+    expect(res.body.message).toBe('Failed to create backup')
+  })
+
+  it('GET /:name/download: ошибка чтения отдаёт 500, поток не уходит клиенту', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bkt-'))
+    backupMocks.resolveBackupPath.mockReturnValue(dir)
+
+    const res = await request(app)
+      .get(`/api/admin/backup/${encodeURIComponent('swiftmatch_broken.sql')}/download`)
+      .set('Authorization', `Bearer ${adminToken()}`)
+
+    expect(res.status).toBe(500)
+    expect(logger.error).toHaveBeenCalledWith('Backup download error:', expect.any(String))
+    expect(res.text).toBe('')
   })
 })
