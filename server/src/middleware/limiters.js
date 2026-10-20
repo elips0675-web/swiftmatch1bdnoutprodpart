@@ -40,16 +40,6 @@ export const makeApiLimiter = () =>
     message: { message: 'Too many requests' },
   })
 
-export const makeLikeLimiter = () =>
-  rateLimit({
-    windowMs: 60_000,
-    max: 30,
-    standardHeaders: true,
-    legacyHeaders: false,
-    store: getRateLimitStore('rl:like:'),
-    message: { message: 'Too many likes' },
-  })
-
 export const makeChatMessageLimiter = () =>
   rateLimit({
     windowMs: 60_000,

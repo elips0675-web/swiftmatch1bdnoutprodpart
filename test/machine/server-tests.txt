@@ -1,5 +1,5 @@
 ===== Сервер (Vitest) =====
-2351 тестов в 135 файлах (зелёных 2351) (vitest --reporter=json)
+2389 тестов в 137 файлах (зелёных 2389) (vitest --reporter=json)
 
 # файл | тестов
 server/src/__tests__/active-user.test.js | 33
@@ -107,6 +107,7 @@ server/src/__tests__/push-quiet-gates.test.js | 8
 server/src/__tests__/push.test.js | 6
 server/src/__tests__/queue-init.test.js | 11
 server/src/__tests__/queue-monitor.test.js | 19
+server/src/__tests__/queue-swagger-limiters.test.js | 7
 server/src/__tests__/quiet-hours.test.js | 43
 server/src/__tests__/race.mysql.test.js | 6
 server/src/__tests__/race.test.js | 8
@@ -114,6 +115,7 @@ server/src/__tests__/ratelimit.test.js | 4
 server/src/__tests__/redis-client.test.js | 17
 server/src/__tests__/redis-fallback.test.js | 7
 server/src/__tests__/referral.test.js | 12
+server/src/__tests__/report-auto-ban.test.js | 31
 server/src/__tests__/sanitize.test.js | 7
 server/src/__tests__/schedule.test.js | 16
 server/src/__tests__/schema-drift.test.js | 16
