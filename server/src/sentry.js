@@ -16,6 +16,18 @@ export function initSentry() {
     integrations: [
       Sentry.expressIntegration({ shouldHandleError: () => false }),
     ],
+    // @sentry/node v11 собирает по умолчанию больше, чем v10: userInfo, cookies,
+    // тела запросов/ответов, данные DB-запросов и входы/выходы genAI уходят в
+    // Sentry, если не ограничить явно. Для дейтинга это регрессия приватности
+    // (переписка, cookie авторизации, содержимое профиля), поэтому держим
+    // ограничительный базлайн v10 явно, а не полагаемся на дефолт.
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpBodies: [],
+      databaseQueryData: false,
+      genAI: { inputs: false, outputs: false },
+    },
     beforeSend(event) {
       if (event.user) {
         delete event.user.email

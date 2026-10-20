@@ -1,6 +1,7 @@
 // Stage 113 (TEST-03): `src/sentry.js` — латентный дефект снят.
+// Stage 114 (DEPS-02): `@sentry/node` поднят 9 → 11, `dataCollection` ограничен явно.
 //
-// В `@sentry/node` v8 удалили legacy `Sentry.Handlers`, а в дереве стоит v9
+// В `@sentry/node` v8 удалили legacy `Sentry.Handlers`, а в дереве стоял v9
 // (9.47.2): `typeof Sentry.Handlers === 'undefined'`. Старый код звал
 // `Sentry.Handlers.requestHandler()` на импорте-пути `initSentry` и
 // `Sentry.Handlers.errorHandler()` в `registerSentryErrorHandler` — то есть
@@ -8,11 +9,16 @@
 // где Sentry и нужен. В dev/тестах DSN пуст, `initSentry` выходит на первой
 // строке (`:7-10`), поэтому дефект не всплывал.
 //
-// Тест фиксирует контракт v9: `init()` получает `expressIntegration` (не
+// Тест фиксирует контракт v9+: `init()` получает `expressIntegration` (не
 // `Handlers.requestHandler`), ошибки маршрутов ловит `setupExpressErrorHandler`,
 // а не `Handlers.errorHandler`. Мок `@sentry/node` сделан так, что обращение к
 // несуществующему `Handlers` даёт `undefined`, как в реальном пакете, — старая
 // реализация упала бы на первом же тесте.
+//
+// Отдельно: v11 собирает по умолчанию больше, чем v10 (userInfo, cookies,
+// тела запросов/ответов, данные DB-запросов, входы/выходы genAI), поэтому тест
+// требует явный ограничительный `dataCollection` — иначе приватность
+// дейтинг-переписки и cookie авторизации утекали бы в Sentry по дефолту.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import express from 'express'
@@ -64,6 +70,13 @@ describe('sentry.js — инициализация при @sentry/node v9', () =
     expect(opts.dsn).toBe('https://public@example.com/1')
     expect(opts.integrations).toEqual([{ name: 'Express', opts: { shouldHandleError: expect.any(Function) } }])
     expect(opts.integrations[0].opts.shouldHandleError()).toBe(false)
+    expect(opts.dataCollection).toEqual({
+      userInfo: false,
+      cookies: false,
+      httpBodies: [],
+      databaseQueryData: false,
+      genAI: { inputs: false, outputs: false },
+    })
     expect(opts.tracesSampleRate).toBeGreaterThan(0)
     expect(typeof opts.beforeSend).toBe('function')
     expect(rootLogger.info).toHaveBeenCalledWith('[sentry] initialized')

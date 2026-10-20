@@ -8,13 +8,13 @@
     "db:seed": "node src/seed.js",
     "db:reset": "node src/seed.js",
     "test": "vitest run",
- "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --coverage",
     "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
     "@aws-sdk/client-rekognition": "^3.1131.0",
     "@aws-sdk/client-s3": "^3.800.0",
-    "@sentry/node": "^9.14.0",
+    "@sentry/node": "^11.8.0",
     "@socket.io/redis-adapter": "^8.3.0",
     "bcryptjs": "^2.4.3",
     "bull": "^4.16.5",
