@@ -3,7 +3,7 @@ import { rootLogger } from './logger.js'
 
 const SENTRY_DSN = process.env.SENTRY_DSN
 
-export function initSentry(app) {
+export function initSentry() {
   if (!SENTRY_DSN) {
     rootLogger.warn('[sentry] SENTRY_DSN not set, skipping')
     return false
@@ -13,6 +13,9 @@ export function initSentry(app) {
     dsn: SENTRY_DSN,
     environment: process.env.NODE_ENV || 'development',
     release: `swiftmatch-server@${process.env.npm_package_version || '0.0.0'}`,
+    integrations: [
+      Sentry.expressIntegration({ shouldHandleError: () => false }),
+    ],
     beforeSend(event) {
       if (event.user) {
         delete event.user.email
@@ -34,17 +37,17 @@ export function initSentry(app) {
     tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
   })
 
-  // requestHandler must be registered before routes (scope/tracing).
-  // errorHandler is registered separately AFTER routes (see registerSentryErrorHandler)
-  // — an error middleware placed before routes never fires in Express.
-  app.use(Sentry.Handlers.requestHandler())
-
+  // @sentry/node v8+ удалил legacy `Sentry.Handlers`. Инструментацию Express
+  // (request scope/tracing) делает `expressIntegration()` внутри `init()`
+  // (см. integrations выше), а ошибки маршрутов ловит `setupExpressErrorHandler`,
+  // зарегистрированный ПОСЛЕ маршрутов (см. registerSentryErrorHandler) —
+  // error-middleware, поставленный до маршрутов, в Express никогда не сработает.
   rootLogger.info('[sentry] initialized')
   return true
 }
 
 export function registerSentryErrorHandler(app) {
   if (!SENTRY_DSN) return false
-  app.use(Sentry.Handlers.errorHandler())
+  Sentry.setupExpressErrorHandler(app)
   return true
 }
