@@ -74,4 +74,39 @@ describe('GET /api/affiliate/offers', () => {
     const res = await request(app).get('/api/affiliate/offers')
     expect(res.status).toBe(500)
   })
+
+  it('maps null price/lat/lng/commission_rate to null instead of 0', async () => {
+    pool.query.mockResolvedValueOnce([[
+      { id: 9, partner_id: 5, category: 'gift', title: 'Gift', description: null, image_url: null, deeplink: 'https://go/z', price: null, city: null, lat: null, lng: null, partner_name: 'Shop', commission_rate: null },
+      { id: 10, partner_id: 5, category: 'gift', title: 'Gift2', description: null, image_url: null, deeplink: 'https://go/w', price: '100', city: 'Сочи', lat: '43.6', lng: '39.7', partner_name: 'Shop', commission_rate: '5' },
+    ], []])
+    const res = await request(app).get('/api/affiliate/offers')
+    expect(res.status).toBe(200)
+    expect(res.body.offers[0].price).toBeNull()
+    expect(res.body.offers[0].lat).toBeNull()
+    expect(res.body.offers[0].lng).toBeNull()
+    expect(res.body.offers[0].commission_rate).toBeNull()
+    expect(res.body.offers[1].lat).toBe(43.6)
+    expect(res.body.offers[1].lng).toBe(39.7)
+  })
+
+  it('clamps limit: below minimum -> 1, above maximum -> 12', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    await request(app).get('/api/affiliate/offers?limit=0')
+    expect(pool.query.mock.calls[0][1].at(-1)).toBe(6)
+
+    pool.query.mockResolvedValueOnce([[], []])
+    await request(app).get('/api/affiliate/offers?limit=999')
+    expect(pool.query.mock.calls[1][1].at(-1)).toBe(12)
+  })
+
+  it('combines city and known category filters', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    await request(app).get('/api/affiliate/offers?city=Казань&category=hotel')
+    const [sql, params] = pool.query.mock.calls[0]
+    expect(sql).toContain('po.category = ?')
+    expect(sql).toContain('po.city = ?')
+    expect(params).toContain('hotel')
+    expect(params).toContain('Казань')
+  })
 })
