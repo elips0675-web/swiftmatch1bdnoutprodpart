@@ -24,10 +24,10 @@ async function getFirebaseApp() {
 
   if (FCM_SERVICE_ACCOUNT) {
     try {
-      const admin = await import('firebase-admin')
+      const { getApps, initializeApp, cert } = await import('firebase-admin/app')
       const serviceAccount = await parseServiceAccount(FCM_SERVICE_ACCOUNT)
-      if (!admin.apps.length) {
-        firebaseApp = admin.initializeApp({ credential: admin.credential.cert(serviceAccount) })
+      if (!getApps().length) {
+        firebaseApp = initializeApp({ credential: cert(serviceAccount) })
       }
       return firebaseApp
     } catch (err) {
@@ -37,11 +37,9 @@ async function getFirebaseApp() {
   }
 
   try {
-    const admin = await import('firebase-admin')
-    if (!admin.apps.length) {
-      firebaseApp = admin.initializeApp({
-        credential: admin.credential.applicationDefault(),
-      })
+    const { getApps, initializeApp, applicationDefault } = await import('firebase-admin/app')
+    if (!getApps().length) {
+      firebaseApp = initializeApp({ credential: applicationDefault() })
     }
     return firebaseApp
   } catch (err) {
@@ -63,7 +61,7 @@ export async function sendFcmToUser(fcmToken, title, body, data = {}) {
   const app = await getFirebaseApp()
   if (app) {
     try {
-      const admin = await import('firebase-admin')
+      const { getMessaging } = await import('firebase-admin/messaging')
       const message = {
         token: fcmToken,
         notification: { title, body },
@@ -71,7 +69,7 @@ export async function sendFcmToUser(fcmToken, title, body, data = {}) {
         android: { priority: 'high', notification: { sound: 'default' } },
         apns: { payload: { aps: { sound: 'default' } } },
       }
-      const response = await admin.messaging().send(message)
+      const response = await getMessaging().send(message)
       return { success: true, messageId: response }
     } catch (err) {
       rootLogger.error('FCM firebase-admin send failed:', err)

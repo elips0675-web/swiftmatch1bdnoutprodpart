@@ -1,3 +1,10 @@
+// Stage 115 (DEPS-03): `firebase-admin` 13 → 14.5.0. В v14 удалён legacy
+// namespace: `import * as admin from 'firebase-admin'` больше не несёт
+// `apps`/`credential`/`messaging` (остались только `initializeApp`/`getApps`),
+// а API переехали в ESM-энтрипоинты `firebase-admin/app` (`getApps`,
+// `initializeApp`, `cert`, `applicationDefault`) и `firebase-admin/messaging`
+// (`getMessaging`). Мок повторяет именно этот шейп, поэтому реализация на
+// старом API упала бы на первом же тесте (`getApps`/`cert` — undefined).
 vi.hoisted(() => {
   delete process.env.FCM_SERVER_KEY
   delete process.env.FCM_SERVICE_ACCOUNT
@@ -5,19 +12,33 @@ vi.hoisted(() => {
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const { adminMock, rootLog, fetchMock, sendMock } = vi.hoisted(() => ({
-  adminMock: {
-    apps: [],
+const { appMock, messagingMock, rootLog, fetchMock, sendMock } = vi.hoisted(() => ({
+  appMock: {
+    getApps: vi.fn(() => []),
     initializeApp: vi.fn(),
-    credential: { cert: vi.fn(), applicationDefault: vi.fn() },
-    messaging: vi.fn(),
+    cert: vi.fn(),
+    applicationDefault: vi.fn(),
+  },
+  messagingMock: {
+    getMessaging: vi.fn(),
   },
   rootLog: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
   fetchMock: vi.fn(),
   sendMock: vi.fn(),
 }))
 
-vi.mock('firebase-admin', () => adminMock)
+const appsList = []
+
+vi.mock('firebase-admin/app', () => ({
+  getApps: appMock.getApps,
+  initializeApp: appMock.initializeApp,
+  cert: appMock.cert,
+  applicationDefault: appMock.applicationDefault,
+}))
+
+vi.mock('firebase-admin/messaging', () => ({
+  getMessaging: messagingMock.getMessaging,
+}))
 
 vi.mock('../logger.js', () => ({
   default: rootLog,
@@ -46,11 +67,12 @@ beforeEach(() => {
   delete process.env.FCM_SERVER_KEY
   delete process.env.FCM_SERVICE_ACCOUNT
   delete process.env.FCM_ENDPOINT
-  adminMock.apps.length = 0
-  adminMock.initializeApp.mockImplementation(() => ({ name: '[DEFAULT]' }))
-  adminMock.credential.cert.mockImplementation((sa) => sa)
-  adminMock.credential.applicationDefault.mockImplementation(() => ({}))
-  adminMock.messaging.mockImplementation(() => ({ send: sendMock }))
+  appsList.length = 0
+  appMock.getApps.mockImplementation(() => appsList)
+  appMock.initializeApp.mockImplementation(() => ({ name: '[DEFAULT]' }))
+  appMock.cert.mockImplementation((sa) => sa)
+  appMock.applicationDefault.mockImplementation(() => ({}))
+  messagingMock.getMessaging.mockImplementation(() => ({ send: sendMock }))
   sendMock.mockResolvedValue('message-id-1')
   fetchMock.mockReset()
   vi.stubGlobal('fetch', fetchMock)
@@ -70,7 +92,7 @@ describe('sendFcmToUser/sendFcmToAll без ключей — mock-режим', (
     const res = await fcm.sendFcmToUser('tok-abcdef1234', 'Title', 'Body', { a: 1 })
     expect(res).toEqual({ success: true, mock: true })
     expect(fetchMock).not.toHaveBeenCalled()
-    expect(adminMock.messaging).not.toHaveBeenCalled()
+    expect(messagingMock.getMessaging).not.toHaveBeenCalled()
     expect(rootLog.info).toHaveBeenCalledWith('[FCM MOCK] Would send to token', 'tok-abcdef', 'Title')
   })
 
@@ -93,8 +115,8 @@ describe('sendFcmToUser — service account, firebase-admin', () => {
     const fcm = await freshFcm({ FCM_SERVICE_ACCOUNT: '{"project_id":"p1"}' })
     const res = await fcm.sendFcmToUser('tok', 'T', 'B', { count: 5, flag: true })
     expect(res).toEqual({ success: true, messageId: 'message-id-1' })
-    expect(adminMock.credential.cert).toHaveBeenCalledWith({ project_id: 'p1' })
-    expect(adminMock.initializeApp).toHaveBeenCalledTimes(1)
+    expect(appMock.cert).toHaveBeenCalledWith({ project_id: 'p1' })
+    expect(appMock.initializeApp).toHaveBeenCalledTimes(1)
     const message = sendMock.mock.calls[0][0]
     expect(message.token).toBe('tok')
     expect(message.notification).toEqual({ title: 'T', body: 'B' })
@@ -108,20 +130,20 @@ describe('sendFcmToUser — service account, firebase-admin', () => {
     const fcm = await freshFcm({ FCM_SERVICE_ACCOUNT: '{"project_id":"p1"}' })
     await fcm.sendFcmToUser('tok1', 'T', 'B')
     await fcm.sendFcmToUser('tok2', 'T', 'B')
-    expect(adminMock.initializeApp).toHaveBeenCalledTimes(1)
+    expect(appMock.initializeApp).toHaveBeenCalledTimes(1)
     expect(sendMock).toHaveBeenCalledTimes(2)
   })
 
   it('default app уже создан вне модуля (guard-ветка): локального app нет → отказ без legacy-ключа', async () => {
-    adminMock.apps.push({ name: '[DEFAULT]' })
+    appsList.push({ name: '[DEFAULT]' })
     const fcm = await freshFcm({ FCM_SERVICE_ACCOUNT: '{"project_id":"p1"}' })
     const res = await fcm.sendFcmToUser('tok', 'T', 'B')
-    expect(adminMock.initializeApp).not.toHaveBeenCalled()
+    expect(appMock.initializeApp).not.toHaveBeenCalled()
     expect(res).toEqual({ success: false, error: 'FCM_SERVER_KEY not set' })
   })
 
   it('default app уже создан, но legacy-ключ есть → уход в HTTP-ветку', async () => {
-    adminMock.apps.push({ name: '[DEFAULT]' })
+    appsList.push({ name: '[DEFAULT]' })
     fetchMock.mockResolvedValue({ json: async () => ({}) })
     const fcm = await freshFcm({
       FCM_SERVICE_ACCOUNT: '{"project_id":"p1"}',
@@ -133,7 +155,7 @@ describe('sendFcmToUser — service account, firebase-admin', () => {
   })
 
   it('init падает: warn + отказ без legacy-ключа (app не создан)', async () => {
-    adminMock.initializeApp.mockImplementation(() => { throw new Error('bad credential') })
+    appMock.initializeApp.mockImplementation(() => { throw new Error('bad credential') })
     const fcm = await freshFcm({ FCM_SERVICE_ACCOUNT: '{"project_id":"p1"}' })
     const res = await fcm.sendFcmToUser('tok', 'T', 'B')
     expect(res).toEqual({ success: false, error: 'FCM_SERVER_KEY not set' })
@@ -144,7 +166,7 @@ describe('sendFcmToUser — service account, firebase-admin', () => {
   })
 
   it('init падает, но legacy-ключ есть → HTTP-ветка', async () => {
-    adminMock.initializeApp.mockImplementation(() => { throw new Error('bad credential') })
+    appMock.initializeApp.mockImplementation(() => { throw new Error('bad credential') })
     fetchMock.mockResolvedValue({ json: async () => ({}) })
     const fcm = await freshFcm({
       FCM_SERVICE_ACCOUNT: '{"project_id":"p1"}',
@@ -169,12 +191,12 @@ describe('sendFcmToUser — только FCM_SERVER_KEY (applicationDefault)', (
     const fcm = await freshFcm({ FCM_SERVER_KEY: 'legacy-key' })
     const res = await fcm.sendFcmToUser('tok', 'T', 'B')
     expect(res).toEqual({ success: true, messageId: 'message-id-1' })
-    expect(adminMock.credential.applicationDefault).toHaveBeenCalled()
+    expect(appMock.applicationDefault).toHaveBeenCalled()
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('applicationDefault init падает → warn и уход в HTTP', async () => {
-    adminMock.initializeApp.mockImplementation(() => { throw new Error('no adc') })
+    appMock.initializeApp.mockImplementation(() => { throw new Error('no adc') })
     fetchMock.mockResolvedValue({ json: async () => ({}) })
     const fcm = await freshFcm({ FCM_SERVER_KEY: 'legacy-key' })
     const res = await fcm.sendFcmToUser('tok', 'T', 'B')
@@ -185,7 +207,7 @@ describe('sendFcmToUser — только FCM_SERVER_KEY (applicationDefault)', (
 
 describe('sendFcmToUser — legacy HTTP-ветка', () => {
   async function freshHttp() {
-    adminMock.initializeApp.mockImplementation(() => { throw new Error('no firebase') })
+    appMock.initializeApp.mockImplementation(() => { throw new Error('no firebase') })
     return freshFcm({ FCM_SERVER_KEY: 'legacy-key' })
   }
 
@@ -226,7 +248,7 @@ describe('sendFcmToUser — legacy HTTP-ветка', () => {
 
   it('FCM_ENDPOINT переопределяет адрес (контрактный смоук — ловушка вместо fcm.googleapis.com)', async () => {
     fetchMock.mockResolvedValue({ json: async () => ({ success: 1 }) })
-    adminMock.initializeApp.mockImplementation(() => { throw new Error('no firebase') })
+    appMock.initializeApp.mockImplementation(() => { throw new Error('no firebase') })
     const fcm = await freshFcm({ FCM_SERVER_KEY: 'legacy-key', FCM_ENDPOINT: 'http://127.0.0.1:9999/fcm/send' })
     await fcm.sendFcmToUser('tok', 'T', 'B')
     expect(fetchMock.mock.calls[0][0]).toBe('http://127.0.0.1:9999/fcm/send')
@@ -235,7 +257,7 @@ describe('sendFcmToUser — legacy HTTP-ветка', () => {
 
 describe('sendFcmToAll с настроенными ключами', () => {
   it('считает успешные отправки: два успеха из трёх → sent: 2', async () => {
-    adminMock.initializeApp.mockImplementation(() => { throw new Error('no firebase') })
+    appMock.initializeApp.mockImplementation(() => { throw new Error('no firebase') })
     fetchMock
       .mockResolvedValueOnce({ json: async () => ({ success: 1 }) })
       .mockResolvedValueOnce({ json: async () => ({ success: 1 }) })
@@ -246,7 +268,7 @@ describe('sendFcmToAll с настроенными ключами', () => {
   })
 
   it('ни одной успешной → success: false, sent: 0', async () => {
-    adminMock.initializeApp.mockImplementation(() => { throw new Error('no firebase') })
+    appMock.initializeApp.mockImplementation(() => { throw new Error('no firebase') })
     fetchMock.mockResolvedValue({ json: async () => ({ failure: 1, results: [{ error: 'Bad' }] }) })
     const fcm = await freshFcm({ FCM_SERVER_KEY: 'legacy-key' })
     const res = await fcm.sendFcmToAll(['a', 'b'], 'T', 'B')
