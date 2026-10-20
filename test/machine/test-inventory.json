@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-20T13:11:20.067Z",
+  "generated": "2026-10-20T13:23:24.261Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -515,17 +515,17 @@
     ]
   },
   "server": {
-    "files": 139,
-    "tests": 2423,
-    "passed": 2423,
+    "files": 140,
+    "tests": 2431,
+    "passed": 2431,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 122
     },
     "product": {
-      "files": 134,
-      "tests": 2301
+      "files": 135,
+      "tests": 2309
     },
     "perFile": [
       {
@@ -1053,6 +1053,10 @@
         "tests": 6
       },
       {
+        "file": "server/src/__tests__/upload-filefilter.test.js",
+        "tests": 8
+      },
+      {
         "file": "server/src/__tests__/upload-s3.test.js",
         "tests": 13
       },
@@ -1189,7 +1193,7 @@
     ]
   },
   "total": {
-    "files": 263,
-    "tests": 4032
+    "files": 264,
+    "tests": 4040
   }
 }
