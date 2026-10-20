@@ -59,6 +59,36 @@ describe('totp.js unit', () => {
     expect(verifyTotpToken('SECRET', '12345')).toBe(false)
     expect(verifyTotpToken('', null)).toBe(false)
   })
+
+  it('verifySync вернул falsy (null) → false, а не падение', async () => {
+    vi.resetModules()
+    vi.doMock('otplib', async (importOriginal) => {
+      const mod = await importOriginal()
+      return { ...mod, verifySync: () => null }
+    })
+    try {
+      const fresh = await import('../totp.js')
+      expect(fresh.verifyTotpToken('SECRET', '123456')).toBe(false)
+    } finally {
+      vi.doUnmock('otplib')
+      vi.resetModules()
+    }
+  })
+
+  it('verifySync бросил исключение → false (catch)', async () => {
+    vi.resetModules()
+    vi.doMock('otplib', async (importOriginal) => {
+      const mod = await importOriginal()
+      return { ...mod, verifySync: () => { throw new Error('otplib boom') } }
+    })
+    try {
+      const fresh = await import('../totp.js')
+      expect(fresh.verifyTotpToken('SECRET', '123456')).toBe(false)
+    } finally {
+      vi.doUnmock('otplib')
+      vi.resetModules()
+    }
+  })
 })
 
 describe('POST /api/auth/2fa/* (router)', () => {
