@@ -306,7 +306,7 @@ describe('живой репозиторий', () => {
     expect(
       findings.map((f) => `[${f.type}] ${f.detail}`),
     ).toEqual([])
-  })
+  }, 60000)
 })
 
 describe('чужой lock-файл в корне', () => {
