@@ -35,7 +35,8 @@ class FakeRedis {
   constructor(url, opts) {
     this.url = url
     this.opts = opts
-    this.on = vi.fn()
+    this.handlers = {}
+    this.on = vi.fn((event, fn) => { this.handlers[event] = fn; return this })
     this.connect = vi.fn(async () => this)
     this.ping = vi.fn(async () => {
       if (pingResult instanceof Error) throw pingResult
@@ -128,6 +129,14 @@ describe('queue.js — инициализация очередей', () => {
     expect(redisInstances[0].url).toBe('redis://127.0.0.1:6379')
     expect(redisInstances[0].opts).toMatchObject({ lazyConnect: true, connectTimeout: 4000, maxRetriesPerRequest: 1 })
     expect(redisInstances[0].disconnect).toHaveBeenCalled()
+  })
+
+  it('probe не реагирует на error-события и не переподключается (retryStrategy -> null)', async () => {
+    const mod = await freshQueue()
+    await initAll(mod)
+    const probe = redisInstances[0]
+    expect(() => probe.handlers.error(new Error('probe noise'))).not.toThrow()
+    expect(probe.opts.retryStrategy()).toBeNull()
   })
 
   it('недостижимый Redis (probe бросает) — очереди выключены, процесс живёт', async () => {
