@@ -15,13 +15,14 @@ vi.mock('../middleware/adminAuth.js', async (importOriginal) => {
   return {
     ...mod,
     adminAuth: (req, res, next) => {
-      req.admin = { id: 1, email: 'admin@mail.ru', role: 'admin' }
+      req.admin = { id: 1, ...(globalThis.__adminOverride || { email: 'admin@mail.ru', role: 'admin' }) }
       next()
     },
   }
 })
 
 import pool from '../db.js'
+import { rootLogger } from '../logger.js'
 import twoFaRoutes from '../routes/totp-2fa.js'
 import { generateTotpSecret, verifyTotpToken } from '../totp.js'
 import { generateSync } from 'otplib'
@@ -123,5 +124,77 @@ describe('POST /api/auth/2fa/* (router)', () => {
     expect(res.status).toBe(200)
     expect(res.body.ok).toBe(true)
     expect(pool.query.mock.calls[1][0]).toMatch(/totp_enabled = 0, totp_secret = NULL/)
+  })
+
+  it('enable: уже включённая 2FA -> ALREADY_ENABLED без перезаписи', async () => {
+    const { secret } = generateTotpSecret('admin@mail.ru')
+    pool.query.mockResolvedValue([[{ totp_secret: secret, totp_enabled: 1 }], []])
+    const { generateSync } = await import('otplib')
+    const code = generateSync({ secret })
+    const res = await request(app).post('/api/auth/2fa/enable').send({ code })
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('ALREADY_ENABLED')
+    expect(pool.query).toHaveBeenCalledTimes(1)
+  })
+
+  it('enable: повторная проверка — код из пробелов считается пустым', async () => {
+    const res = await request(app).post('/api/auth/2fa/enable').send({ code: '   ' })
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('CODE_REQUIRED')
+    expect(pool.query).not.toHaveBeenCalled()
+  })
+
+  it('disable: код обязателен', async () => {
+    const res = await request(app).post('/api/auth/2fa/disable').send({})
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('CODE_REQUIRED')
+    expect(pool.query).not.toHaveBeenCalled()
+  })
+
+  it('disable: неверный код -> TOTP_INVALID без сброса', async () => {
+    const { secret } = generateTotpSecret('admin@mail.ru')
+    pool.query.mockResolvedValue([[{ totp_secret: secret, totp_enabled: 1 }], []])
+    const res = await request(app).post('/api/auth/2fa/disable').send({ code: '000000' })
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('TOTP_INVALID')
+    expect(pool.query).toHaveBeenCalledTimes(1)
+  })
+
+  it('setup: падение БД -> 500 и лог', async () => {
+    pool.query.mockRejectedValue(new Error('db down'))
+    const res = await request(app).post('/api/auth/2fa/setup').send({})
+    expect(res.status).toBe(500)
+    expect(res.body.message).toBe('Internal server error')
+    expect(rootLogger.error).toHaveBeenCalledWith(expect.stringContaining('2FA setup error'))
+  })
+
+  it('enable: падение БД -> 500 и лог', async () => {
+    pool.query.mockRejectedValue(new Error('db down'))
+    const res = await request(app).post('/api/auth/2fa/enable').send({ code: '123456' })
+    expect(res.status).toBe(500)
+    expect(res.body.message).toBe('Internal server error')
+    expect(rootLogger.error).toHaveBeenCalledWith(expect.stringContaining('2FA enable error'))
+  })
+
+  it('disable: падение БД -> 500 и лог', async () => {
+    pool.query.mockRejectedValue(new Error('db down'))
+    const res = await request(app).post('/api/auth/2fa/disable').send({ code: '123456' })
+    expect(res.status).toBe(500)
+    expect(res.body.message).toBe('Internal server error')
+    expect(rootLogger.error).toHaveBeenCalledWith(expect.stringContaining('2FA disable error'))
+  })
+})
+
+describe('POST /api/auth/2fa/setup — фолбэк email', () => {
+  it('без req.admin.email issuer-метка берёт "admin"', async () => {
+    globalThis.__adminOverride = { role: 'admin' }
+    try {
+      pool.query.mockResolvedValue([{ affectedRows: 1 }, []])
+      const res = await request(createApp()).post('/api/auth/2fa/setup').send({})
+      expect(res.status).toBe(200)
+      expect(res.body.otpauthUrl).toContain(':admin?')
+    } finally {
+      delete globalThis.__adminOverride
+    }
   })
 })
