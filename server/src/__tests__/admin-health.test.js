@@ -93,6 +93,36 @@ describe('collectHealth', () => {
     expect(byName(report, 'redis').status).toBe('error')
     expect(report.status).toBe('degraded')
   })
+
+  it('withRedis выполняет ping-колбэк и получает PONG', async () => {
+    process.env.REDIS_URL = 'redis://localhost:6379'
+    process.env.STRIPE_SECRET_KEY = 'sk_test_x'
+    pool.query.mockResolvedValueOnce([[{ 1: 1 }], []])
+    const ping = vi.fn().mockResolvedValue('PONG')
+    withRedis.mockImplementationOnce((fn) => fn({ ping }))
+
+    const report = await collectHealth()
+
+    expect(ping).toHaveBeenCalledTimes(1)
+    expect(byName(report, 'redis').status).toBe('ok')
+  })
+
+  it('интеграция с недоступным режимом → status error и degraded', async () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_x'
+    pool.query.mockResolvedValueOnce([[{ 1: 1 }], []])
+    const modes = { smtp: 'mock', stripe: 'unavailable', moderation: 'mock', fcm: 'mock', redis: 'mock' }
+    vi.doMock('../runtime.js', () => ({ integrationModes: () => modes }))
+    vi.resetModules()
+    const { collectHealth: freshCollect } = await import('../health-check.js')
+
+    const report = await freshCollect()
+
+    expect(byName(report, 'stripe').status).toBe('error')
+    expect(byName(report, 'stripe').mode).toBe('unavailable')
+    expect(report.status).toBe('degraded')
+    vi.doUnmock('../runtime.js')
+    vi.resetModules()
+  })
 })
 
 describe('GET /api/admin/health', () => {
