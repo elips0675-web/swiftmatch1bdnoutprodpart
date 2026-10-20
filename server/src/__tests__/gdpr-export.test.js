@@ -3,7 +3,7 @@ import request from 'supertest'
 import express from 'express'
 import { mkdtempSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { join, sep } from 'path'
 
 vi.mock('../logger.js', () => ({
   default: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
@@ -115,6 +115,12 @@ describe('buildExportPayload', () => {
     const payload = await buildExportPayload(pool, 1, { now: () => new Date('2026-10-13T00:00:00.000Z') })
     expect(payload).toBe(null)
   })
+
+  it('profile is undefined when the profile row is missing', async () => {
+    mockDbQueries({ ...baseRows, user_profiles: [] })
+    const payload = await buildExportPayload(pool, 1, { now: () => new Date('2026-10-13T00:00:00.000Z') })
+    expect(payload.profile).toBeUndefined()
+  })
 })
 
 describe('resolveLocalPhotoPath', () => {
@@ -131,6 +137,10 @@ describe('resolveLocalPhotoPath', () => {
     expect(resolveLocalPhotoPath('/uploads/', uploadsDir)).toBe(null)
     expect(resolveLocalPhotoPath('/uploads/../../secret.txt', uploadsDir)).toBe(null)
     expect(resolveLocalPhotoPath('/uploads/sub/dir/a.jpg', uploadsDir)).toBe(null)
+  })
+
+  it('rejects any URL when the uploads dir is the filesystem root (containment guard)', () => {
+    expect(resolveLocalPhotoPath('/uploads/a.jpg', sep)).toBe(null)
   })
 })
 
@@ -170,6 +180,31 @@ describe('buildExportArchive', () => {
   it('returns null when the user does not exist', async () => {
     mockDbQueries({ users: [] })
     expect(await buildExportArchive({ db: pool, userId: 1, uploadsDir: tmpdir(), now: () => new Date() })).toBe(null)
+  })
+
+  it('skips photos without a resolvable local path (external URL)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gdpr-export-external-'))
+    mockDbQueries({ ...baseRows, user_photos: [{ id: 8, url: 'https://cdn.example.com/8_a.jpg', sort_order: 0, is_avatar: 0, created_at: '2026-01-02T00:00:00.000Z' }] })
+
+    const archive = await buildExportArchive({ db: pool, userId: 1, uploadsDir: dir, now: () => new Date('2026-10-13T00:00:00.000Z') })
+    const names = readEntries(archive.buffer).map(e => e.name)
+    expect(names).toContain('data.json')
+    expect(names.every(n => !n.startsWith(PHOTOS_PREFIX))).toBe(true)
+  })
+
+  it('builds the archive when the photos rows are null (photos ?? [] fallback)', async () => {
+    const stubDb = {
+      query: async (sql) => {
+        if (/FROM users\b/.test(sql)) return [[baseRows.users[0]]]
+        if (/FROM user_photos/.test(sql)) return [null]
+        return [[]]
+      },
+    }
+
+    const archive = await buildExportArchive({ db: stubDb, userId: 1, uploadsDir: tmpdir(), now: () => new Date('2026-10-13T00:00:00.000Z') })
+    const names = readEntries(archive.buffer).map(e => e.name)
+    expect(names).toContain('data.json')
+    expect(names.every(n => !n.startsWith(PHOTOS_PREFIX))).toBe(true)
   })
 })
 
