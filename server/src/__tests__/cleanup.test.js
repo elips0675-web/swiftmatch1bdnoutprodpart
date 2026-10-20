@@ -99,4 +99,31 @@ describe('cleanup', () => {
     await vi.advanceTimersByTimeAsync(5000)
     expect(pool.query.mock.calls.length).toBe(afterTick)
   })
+
+  it('purge возвращает 0, когда БД не вернула affectedRows', async () => {
+    pool.query.mockResolvedValueOnce([undefined, []])
+    pool.query.mockResolvedValueOnce([undefined, []])
+    expect(await purgeRevokedRefreshTokens()).toBe(0)
+    expect(await purgeOldNotifications()).toBe(0)
+  })
+
+  it('повторный start возвращает уже запущенный таймер, а не плодит второй', () => {
+    const first = startRefreshTokenCleanup(60_000)
+    const second = startRefreshTokenCleanup(60_000)
+    expect(second).toBe(first)
+
+    const firstNotif = startNotificationCleanup(60_000)
+    const secondNotif = startNotificationCleanup(60_000)
+    expect(secondNotif).toBe(firstNotif)
+  })
+
+  it('сбой purge внутри таймера логируется и не роняет процесс', async () => {
+    vi.useFakeTimers()
+    pool.query.mockRejectedValueOnce(new Error('db down'))
+    pool.query.mockRejectedValueOnce(new Error('db down'))
+    startRefreshTokenCleanup(1000)
+    startNotificationCleanup(1000)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(pool.query).toHaveBeenCalledTimes(2)
+  })
 })

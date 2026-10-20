@@ -94,4 +94,35 @@ describe('createGracefulShutdown', () => {
     expect(logger.error).toHaveBeenCalled()
     expect(deps.exit).toHaveBeenCalledWith(1)
   })
+
+  it('не-Error исключение логируется строкой и не роняет shutdown', async () => {
+    const { deps, logger } = makeDeps({
+      closeQueues: async () => {
+        throw 'boom'
+      },
+    })
+    const shutdown = createGracefulShutdown(deps)
+
+    expect(await shutdown('SIGTERM')).toBe(false)
+    expect(logger.error).toHaveBeenCalledWith('Graceful shutdown failed: boom')
+    expect(deps.exit).toHaveBeenCalledWith(1)
+  })
+
+  it('без инъекции exit используется process.exit', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined)
+    const { deps } = makeDeps({ exit: undefined })
+    const shutdown = createGracefulShutdown(deps)
+
+    expect(await shutdown('SIGTERM')).toBe(true)
+    expect(exitSpy).toHaveBeenCalledWith(0)
+    exitSpy.mockRestore()
+  })
+
+  it('таймер deadline без unref не роняет shutdown', async () => {
+    const { deps } = makeDeps({ setTimer: () => ({}) })
+    const shutdown = createGracefulShutdown(deps)
+
+    expect(await shutdown('SIGTERM')).toBe(true)
+    expect(deps.exit).toHaveBeenCalledWith(0)
+  })
 })
