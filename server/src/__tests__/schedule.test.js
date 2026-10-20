@@ -140,6 +140,20 @@ describe('POST /api/schedule', () => {
     expect(res.status).toBe(500)
     expect(reqLog.error).toHaveBeenCalledWith('Schedule create error:', expect.any(Error))
   })
+
+  it('201 без поднятого WS: getIO вернул null и событие не ушло', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ user_id: 1 }, { user_id: 2 }], []])
+      .mockResolvedValueOnce([{ insertId: 56 }, []])
+      .mockResolvedValueOnce([[{ id: 56, status: 'pending', proposer_id: 1, invitee_id: 2 }], []])
+
+    const res = await request(app).post('/api/schedule')
+      .set('Authorization', `Bearer ${token(1)}`)
+      .send({ chat_id: 10, scheduled_at: '2026-11-01T10:00:00Z' })
+    expect(res.status).toBe(201)
+    expect(getIO).toHaveBeenCalledTimes(1)
+    expect(reqLog.error).not.toHaveBeenCalled()
+  })
 })
 
 describe('PUT /api/schedule/:id/accept|decline|cancel', () => {
@@ -164,15 +178,61 @@ describe('PUT /api/schedule/:id/accept|decline|cancel', () => {
     expect(emit).toHaveBeenCalledTimes(2)
   })
 
-  it('decline: 200 и статус declined', async () => {
+  it('accept: 200 без поднятого WS — ответ уходит, событие не отправляется', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 55, proposer_id: 1, invitee_id: 2, status: 'pending' }], []])
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []])
+      .mockResolvedValueOnce([[{ id: 55, status: 'accepted', proposer_id: 1, invitee_id: 2 }], []])
+
+    const res = await request(app).put('/api/schedule/55/accept').set('Authorization', `Bearer ${token(2)}`)
+    expect(res.status).toBe(200)
+    expect(getIO).toHaveBeenCalledTimes(1)
+    expect(reqLog.error).not.toHaveBeenCalled()
+  })
+
+  it('accept: ошибка БД → 500 через req.log', async () => {
+    pool.query.mockRejectedValueOnce(new Error('db down'))
+    const res = await request(app).put('/api/schedule/55/accept').set('Authorization', `Bearer ${token(2)}`)
+    expect(res.status).toBe(500)
+    expect(reqLog.error).toHaveBeenCalledWith('Schedule accept error:', expect.any(Error))
+  })
+
+  it('decline: 404 если приглашение не найдено или уже отвечено', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    const res = await request(app).put('/api/schedule/55/decline').set('Authorization', `Bearer ${token(2)}`)
+    expect(res.status).toBe(404)
+    expect(pool.query).toHaveBeenCalledTimes(1)
+  })
+
+  it('decline: 200, статус declined и событие обоим', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 55, proposer_id: 1, invitee_id: 2, status: 'pending' }], []])
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []])
+      .mockResolvedValueOnce([[{ id: 55, status: 'declined' }], []])
+    const { emit } = ioSpy()
+    const res = await request(app).put('/api/schedule/55/decline').set('Authorization', `Bearer ${token(2)}`)
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('declined')
+    expect(pool.query.mock.calls[1][1]).toEqual(['declined', '55'])
+    expect(emit).toHaveBeenCalledTimes(2)
+  })
+
+  it('decline: ошибка БД → 500 через req.log', async () => {
+    pool.query.mockRejectedValueOnce(new Error('db down'))
+    const res = await request(app).put('/api/schedule/55/decline').set('Authorization', `Bearer ${token(2)}`)
+    expect(res.status).toBe(500)
+    expect(reqLog.error).toHaveBeenCalledWith('Schedule decline error:', expect.any(Error))
+  })
+
+  it('decline: 200 без поднятого WS — событие не отправляется', async () => {
     pool.query
       .mockResolvedValueOnce([[{ id: 55, proposer_id: 1, invitee_id: 2, status: 'pending' }], []])
       .mockResolvedValueOnce([{ affectedRows: 1 }, []])
       .mockResolvedValueOnce([[{ id: 55, status: 'declined' }], []])
     const res = await request(app).put('/api/schedule/55/decline').set('Authorization', `Bearer ${token(2)}`)
     expect(res.status).toBe(200)
-    expect(res.body.status).toBe('declined')
-    expect(pool.query.mock.calls[1][1]).toEqual(['declined', '55'])
+    expect(getIO).toHaveBeenCalledTimes(1)
+    expect(reqLog.error).not.toHaveBeenCalled()
   })
 
   it('cancel: ищет по proposer_id и статусу pending/accepted', async () => {
@@ -180,6 +240,7 @@ describe('PUT /api/schedule/:id/accept|decline|cancel', () => {
       .mockResolvedValueOnce([[{ id: 55, proposer_id: 1, invitee_id: 2, status: 'accepted' }], []])
       .mockResolvedValueOnce([{ affectedRows: 1 }, []])
       .mockResolvedValueOnce([[{ id: 55, status: 'cancelled' }], []])
+    const { emit } = ioSpy()
     const res = await request(app).put('/api/schedule/55/cancel').set('Authorization', `Bearer ${token(1)}`)
     expect(res.status).toBe(200)
     expect(res.body.status).toBe('cancelled')
@@ -188,12 +249,31 @@ describe('PUT /api/schedule/:id/accept|decline|cancel', () => {
     expect(String(selectSql)).toContain('status IN (?, ?)')
     expect(selectParams).toEqual(['55', 1, 'pending', 'accepted'])
     expect(pool.query.mock.calls[1][1]).toEqual(['cancelled', '55'])
+    expect(emit).toHaveBeenCalledTimes(2)
   })
 
   it('cancel: 404 когда чужое приглашение', async () => {
     pool.query.mockResolvedValueOnce([[], []])
     const res = await request(app).put('/api/schedule/55/cancel').set('Authorization', `Bearer ${token(9)}`)
     expect(res.status).toBe(404)
+  })
+
+  it('cancel: ошибка БД → 500 через req.log', async () => {
+    pool.query.mockRejectedValueOnce(new Error('db down'))
+    const res = await request(app).put('/api/schedule/55/cancel').set('Authorization', `Bearer ${token(1)}`)
+    expect(res.status).toBe(500)
+    expect(reqLog.error).toHaveBeenCalledWith('Schedule cancel error:', expect.any(Error))
+  })
+
+  it('cancel: 200 без поднятого WS — событие не отправляется', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 55, proposer_id: 1, invitee_id: 2, status: 'accepted' }], []])
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []])
+      .mockResolvedValueOnce([[{ id: 55, status: 'cancelled' }], []])
+    const res = await request(app).put('/api/schedule/55/cancel').set('Authorization', `Bearer ${token(1)}`)
+    expect(res.status).toBe(200)
+    expect(getIO).toHaveBeenCalledTimes(1)
+    expect(reqLog.error).not.toHaveBeenCalled()
   })
 
   it('401 без токена', async () => {
