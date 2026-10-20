@@ -120,6 +120,22 @@ describe('POST /api/admin/webhooks/:id/replay', () => {
     expect(sqls.some((s) => s.includes('UPDATE webhook_deliveries') && s.includes("'processed'"))).toBe(true)
   })
 
+  it('payload парсится в null -> 400 «empty», транзакция не открывается', async () => {
+    deliveryMock({ id: 7, provider: 'stripe', eventId: 'e', payload: 'null' })
+    const res = await request(createApp()).post('/api/admin/webhooks/7/replay')
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('Stored payload is empty')
+    expect(pool.getConnection).not.toHaveBeenCalled()
+  })
+
+  it('падение getWebhookDelivery -> 500 без markWebhookFailed (row неизвестен)', async () => {
+    pool.query.mockRejectedValue(new Error('read boom'))
+    const res = await request(createApp()).post('/api/admin/webhooks/8/replay')
+    expect(res.status).toBe(500)
+    const sqls = pool.query.mock.calls.map((c) => String(c[0]))
+    expect(sqls.some((s) => s.includes('UPDATE webhook_deliveries'))).toBe(false)
+  })
+
   it('падение хендлера -> rollback, failed, 500', async () => {
     deliveryMock({
       id: 6,
