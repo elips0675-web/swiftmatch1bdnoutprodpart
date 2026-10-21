@@ -189,6 +189,7 @@ export const SECURITY_DOC = 'docs/AGENTS-security.md'
 export const PRODUCTION_DOC = 'docs/AGENTS-production.md'
 export const WORKFLOW_DOC = 'docs/AGENTS-workflow.md'
 export const MIGRATIONS_DIR = 'database/migrations'
+export const E2E_DIR = 'e2e'
 export const README_FILE = 'README.md'
 
 export const CI_JOBS_CLAIM_RE = /(\d+)\s+джобы\s+`ci\.yml`/
@@ -196,6 +197,7 @@ export const DEPLOY_JOBS_CLAIM_RE = /(\d+)\s+`deploy\.yml`/
 export const MIGRATIONS_CLAIM_RE = /`database\/migrations\/`\s*\|\s*(\d+)\s+нумерованн/i
 export const README_MIGRATIONS_COUNT_RE = /(\d+)\s+пронумерованных\s+`\.sql`/i
 export const README_MIGRATIONS_SQL_RE = /`migrations\/`\s*\((\d+)\s+SQL\)/i
+export const README_E2E_SPECS_RE = /Playwright-спеки\s+\((\d+)\)/
 export const UPLOAD_CODE_RE = /fileSize:\s*(\d+)\s*\*\s*1024\s*\*\s*1024/
 export const UPLOAD_MB_CLAIM_RE = /ограничение\s+(\d+)\s*MB/i
 export const WORKFLOW_ARCHIVE_RE = /context\.txt/
@@ -711,6 +713,15 @@ export function countMigrations(root) {
   }
 }
 
+/** Число Playwright-спек (`*.spec.ts` в `e2e/`); `null` — каталог не найден. */
+export function countE2eSpecs(root) {
+  try {
+    return fs.readdirSync(path.join(root, E2E_DIR)).filter(f => f.endsWith('.spec.ts')).length
+  } catch {
+    return null
+  }
+}
+
 /**
  * Сверка чисел и ссылок документации с реальными файлами (Stage 79, пункт 8).
  *
@@ -724,7 +735,7 @@ export function countMigrations(root) {
  * по литералу `fileSize` в `upload.js`. Отсутствие якоря (утверждение пропало
  * из дока, в коде нет литерала, каталог не найден) — находка, а не пропуск.
  */
-export function collectConsistencyFindings({ analysisText, readmeText, ciYaml, deployYaml, uploadJs, securityText, productionText, workflowText, migrationCount }) {
+export function collectConsistencyFindings({ analysisText, readmeText, ciYaml, deployYaml, uploadJs, securityText, productionText, workflowText, migrationCount, e2eSpecCount }) {
   const findings = []
 
   if (readmeText && migrationCount !== null) {
@@ -734,6 +745,17 @@ export function collectConsistencyFindings({ analysisText, readmeText, ciYaml, d
       if (Number(m[1]) !== migrationCount) {
         findings.push({ id: 'consistency-readme-migrations', file: README_FILE, line: lineAt(readmeText, m.index), text: `заявлено «${m[1]}» миграций, а в ${MIGRATIONS_DIR} ${migrationCount} *.sql` })
       }
+    }
+  }
+
+  if (readmeText) {
+    const specs = README_E2E_SPECS_RE.exec(readmeText)
+    if (e2eSpecCount === null) {
+      findings.push({ id: 'consistency-e2e-anchor', file: E2E_DIR, line: 1, text: 'каталог не найден — источник истины по числу Playwright-спек отсутствует' })
+    } else if (!specs) {
+      findings.push({ id: 'consistency-e2e-specs-anchor', file: README_FILE, line: 1, text: 'нет строки «Playwright-спеки (N)» — сверка числа спек потеряла якорь' })
+    } else if (Number(specs[1]) !== e2eSpecCount) {
+      findings.push({ id: 'consistency-e2e-specs', file: README_FILE, line: lineAt(readmeText, specs.index), text: `заявлено «Playwright-спеки (${specs[1]})», а в ${E2E_DIR}/ ${e2eSpecCount} *.spec.ts` })
     }
   }
 
@@ -897,6 +919,7 @@ export function audit(root) {
     productionText: read(PRODUCTION_DOC),
     workflowText: read(WORKFLOW_DOC),
     migrationCount: countMigrations(root),
+    e2eSpecCount: countE2eSpecs(root),
   }))
 
   return { findings, docs, missing, source, promptsCheck, roadmapCheck }

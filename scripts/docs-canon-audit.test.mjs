@@ -57,6 +57,7 @@ import {
   collectConsistencyFindings,
   countWorkflowJobs,
   countMigrations,
+  countE2eSpecs,
   collectTrackedDocs,
   ANALYSIS_FILE,
   UPLOAD_ROUTE,
@@ -661,7 +662,7 @@ describe('agenda-archive.md остаётся архивом', () => {
 describe('согласованность чисел документации с реальными файлами', () => {
   const good = {
     analysisText: '- Гейты: 3 джобы `ci.yml` + 2 `deploy.yml` (на 19.10.2026).\n| `database/migrations/` | 2 нумерованная миграция + migrate.js |\n',
-    readmeText: '- **Миграции:** `database/migrations/` — 2 пронумерованных `.sql` + `migrate.js` (таблица `_migrations`)\n| `database/` | `mysql_schema.sql` + `demo_data.sql` + `migrations/` (2 SQL) |\n',
+    readmeText: '- **Миграции:** `database/migrations/` — 2 пронумерованных `.sql` + `migrate.js` (таблица `_migrations`)\n| `database/` | `mysql_schema.sql` + `demo_data.sql` + `migrations/` (2 SQL) |\n| `e2e/` | Playwright-спеки (2) |\n',
     ciYaml: 'jobs:\n  a:\n    runs-on: ubuntu-latest\n  b:\n    runs-on: ubuntu-latest\n  c:\n    runs-on: ubuntu-latest\n',
     deployYaml: 'jobs:\n  d:\n    runs-on: ubuntu-latest\n  e:\n    runs-on: ubuntu-latest\n',
     uploadJs: 'app.use("/api/upload", upload({ limits: { fileSize: 10 * 1024 * 1024 } }))\n',
@@ -669,6 +670,7 @@ describe('согласованность чисел документации с 
     productionText: '- [ ] Ограничение размера: `limits: { fileSize: 10 * 1024 * 1024 }`\n',
     workflowText: '## Этап 5 — обновить документацию\n1. project-context.md\n',
     migrationCount: 2,
+    e2eSpecCount: 2,
   }
   const run = over => collectConsistencyFindings({ ...good, ...over })
 
@@ -683,6 +685,7 @@ describe('согласованность чисел документации с 
       productionText: read(PRODUCTION_DOC),
       workflowText: read(WORKFLOW_DOC),
       migrationCount: countMigrations(ROOT),
+      e2eSpecCount: countE2eSpecs(ROOT),
     })).toEqual([])
   })
 
@@ -726,6 +729,24 @@ describe('согласованность чисел документации с 
   it('потеря якоря в upload.js (нет литерала fileSize) — находка, а не пропуск', () => {
     expect(ids(run({ uploadJs: 'app.use("/api/upload", multer())\n' }))).toContain('consistency-upload-source')
     expect(ids(run({ uploadJs: null }))).toContain('consistency-upload-source')
+  })
+
+  it('расхождение числа e2e-спек в README с фактом (находка 1.2) — находка', () => {
+    const f = run({ readmeText: good.readmeText.replace('Playwright-спеки (2)', 'Playwright-спеки (19)'), e2eSpecCount: 2 })
+    expect(ids(f)).toContain('consistency-e2e-specs')
+    expect(f.find(x => x.id === 'consistency-e2e-specs').file).toBe(README_FILE)
+  })
+
+  it('пропавшая строка «Playwright-спеки (N)» — потеря якоря, а не молчаливый пропуск', () => {
+    expect(ids(run({ readmeText: 'просто текст без строки о спеках\n' }))).toContain('consistency-e2e-specs-anchor')
+  })
+
+  it('отсутствующий каталог e2e — находка, а не пропуск', () => {
+    expect(ids(run({ e2eSpecCount: null }))).toContain('consistency-e2e-anchor')
+  })
+
+  it('countE2eSpecs на реальном репозитории больше нуля (якорь сверки на месте)', () => {
+    expect(countE2eSpecs(ROOT)).toBeGreaterThan(0)
   })
 
   it('ссылка на архив context.txt в AGENTS-workflow.md — находка', () => {

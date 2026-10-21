@@ -181,7 +181,7 @@ cd server && npm test            # серверные тесты
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 1617 тестов, 124 файла — **0 failures**
+- **Фронтенд (Vitest):** 1621 тест, 124 файла — **0 failures**
 - **Сервер (Vitest):** 2546 тестов, 146 файлов — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 206 тестов, 22 spec-файла — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
@@ -437,7 +437,7 @@ cd server && npm test            # серверные тесты
 | `server/src/seed.js` | Генератор демо-данных (50 users, 30 matches, 200 msgs) |
 | `database/` | `mysql_schema.sql` + `demo_data.sql` + `migrations/` (71 SQL) |
 | `scripts/` | Гейты и утилиты (аудит схемы/секретов/счётчиков/персистентности, бэкап, EXPLAIN) |
-| `e2e/` | Playwright-спеки (19) |
+| `e2e/` | Playwright-спеки (22) |
 | `android/` | Capacitor/Gradle-проект |
 | `k6/` | Нагрузочный сценарий |
 | `docs/` | Инструкции по модулям (см. ниже) |
