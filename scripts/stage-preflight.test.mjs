@@ -16,7 +16,11 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
   PREFLIGHT_CHECKS,
+  WINDOW_CHECK_NAME,
+  WINDOW_LIMITS,
+  WINDOW_RED_MESSAGE,
   collectPreflight,
+  probeWindow,
   verdictOf,
   renderReport,
 } from './stage-preflight.mjs'
@@ -25,7 +29,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
 
 describe('PREFLIGHT_CHECKS — состав быстрых гейтов', () => {
-  it('ровно 8 проверок из спецификации (B) плюс окно незакоммиченного', () => {
+  it('ровно 9 проверок: 8 из спецификации (B) плюс окно незакоммиченного и жёсткая проба окна', () => {
     expect(PREFLIGHT_CHECKS.map((c) => c.name)).toEqual([
       'tsc --noEmit',
       'eslint (root)',
@@ -35,6 +39,7 @@ describe('PREFLIGHT_CHECKS — состав быстрых гейтов', () => 
       'check:mirrors',
       'check:env-parity',
       'незакоммиченное окно',
+      WINDOW_CHECK_NAME,
     ])
   })
 
@@ -49,7 +54,7 @@ describe('PREFLIGHT_CHECKS — состав быстрых гейтов', () => 
   })
 
   it('каждая команда указывает на реальный npm-скрипт, файл или tsc', () => {
-    for (const c of PREFLIGHT_CHECKS) {
+    for (const c of PREFLIGHT_CHECKS.filter((x) => x.kind !== 'window')) {
       const npm = c.cmd.match(/^npm run ([\w:.-]+)$/)
       if (npm) {
         expect(pkg.scripts[npm[1]], `npm-скрипт «${npm[1]}» отсутствует в package.json`).toBeTruthy()
@@ -65,6 +70,14 @@ describe('PREFLIGHT_CHECKS — состав быстрых гейтов', () => 
     }
   })
 
+  it('проба окна объявляет, по чему считается (diff + numstat + untracked)', () => {
+    const window = PREFLIGHT_CHECKS.find((c) => c.kind === 'window')
+    expect(window).toBeTruthy()
+    expect(window.cmd).toContain('git diff --name-only HEAD')
+    expect(window.cmd).toContain('git diff --numstat HEAD')
+    expect(window.cmd).toContain('untracked')
+  })
+
   it('счётчики — самая долгая проверка: их лимит не меньше остальных', () => {
     const counters = PREFLIGHT_CHECKS.find((c) => c.cmd.includes('test-counter-audit'))
     const rest = PREFLIGHT_CHECKS.filter((c) => c !== counters)
@@ -75,25 +88,72 @@ describe('PREFLIGHT_CHECKS — состав быстрых гейтов', () => 
 })
 
 describe('collectPreflight — прогон через runner', () => {
-  it('вызывает runner для каждой проверки в порядке списка, с таймаутом', () => {
+  const greenProbe = () => ({ exit: 0, message: '', detail: 'окно: 0 файлов / 0 строк' })
+
+  it('вызывает runner для каждой командной проверки в порядке списка, с таймаутом', () => {
     const calls = []
     const runner = (cmd, opts) => {
       calls.push({ cmd, opts })
       return { exit: 0, output: '' }
     }
-    const checks = collectPreflight(runner)
-    expect(calls.map((c) => c.cmd)).toEqual(PREFLIGHT_CHECKS.map((c) => c.cmd))
+    const checks = collectPreflight(runner, greenProbe)
+    const cmdChecks = PREFLIGHT_CHECKS.filter((c) => c.kind !== 'window')
+    expect(calls.map((c) => c.cmd)).toEqual(cmdChecks.map((c) => c.cmd))
     expect(checks.map((c) => c.name)).toEqual(PREFLIGHT_CHECKS.map((c) => c.name))
     for (const call of calls) expect(call.opts.timeout).toBeGreaterThan(0)
   })
 
   it('exit каждой проверки собирается в результат, красная не маскируется', () => {
     const runner = (cmd) => ({ exit: cmd.includes('check:docs') ? 1 : 0, output: '' })
-    const checks = collectPreflight(runner)
+    const checks = collectPreflight(runner, greenProbe)
     expect(checks).toHaveLength(PREFLIGHT_CHECKS.length)
     expect(checks.find((c) => c.name === 'check:docs').exit).toBe(1)
     expect(checks.filter((c) => c.exit === 0)).toHaveLength(PREFLIGHT_CHECKS.length - 1)
     expect(checks.every((c) => typeof c.exit === 'number')).toBe(true)
+  })
+
+  it('проба окна не идёт через runner, а красная окна роняет весь preflight', () => {
+    const calls = []
+    const runner = (cmd) => {
+      calls.push(cmd)
+      return { exit: 0, output: '' }
+    }
+    const redProbe = () => ({ exit: 1, message: WINDOW_RED_MESSAGE, detail: 'окно: 9 файлов / 400 строк' })
+    const checks = collectPreflight(runner, redProbe)
+    expect(calls).not.toContain(WINDOW_CHECK_NAME)
+    const windowCheck = checks.find((c) => c.name === WINDOW_CHECK_NAME)
+    expect(windowCheck.exit).toBe(1)
+    expect(windowCheck.message).toBe(WINDOW_RED_MESSAGE)
+    expect(verdictOf(checks).exit).toBe(1)
+    expect(verdictOf(checks).red).toEqual([WINDOW_CHECK_NAME])
+  })
+})
+
+describe('probeWindow — окно перед стартом этапа', () => {
+  const fakeCollect = (summary) => () => ({ summary })
+
+  it('порог жёсткий и зафиксирован литералами: 6 файлов / 300 строк', () => {
+    expect(WINDOW_LIMITS).toEqual({ files: 6, lines: 300 })
+  })
+
+  it('окно в пределах порога — зелёное, без текста о чекпойнте', () => {
+    const res = probeWindow(WINDOW_LIMITS, fakeCollect({ files: 6, lines: 300 }))
+    expect(res.exit).toBe(0)
+    expect(res.message).toBe('')
+  })
+
+  it('больше 6 файлов — красное с точным текстом про чекпойнт', () => {
+    const res = probeWindow(WINDOW_LIMITS, fakeCollect({ files: 7, lines: 10 }))
+    expect(res.exit).toBe(1)
+    expect(res.message).toBe(
+      'Слишком много незакоммиченного перед стартом этапа. Сделай чекпойнт (микрокоммит+push) перед началом следующей большой правки.'
+    )
+  })
+
+  it('больше 300 строк — красное даже при одном файле', () => {
+    const res = probeWindow(WINDOW_LIMITS, fakeCollect({ files: 1, lines: 301 }))
+    expect(res.exit).toBe(1)
+    expect(res.message).toContain('Сделай чекпойнт (микрокоммит+push)')
   })
 })
 
@@ -132,7 +192,7 @@ describe('renderReport', () => {
     expect(report).toContain('=== PREFLIGHT (гейты до начала этапа) ===')
     expect(report).toContain('| проверка | команда | exit | статус |')
     expect(report).toContain(`| check:docs | \`npm run check:docs\` | 0 | ✅ |`)
-    expect(report).toContain(`Preflight зелёный: 8/8`)
+    expect(report).toContain(`Preflight зелёный: 9/9`)
     expect(report).toContain('можно начинать этап')
     expect(report).not.toContain('НЕ НАЧИНАЙ ЭТАП')
   })
@@ -142,8 +202,20 @@ describe('renderReport', () => {
     const report = renderReport(checks)
     expect(report).toContain('| check:mirrors | `npm run check:mirrors` | 1 | ❌ |')
     expect(report).toContain('НЕ НАЧИНАЙ ЭТАП')
-    expect(report).toContain('красные 1/8')
+    expect(report).toContain('красные 1/9')
     expect(report).toContain('check:mirrors')
     expect(report).not.toContain('можно начинать этап')
+  })
+
+  it('красная проба окна печатает текст про чекпойнт, а не только «красные 1/9»', () => {
+    const checks = green.map((c) =>
+      c.name === WINDOW_CHECK_NAME
+        ? { ...c, exit: 1, message: WINDOW_RED_MESSAGE, detail: 'окно: 9 файлов / 400 строк' }
+        : c
+    )
+    const report = renderReport(checks)
+    expect(report).toContain(WINDOW_RED_MESSAGE)
+    expect(report).toContain('окно: 9 файлов / 400 строк')
+    expect(report).toContain('НЕ НАЧИНАЙ ЭТАП')
   })
 })
