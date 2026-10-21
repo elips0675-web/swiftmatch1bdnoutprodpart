@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-21T11:31:27.661Z",
+  "generated": "2026-10-21T17:33:06.093Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -531,17 +531,17 @@
     ]
   },
   "server": {
-    "files": 147,
-    "tests": 2553,
-    "passed": 2553,
+    "files": 148,
+    "tests": 2570,
+    "passed": 2570,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 122
     },
     "product": {
-      "files": 142,
-      "tests": 2431
+      "files": 143,
+      "tests": 2448
     },
     "perFile": [
       {
@@ -651,6 +651,10 @@
       {
         "file": "server/src/__tests__/api-contract.test.js",
         "tests": 14
+      },
+      {
+        "file": "server/src/__tests__/async-handler.test.js",
+        "tests": 17
       },
       {
         "file": "server/src/__tests__/audit-action-enum.test.js",
@@ -1237,7 +1241,7 @@
     ]
   },
   "total": {
-    "files": 275,
-    "tests": 4241
+    "files": 276,
+    "tests": 4258
   }
 }
