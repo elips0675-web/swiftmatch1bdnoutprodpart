@@ -74,6 +74,7 @@ import adminWebhooks from './routes/admin/webhooks.js'
 import adminHealth from './routes/admin/health.js'
 import notificationsRoutes from './routes/notifications.js'
 import unsubscribeRoutes from './routes/unsubscribe.js'
+import reportRoutes from './routes/report.js'
 import { metricsMiddleware, metricsRoute } from './metrics.js'
 import { JWT_SECRET, verifyToken } from './middleware.js'
 import { setAuthCookies, clearAuthCookies, extractToken, REFRESH_COOKIE, ACCESS_TOKEN_TTL } from './cookies.js'
@@ -335,6 +336,7 @@ app.use(eventsRoutes)
 app.use(affiliateRoutes)
 app.use(notificationsRoutes)
 app.use(unsubscribeRoutes)
+app.use(reportRoutes)
 
 app.get('/health', healthHandler)
 app.get('/health/live', liveHandler)
