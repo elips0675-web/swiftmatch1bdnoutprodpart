@@ -30,6 +30,7 @@ import { createGracefulShutdown } from './shutdown.js'
 import { resolveTrustProxy } from './trust-proxy.js'
 import { healthHandler, liveHandler, readyHandler } from './health.js'
 import { isProduction, nonLiveIntegrations } from './runtime.js'
+import { wrapApp } from './async-handler.js'
 
 import adminDashboard from './routes/admin/dashboard.js'
 import adminUsers from './routes/admin/users.js'
@@ -338,6 +339,9 @@ app.use(unsubscribeRoutes)
 app.get('/health', healthHandler)
 app.get('/health/live', liveHandler)
 app.get('/health/ready', readyHandler)
+
+const asyncGuard = wrapApp(app)
+rootLogger.info(`Async guard: ${asyncGuard.wrapped}/${asyncGuard.total} route handlers wrapped`)
 
 // Error middleware order matters: Sentry errorHandler must be registered
 // before the generic 500 handler above to catch route errors.
