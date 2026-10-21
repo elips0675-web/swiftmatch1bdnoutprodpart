@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import request from 'supertest'
 import express from 'express'
 import jwt from 'jsonwebtoken'
+import crypto from 'crypto'
 
 vi.mock('../db.js', () => ({
   default: { query: vi.fn() },
@@ -268,6 +269,37 @@ describe('GET /api/partners/offers/hotel — запись в кэш', () => {
       expect.any(Array),
       3600,
     )
+  })
+})
+
+describe('POST /api/partners/postback/:id — подпись партнёра', () => {
+  it('подпись не той длины — 401, а не 500', async () => {
+    pool.query.mockResolvedValueOnce([[{ id: 1, affiliate_token: null, hmac_secret: 'secret', commission_rate: 10 }], []])
+
+    const res = await request(app)
+      .post('/api/partners/postback/1')
+      .set('X-Partner-Signature', 'deadbeef')
+      .send({ external_order_id: 'ext_sig_short', amount: 1000 })
+
+    expect(res.status).toBe(401)
+    expect(res.body.message).toBe('Invalid signature')
+  })
+
+  it('корректная подпись по телу — конверсия записывается', async () => {
+    const body = { external_order_id: 'ext_sig_ok', amount: 1000 }
+    const signature = crypto.createHmac('sha256', 'secret').update(JSON.stringify(body)).digest('hex')
+    pool.query
+      .mockResolvedValueOnce([[{ id: 1, affiliate_token: null, hmac_secret: 'secret', commission_rate: 10 }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([{ insertId: 505 }, []])
+
+    const res = await request(app)
+      .post('/api/partners/postback/1')
+      .set('X-Partner-Signature', signature)
+      .send(body)
+
+    expect(res.status).toBe(200)
+    expect(res.body.commission).toBe(100)
   })
 })
 

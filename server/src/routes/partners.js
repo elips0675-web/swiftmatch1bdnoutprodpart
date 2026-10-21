@@ -204,7 +204,9 @@ router.post('/api/partners/postback/:id', async (req, res) => {
       if (!signature) return res.status(401).json({ message: 'Missing X-Partner-Signature' })
       const raw = typeof req.body === 'string' ? req.body : JSON.stringify(req.body)
       const expected = crypto.createHmac('sha256', partner.hmac_secret).update(raw).digest('hex')
-      if (!crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'))) {
+      const provided = Buffer.from(signature, 'hex')
+      const expectedBuf = Buffer.from(expected, 'hex')
+      if (provided.length !== expectedBuf.length || !crypto.timingSafeEqual(provided, expectedBuf)) {
         return res.status(401).json({ message: 'Invalid signature' })
       }
     } else {
