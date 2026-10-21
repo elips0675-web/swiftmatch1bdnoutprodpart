@@ -26,9 +26,12 @@ vi.mock('../logger.js', () => ({
   default: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }))
 
-vi.mock('../ws.js', () => ({
-  getIO: vi.fn(() => null),
-}))
+const { emitMock, toMock } = vi.hoisted(() => {
+  const emit = vi.fn()
+  const to = vi.fn(() => ({ emit }))
+  return { emitMock: emit, toMock: to }
+})
+vi.mock('../ws.js', () => ({ getIO: vi.fn(() => ({ to: toMock })) }))
 
 const { getCachedMock, setCachedMock } = vi.hoisted(() => ({
   getCachedMock: vi.fn(async () => null),
@@ -214,5 +217,33 @@ describe('POST /api/partners/spa/book — фоллбэки брони', () => {
 
     expect(res.status).toBe(201)
     expect(res.body.deeplink).toBe('')
+  })
+})
+
+describe('POST /api/partners/booking/share — карточка брони', () => {
+  it('незаполненные дата, время и сообщение уходят в карточке как null', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 30, title: 'Ресторан', deeplink: '', city: 'Сочи', partner_name: 'R' }], []])
+      .mockResolvedValueOnce([[{ user_id: 5 }], []])
+
+    const res = await request(app)
+      .post('/api/partners/booking/share')
+      .set(as(5))
+      .send({ chat_id: 5, offer_id: 30 })
+
+    expect(res.status).toBe(200)
+    expect(toMock).toHaveBeenCalledWith('chat:5')
+    expect(emitMock).toHaveBeenCalledWith('partner:restaurant_shared', expect.objectContaining({
+      chatId: 5,
+      senderId: 5,
+      card: expect.objectContaining({
+        type: 'restaurant_shared',
+        restaurant: 'Ресторан',
+        date: null,
+        time: null,
+        message: null,
+        guests: 2,
+      }),
+    }))
   })
 })
