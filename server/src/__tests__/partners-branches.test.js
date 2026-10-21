@@ -168,3 +168,51 @@ describe('POST /api/partners/track — город в плейсхолдере', 
     expect(res.body.deeplink).toBe('https://taxi.ru/order?city={city}&utm_source=swiftmatch&ref=REFE')
   })
 })
+
+describe('POST /api/partners/booking — фоллбэки брони', () => {
+  it('оффер без deeplink — ссылка пустая, гости по умолчанию 2', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 8, partner_id: 4, title: 'Ресторан', deeplink: null, city: 'Сочи', partner_name: 'R' }], []])
+      .mockResolvedValueOnce([{ insertId: 701 }, []])
+
+    const res = await request(app)
+      .post('/api/partners/booking')
+      .set(as())
+      .send({ offer_id: 8, date: '2026-11-01', time: '19:00' })
+
+    expect(res.status).toBe(201)
+    expect(res.body.guests).toBe(2)
+    expect(res.body.deeplink).toBe('')
+  })
+
+  it('deeplink с уже готовым query — параметры дописываются через &', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 9, partner_id: 4, title: 'Ресторан', deeplink: 'https://r.example/book?ref=x', city: 'Сочи', partner_name: 'R' }], []])
+      .mockResolvedValueOnce([{ insertId: 702 }, []])
+
+    const res = await request(app)
+      .post('/api/partners/booking')
+      .set(as())
+      .send({ offer_id: 9, date: '2026-11-01', time: '19:00', guests: 4 })
+
+    expect(res.status).toBe(201)
+    expect(res.body.guests).toBe(4)
+    expect(res.body.deeplink).toBe('https://r.example/book?ref=x&date=2026-11-01&time=19%3A00&guests=4')
+  })
+})
+
+describe('POST /api/partners/spa/book — фоллбэки брони', () => {
+  it('оффер без deeplink — ссылка пустая', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 20, partner_id: 2, title: 'Спа', deeplink: null, city: 'Сочи', price: 100, partner_name: 'S' }], []])
+      .mockResolvedValueOnce([{ insertId: 703 }, []])
+
+    const res = await request(app)
+      .post('/api/partners/spa/book')
+      .set(as())
+      .send({ offer_id: 20, date: '2026-11-01', time: '18:00' })
+
+    expect(res.status).toBe(201)
+    expect(res.body.deeplink).toBe('')
+  })
+})
