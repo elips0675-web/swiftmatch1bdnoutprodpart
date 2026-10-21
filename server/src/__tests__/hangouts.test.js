@@ -274,6 +274,19 @@ describe('GET /api/hangouts/:id (detail) view counter (H2)', () => {
     expect(res.status).toBe(200)
     expect(res.body.chat_id).toBe(300)
   })
+
+  it('parses attendees_csv: empty display_name and avatar_url become undefined/null', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ ...baseRow, attendees_csv: '9||;10|Макс' }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await request(createApp(hangoutsRoutes)).get('/api/hangouts/5').set('Authorization', `Bearer ${authToken(10)}`)
+    expect(res.status).toBe(200)
+    expect(res.body.attendees).toEqual([
+      { user_id: 9, avatar_url: null },
+      { user_id: 10, display_name: 'Макс', avatar_url: null },
+    ])
+  })
 })
 
 describe('POST /api/hangouts', () => {
@@ -562,6 +575,17 @@ describe('POST /api/hangouts/:id/respond', () => {
       .mockResolvedValueOnce([[{ status: 'paid' }], []])
       .mockResolvedValueOnce([[{ cnt: 2 }], []])
       .mockResolvedValueOnce([[{ cnt: 1 }], []])
+    const res = await respond(createApp(hangoutsRoutes))
+    expect(res.status).toBe(409)
+    expect(res.body.message).toBe('CAPACITY_FULL')
+  })
+
+  it('returns CAPACITY_FULL via max_companions fallback when capacity is null', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 7, user_id: 1, status: 'active', title: 'Gala', price: 500.0, capacity: null, max_companions: 1, hangout_type: 'date' }], []])
+      .mockResolvedValueOnce([[{ status: 'paid' }], []])
+      .mockResolvedValueOnce([[{ cnt: 1 }], []])
+      .mockResolvedValueOnce([[{ cnt: 0 }], []])
     const res = await respond(createApp(hangoutsRoutes))
     expect(res.status).toBe(409)
     expect(res.body.message).toBe('CAPACITY_FULL')
