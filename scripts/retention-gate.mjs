@@ -42,8 +42,6 @@ export const PREFLIGHT_LIMITS = {
 
 export const IGNORED_UNTRACKED = ['Анализ задание агенту.txt', 'Анализ тестов.txt']
 
-const NOT_A_REGRESSION = ['задача владельца', 'черновик владельца', 'не коммитить']
-
 export function parsePorcelain(text) {
   const entries = []
   for (const raw of String(text || '').split('\n')) {
