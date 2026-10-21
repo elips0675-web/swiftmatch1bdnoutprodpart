@@ -134,7 +134,7 @@ export function runCheckpoint({ args, deps = {} }) {
   }
 
   const message = args.messageFile
-    ? readFile(path.join(ROOT, args.messageFile))
+    ? readFile(path.isAbsolute(args.messageFile) ? args.messageFile : path.join(ROOT, args.messageFile))
     : defaultMessage({ stage: args.stage, note: args.note, files: args.files })
 
   const plan = [
