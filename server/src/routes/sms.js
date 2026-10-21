@@ -3,6 +3,7 @@ import pool from '../db.js'
 import { auth } from '../middleware.js'
 import { rootLogger } from '../logger.js'
 import { sendSMS } from '../sms.js'
+import { wrapRouter } from '../async-handler.js'
 
 const router = Router()
 
@@ -170,4 +171,4 @@ router.get('/api/sms/status', auth, async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)

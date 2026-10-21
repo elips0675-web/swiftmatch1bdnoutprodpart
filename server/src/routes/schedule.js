@@ -3,6 +3,7 @@ import pool from '../db.js'
 import { auth } from '../middleware.js'
 import { getIO } from '../ws.js'
 import { activeUser } from '../active-user.js'
+import { wrapRouter } from '../async-handler.js'
 
 const router = Router()
 
@@ -213,4 +214,4 @@ router.put('/api/schedule/:id/cancel', auth, async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)

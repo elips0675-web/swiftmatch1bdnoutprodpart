@@ -9,6 +9,7 @@ import { notBlocked } from '../user-blocks.js'
 import { dateOnly } from '../date-only.js'
 import { auditUpdate } from '../audit.js'
 import { applyActivityPrivacy } from '../presence.js'
+import { wrapRouter } from '../async-handler.js'
 import { FieldError, blankToUndef, dateField, enumField, intField, numField, textField } from '../profile-fields.js'
 
 const GENDERS = ['male', 'female', 'other']
@@ -857,5 +858,5 @@ router.get('/api/users/watching', auth, async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)
 
