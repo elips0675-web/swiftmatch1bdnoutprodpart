@@ -1,15 +1,15 @@
 {
-  "generated": "2026-10-21T10:25:38.276Z",
+  "generated": "2026-10-21T11:13:35.116Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
     "files": 127,
-    "tests": 1656,
-    "passed": 1656,
+    "tests": 1660,
+    "passed": 1660,
     "failed": 0,
     "gate": {
       "files": 30,
-      "tests": 737
+      "tests": 741
     },
     "product": {
       "files": 97,
@@ -98,7 +98,7 @@
       },
       {
         "file": "scripts/retention-gate.test.mjs",
-        "tests": 12
+        "tests": 16
       },
       {
         "file": "scripts/schema-drift-audit.test.mjs",
@@ -1234,6 +1234,6 @@
   },
   "total": {
     "files": 274,
-    "tests": 4209
+    "tests": 4213
   }
 }
