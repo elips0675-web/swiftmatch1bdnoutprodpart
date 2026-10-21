@@ -6,6 +6,7 @@ import logger from '../logger.js'
 import { textField } from '../profile-fields.js'
 import { auditLog } from '../audit.js'
 import { buildExportPayload, buildExportArchive } from '../gdpr-export.js'
+import { wrapRouter } from '../async-handler.js'
 
 const router = Router()
 
@@ -189,4 +190,4 @@ router.get('/api/consent/history', auth, async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)

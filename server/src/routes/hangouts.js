@@ -17,6 +17,7 @@ import { logWebhookDelivery, markWebhookProcessed, markWebhookFailed, WEBHOOK_PR
 import { createBreaker } from '../circuit-breaker.js'
 import { getPrefs, getPrefsMap, isAllowed, isAllowedIn } from '../notification-prefs.js'
 import { refuseMockPayment } from '../runtime.js'
+import { wrapRouter } from '../async-handler.js'
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 
@@ -2129,4 +2130,4 @@ export async function applyHangoutTicket(event, conn) {
   )
 }
 
-export default router
+export default wrapRouter(router)

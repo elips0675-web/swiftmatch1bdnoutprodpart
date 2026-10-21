@@ -4,6 +4,7 @@ import { adminAuth } from '../middleware/adminAuth.js'
 import pool from '../db.js'
 import { rootLogger } from '../logger.js'
 import { moderateText, moderateImage, reviewProfile, isAIModerationConfigured } from '../ai-moderation.js'
+import { wrapRouter } from '../async-handler.js'
 
 const router = Router()
 
@@ -118,4 +119,4 @@ router.get('/api/moderation/status', auth, async (req, res) => {
   })
 })
 
-export default router
+export default wrapRouter(router)

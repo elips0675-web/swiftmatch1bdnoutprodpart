@@ -6,6 +6,7 @@ import { rootLogger } from '../logger.js'
 import { createBreaker } from '../circuit-breaker.js'
 import { activeUser } from '../active-user.js'
 import { notBlocked } from '../user-blocks.js'
+import { wrapRouter } from '../async-handler.js'
 
 const router = Router()
 
@@ -129,4 +130,4 @@ router.post('/api/icebreakers/suggest', auth, icebreakerLimiter, async (req, res
   }
 })
 
-export default router
+export default wrapRouter(router)
