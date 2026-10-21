@@ -247,3 +247,23 @@ describe('POST /api/partners/booking/share — карточка брони', () 
     }))
   })
 })
+
+describe('GET /api/partners/offers/hotel — запись в кэш', () => {
+  it('падение записи в кэш не роняет ленту офферов', async () => {
+    pool.query.mockResolvedValueOnce([[{ id: 40, title: 'Отель', price: 5000 }], []])
+    setCachedMock.mockRejectedValueOnce(new Error('redis down'))
+
+    const res = await request(app)
+      .get('/api/partners/offers/hotel?city=Sochi')
+      .set(as())
+
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].title).toBe('Отель')
+    expect(setCachedMock).toHaveBeenCalledWith(
+      'partner:offers:hotel:sochi',
+      expect.any(Array),
+      3600,
+    )
+  })
+})
