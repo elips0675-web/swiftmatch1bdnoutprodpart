@@ -48,6 +48,8 @@
     "check:blocks-coverage": "node scripts/blocks-coverage-audit.mjs",
     "check:query-param": "node scripts/query-param-audit.mjs",
     "check:migrations-lag": "node scripts/migrations-lag-audit.mjs",
+    "stage:preflight": "node scripts/stage-preflight.mjs",
+    "retent:check": "node scripts/retention-gate.mjs",
     "stage:facts": "node scripts/stage-facts.mjs",
     "stage:section": "node scripts/stage-section.mjs"
   },
