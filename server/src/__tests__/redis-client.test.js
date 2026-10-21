@@ -90,15 +90,18 @@ describe('redis.js — жизненный цикл клиентов', () => {
     expect(logger.info).toHaveBeenCalledWith('Redis not configured — skipping')
   })
 
-  it('опции клиента: лимит повторов, connectTimeout и retryStrategy с потолком', async () => {
+  it('опции клиента: лимит повторов, connectTimeout и retryStrategy никогда не сдаётся', async () => {
     const { getRedis } = await freshRedis()
     const client = getRedis()
     expect(client.opts.maxRetriesPerRequest).toBe(3)
     expect(client.opts.connectTimeout).toBe(3000)
     expect(client.opts.retryStrategy(1)).toBe(200)
     expect(client.opts.retryStrategy(3)).toBe(600)
-    expect(client.opts.retryStrategy(4)).toBeNull()
-    expect(client.opts.retryStrategy(999)).toBeNull()
+    // Инцидент 21.10.2026: `times > 3 → null` убивал клиент навсегда после
+    // обрыва — все /api отвечали 500 до рестарта процесса. Стратегия обязана
+    // возвращать задержку при любых times (с потолком), без null.
+    expect(client.opts.retryStrategy(4)).toBe(800)
+    expect(client.opts.retryStrategy(999)).toBe(10_000)
   })
 
   it('lazyConnect включается только вне NODE_ENV=test', async () => {

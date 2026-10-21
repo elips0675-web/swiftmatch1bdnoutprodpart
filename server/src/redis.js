@@ -13,8 +13,7 @@ function createRedisClient() {
   const opts = {
     maxRetriesPerRequest: 3,
     retryStrategy(times) {
-      if (times > 3) return null
-      return Math.min(times * 200, 2000)
+      return Math.min(times * 200, 10_000)
     },
     connectTimeout: 3000,
   }
