@@ -16,7 +16,7 @@
 - `adminAuth` middleware — **ACTIVE** (с этапа 9): 401 без/невалидный токен, 403 не-админ. Единый гейт `app.use('/api/admin', ...)` в index.js; публичен только `GET /api/admin/features`; `dev-login` → 404 в production
 - **ПРАВИЛО adminAuth (qwen #1, этап 37):** защита админ-эндпоинтов — ТОЛЬКО через active-check middleware `adminAuth` (сам валидирует JWT и роль, сам отвечает 401/403). ЗАПРЕЩЕНО: (а) пассивные проверки вида `if (!req.user) next()` без ответа; (б) ручные проверки `req.user.role !== 'admin'` внутри хендлеров вместо middleware; (в) обход/удаление единого гейта `app.use('/api/admin', adminAuth)`. Новые админ-роуты наследуют защиту автоматически; проверка при ревью: запрос без токена обязан вернуть 401 ДО логики хендлера
 - Все SQL-запросы — prepared statements (`??` в mysql2). Никакой конкатенации строк.
-- Server-side только uuid для имён файлов, ограничение 10MB (`upload.js:76`), только image/*
+- Server-side только uuid для имён файлов, ограничение 10MB (`upload.js:77`), только image/*
 - CORS: `*` для Capacitor (dev), env-переменная для production
 - Sentry beforeSend: фильтрует authorization, cookie, email, IP
 - Stripe webhook: `express.raw({ type: 'application/json' })` ДО express.json()
