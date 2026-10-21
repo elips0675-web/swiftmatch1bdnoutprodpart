@@ -37,7 +37,7 @@ const JWT_SECRET = process.env.JWT_SECRET
 function createApp() {
   const app = express()
   app.use(express.json())
-  // cookie-parser подключён в index.js:103 — без него req.cookies пуст и ветки
+  // cookie-parser подключён в index.js:105 — без него req.cookies пуст и ветки
   // «токен из cookie» неисполнимы в честном сценарии.
   app.use(cookieParser())
   app.use(authRoutes)

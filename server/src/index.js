@@ -115,7 +115,7 @@ app.use(csrf)
 // app.use(csrfGuard)
 
 // Sentry must be initialized BEFORE routes and the final error handler,
-// otherwise setupExpressErrorHandler (registered last, see :344) never fires.
+// otherwise setupExpressErrorHandler (registered last, see :350) never fires.
 initSentry()
 
 // Request ID + structured logger
