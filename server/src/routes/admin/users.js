@@ -5,6 +5,7 @@ import logger from '../../logger.js'
 import { softDelete, softDeleteWhere, auditLog } from '../../audit.js'
 import { JWT_SECRET } from '../../middleware.js'
 import { getIO } from '../../ws.js'
+import { wrapRouter } from '../../async-handler.js'
 
 const router = Router()
 
@@ -553,4 +554,4 @@ router.post('/impersonate/:userId', async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)

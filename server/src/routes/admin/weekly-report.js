@@ -5,6 +5,7 @@ import {
   resolveRecipient,
   sendWeeklyReport,
 } from '../../weekly-report.js'
+import { wrapRouter } from '../../async-handler.js'
 
 const router = Router()
 
@@ -51,4 +52,4 @@ router.post('/weekly-report/send', async (req, res) => {
   res.json({ message: 'Weekly report sent', summary: result.summary })
 })
 
-export default router
+export default wrapRouter(router)

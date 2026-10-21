@@ -1,5 +1,7 @@
 # Что сделано
 
+(Stage 149.10 — 21.10.2026) — Part 3 завершена: батч 8/8 — `admin/users`, `admin/webhooks`, `admin/weekly-report`. Итог: **все 44 файла `server/src/routes/**/*.js` теперь экспортируют `export default wrapRouter(router)`** (проверка `findstr`: 44 совпадения `export default wrapRouter(router)`, 0 совпадений `export default router`). Покрыты оба контура: `wrapApp(app)` в `index.js` (прод) и обёртка на уровне самого роутера (тест, который монтирует роутер напрямую через supertest). Проверки после последнего батча: `npx eslint` по трём файлам — чисто; полный прогон сервера — 148 файлов / 2570 тестов, 0 падений.
+
 (Stage 149.9 — 21.10.2026) — Part 3, батч 7/8: `admin/messaging`, `admin/monetization`, `admin/partners`, `admin/queues`, `admin/reports`, `admin/teams`. Все шесть — ровно 2/1 в diff.
 
 (Stage 149.8 — 21.10.2026) — Part 3, батч 6/8: `admin/content`, `admin/dashboard`, `admin/features`, `admin/hangouts`, `admin/health`, `admin/logs`. Все шесть — ровно 2/1 в diff.

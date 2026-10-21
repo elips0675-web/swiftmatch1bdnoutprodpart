@@ -13,6 +13,7 @@ import { applyEventTicket } from '../events.js'
 import { applyPartnerOrder } from '../partners.js'
 import { applyPartnerSubscription } from '../partner-dashboard.js'
 import { applyHangoutTicket } from '../hangouts.js'
+import { wrapRouter } from '../../async-handler.js'
 
 const router = Router()
 
@@ -100,4 +101,4 @@ router.post('/webhooks/:id/replay', async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)
