@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-21T20:13:48.100Z",
+  "generated": "2026-10-21T20:23:26.467Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -531,17 +531,17 @@
     ]
   },
   "server": {
-    "files": 154,
-    "tests": 2618,
-    "passed": 2618,
+    "files": 155,
+    "tests": 2621,
+    "passed": 2621,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 122
     },
     "product": {
-      "files": 149,
-      "tests": 2496
+      "files": 150,
+      "tests": 2499
     },
     "perFile": [
       {
@@ -937,6 +937,10 @@
         "tests": 16
       },
       {
+        "file": "server/src/__tests__/payment-reconcile-run.test.js",
+        "tests": 3
+      },
+      {
         "file": "server/src/__tests__/payment-reconcile.test.js",
         "tests": 13
       },
@@ -1265,7 +1269,7 @@
     ]
   },
   "total": {
-    "files": 282,
-    "tests": 4306
+    "files": 283,
+    "tests": 4309
   }
 }
