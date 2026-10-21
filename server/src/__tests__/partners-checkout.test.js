@@ -329,6 +329,27 @@ describe('POST /api/partners/order/webhook', () => {
     expect(conn.release).toHaveBeenCalled()
   })
 
+  it('событие без id — обрабатывается с пустым event_id, заказ всё равно applied', async () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_x'
+    process.env.STRIPE_WEBHOOK_SECRET = 'whsec'
+    constructEvent.mockReturnValueOnce({
+      type: 'checkout.session.completed',
+      data: { object: { id: 'cs_1', payment_status: 'paid' } },
+    })
+    connQuery.mockImplementation(async (sql) => {
+      if (String(sql).includes('INSERT IGNORE INTO webhook_events')) return [{ affectedRows: 1 }, []]
+      return [{}, []]
+    })
+    const res = await request(app).post('/api/partners/order/webhook').set('stripe-signature', 't=1,v1=ok').send({})
+    expect(res.status).toBe(200)
+    const insert = connQuery.mock.calls.find((c) => String(c[0]).includes('INSERT IGNORE INTO webhook_events'))
+    expect(insert[1]).toEqual(['partner_order', ''])
+    expect(markProcessedMock).toHaveBeenCalledWith('partner_order', '')
+    expect(conn.commit).toHaveBeenCalled()
+    const sqls = connQuery.mock.calls.map((c) => String(c[0]))
+    expect(sqls.some((s) => s.includes("UPDATE partner_orders SET status = 'paid'"))).toBe(true)
+  })
+
   it('повторная доставка события откатывается и не применяет заказ', async () => {
     process.env.STRIPE_SECRET_KEY = 'sk_test_x'
     process.env.STRIPE_WEBHOOK_SECRET = 'whsec'
