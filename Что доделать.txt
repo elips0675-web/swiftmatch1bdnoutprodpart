@@ -36,9 +36,9 @@
 
 ## 🟡 P2 — nice-to-have, дошлифовка
 
-### CI-01: подтвердить зелёный прогон `ci.yml`/`deploy.yml` на `main` (проверено 20.10.2026)
+### CI-01: подтвердить зелёный прогон `ci.yml`/`deploy.yml` на `main` (проверено 21.10.2026)
 
-Четыре джобы (`server-test`, `test-counters`, `e2e`, Trivy) разобраны и исправлены 12.10.2026. Остаток: подтвердить последний прогон на `main` после проброса секретов (ENV-02). При зелёном — внести в `Что сделано.txt`; при красном — чинить. Детали — `docs/backlog-p0-p1.md`, раздел «P0. Живое состояние и CI».
+Разбор HEAD `b9c7fb9` (run 292): **4 постоянных красных джобы**, локально все четыре разобраны с file:line. `dependency-audit` — HIGH `follow-redirects` 1.16.0 в `server/`, закрыт Stage 143 (`npm audit fix` → 1.16.1, оба `audit:prod` exit 0). `test-counters` — Stage 142 не закоммитил `test/machine/*` (7 расхождений), закрыт Stage 143 (`test-counter-audit --fix`, прогон exit 0). `integration-smoke` — FCM-регресс: `server/src/fcm.js:39-49` (ветка `applicationDefault` перекрывает legacy HTTP `:80-104` после обновления firebase-admin 13→14), чинится следующим этапом. `test-server` — локально не воспроизводится (6 прогонов зелёные: обычный, Node 22 + `CI=true`, `TZ=UTC`), логи CI недоступны без входа (403 «Must have admin rights») — нужен доступ владельца либо воспроизведение в Docker-контуре CI. Остаток: подтвердить зелёный прогон на `main` после проброса секретов (ENV-02). Детали — `docs/backlog-p0-p1.md`, раздел «P0. Живое состояние и CI».
 
 ### TEST-04: native/WebView E2E (Capacitor) — нет спека (проверено 20.10.2026)
 
