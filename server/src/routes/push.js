@@ -6,6 +6,7 @@ import logger from '../logger.js'
 import { pushQueue } from '../queue.js'
 import { isFCMConfigured, sendFcmToAll } from '../fcm.js'
 import { isQuietNow, quietUserSet } from '../quiet-hours.js'
+import { wrapRouter } from '../async-handler.js'
 
 const router = Router()
 
@@ -220,4 +221,4 @@ async function sendPushAllDirect(title, body, url) {
   }
 }
 
-export default router
+export default wrapRouter(router)

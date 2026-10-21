@@ -7,6 +7,7 @@ import { invalidate } from '../cache.js'
 import { refuseMockPayment } from '../runtime.js'
 import { logWebhookDelivery, markWebhookProcessed, markWebhookFailed, WEBHOOK_PROVIDERS } from '../webhooks.js'
 import { FieldError, enumField, intField, numField, textField } from '../profile-fields.js'
+import { wrapRouter } from '../async-handler.js'
 
 const router = Router()
 
@@ -492,4 +493,4 @@ export async function applyPartnerSubscription(event, conn) {
   await conn.query('UPDATE partners SET commission_rate = 15 WHERE id = ?', [Number(partnerId)])
 }
 
-export default router
+export default wrapRouter(router)

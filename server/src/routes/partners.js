@@ -9,6 +9,7 @@ import { parseRadiusKm } from '../geo.js'
 import { refuseMockPayment } from '../runtime.js'
 import { logWebhookDelivery, markWebhookProcessed, markWebhookFailed, WEBHOOK_PROVIDERS } from '../webhooks.js'
 import { textField } from '../profile-fields.js'
+import { wrapRouter } from '../async-handler.js'
 
 const router = Router()
 
@@ -763,4 +764,4 @@ router.post('/api/partners/booking/share', auth, async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)

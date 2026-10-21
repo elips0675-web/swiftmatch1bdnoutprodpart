@@ -6,6 +6,7 @@ import {
   getPrefs, savePrefs, normalizePrefs, defaultPrefs, describeMatrix, CHANNELS,
 } from '../notification-prefs.js'
 import { getQuiet, saveQuiet, normalizeQuiet } from '../quiet-hours.js'
+import { wrapRouter } from '../async-handler.js'
 
 const router = Router()
 
@@ -248,4 +249,4 @@ router.put('/api/notifications/:id/read', auth, async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)

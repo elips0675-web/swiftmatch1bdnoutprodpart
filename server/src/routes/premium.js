@@ -7,6 +7,7 @@ import { createBreaker } from '../circuit-breaker.js'
 import { refuseMockPayment } from '../runtime.js'
 import { logWebhookDelivery, markWebhookProcessed, markWebhookFailed, WEBHOOK_PROVIDERS } from '../webhooks.js'
 import { FieldError, intField } from '../profile-fields.js'
+import { wrapRouter } from '../async-handler.js'
 
 const router = Router()
 
@@ -349,4 +350,4 @@ export async function applyPremiumEvent(event, conn) {
   return false
 }
 
-export default router
+export default wrapRouter(router)
