@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import logger from '../../logger.js'
 import { collectHealth } from '../../health-check.js'
+import { wrapRouter } from '../../async-handler.js'
 
 const router = Router()
 
@@ -24,4 +25,4 @@ router.get('/health', async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)

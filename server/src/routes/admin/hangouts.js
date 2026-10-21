@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import pool from '../../db.js'
 import logger from '../../logger.js'
+import { wrapRouter } from '../../async-handler.js'
 
 /**
  * @openapi
@@ -199,4 +200,4 @@ router.post('/hangouts/:id/merge', async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)

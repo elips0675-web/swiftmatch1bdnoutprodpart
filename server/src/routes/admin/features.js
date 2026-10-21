@@ -2,6 +2,7 @@ import { Router } from 'express'
 import pool from '../../db.js'
 import logger from '../../logger.js'
 import { FieldError, intField } from '../../profile-fields.js'
+import { wrapRouter } from '../../async-handler.js'
 
 const router = Router()
 
@@ -109,4 +110,4 @@ router.put('/features', async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)

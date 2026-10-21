@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { getRecentLogs } from '../../log-buffer.js'
+import { wrapRouter } from '../../async-handler.js'
 
 const router = Router()
 
@@ -30,4 +31,4 @@ router.get('/logs/recent', (req, res) => {
   res.json({ logs })
 })
 
-export default router
+export default wrapRouter(router)
