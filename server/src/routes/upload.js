@@ -11,6 +11,7 @@ import { processImage, getImageUrls } from '../image-pipeline.js'
 import { moderateImage } from '../ai-moderation.js'
 import { requirePhotoModerationOrRefuse, initialPhotoModerationStatus } from '../runtime.js'
 import { auditLog } from '../audit.js'
+import { wrapRouter } from '../async-handler.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(__dirname, '../../uploads')
@@ -317,4 +318,4 @@ router.get('/api/photos/:userId', auth, async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)

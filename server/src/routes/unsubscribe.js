@@ -2,6 +2,7 @@ import { Router } from 'express'
 import pool from '../db.js'
 import logger from '../logger.js'
 import { verifyUnsubscribeToken, recordUnsubscribe, isUnsubscribeFeatureEnabled } from '../email-unsubscribe.js'
+import { wrapRouter } from '../async-handler.js'
 
 const router = Router()
 
@@ -54,4 +55,4 @@ router.post('/api/email/unsubscribe', async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)

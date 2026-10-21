@@ -4,6 +4,7 @@ import { statSync } from 'fs'
 import { basename } from 'path'
 import logger from '../../logger.js'
 import { listBackups, createBackup, createFileBackup, resolveBackupPath } from '../../backup.js'
+import { wrapRouter } from '../../async-handler.js'
 
 const router = Router()
 
@@ -107,4 +108,4 @@ router.get('/backup/:name/download', async (req, res) => {
   stream.pipe(res)
 })
 
-export default router
+export default wrapRouter(router)

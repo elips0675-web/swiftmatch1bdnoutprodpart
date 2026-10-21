@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import pool from '../../db.js'
 import logger from '../../logger.js'
+import { wrapRouter } from '../../async-handler.js'
 
 const router = Router()
 
@@ -111,4 +112,4 @@ router.get('/analytics/registrations', wrap(async (req, res) => {
   res.json(rows)
 }))
 
-export default router
+export default wrapRouter(router)

@@ -5,6 +5,7 @@ import pool from '../db.js'
 import { rootLogger } from '../logger.js'
 import { adminAuth } from '../middleware/adminAuth.js'
 import { generateTotpSecret, verifyTotpToken } from '../totp.js'
+import { wrapRouter } from '../async-handler.js'
 
 const router = Router()
 
@@ -86,4 +87,4 @@ router.post('/api/auth/2fa/disable', adminAuth, async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)

@@ -14,6 +14,7 @@ import { trackEvent } from './experiments.js'
 import { getPrefs, isAllowed, isAllowedIn } from '../notification-prefs.js'
 import { activeUser } from '../active-user.js'
 import { applyActivityPrivacy } from '../presence.js'
+import { wrapRouter } from '../async-handler.js'
 
 const likeLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: 100, message: { message: 'Too many likes' } })
 
@@ -1311,4 +1312,4 @@ router.get('/api/block/list', auth, async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)
