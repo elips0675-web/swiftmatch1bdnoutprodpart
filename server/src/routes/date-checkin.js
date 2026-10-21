@@ -3,6 +3,7 @@ import pool from '../db.js'
 import { auth } from '../middleware.js'
 import logger from '../logger.js'
 import { FieldError, textField } from '../profile-fields.js'
+import { wrapRouter } from '../async-handler.js'
 
 const router = Router()
 
@@ -206,4 +207,4 @@ router.get('/active', auth, async (req, res) => {
   }
 });
 
-export default router
+export default wrapRouter(router)

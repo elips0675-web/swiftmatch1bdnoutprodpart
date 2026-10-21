@@ -4,6 +4,7 @@ import { auth } from '../middleware.js'
 import { adminAuth } from '../middleware/adminAuth.js'
 import pool from '../db.js'
 import { rootLogger } from '../logger.js'
+import { wrapRouter } from '../async-handler.js'
 
 const router = Router()
 
@@ -189,4 +190,4 @@ router.delete('/api/admin/experiments/:id', adminAuth, async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)

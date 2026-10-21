@@ -4,6 +4,7 @@ import { auth } from '../middleware.js'
 import logger from '../logger.js'
 import { refuseMockPayment } from '../runtime.js'
 import { logWebhookDelivery, markWebhookProcessed, markWebhookFailed, WEBHOOK_PROVIDERS } from '../webhooks.js'
+import { wrapRouter } from '../async-handler.js'
 
 const router = Router()
 
@@ -295,4 +296,4 @@ export async function applyEventTicket(event, conn) {
   }
 }
 
-export default router
+export default wrapRouter(router)

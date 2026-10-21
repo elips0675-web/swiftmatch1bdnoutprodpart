@@ -8,6 +8,7 @@ import logger from '../logger.js'
 import { trackEvent } from './experiments.js'
 import { setAuthCookies, clearAuthCookies, ACCESS_COOKIE, REFRESH_COOKIE, ACCESS_TOKEN_TTL } from '../cookies.js'
 import { stripHtml } from '../sanitize.js'
+import { wrapRouter } from '../async-handler.js'
 
 const router = Router()
 
@@ -524,4 +525,4 @@ router.get('/api/auth/me', async (req, res) => {
 })
 
 export { createRefreshToken, makeFingerprint }
-export default router
+export default wrapRouter(router)
