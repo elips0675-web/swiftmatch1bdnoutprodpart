@@ -1,5 +1,5 @@
 ===== Фронт (Vitest) =====
-1667 тестов в 127 файлах (зелёных 1667) (vitest --reporter=json)
+1688 тестов в 128 файлах (зелёных 1688) (vitest --reporter=json)
 
 # файл | тестов
 scripts/backup-smoke-gate.test.mjs | 34
@@ -25,6 +25,7 @@ scripts/query-param-audit.test.mjs | 15
 scripts/retention-gate.test.mjs | 16
 scripts/schema-drift-audit.test.mjs | 31
 scripts/secrets-leak-audit.test.mjs | 22
+scripts/stage-checkpoint.test.mjs | 21
 scripts/stage-context.test.mjs | 12
 scripts/stage-facts.test.mjs | 15
 scripts/stage-preflight.test.mjs | 18
