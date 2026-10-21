@@ -51,6 +51,9 @@ const app = express()
 app.use(express.json())
 app.use(partnersRoutes)
 
+const noParserApp = express()
+noParserApp.use(partnersRoutes)
+
 const as = (userId = 1) => ({
   Authorization: `Bearer ${jwt.sign({ userId, role: 'user' }, JWT_SECRET, { expiresIn: '1h' })}`,
 })
@@ -265,5 +268,27 @@ describe('GET /api/partners/offers/hotel — запись в кэш', () => {
       expect.any(Array),
       3600,
     )
+  })
+})
+
+describe('роуты партнёров, смонтированные без body-парсера', () => {
+  const cases = [
+    { path: '/api/partners/track', message: 'offer_id is required', auth: true },
+    { path: '/api/partners/postback/1', message: 'external_order_id is required', auth: false },
+    { path: '/api/partners/hotel/book', message: 'offer_id is required', auth: true },
+    { path: '/api/partners/spa/book', message: 'offer_id is required', auth: true },
+    { path: '/api/partners/order', message: 'offer_id is required', auth: true },
+    { path: '/api/partners/booking', message: 'offer_id is required', auth: true },
+    { path: '/api/partners/booking/share', message: 'chat_id is required', auth: true },
+  ]
+
+  it.each(cases)('без body-парсера $path отвечает 400, а не 500', async ({ path, message, auth }) => {
+    const req = request(noParserApp).post(path)
+    if (auth) req.set(as())
+    const res = await req.send({ offer_id: 1 })
+
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe(message)
+    expect(pool.query).not.toHaveBeenCalled()
   })
 })
