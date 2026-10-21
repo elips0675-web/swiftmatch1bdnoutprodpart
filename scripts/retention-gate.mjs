@@ -12,12 +12,18 @@
  * push. Порог ниже — не «красота ради красоты», а сигнал, что этап пора
  * резать: каждая часть — своя запись Stage N, свой коммит, свой push.
  *
+ * Stage 148 (часть 2) — пороги ужесточены: строгий режим 8/400 → **6 файлов /
+ * 300 строк**, preflight 12/600 → **10/450**. Причина: правило «чекпойнт после
+ * каждого логического блока» (docs/AGENTS-workflow.md) — это не «совет в конце
+ * этапа», а запрет накапливать окно. Мягкий порог оставлен с запасом: старт
+ * этапа прощает чуть больше, рутинные вызовы в середине — нет.
+ *
  * Гейт офлайн (только git): вызывается из `npm run stage:preflight` перед
  * стартом этапа и из `npm run retent:check` сколько угодно раз в процессе.
  *
  * Флаги:
  *   (без флагов)  — строгий режим для рутинных вызовов в конце/середине этапа
- *   --preflight   — мягкий режим для старта этапа (порог +4 файла/+200 строк)
+ *   --preflight   — мягкий режим для старта этапа (порог +4 файла/+150 строк)
  *   --json        — машинный вывод вместо таблицы
  *
  * Exit: 0 — окно в норме; 1 — окно слишком большое (список файлов в отчёте).
@@ -31,16 +37,50 @@ import { fileURLToPath } from 'node:url'
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 export const LIMITS = {
-  files: 8,
-  lines: 400,
+  files: 6,
+  lines: 300,
 }
 
 export const PREFLIGHT_LIMITS = {
-  files: 12,
-  lines: 600,
+  files: 10,
+  lines: 450,
 }
 
 export const IGNORED_UNTRACKED = ['Анализ задание агенту.txt', 'Анализ тестов.txt']
+
+/**
+ * Декодирует путь, который git отдаёт в кавычках: не-ASCII он пишет
+ * восьмеричными байтами (`"\320\226\320\275..."`), а не буквами. Без этого
+ * `IGNORED_UNTRACKED` никогда не совпадал с реальным именем файла — владельческие
+ * черновики считались в окне двумя лишними файлами, а имена в отчёте печатались
+ * нечитаемыми (питфолл «фикстура воспроизводит то, что создаёт тестируемый
+ * код»: тест кормил парсер готовым кириллическим именем, которого git не
+ * выдаёт).
+ */
+export function decodeGitPath(raw) {
+  const text = String(raw == null ? '' : raw)
+  if (!text.includes('\\')) return text
+  const bytes = []
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i]
+    if (ch === '\\' && i + 1 < text.length) {
+      const next = text[i + 1]
+      if (next === '"' || next === '\\') {
+        bytes.push(next.charCodeAt(0))
+        i += 1
+        continue
+      }
+      const octal = text.slice(i + 1, i + 4)
+      if (/^[0-7]{3}$/.test(octal)) {
+        bytes.push(parseInt(octal, 8))
+        i += 3
+        continue
+      }
+    }
+    bytes.push(ch.charCodeAt(0))
+  }
+  return Buffer.from(bytes).toString('utf8')
+}
 
 export function parsePorcelain(text) {
   const entries = []
@@ -50,8 +90,9 @@ export function parsePorcelain(text) {
     const status = line.slice(0, 2)
     let file = line.slice(3)
     if (file.includes(' -> ')) file = file.split(' -> ').pop()
-    file = file.replace(/^"|"$/g, '')
-    entries.push({ status, file, untracked: status === '??' })
+    const quoted = file.startsWith('"') && file.endsWith('"')
+    file = quoted ? file.slice(1, -1) : file
+    entries.push({ status, file: decodeGitPath(file), untracked: status === '??' })
   }
   return entries
 }
@@ -64,7 +105,7 @@ export function parseNumstat(text) {
     const line = raw.replace(/\r$/, '')
     if (!line.trim()) continue
     const [a, r, ...rest] = line.split('\t')
-    const file = rest.join('\t')
+    const file = decodeGitPath(rest.join('\t'))
     const add = a === '-' ? 0 : Number(a) || 0
     const del = r === '-' ? 0 : Number(r) || 0
     added += add
@@ -142,8 +183,14 @@ export function renderReport(summary, verdict, tracked, untracked) {
     lines.push('Окно в норме: работа не рискует потеряться сильнее порога.')
   } else {
     lines.push(`ОКНО СЛИШКОМ БОЛЬШОЕ: ${verdict.red.join(', ')}.`)
+    lines.push('Слишком большое незакоммиченное окно. Сделай МИКРОКОММИТ:')
+    lines.push('- разбей правки на логические блоки')
+    lines.push('- git add поимённо по каждому блоку')
+    lines.push('- запиши Stage N.Y в «Что сделано.txt»')
+    lines.push('- git commit --no-verify -F + git push origin main')
+    lines.push('Затем продолжай следующий блок.')
     lines.push(
-      'Разбей этап на части: каждая часть — запись Stage N в «Что сделано.txt», коммит (`git commit --no-verify -F`) и `git push`. Работа сверх порога теряется при обрыве сессии.'
+      'Работа сверх порога теряется при обрыве сессии: окно не закоммичено — значит, не сохранено.'
     )
   }
   if (untracked.some((u) => u.ignored)) {
@@ -162,8 +209,10 @@ export function git(args) {
 }
 
 export function collectRetention() {
-  const porcelain = git(['status', '--porcelain'])
-  const numstat = git(['diff', '--numstat', 'HEAD'])
+  // core.quotepath=false — git отдаёт не-ASCII пути буквами, а не \320\226…:
+  // иначе имена в отчёте нечитаемы и сравнение с IGNORED_UNTRACKED не срабатывает.
+  const porcelain = git(['-c', 'core.quotepath=false', 'status', '--porcelain'])
+  const numstat = git(['-c', 'core.quotepath=false', 'diff', '--numstat', 'HEAD'])
   const entries = parsePorcelain(porcelain)
   const { tracked, untracked } = classify(entries, parseNumstat(numstat))
   const summary = summarize(tracked, untracked)

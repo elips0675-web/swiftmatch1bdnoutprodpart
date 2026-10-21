@@ -5,6 +5,19 @@
  * порога в обе стороны, честная сумма строк (tracked — из `--numstat`,
  * untracked — длиной файла), игнор владельческих черновиков и запрет молчания
  * при пустом дереве. Сломать правило = покрасить эти тесты.
+ *
+ * Stage 148 (часть 2) — пороги ужесточены (строгий 6/300, preflight 10/450).
+ * Числа зафиксированы в тесте **литералами**, а не ссылкой на константы гейта:
+ * иначе ослабление порога (8/400 → 12/800) осталось бы зелёным — гейт
+ * сверялся бы сам с собой (питфолл «гейт сверяет реальность с собственной
+ * константой»).
+ *
+ * Там же — фикс реального бага гейта: git отдаёт не-ASCII пути в кавычках
+ * восьмеричными байтами, поэтому `IGNORED_UNTRACKED` никогда не совпадал, и
+ * **владельческие черновики считались в окне двумя лишними файлами** (треть
+ * бюджета порога!). Фикстура ниже воспроизводит именно тот вывод, который
+ * отдаёт git, — иначе тест кормил бы парсер несуществующим форматом и баг жил
+ * бы дальше (питфолл «фикстура воспроизводит то, что создаёт тестируемый код»).
  */
 
 import { describe, expect, it } from 'vitest'
@@ -21,6 +34,7 @@ import {
   summarize,
   verdictOf,
   renderReport,
+  collectRetention,
 } from './retention-gate.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -45,6 +59,23 @@ describe('parsePorcelain', () => {
   it('пустой вывод — пустой список, не падение', () => {
     expect(parsePorcelain('')).toEqual([])
     expect(parsePorcelain('\n')).toEqual([])
+  })
+
+  it('декодирует восьмеричные байты git в настоящее имя — иначе черновики не исключаются', () => {
+    const octal = (name) =>
+      '"' +
+      [...Buffer.from(name, 'utf8')]
+        .map((b) => '\\' + b.toString(8).padStart(3, '0'))
+        .join('') +
+      '"'
+    const text = [
+      '?? ' + octal('Анализ тестов.txt'),
+      '?? ' + octal('Анализ задание агенту.txt'),
+    ].join('\n')
+    const entries = parsePorcelain(text)
+    expect(entries.map((e) => e.file)).toEqual(['Анализ тестов.txt', 'Анализ задание агенту.txt'])
+    const { untracked } = classify(entries, parseNumstat(''), () => 5)
+    expect(untracked.every((u) => u.ignored)).toBe(true)
   })
 })
 
@@ -102,6 +133,11 @@ describe('verdictOf', () => {
     expect(verdictOf(mid, LIMITS).exit).toBe(1)
     expect(verdictOf(mid, PREFLIGHT_LIMITS).exit).toBe(0)
   })
+
+  it('пороги зафиксированы литералами: ослабить окно молча нельзя', () => {
+    expect(LIMITS).toEqual({ files: 6, lines: 300 })
+    expect(PREFLIGHT_LIMITS).toEqual({ files: 10, lines: 450 })
+  })
 })
 
 describe('renderReport', () => {
@@ -115,6 +151,18 @@ describe('renderReport', () => {
     expect(report).toContain('ОКНО СЛИШКОМ БОЛЬШОЕ')
     expect(report).toContain('git push')
     expect(report).toContain('Что сделано.txt')
+  })
+
+  it('красный отчёт зовёт именно к микрокоммиту, а не «разбей этап когда-нибудь»', () => {
+    const summary = summarize(tracked, untracked)
+    const verdict = verdictOf(summary, LIMITS)
+    const report = renderReport(summary, verdict, tracked, untracked)
+    expect(report).toContain('Сделай МИКРОКОММИТ')
+    expect(report).toContain('разбей правки на логические блоки')
+    expect(report).toContain('git add поимённо по каждому блоку')
+    expect(report).toContain('запиши Stage N.Y в «Что сделано.txt»')
+    expect(report).toContain('git commit --no-verify -F + git push origin main')
+    expect(report).toContain('Затем продолжай следующий блок.')
   })
 
   it('зелёный отчёт фиксирует норму и перечисляет игнорируемое', () => {
@@ -142,5 +190,12 @@ describe('гейт подключён и не молчит на пустом д�
     const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
     expect(pkg.scripts['retent:check']).toBe('node scripts/retention-gate.mjs')
     expect(pkg.scripts['stage:preflight']).toBe('node scripts/stage-preflight.mjs')
+  })
+
+  it('на живом дереве владельческие черновики исключаются (кириллица не ломает сравнение)', () => {
+    const { untracked } = collectRetention()
+    for (const u of untracked) {
+      if (IGNORED_UNTRACKED.includes(u.file)) expect(u.ignored).toBe(true)
+    }
   })
 })
