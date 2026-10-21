@@ -9,6 +9,10 @@
 // Проверяется поведение, а не строки: каждая ветка обязана менять ответ или
 // запись в БД, иначе тест проходит и на сломанной ветке.
 
+vi.hoisted(() => {
+  process.env.JWT_SECRET = 'test-secret'
+})
+
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import request from 'supertest'
 import express from 'express'
@@ -128,5 +132,39 @@ describe('POST /api/partners/postback/:id — атрибуция user_id', () =>
     expect(res.status).toBe(200)
     const insertCall = pool.query.mock.calls.find(([sql]) => sql.includes('INSERT INTO partner_conversions'))
     expect(insertCall[1][2]).toBeNull()
+  })
+})
+
+describe('POST /api/partners/track — город в плейсхолдере', () => {
+  it('берёт город из query, когда в body его нет', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 11, partner_id: 1, deeplink: 'https://taxi.ru/order?city={city}' }], []])
+      .mockResolvedValueOnce([{ insertId: 601 }, []])
+      .mockResolvedValueOnce([[{ referral_code: 'REFQ' }], []])
+
+    const res = await request(app)
+      .post('/api/partners/track?city=%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D0%B0')
+      .set(as(3))
+      .send({ offer_id: 11 })
+
+    expect(res.status).toBe(200)
+    expect(res.body.deeplink).toBe(
+      `https://taxi.ru/order?city=${encodeURIComponent('Москва')}&utm_source=swiftmatch&ref=REFQ`,
+    )
+  })
+
+  it('пустой город не подставляется — плейсхолдер сохраняется', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 12, partner_id: 1, deeplink: 'https://taxi.ru/order?city={city}' }], []])
+      .mockResolvedValueOnce([{ insertId: 602 }, []])
+      .mockResolvedValueOnce([[{ referral_code: 'REFE' }], []])
+
+    const res = await request(app)
+      .post('/api/partners/track')
+      .set(as(3))
+      .send({ offer_id: 12, city: '   ' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.deeplink).toBe('https://taxi.ru/order?city={city}&utm_source=swiftmatch&ref=REFE')
   })
 })
