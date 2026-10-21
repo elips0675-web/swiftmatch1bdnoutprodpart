@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import logger from '../../logger.js'
 import { queueNames, queueStats, retryFailed, redisConfigured } from '../../queue-monitor.js'
+import { wrapRouter } from '../../async-handler.js'
 
 const router = Router()
 
@@ -57,4 +58,4 @@ router.post('/queues/:name/retry', async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)

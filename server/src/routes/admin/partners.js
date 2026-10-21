@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import pool from '../../db.js'
 import logger from '../../logger.js'
 import { invalidate } from '../../cache.js'
+import { wrapRouter } from '../../async-handler.js'
 
 const router = Router()
 
@@ -388,4 +389,4 @@ router.get('/stats/daily', async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)

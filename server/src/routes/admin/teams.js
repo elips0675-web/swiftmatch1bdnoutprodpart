@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import pool from '../../db.js'
 import logger from '../../logger.js'
+import { wrapRouter } from '../../async-handler.js'
 
 const router = Router()
 
@@ -292,4 +293,4 @@ router.post('/reports/:id/assign', async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)

@@ -4,6 +4,7 @@ import { sendPushToAll } from '../push.js'
 import { sendCustomEmail } from '../../mail.js'
 import logger from '../../logger.js'
 import { buildUnsubscribeUrl, listEmailRecipients, isUnsubscribeFeatureEnabled } from '../../email-unsubscribe.js'
+import { wrapRouter } from '../../async-handler.js'
 
 const router = Router()
 
@@ -92,4 +93,4 @@ router.post('/campaigns', async (req, res) => {
   }
 })
 
-export default router
+export default wrapRouter(router)

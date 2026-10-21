@@ -1,5 +1,7 @@
 # Что сделано
 
+(Stage 149.9 — 21.10.2026) — Part 3, батч 7/8: `admin/messaging`, `admin/monetization`, `admin/partners`, `admin/queues`, `admin/reports`, `admin/teams`. Все шесть — ровно 2/1 в diff.
+
 (Stage 149.8 — 21.10.2026) — Part 3, батч 6/8: `admin/content`, `admin/dashboard`, `admin/features`, `admin/hangouts`, `admin/health`, `admin/logs`. Все шесть — ровно 2/1 в diff.
 
 (Stage 149.7 — 21.10.2026) — Part 3, батч 5/8: `social`, `totp-2fa`, `unsubscribe`, `upload`, `admin/analytics`, `admin/backup`. В `admin/*` путь импорта — `../../async-handler.js` (вложенный каталог). У `admin/analytics.js` есть собственный локальный `wrap(fn)` — имя не конфликтует с `wrapRouter`, конфликта нет. Все шесть файлов — ровно 2/1 в diff, окончания строк не тронуты.
