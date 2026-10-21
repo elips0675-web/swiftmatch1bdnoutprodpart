@@ -49,6 +49,7 @@
     "check:query-param": "node scripts/query-param-audit.mjs",
     "check:migrations-lag": "node scripts/migrations-lag-audit.mjs",
     "stage:preflight": "node scripts/stage-preflight.mjs",
+    "stage:context": "node scripts/stage-context.mjs",
     "retent:check": "node scripts/retention-gate.mjs",
     "stage:facts": "node scripts/stage-facts.mjs",
     "stage:section": "node scripts/stage-section.mjs"
