@@ -16,7 +16,7 @@
  * --reporter=json`, `playwright test --list --reporter=json`) и сверяются с
  * написанным в документации.
  *
- * Два слоя проверки:
+ * Три слоя проверки:
  *
  *  1. Заголовки счётчиков: `README.md` (фронт/сервер/E2E), `project-context.md`
  *     (блок «Актуальный срез»), `test/ИНВЕНТАРЬ-ТЕСТОВ.md` (шапка, блок
@@ -31,6 +31,13 @@
  *     тестов `blocks.test.js` не попали в таблицу после этапа 22). Строка
  *     с описанием-заглушкой `PLACEHOLDER_HINT` — тоже ошибка: иначе гейт
  *     зеленел на пустом месте (питфолл 59 `docs/AGENTS-pitfalls.md`).
+ *  3. Свежесть машинного слоя: `generated` в `test/machine/test-inventory.json`
+ *     не старше даты «Прогон DD.MM.YYYY» в `test/ИНВЕНТАРЬ-ТЕСТОВ.md` — иначе
+ *     JSON валиден по числам, но протух по дате: md пересобрали прогоном, а
+ *     машинный слой остался от прошлого дня (находка 1.1,
+ *     `ЗАДАНИЕ АГЕНТУ.txt`). Поэтому `--fix` переписывает `generated`, даже
+ *     когда числа не изменились: дата среза в md обновляется на каждом
+ *     прогоне, и без обновления JSON этот слой краснел бы навсегда.
  *
  * `--fix` переписывает числа сам (включая русские окончания: `49 файла` →
  * `52 файлов`), дописывает недостающие строки с пометкой «требует описания»
@@ -466,10 +473,24 @@ export function plural(n, forms) {
   return forms[2]
 }
 
-function todayRu() {
-  const d = new Date()
+function ruDateOf(d) {
   const p = (v) => String(v).padStart(2, '0')
   return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`
+}
+
+function dateKey(d) {
+  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate()
+}
+
+function todayRu() {
+  return ruDateOf(new Date())
+}
+
+function sameRuDay(isoA, isoB) {
+  const a = new Date(isoA)
+  const b = new Date(isoB)
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return false
+  return dateKey(a) === dateKey(b)
 }
 
 function lineOf(text, index) {
@@ -851,6 +872,44 @@ export function checkInventoryJson(relPath, text, counts) {
   return problems
 }
 
+/**
+ * Слой 3: `generated` в машинном инвентаре не старше даты «Прогон DD.MM.YYYY»
+ * в md-инвентаре. Числа при этом валидны — протухание чисто по дате
+ * (находка 1.1). Даты сравниваются в **локальной** таймзоне: `generated`
+ * пишется как UTC-ISO тем же прогоном, что рендерит md-дату локальной
+ * `todayRu()`, и «вчера в UTC / сегодня локально» не даёт ложный протух.
+ */
+export function checkMachineFreshness(jsonPath, jsonText, mdPath, mdText) {
+  let parsed
+  try {
+    parsed = JSON.parse(jsonText)
+  } catch {
+    return [{ file: jsonPath, claim: 'inventory-freshness', line: 0, message: 'не парсится как JSON — свежесть generated не проверить' }]
+  }
+  const generatedIso = parsed && parsed.generated
+  if (typeof generatedIso !== 'string') {
+    return [{ file: jsonPath, claim: 'inventory-freshness', line: 0, message: 'нет поля generated — свежесть машинного слоя не проверить' }]
+  }
+  const run = /^\*\*Прогон (\d{2})\.(\d{2})\.(\d{4}):\*\*/m.exec(mdText)
+  if (!run) {
+    return [{ file: mdPath, claim: 'inventory-freshness', line: 0, message: 'нет строки «Прогон DD.MM.YYYY» — свежесть машинного слоя не проверить' }]
+  }
+  const generated = new Date(generatedIso)
+  if (Number.isNaN(generated.getTime())) {
+    return [{ file: jsonPath, claim: 'inventory-freshness', line: 0, message: `generated «${generatedIso}» не парсится как дата` }]
+  }
+  const runDate = new Date(Number(run[3]), Number(run[2]) - 1, Number(run[1]))
+  if (dateKey(generated) < dateKey(runDate)) {
+    return [{
+      file: jsonPath,
+      claim: 'inventory-freshness',
+      line: 0,
+      message: `машинный инвентарь протух: generated ${ruDateOf(generated)} < дата среза ${run[1]}.${run[2]}.${run[3]} — пересобрать node scripts/test-counter-audit.mjs --fix без флагов`,
+    }]
+  }
+  return []
+}
+
 export function renderPerFileTxt(spec, countData) {
   const green = countData.passed === undefined ? '' : ` (зелёных ${countData.passed})`
   const lines = [
@@ -897,7 +956,9 @@ export function writeInventoryArtifacts(root, counts, generated) {
   let keep = false
   if (fs.existsSync(jsonAbs)) {
     try {
-      keep = JSON.stringify(withoutGenerated(JSON.parse(fs.readFileSync(jsonAbs, 'utf8')))) === JSON.stringify(withoutGenerated(inventory))
+      const prev = JSON.parse(fs.readFileSync(jsonAbs, 'utf8'))
+      keep = sameRuDay(prev.generated, generated) &&
+        JSON.stringify(withoutGenerated(prev)) === JSON.stringify(withoutGenerated(inventory))
     } catch {
       keep = false
     }
@@ -1053,8 +1114,13 @@ export function audit(root, counts, options = {}) {
 
   if (!options.skipPerFile && !options.skipE2E) {
     const jsonAbs = path.join(root, INVENTORY_JSON)
+    const mdAbs = path.join(root, INVENTORY_FILE)
     if (fs.existsSync(jsonAbs)) {
-      problems.push(...checkInventoryJson(INVENTORY_JSON, fs.readFileSync(jsonAbs, 'utf8'), counts))
+      const jsonText = fs.readFileSync(jsonAbs, 'utf8')
+      problems.push(...checkInventoryJson(INVENTORY_JSON, jsonText, counts))
+      if (fs.existsSync(mdAbs)) {
+        problems.push(...checkMachineFreshness(INVENTORY_JSON, jsonText, INVENTORY_FILE, fs.readFileSync(mdAbs, 'utf8')))
+      }
     }
     for (const spec of INVENTORY_TXT) {
       const abs = path.join(root, spec.file)

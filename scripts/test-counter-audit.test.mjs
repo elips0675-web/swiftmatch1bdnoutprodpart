@@ -10,6 +10,10 @@
  * чисел обязана менять **только цифры** и не трогать окружающий текст.
  */
 
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -18,6 +22,7 @@ import {
   checkClaims,
   checkInventoryJson,
   checkInventoryRows,
+  checkMachineFreshness,
   checkPerFileTxt,
   countsFromPlaywrightList,
   countsFromVitestReport,
@@ -32,6 +37,7 @@ import {
   SERVER_GATE_TESTS,
   testKind,
   totalsOf,
+  writeInventoryArtifacts,
 } from "./test-counter-audit.mjs";
 
 const COUNTS = {
@@ -544,6 +550,75 @@ describe("машинный инвентарь (test-inventory.json / *-tests.txt
     expect(checkPerFileTxt(spec.file, spec, broken, counts.front).map((p) => p.message)).toContain(
       "scripts/gate.test.mjs: в прогоне 2, в файле 1"
     );
+  });
+
+  it("writeInventoryArtifacts обновляет generated на новой дате при неизменных числах", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "counter-audit-"));
+    try {
+      writeInventoryArtifacts(dir, counts, "2026-10-20T10:00:00.000Z");
+      writeInventoryArtifacts(dir, counts, "2026-10-21T10:00:00.000Z");
+      const inv = JSON.parse(
+        fs.readFileSync(path.join(dir, "test", "machine", "test-inventory.json"), "utf8")
+      );
+      expect(inv.generated).toBe("2026-10-21T10:00:00.000Z");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("writeInventoryArtifacts в тот же день не трогает файл (нет дневного шума в git)", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "counter-audit-"));
+    try {
+      writeInventoryArtifacts(dir, counts, "2026-10-21T10:00:00.000Z");
+      writeInventoryArtifacts(dir, counts, "2026-10-21T15:30:00.000Z");
+      const inv = JSON.parse(
+        fs.readFileSync(path.join(dir, "test", "machine", "test-inventory.json"), "utf8")
+      );
+      expect(inv.generated).toBe("2026-10-21T10:00:00.000Z");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("свежесть машинного слоя (generated vs «Прогон»)", () => {
+  const rel = "test/machine/test-inventory.json";
+  const relMd = "test/ИНВЕНТАРЬ-ТЕСТОВ.md";
+  const json = (generated) => JSON.stringify({ generated });
+  const md = (date) =>
+    `**Прогон ${date}:** сервер **2546/2546** (146 файлов) + фронт **1609/1609** (124 файлов) = **4155/4155**.\n`;
+
+  it("один день — молчит", () => {
+    expect(checkMachineFreshness(rel, json("2026-10-21T07:19:43.196Z"), relMd, md("21.10.2026"))).toEqual([]);
+  });
+
+  it("JSON от вчера, md от сегодня — FAIL с текстом «машинный инвентарь протух»", () => {
+    const problems = checkMachineFreshness(rel, json("2026-10-20T07:19:43.196Z"), relMd, md("21.10.2026"));
+    expect(problems).toHaveLength(1);
+    expect(problems[0].message).toMatch(
+      /машинный инвентарь протух: generated \d{2}\.\d{2}\.\d{4} < дата среза \d{2}\.\d{2}\.\d{4}/
+    );
+  });
+
+  it("generated новее даты среза — молчит (условие «не старше», а не «равно»)", () => {
+    expect(checkMachineFreshness(rel, json("2026-10-22T07:19:43.196Z"), relMd, md("21.10.2026"))).toEqual([]);
+  });
+
+  it("generated — предыдущий день в UTC, но тот же локальный день: не ложный протух", () => {
+    const now = new Date();
+    const localMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const p = (v) => String(v).padStart(2, "0");
+    const ru = `${p(localMidnight.getDate())}.${p(localMidnight.getMonth() + 1)}.${localMidnight.getFullYear()}`;
+    expect(checkMachineFreshness(rel, json(localMidnight.toISOString()), relMd, md(ru))).toEqual([]);
+  });
+
+  it("нет строки «Прогон DD.MM.YYYY» — FAIL, а не молчаливый пропуск", () => {
+    const problems = checkMachineFreshness(rel, json("2026-10-21T07:19:43.196Z"), relMd, "строка без даты среза");
+    expect(problems[0].message).toMatch(/нет строки/);
+  });
+
+  it("битый JSON — FAIL, а не исключение", () => {
+    expect(checkMachineFreshness(rel, "{", relMd, md("21.10.2026"))[0].message).toMatch(/не парсится/);
   });
 });
 
