@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-22T06:46:13.303Z",
+  "generated": "2026-10-22T07:46:14.450Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -531,17 +531,17 @@
     ]
   },
   "server": {
-    "files": 158,
-    "tests": 2649,
-    "passed": 2649,
+    "files": 159,
+    "tests": 2650,
+    "passed": 2650,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 122
     },
     "product": {
-      "files": 153,
-      "tests": 2527
+      "files": 154,
+      "tests": 2528
     },
     "perFile": [
       {
@@ -1101,6 +1101,10 @@
         "tests": 8
       },
       {
+        "file": "server/src/__tests__/sms-branches.test.js",
+        "tests": 1
+      },
+      {
         "file": "server/src/__tests__/sms-client.test.js",
         "tests": 10
       },
@@ -1281,7 +1285,7 @@
     ]
   },
   "total": {
-    "files": 286,
-    "tests": 4337
+    "files": 287,
+    "tests": 4338
   }
 }
