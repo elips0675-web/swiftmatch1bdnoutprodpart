@@ -48,8 +48,15 @@ vi.mock('../notification-prefs.js', () => ({
   isAllowedIn: vi.fn(() => true),
 }))
 
+const { invalidateMock } = vi.hoisted(() => ({ invalidateMock: vi.fn(async () => {}) }))
+vi.mock('../cache.js', () => ({
+  cacheRoutePerUser: () => (req, res, next) => next(),
+  invalidate: invalidateMock,
+}))
+
 import pool from '../db.js'
 import logger from '../logger.js'
+import { getIO } from '../ws.js'
 import socialRoutes from '../routes/social.js'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'test-secret'
@@ -84,6 +91,9 @@ beforeEach(() => {
   bannedState.hit = false
   bannedState.fail = false
   isAllowedMock.mockResolvedValue(true)
+  getIO.mockReturnValue({ to: toMock })
+  invalidateMock.mockReset()
+  invalidateMock.mockResolvedValue(undefined)
 })
 
 describe('POST /api/chats', () => {
@@ -537,5 +547,160 @@ describe('POST /api/likes и GET /api/matches: остаток веток', () =>
     const res = await request(app).get('/api/matches').set(as())
     expect(res.status).toBe(500)
     expect(logger.error).toHaveBeenCalledWith('Matches error:', expect.any(Error))
+  })
+})
+
+describe('COV-03: social.js — поиск, лайки, группы, чаты и сообщения', () => {
+  it('поиск использует паспортные координаты, когда passport_mode включён', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ attachment_style: null, lat: null, lng: null, passport_mode: 1, passport_lat: '48.85', passport_lng: '2.35' }], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await request(app).get('/api/users/search').set(as())
+    expect(res.status).toBe(200)
+    const [sql, params] = pool.query.mock.calls[1]
+    expect(sql).toContain('ST_Distance_Sphere')
+    expect(params).toEqual([2.35, 48.85, 1, 1, 1, 50000])
+  })
+
+  it('нечисловые lat/lng не добавляют ST_Distance_Sphere и лишние параметры', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ attachment_style: null, lat: 50, lng: 30, passport_mode: 0 }], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await request(app).get('/api/users/search').query({ lat: 'abc', lng: 'def' }).set(as())
+    expect(res.status).toBe(200)
+    const [sql, params] = pool.query.mock.calls[1]
+    expect(sql).not.toContain('ST_Distance_Sphere')
+    expect(sql).not.toContain('HAVING distance')
+    expect(params).toEqual([1, 1, 1])
+  })
+
+  it('фильтр looking_for попадает в SQL и параметры', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ attachment_style: null, lat: 50, lng: 30, passport_mode: 0 }], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await request(app).get('/api/users/search').query({ looking_for: 'friendship' }).set(as())
+    expect(res.status).toBe(200)
+    const [sql, params] = pool.query.mock.calls[1]
+    expect(sql).toContain('up.looking_for = ?')
+    expect(params).toEqual([30, 50, 1, 1, 1, 'friendship', 50000])
+  })
+
+  it('мэтч без display_name у лайкера — push «It\'s a match with someone!»', async () => {
+    invalidateMock.mockRejectedValue(new Error('cache down'))
+    pool.query
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ cnt: 0 }], []])
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []])
+      .mockResolvedValueOnce([[{ id: 3 }], []])
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []])
+      .mockResolvedValueOnce([{ insertId: 9 }, []])
+      .mockResolvedValueOnce([[{ id: 9, type: 'like', payload: '{}' }], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await request(app).post('/api/likes').set(as()).send({ liked_user_id: 2 })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(res.status).toBe(201)
+    expect(res.body.matched).toBe(true)
+    expect(invalidateMock).toHaveBeenCalledTimes(2)
+    expect(pushMock).toHaveBeenCalledWith(2, 'SwiftMatch', "It's a match with someone!")
+  })
+
+  it('лайк без мэтча и без имени — push «Someone liked you!»', async () => {
+    pool.query
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ cnt: 0 }], []])
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([{ insertId: 9 }, []])
+      .mockResolvedValueOnce([[{ id: 9, type: 'like', payload: '{}' }], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await request(app).post('/api/likes').set(as()).send({ liked_user_id: 2 })
+    expect(res.status).toBe(201)
+    expect(pushMock).toHaveBeenCalledWith(2, 'SwiftMatch', 'Someone liked you!')
+  })
+
+  it('лента группы собирает несколько комментариев одного поста', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 10, group_id: 7, user_id: 1, text: 'пост', images: '[]', created_at: '2026-10-20T10:00:00.000Z', updated_at: null, display_name: 'Я', avatar_url: null, likes_count: 0, liked_by_me: 0 }], []])
+      .mockResolvedValueOnce([[{ id: 1, post_id: 10, user_id: 1, text: 'первый', image_url: null, created_at: '2026-10-20T10:01:00.000Z', display_name: 'Я', avatar_url: null }, { id: 2, post_id: 10, user_id: 2, text: 'второй', image_url: null, created_at: '2026-10-20T10:02:00.000Z', display_name: 'Маша', avatar_url: null }], []])
+    const res = await request(app).get('/api/groups/7/posts').set(as())
+    expect(res.status).toBe(200)
+    expect(res.body[0].comments.map((c) => c.text)).toEqual(['первый', 'второй'])
+  })
+
+  it('создание поста с массивом images отдаёт массив, а не JSON-строку', async () => {
+    pool.query
+      .mockResolvedValueOnce([{ insertId: 50 }, []])
+      .mockResolvedValueOnce([[{ id: 50, group_id: 7, user_id: 1, text: 'пост', images: ['/a.jpg'], created_at: '2026-10-20T10:00:00.000Z', display_name: 'Я', avatar_url: null }], []])
+    const res = await request(app).post('/api/groups/7/posts').set(as()).send({ text: 'пост', images: ['/a.jpg'] })
+    expect(res.status).toBe(201)
+    expect(res.body.images).toEqual(['/a.jpg'])
+  })
+
+  it('несколько реакций одного сообщения отдаются вместе', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ chat_id: 5 }], []])
+      .mockResolvedValueOnce([[messageRow({ id: 100 })], []])
+      .mockResolvedValueOnce([[{ user_id: 2, last_read_at: null }], []])
+      .mockResolvedValueOnce([[{ id: 1, message_id: 100, user_id: 1, emoji: '❤️', created_at: '2026-10-20T10:01:00.000Z', user_name: 'Я' }, { id: 2, message_id: 100, user_id: 2, emoji: '👍', created_at: '2026-10-20T10:02:00.000Z', user_name: 'Маша' }], []])
+    const res = await request(app).get('/api/chats/5/messages').set(as())
+    expect(res.status).toBe(200)
+    expect(res.body.messages[0].reactions).toHaveLength(2)
+  })
+
+  it('reply_to числовой строкой сохраняется числом, пустой текст — пустое превью, без имени — «New message», без io', async () => {
+    getIO.mockReturnValue(null)
+    pool.query
+      .mockResolvedValueOnce([[{ chat_id: 5 }], []])
+      .mockResolvedValueOnce([[{ id: 100 }], []])
+      .mockResolvedValueOnce([{ insertId: 100 }, []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[messageRow({ text: null })], []])
+      .mockResolvedValueOnce([[{ user_id: 2 }], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await request(app).post('/api/chats/5/messages').set(as()).send({ text: '<b></b>', reply_to: '100' })
+    expect(res.status).toBe(201)
+    const insert = pool.query.mock.calls.find((c) => String(c[0]).startsWith('INSERT INTO messages'))
+    expect(insert[1][5]).toBe(100)
+    const preview = pool.query.mock.calls.find((c) => String(c[0]).startsWith('UPDATE chats SET last_message'))
+    expect(preview[1][0]).toBe('')
+    expect(pushMock).toHaveBeenCalledWith(2, 'New message', '', '/chats?matchId=2')
+    expect(emitMock).not.toHaveBeenCalled()
+  })
+
+  it('правка без io не падает и не шлёт WS', async () => {
+    getIO.mockReturnValue(null)
+    pool.query
+      .mockResolvedValueOnce([[{ chat_id: 5 }], []])
+      .mockResolvedValueOnce([[{ id: 100, sender_id: 1, created_at: new Date().toISOString() }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[messageRow({ text: 'новый' })], []])
+      .mockResolvedValueOnce([[{ user_id: 2 }], []])
+    const res = await request(app).put('/api/chats/5/messages/100').set(as()).send({ text: 'новый' })
+    expect(res.status).toBe(200)
+    expect(emitMock).not.toHaveBeenCalled()
+  })
+
+  it('ошибки БД в списке/деталях/отметке прочтения чата — 500', async () => {
+    pool.query.mockRejectedValueOnce(new Error('boom'))
+    const list = await request(app).get('/api/chats').set(as())
+    expect(list.status).toBe(500)
+    expect(logger.error).toHaveBeenCalledWith('Chats error:', expect.any(Error))
+
+    pool.query.mockRejectedValueOnce(new Error('boom'))
+    const detail = await request(app).get('/api/chats/5').set(as())
+    expect(detail.status).toBe(500)
+    expect(logger.error).toHaveBeenCalledWith('Chat detail error:', expect.any(Error))
+
+    pool.query.mockRejectedValueOnce(new Error('boom'))
+    const read = await request(app).put('/api/chats/5/read').set(as())
+    expect(read.status).toBe(500)
+    expect(logger.error).toHaveBeenCalledWith('Chat read error:', expect.any(Error))
+  })
+
+  it('ошибка БД при удалении сообщения — 500', async () => {
+    pool.query.mockRejectedValueOnce(new Error('boom'))
+    const res = await request(app).delete('/api/chats/5/messages/100').set(as())
+    expect(res.status).toBe(500)
+    expect(logger.error).toHaveBeenCalledWith('Delete message error:', expect.any(Error))
   })
 })

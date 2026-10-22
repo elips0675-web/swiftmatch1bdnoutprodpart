@@ -196,6 +196,7 @@ router.get('/api/users/search', auth, async (req, res) => {
         geoParams.push(userLng, userLat, searchRadiusKm * 1000)
       }
     }
+    const hasGeoDistance = geoParams.length > 0
 
     const blockParams = [req.userId, req.userId]
     const blockJoin = ' LEFT JOIN user_blocks bl ON (bl.blocker_id = ? AND bl.blocked_id = up.id) OR (bl.blocker_id = up.id AND bl.blocked_id = ?)'
@@ -222,11 +223,11 @@ router.get('/api/users/search', auth, async (req, res) => {
       : 'FROM user_profiles up'
 
     const params = []
-    if (hasGeo) params.push(geoParams[0], geoParams[1])
+    if (hasGeoDistance) params.push(geoParams[0], geoParams[1])
     if (userStyle) params.push(userStyle)
     params.push(...blockParams)
     params.push(...whereParams)
-    if (hasGeo) params.push(geoParams[2])
+    if (hasGeoDistance) params.push(geoParams[2])
 
     const sql = `SELECT ${baseSelect}${distanceExpr}
                  ${fromClause}
