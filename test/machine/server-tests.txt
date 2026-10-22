@@ -1,5 +1,5 @@
 ===== Сервер (Vitest) =====
-2655 тестов в 159 файлах (зелёных 2655) (vitest --reporter=json)
+2670 тестов в 160 файлах (зелёных 2670) (vitest --reporter=json)
 
 # файл | тестов
 server/src/__tests__/active-user.test.js | 33
@@ -46,6 +46,7 @@ server/src/__tests__/csrf-prod.test.js | 3
 server/src/__tests__/csrf.test.js | 6
 server/src/__tests__/date-checkin.test.js | 30
 server/src/__tests__/date-only.test.js | 6
+server/src/__tests__/db-retry.test.js | 11
 server/src/__tests__/deploy-persistence-audit.test.js | 18
 server/src/__tests__/email-unsubscribe.test.js | 21
 server/src/__tests__/events-stripe.test.js | 20
@@ -125,8 +126,8 @@ server/src/__tests__/queue-init.test.js | 12
 server/src/__tests__/queue-monitor.test.js | 27
 server/src/__tests__/queue-swagger-limiters.test.js | 7
 server/src/__tests__/quiet-hours.test.js | 43
-server/src/__tests__/race.mysql.test.js | 6
-server/src/__tests__/race.test.js | 8
+server/src/__tests__/race.mysql.test.js | 7
+server/src/__tests__/race.test.js | 11
 server/src/__tests__/ratelimit.test.js | 4
 server/src/__tests__/redis-client.test.js | 17
 server/src/__tests__/redis-fallback.test.js | 7

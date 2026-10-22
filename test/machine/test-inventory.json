@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-22T09:45:22.438Z",
+  "generated": "2026-10-22T10:56:04.397Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -531,17 +531,17 @@
     ]
   },
   "server": {
-    "files": 159,
-    "tests": 2655,
-    "passed": 2655,
+    "files": 160,
+    "tests": 2670,
+    "passed": 2670,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 123
     },
     "product": {
-      "files": 154,
-      "tests": 2532
+      "files": 155,
+      "tests": 2547
     },
     "perFile": [
       {
@@ -719,6 +719,10 @@
       {
         "file": "server/src/__tests__/date-only.test.js",
         "tests": 6
+      },
+      {
+        "file": "server/src/__tests__/db-retry.test.js",
+        "tests": 11
       },
       {
         "file": "server/src/__tests__/deploy-persistence-audit.test.js",
@@ -1038,11 +1042,11 @@
       },
       {
         "file": "server/src/__tests__/race.mysql.test.js",
-        "tests": 6
+        "tests": 7
       },
       {
         "file": "server/src/__tests__/race.test.js",
-        "tests": 8
+        "tests": 11
       },
       {
         "file": "server/src/__tests__/ratelimit.test.js",
@@ -1285,7 +1289,7 @@
     ]
   },
   "total": {
-    "files": 287,
-    "tests": 4343
+    "files": 288,
+    "tests": 4358
   }
 }
