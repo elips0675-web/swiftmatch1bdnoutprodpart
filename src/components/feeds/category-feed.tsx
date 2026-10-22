@@ -216,11 +216,35 @@ function generatePosts(categoryName: string, categoryEn: string) {
 
   const timesRu = ["45 минут назад", "1 час назад", "2 часа назад", "3 часа назад", "5 часов назад", "6 часов назад", "8 часов назад", "12 часов назад"];
   const timesEn = ["45 min ago", "1 hour ago", "2 hours ago", "3 hours ago", "5 hours ago", "6 hours ago", "8 hours ago", "12 hours ago"];
+  const commentNames = [
+    { ru: "Анна", en: "Anna" },
+    { ru: "Иван", en: "Ivan" },
+    { ru: "Максим", en: "Maxim" },
+    { ru: "Елена", en: "Elena" },
+  ];
+  const commentSeeds = [
+    { ru: "Отличная подборка, спасибо!", en: "Great selection, thanks!" },
+    { ru: "Как раз искал такое.", en: "Just what I was looking for." },
+    { ru: "Сохранил, чтобы не потерять.", en: "Saved it so I don't lose it." },
+    { ru: "А можно подробнее?", en: "Could you elaborate?" },
+    { ru: "Проверено на себе — работает.", en: "Tried it myself — it works." },
+  ];
 
   return seeds.map((seed, i) => {
     const images = Array.from({ length: seed.imgCount }, (_, j) =>
       `https://picsum.photos/seed/${categoryEn.toLowerCase().replace(/\s+/g, '_')}_${i}_${j}/800/600`
     );
+    const commentCount = i % 4;
+    const comments = Array.from({ length: commentCount }, (_, k) => ({
+      id: i * 100 + k + 1,
+      authorRu: commentNames[(i + k) % commentNames.length].ru,
+      authorEn: commentNames[(i + k) % commentNames.length].en,
+      avatar: AVATAR_POOL[(i + k + 1) % AVATAR_POOL.length],
+      timeRu: timesRu[(i + k) % timesRu.length],
+      timeEn: timesEn[(i + k) % timesEn.length],
+      textRu: commentSeeds[(i + k) % commentSeeds.length].ru,
+      textEn: commentSeeds[(i + k) % commentSeeds.length].en,
+    }));
 
     return {
       id: i + 1,
@@ -234,10 +258,10 @@ function generatePosts(categoryName: string, categoryEn: string) {
       textRu: seed.textRu,
       textEn: seed.textEn,
       images,
-      likes: Math.floor(Math.random() * 5000) + 100,
-      commentsCount: Math.floor(Math.random() * 5),
+      likes: 100 + ((i * 137) % 4900),
+      commentsCount: comments.length,
       isLiked: false,
-      comments: [] as any[],
+      comments: comments as any[],
     };
   });
 }
@@ -251,7 +275,6 @@ interface CategoryFeedProps {
 export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: CategoryFeedProps) {
   const isApiMode = !!groupId;
   const [posts, setPosts] = useState<any[]>([]);
-  const [apiLoaded, setApiLoaded] = useState(false);
   const { toast } = useToast();
   const { t, language } = useLanguage();
 
@@ -266,32 +289,32 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
           const mapped = data.map((p: any) => ({
             id: p.id,
             author: p.author,
-            group: categoryNameRu,
+            group: language === 'RU' ? categoryNameRu : categoryNameEn,
             text: p.text || '',
-            time: new Date(p.createdAt).toLocaleDateString(),
+            time: p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '',
             avatar: p.avatar || '',
             images: p.images || [],
             likes: p.likes,
             isLiked: p.likedByMe,
-            commentsCount: p.comments.length,
-            comments: p.comments.map((c: any) => ({
+            commentsCount: (p.comments || []).length,
+            comments: (p.comments || []).map((c: any) => ({
               id: c.id, author: c.author, avatar: c.avatar || '',
               text: c.text || '', imageUrl: c.imageUrl,
-              time: new Date(c.createdAt).toLocaleDateString(),
+              time: c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '',
             })),
           }))
           setPosts(mapped);
-          setApiLoaded(true);
         })
-        .catch(() => setApiLoaded(true));
+        .catch(() => setPosts([]));
     } else {
       setPosts(generatePosts(categoryNameRu, categoryNameEn));
     }
-  }, [isApiMode, groupId, categoryNameRu, categoryNameEn]);
+  }, [isApiMode, groupId, categoryNameRu, categoryNameEn, language]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [commentInputs, setCommentInputs] = useState<{ [key: number]: string }>({});
+  const [commentImages, setCommentImages] = useState<{ [key: number]: string }>({});
   const [commentsOpen, setCommentsOpen] = useState<Set<number>>(new Set());
   const commentFileRefs = useRef<{ [key: number]: HTMLInputElement }>({});
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
@@ -309,22 +332,14 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
   };
 
   const handleCommentImageSelect = (postId: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-    Array.from(files).slice(0, 14).forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (reader.result) {
-          setPosts(prev => prev.map(p =>
-            p.id === postId
-              ? { ...p, images: [reader.result as string, ...p.images] }
-              : p
-          ));
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    const file = e.target.files?.[0];
     e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (reader.result) setCommentImages(prev => ({ ...prev, [postId]: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const tr = useCallback((ru: string, en: string) => (language === "RU" ? ru : en), [language]);
@@ -334,36 +349,43 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
   const normalizeUrl = useCallback(
     (url: string | undefined, fallbackIndex: number) => {
       if (!url) return fallbackPool[fallbackIndex % fallbackPool.length];
-      if (url.startsWith("https://picsum.photos")) return fallbackPool[fallbackIndex % fallbackPool.length];
       return url;
     },
     [fallbackPool]
   );
 
+  const localize = useCallback(
+    (ru: string | undefined, en: string | undefined, fallback: string) => (ru || en ? tr(ru || '', en || '') : fallback),
+    [tr]
+  );
+
   const normalizedPosts = useMemo(() => {
     return posts.map((post) => ({
       ...post,
-      author: tr(post.authorRu, post.authorEn),
-      group: tr(post.groupRu, post.groupEn),
-      time: tr(post.timeRu, post.timeEn),
-      text: tr(post.textRu, post.textEn),
+      author: localize(post.authorRu, post.authorEn, post.author || ''),
+      group: localize(post.groupRu, post.groupEn, post.group || ''),
+      time: localize(post.timeRu, post.timeEn, post.time || ''),
+      text: localize(post.textRu, post.textEn, post.text || ''),
       avatar: normalizeUrl(post.avatar, post.id),
-      images: post.images.map((img: string, i: number) => normalizeUrl(img, i + post.id)),
-      comments: post.comments.map((c: any, i: number) => ({
+      images: (post.images || []).map((img: string, i: number) => normalizeUrl(img, i + post.id)),
+      comments: (post.comments || []).map((c: any, i: number) => ({
         ...c,
+        author: localize(c.authorRu, c.authorEn, c.author || ''),
+        time: localize(c.timeRu, c.timeEn, c.time || ''),
+        text: localize(c.textRu, c.textEn, c.text || ''),
         avatar: normalizeUrl(c.avatar, i + post.id),
       })),
     }));
-  }, [posts, normalizeUrl, tr]);
+  }, [posts, normalizeUrl, tr, localize]);
 
   const filteredPosts = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
     if (!query) return normalizedPosts;
     return normalizedPosts.filter(
       (post) =>
-        post.text.toLowerCase().includes(query) ||
-        post.author.toLowerCase().includes(query) ||
-        post.group.toLowerCase().includes(query)
+        (post.text || '').toLowerCase().includes(query) ||
+        (post.author || '').toLowerCase().includes(query) ||
+        (post.group || '').toLowerCase().includes(query)
     );
   }, [searchQuery, normalizedPosts]);
 
@@ -382,17 +404,26 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       fetch(`/api/groups/${groupId}/posts/${postId}/like`, { method: 'POST', headers })
-        .then(r => r.json())
+        .then(r => {
+          if (!r.ok) throw new Error('like failed');
+          return r.json();
+        })
         .then(data => {
           setPosts((current) =>
             current.map((post) =>
               post.id === postId
-                ? { ...post, isLiked: data.liked, likes: post.likes + (data.liked ? 1 : -1) }
+                ? { ...post, isLiked: !!data.liked, likes: post.likes + (data.liked ? 1 : -1) }
                 : post
             )
           );
         })
-        .catch(() => {});
+        .catch(() => {
+          toast({
+            variant: 'destructive',
+            title: tr('Не удалось поставить лайк', 'Could not like the post'),
+            description: tr('Проверьте соединение и попробуйте снова.', 'Check your connection and try again.'),
+          });
+        });
     } else {
       setPosts((current) =>
         current.map((post) =>
@@ -402,29 +433,40 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
         )
       );
     }
-  }, [groupId]);
+  }, [groupId, toast, tr]);
 
-  const handleShare = useCallback(() => {
-    toast({
-      title: tr('Ссылка скопирована', 'Link copied'),
-      description: tr('Скопируйте ссылку и отправьте другу.', 'Copy the link and send it to a friend.'),
-    });
-  }, [toast, tr]);
+  const handleShare = useCallback(async () => {
+    const url = `${window.location.origin}/chats?groupId=${groupId || ''}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({
+        title: tr('Ссылка скопирована', 'Link copied'),
+        description: tr('Скопируйте ссылку и отправьте другу.', 'Copy the link and send it to a friend.'),
+      });
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: tr('Не удалось скопировать', 'Could not copy'),
+        description: url,
+      });
+    }
+  }, [toast, tr, groupId]);
 
   const handleCommentChange = (postId: number, text: string) => {
     setCommentInputs((prev) => ({ ...prev, [postId]: text }));
   };
 
   const handleCommentSubmit = (postId: number) => {
-    const commentText = commentInputs[postId];
-    if (!commentText?.trim()) return;
+    const commentText = commentInputs[postId] || '';
+    const commentImage = commentImages[postId];
+    if (!commentText.trim() && !commentImage) return;
 
-    if (containsForbiddenWords(commentText)) {
+    if (commentText.trim() && containsForbiddenWords(commentText)) {
       toast({ variant: 'destructive', title: t('filter.toast.title', { context: 'inappropriate' }), description: t('filter.toast.description', { context: 'inappropriate' }) });
       return;
     }
 
-    if (isGibberish(commentText)) {
+    if (commentText.trim() && isGibberish(commentText)) {
       toast({ variant: 'destructive', title: t('filter.toast.title', { context: 'gibberish' }), description: t('filter.toast.gibberish_description', { context: 'gibberish' }) });
       return;
     }
@@ -435,29 +477,43 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
       if (token) headers['Authorization'] = `Bearer ${token}`;
       fetch(`/api/groups/${groupId}/posts/${postId}/comments`, {
         method: 'POST', headers,
-        body: JSON.stringify({ text: commentText }),
+        body: JSON.stringify({ text: commentText, image_url: commentImage || null }),
       })
-        .then(r => r.ok ? r.json() : null)
-        .then(newComment => {
-          if (newComment) {
-            setPosts((current) =>
-              current.map((post) =>
-                post.id === postId
-                  ? {
-                      ...post,
-                      comments: [...post.comments, {
-                        id: newComment.id, author: newComment.author, avatar: newComment.avatar || '',
-                        text: newComment.text || '', imageUrl: newComment.imageUrl,
-                        time: new Date(newComment.createdAt).toLocaleDateString(),
-                      }],
-                      commentsCount: post.commentsCount + 1,
-                    }
-                  : post
-              )
-            );
-          }
+        .then(r => {
+          if (!r.ok) throw new Error('comment failed');
+          return r.json();
         })
-        .catch(() => {});
+        .then(newComment => {
+          if (!newComment) return;
+          setPosts((current) =>
+            current.map((post) =>
+              post.id === postId
+                ? {
+                    ...post,
+                    comments: [...post.comments, {
+                      id: newComment.id, author: newComment.author, avatar: newComment.avatar || '',
+                      text: newComment.text || '', imageUrl: newComment.imageUrl,
+                      time: new Date(newComment.createdAt).toLocaleDateString(),
+                    }],
+                    commentsCount: post.commentsCount + 1,
+                  }
+                : post
+            )
+          );
+          setCommentInputs((prev) => ({ ...prev, [postId]: '' }));
+          setCommentImages((prev) => {
+            const next = { ...prev };
+            delete next[postId];
+            return next;
+          });
+        })
+        .catch(() => {
+          toast({
+            variant: 'destructive',
+            title: tr('Не удалось отправить комментарий', 'Could not post the comment'),
+            description: tr('Текст сохранён, попробуйте ещё раз.', 'Your text is kept, please try again.'),
+          });
+        });
     } else {
       const newComment: any = {
         id: Date.now(),
@@ -465,6 +521,7 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
         avatar: "/demo/people/me.png",
         time: tr("Только что", "Just now"),
         text: commentText,
+        imageUrl: commentImage,
       };
       setPosts((current) =>
         current.map((post) =>
@@ -473,8 +530,20 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
             : post
         )
       );
+      setCommentInputs((prev) => ({ ...prev, [postId]: '' }));
+      setCommentImages((prev) => {
+        const next = { ...prev };
+        delete next[postId];
+        return next;
+      });
     }
-    setCommentInputs((prev) => ({ ...prev, [postId]: '' }));
+  };
+
+  const closeCreatePost = () => {
+    setIsCreatePostOpen(false);
+    setNewPostText("");
+    setNewPostImages([]);
+    setNewPostImageUrls("");
   };
 
   const handleCreatePost = () => {
@@ -494,18 +563,27 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
         method: 'POST', headers,
         body: JSON.stringify({ text: newPostText, images: allImages }),
       })
-        .then(r => r.ok ? r.json() : null)
-        .then(post => {
-          if (post) {
-            setPosts((current) => [{
-              id: post.id, author: post.author, group: categoryNameRu,
-              text: post.text || '', time: new Date(post.createdAt).toLocaleDateString(),
-              avatar: post.avatar || '', images: post.images || [],
-              likes: 0, isLiked: false, commentsCount: 0, comments: [],
-            }, ...current]);
-          }
+        .then(r => {
+          if (!r.ok) throw new Error('create post failed');
+          return r.json();
         })
-        .catch(() => {});
+        .then(post => {
+          setPosts((current) => [{
+            id: post.id, author: post.author, group: tr(categoryNameRu, categoryNameEn),
+            text: post.text || '', time: post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '',
+            avatar: post.avatar || '', images: post.images || [],
+            likes: 0, isLiked: false, commentsCount: 0, comments: [],
+          }, ...current]);
+          closeCreatePost();
+          toast({ title: tr("Пост опубликован", "Post published") });
+        })
+        .catch(() => {
+          toast({
+            variant: 'destructive',
+            title: tr('Не удалось опубликовать пост', 'Could not publish the post'),
+            description: tr('Черновик сохранён, попробуйте ещё раз.', 'Your draft is kept, please try again.'),
+          });
+        });
     } else {
       const newPost = {
         id: Date.now(),
@@ -525,12 +603,9 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
         comments: [] as any[],
       };
       setPosts((current) => [newPost, ...current]);
+      closeCreatePost();
+      toast({ title: tr("Пост опубликован", "Post published") });
     }
-    setIsCreatePostOpen(false);
-    setNewPostText("");
-    setNewPostImages([]);
-    setNewPostImageUrls("");
-    toast({ title: tr("Пост опубликован", "Post published") });
   };
 
   return (
@@ -636,41 +711,61 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
                               <p className="text-gray-400 text-[10px]">{comment.time}</p>
                             </div>
                             {comment.text && <p className="text-sm text-gray-700 mt-1">{comment.text}</p>}
+                            {comment.imageUrl && (
+                              <img src={comment.imageUrl} alt={comment.author} className="mt-2 rounded-lg max-h-48 w-auto object-cover" />
+                            )}
                           </div>
                         </div>
                       ))}
 
                       <div className="flex items-center gap-3 mt-2">
                         <div className="w-8 h-8 rounded-full bg-gray-300 font-bold text-white flex items-center justify-center text-sm flex-shrink-0">ME</div>
-                        <div className="flex-1 relative flex items-center gap-2 bg-gray-100 rounded-full px-3">
-                          <input
-                            type="text"
-                            value={commentInputs[post.id] || ''}
-                            onChange={(e) => handleCommentChange(post.id, e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleCommentSubmit(post.id)}
-                            placeholder={tr("Напишите комментарий...", "Write a comment...")}
-                            className="flex-1 bg-transparent py-2 text-sm focus:outline-none min-w-0"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => commentFileRefs.current[post.id]?.click()}
-                            className="text-gray-400 hover:text-blue-500 transition-colors flex-shrink-0"
-                          >
-                            <Image size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleCommentSubmit(post.id)}
-                            className="text-gray-400 hover:text-blue-500 transition-colors flex-shrink-0"
-                          >
-                            <Send size={18} />
-                          </button>
+                        <div className="flex-1 relative flex flex-col gap-2 bg-gray-100 rounded-2xl px-3 py-2">
+                          {commentImages[post.id] && (
+                            <div className="relative w-20 h-20 rounded-lg overflow-hidden">
+                              <img src={commentImages[post.id]} alt="pending" className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => setCommentImages((prev) => {
+                                  const next = { ...prev };
+                                  delete next[post.id];
+                                  return next;
+                                })}
+                                className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={commentInputs[post.id] || ''}
+                              onChange={(e) => handleCommentChange(post.id, e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleCommentSubmit(post.id)}
+                              placeholder={tr("Напишите комментарий...", "Write a comment...")}
+                              className="flex-1 bg-transparent py-1 text-sm focus:outline-none min-w-0"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => commentFileRefs.current[post.id]?.click()}
+                              className="text-gray-400 hover:text-blue-500 transition-colors flex-shrink-0"
+                            >
+                              <Image size={18} />
+                            </button>
+                            <button
+                              onClick={() => handleCommentSubmit(post.id)}
+                              className="text-gray-400 hover:text-blue-500 transition-colors flex-shrink-0"
+                            >
+                              <Send size={18} />
+                            </button>
+                          </div>
                           <input
                             type="file"
                             ref={el => { commentFileRefs.current[post.id] = el!; }}
                             onChange={(e) => handleCommentImageSelect(post.id, e)}
                             className="hidden"
                             accept="image/png, image/jpeg, image/gif, image/webp"
-                            multiple
                           />
                         </div>
                       </div>
