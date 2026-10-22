@@ -46,7 +46,7 @@ export const PREFLIGHT_LIMITS = {
   lines: 450,
 }
 
-export const IGNORED_UNTRACKED = ['Анализ задание агенту.txt', 'Анализ тестов.txt']
+export const IGNORED_UNTRACKED = ['Анализ задание агенту.txt', 'Анализ тестов.txt', 'Оценка доработка дипсик1.txt']
 
 /**
  * Декодирует путь, который git отдаёт в кавычках: не-ASCII он пишет

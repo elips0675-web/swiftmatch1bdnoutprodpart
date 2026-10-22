@@ -71,9 +71,14 @@ describe('parsePorcelain', () => {
     const text = [
       '?? ' + octal('Анализ тестов.txt'),
       '?? ' + octal('Анализ задание агенту.txt'),
+      '?? ' + octal('Оценка доработка дипсик1.txt'),
     ].join('\n')
     const entries = parsePorcelain(text)
-    expect(entries.map((e) => e.file)).toEqual(['Анализ тестов.txt', 'Анализ задание агенту.txt'])
+    expect(entries.map((e) => e.file)).toEqual([
+      'Анализ тестов.txt',
+      'Анализ задание агенту.txt',
+      'Оценка доработка дипсик1.txt',
+    ])
     const { untracked } = classify(entries, parseNumstat(''), () => 5)
     expect(untracked.every((u) => u.ignored)).toBe(true)
   })
@@ -176,8 +181,12 @@ describe('renderReport', () => {
 })
 
 describe('гейт подключён и не молчит на пустом дереве', () => {
-  it('список игнора — ровно два владельческих файла', () => {
-    expect(IGNORED_UNTRACKED).toEqual(['Анализ задание агенту.txt', 'Анализ тестов.txt'])
+  it('список игнора — только владельческие черновики', () => {
+    expect(IGNORED_UNTRACKED).toEqual([
+      'Анализ задание агенту.txt',
+      'Анализ тестов.txt',
+      'Оценка доработка дипсик1.txt',
+    ])
   })
 
   it('preflight содержит проверку незакоммиченного окна', () => {
