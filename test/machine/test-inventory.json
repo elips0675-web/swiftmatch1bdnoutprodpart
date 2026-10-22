@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-22T10:56:04.397Z",
+  "generated": "2026-10-22T11:10:23.439Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -532,8 +532,8 @@
   },
   "server": {
     "files": 160,
-    "tests": 2670,
-    "passed": 2670,
+    "tests": 2682,
+    "passed": 2682,
     "failed": 0,
     "gate": {
       "files": 5,
@@ -541,7 +541,7 @@
     },
     "product": {
       "files": 155,
-      "tests": 2547
+      "tests": 2559
     },
     "perFile": [
       {
@@ -1122,7 +1122,7 @@
       },
       {
         "file": "server/src/__tests__/social-messages-blocks.test.js",
-        "tests": 50
+        "tests": 62
       },
       {
         "file": "server/src/__tests__/social.test.js",
@@ -1290,6 +1290,6 @@
   },
   "total": {
     "files": 288,
-    "tests": 4358
+    "tests": 4370
   }
 }
