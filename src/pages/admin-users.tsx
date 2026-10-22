@@ -116,6 +116,7 @@ export default function AdminUsersPage() {
       });
       if (!res.ok) throw new Error('Failed to fetch');
       const data: UsersResponse = await res.json();
+      setUsers(data.users);
       setTotal(data.total);
       if (data.cities.length > 0) setCities(data.cities);
     } catch {
@@ -223,10 +224,12 @@ export default function AdminUsersPage() {
       const token = getToken();
       const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
       if (currentlyBanned) {
-        await fetch(`/api/admin/users/${id}/unban`, { method: 'POST', headers });
+        const res = await fetch(`/api/admin/users/${id}/unban`, { method: 'POST', headers });
+        if (!res.ok) throw new Error('Unban failed');
         toast.success(t('admin.users.unbanned_toast'));
       } else {
-        await fetch(`/api/admin/users/${id}/ban`, { method: 'POST', headers, body: JSON.stringify({ reason: 'Admin action' }) });
+        const res = await fetch(`/api/admin/users/${id}/ban`, { method: 'POST', headers, body: JSON.stringify({ reason: 'Admin action' }) });
+        if (!res.ok) throw new Error('Ban failed');
         toast.success(t('admin.users.banned_toast'));
       }
       fetchUsers();
