@@ -1,5 +1,5 @@
 ===== Сервер (Vitest) =====
-2621 тестов в 155 файлах (зелёных 2621) (vitest --reporter=json)
+2643 тестов в 157 файлах (зелёных 2643) (vitest --reporter=json)
 
 # файл | тестов
 server/src/__tests__/active-user.test.js | 33
@@ -102,6 +102,8 @@ server/src/__tests__/partners.test.js | 66
 server/src/__tests__/payment-reconcile-edge.test.js | 16
 server/src/__tests__/payment-reconcile-run.test.js | 3
 server/src/__tests__/payment-reconcile.test.js | 13
+server/src/__tests__/premium-branches.test.js | 6
+server/src/__tests__/premium-branches2.test.js | 16
 server/src/__tests__/premium-checkout-stripe.test.js | 5
 server/src/__tests__/premium-refund.test.js | 11
 server/src/__tests__/premium-webhook-metadata.test.js | 9
