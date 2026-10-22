@@ -267,8 +267,12 @@ export function AppHeader() {
         </DropdownMenu>
 
         <Popover onOpenChange={(open) => {
-          setIsNotificationsOpen(open);
-          if (open) markAllRead();
+          if (open) {
+            setIsNotificationsOpen(true);
+            return;
+          }
+          setIsNotificationsOpen(false);
+          markAllRead();
         }}>
           <PopoverTrigger asChild>
             <button className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center text-foreground hover:bg-muted transition-all active:scale-95 relative group">
