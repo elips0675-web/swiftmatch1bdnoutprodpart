@@ -8,6 +8,10 @@
 vi.hoisted(() => {
   delete process.env.FCM_SERVER_KEY
   delete process.env.FCM_SERVICE_ACCOUNT
+  delete process.env.GOOGLE_APPLICATION_CREDENTIALS
+  delete process.env.GCLOUD_PROJECT
+  delete process.env.GOOGLE_CLOUD_PROJECT
+  delete process.env.FIREBASE_PROJECT_ID
 })
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -48,8 +52,16 @@ vi.mock('../logger.js', () => ({
 
 let savedEnv = {}
 
+const ADC_KEYS = [
+  'GOOGLE_APPLICATION_CREDENTIALS',
+  'GCLOUD_PROJECT',
+  'GOOGLE_CLOUD_PROJECT',
+  'FIREBASE_PROJECT_ID',
+]
+
 async function freshFcm(env = {}) {
   vi.resetModules()
+  for (const key of ADC_KEYS) delete process.env[key]
   for (const [key, value] of Object.entries(env)) {
     if (value === undefined) delete process.env[key]
     else process.env[key] = value
@@ -63,10 +75,12 @@ beforeEach(() => {
     FCM_SERVER_KEY: process.env.FCM_SERVER_KEY,
     FCM_SERVICE_ACCOUNT: process.env.FCM_SERVICE_ACCOUNT,
     FCM_ENDPOINT: process.env.FCM_ENDPOINT,
+    ...Object.fromEntries(ADC_KEYS.map((key) => [key, process.env[key]])),
   }
   delete process.env.FCM_SERVER_KEY
   delete process.env.FCM_SERVICE_ACCOUNT
   delete process.env.FCM_ENDPOINT
+  for (const key of ADC_KEYS) delete process.env[key]
   appsList.length = 0
   appMock.getApps.mockImplementation(() => appsList)
   appMock.initializeApp.mockImplementation(() => ({ name: '[DEFAULT]' }))
@@ -186,22 +200,65 @@ describe('sendFcmToUser — service account, firebase-admin', () => {
   })
 })
 
-describe('sendFcmToUser — только FCM_SERVER_KEY (applicationDefault)', () => {
-  it('applicationDefault init успешен → отправка через firebase-admin', async () => {
+describe('sendFcmToUser — FCM_SERVER_KEY без ADC (регресс firebase-admin 14.5.0)', () => {
+  it('FCM_SERVER_KEY без ADC-креденшелов → firebase-admin не поднимается, сразу legacy HTTP', async () => {
+    fetchMock.mockResolvedValue({ json: async () => ({ success: 1 }) })
     const fcm = await freshFcm({ FCM_SERVER_KEY: 'legacy-key' })
+    const res = await fcm.sendFcmToUser('tok', 'T', 'B')
+    expect(res).toEqual({ success: true })
+    expect(appMock.applicationDefault).not.toHaveBeenCalled()
+    expect(appMock.initializeApp).not.toHaveBeenCalled()
+    expect(messagingMock.getMessaging).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('key=legacy-key')
+  })
+
+  it('ADC-переменная окружения (FIREBASE_PROJECT_ID) включает applicationDefault', async () => {
+    const fcm = await freshFcm({ FCM_SERVER_KEY: 'legacy-key', FIREBASE_PROJECT_ID: 'demo-project' })
     const res = await fcm.sendFcmToUser('tok', 'T', 'B')
     expect(res).toEqual({ success: true, messageId: 'message-id-1' })
     expect(appMock.applicationDefault).toHaveBeenCalled()
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('applicationDefault init падает → warn и уход в HTTP', async () => {
+  it('applicationDefault init падает → warn и уход в legacy HTTP', async () => {
     appMock.initializeApp.mockImplementation(() => { throw new Error('no adc') })
     fetchMock.mockResolvedValue({ json: async () => ({}) })
-    const fcm = await freshFcm({ FCM_SERVER_KEY: 'legacy-key' })
+    const fcm = await freshFcm({ FCM_SERVER_KEY: 'legacy-key', GOOGLE_CLOUD_PROJECT: 'demo-project' })
     const res = await fcm.sendFcmToUser('tok', 'T', 'B')
     expect(res).toEqual({ success: true })
     expect(rootLog.warn).toHaveBeenCalledWith('FCM: firebase-admin init failed:', 'no adc')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('ADC-приложение создано, но send падает → откат на legacy HTTP, а не отказ', async () => {
+    sendMock.mockRejectedValue(new Error('Unable to detect a Project Id in the current environment'))
+    fetchMock.mockResolvedValue({ json: async () => ({ success: 1 }) })
+    const fcm = await freshFcm({ FCM_SERVER_KEY: 'legacy-key', GCLOUD_PROJECT: 'demo-project' })
+    const res = await fcm.sendFcmToUser('tok', 'T', 'B')
+    expect(res).toEqual({ success: true })
+    expect(rootLog.error).toHaveBeenCalledWith(
+      'FCM firebase-admin send failed:',
+      expect.any(Error),
+    )
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('ADC send падает и legacy-ключа нет → { success: false, error } без сети', async () => {
+    sendMock.mockRejectedValue(new Error('Unable to detect a Project Id in the current environment'))
+    const fcm = await freshFcm({ FIREBASE_PROJECT_ID: 'demo-project' })
+    const res = await fcm.sendFcmToUser('tok', 'T', 'B')
+    expect(res).toEqual({
+      success: false,
+      error: 'Unable to detect a Project Id in the current environment',
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('ADC-креденшелы без legacy-ключа — не mock-режим: isFCMConfigured true', async () => {
+    const fcm = await freshFcm({ GOOGLE_APPLICATION_CREDENTIALS: '/tmp/creds.json' })
+    expect(fcm.isFCMConfigured()).toBe(true)
+    expect(await fcm.sendFcmToUser('tok', 'T', 'B')).toEqual({ success: true, messageId: 'message-id-1' })
   })
 })
 

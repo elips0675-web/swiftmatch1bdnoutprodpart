@@ -1,3 +1,5 @@
+import { isFCMConfigured } from './fcm.js'
+
 export function isProduction() {
   return process.env.NODE_ENV === 'production'
 }
@@ -69,7 +71,7 @@ export function integrationModes() {
     stripe: stripeIsConfigured() ? 'live' : 'mock',
     smtp: process.env.SMTP_HOST ? 'live' : 'mock',
     sms: process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN ? 'live' : 'mock',
-    fcm: process.env.FCM_SERVER_KEY || process.env.FCM_SERVICE_ACCOUNT ? 'live' : 'mock',
+    fcm: isFCMConfigured() ? 'live' : 'mock',
     redis: process.env.REDIS_URL ? 'live' : 'mock',
     moderation: mod,
   }

@@ -269,6 +269,15 @@ describe('режим интеграций виден в /health', () => {
     process.env.TWILIO_ACCOUNT_SID = 'AC1'
     expect(integrationModes().sms).toBe('mock')
   })
+
+  it('fcm считается live и по ADC-креденшелам (без legacy-ключа)', () => {
+    process.env.FIREBASE_PROJECT_ID = 'demo-project'
+    try {
+      expect(integrationModes().fcm).toBe('live')
+    } finally {
+      delete process.env.FIREBASE_PROJECT_ID
+    }
+  })
 })
 
 describe('refuseMockPayment', () => {

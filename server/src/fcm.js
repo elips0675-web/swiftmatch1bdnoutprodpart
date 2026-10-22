@@ -3,7 +3,6 @@ import { rootLogger } from './logger.js'
 const FCM_SERVER_KEY = process.env.FCM_SERVER_KEY
 const FCM_SERVICE_ACCOUNT = process.env.FCM_SERVICE_ACCOUNT
 const FCM_ENDPOINT = process.env.FCM_ENDPOINT || 'https://fcm.googleapis.com/fcm/send'
-let fcmConfigured = false
 let firebaseApp = null
 
 // FCM_SERVICE_ACCOUNT принимает: base64 JSON (старый формат), сырой JSON или путь к файлу
@@ -19,8 +18,24 @@ export async function parseServiceAccount(value) {
   return JSON.parse(Buffer.from(trimmed, 'base64').toString('utf-8'))
 }
 
+const ADC_ENV_KEYS = [
+  'GOOGLE_APPLICATION_CREDENTIALS',
+  'GCLOUD_PROJECT',
+  'GOOGLE_CLOUD_PROJECT',
+  'FIREBASE_PROJECT_ID',
+]
+
+function hasAdcConfiguration() {
+  return ADC_ENV_KEYS.some((key) => Boolean(process.env[key]))
+}
+
+function isMockMode() {
+  return !FCM_SERVER_KEY && !FCM_SERVICE_ACCOUNT && !hasAdcConfiguration()
+}
+
 async function getFirebaseApp() {
   if (firebaseApp) return firebaseApp
+  if (!FCM_SERVICE_ACCOUNT && !hasAdcConfiguration()) return null
 
   if (FCM_SERVICE_ACCOUNT) {
     try {
@@ -49,11 +64,11 @@ async function getFirebaseApp() {
 }
 
 export function isFCMConfigured() {
-  return fcmConfigured || !!FCM_SERVICE_ACCOUNT
+  return Boolean(process.env.FCM_SERVER_KEY || process.env.FCM_SERVICE_ACCOUNT) || hasAdcConfiguration()
 }
 
 export async function sendFcmToUser(fcmToken, title, body, data = {}) {
-  if (!FCM_SERVER_KEY && !FCM_SERVICE_ACCOUNT) {
+  if (isMockMode()) {
     rootLogger.info('[FCM MOCK] Would send to token', fcmToken?.slice(0, 10), title)
     return { success: true, mock: true }
   }
@@ -73,7 +88,7 @@ export async function sendFcmToUser(fcmToken, title, body, data = {}) {
       return { success: true, messageId: response }
     } catch (err) {
       rootLogger.error('FCM firebase-admin send failed:', err)
-      return { success: false, error: err.message }
+      if (!FCM_SERVER_KEY) return { success: false, error: err.message }
     }
   }
 
@@ -105,7 +120,7 @@ export async function sendFcmToUser(fcmToken, title, body, data = {}) {
 }
 
 export async function sendFcmToAll(fcmTokens, title, body, data = {}) {
-  if (!FCM_SERVER_KEY && !FCM_SERVICE_ACCOUNT) {
+  if (isMockMode()) {
     rootLogger.info('[FCM MOCK] Would send to', fcmTokens?.length, 'tokens')
     return { success: true, mock: true }
   }
@@ -115,5 +130,3 @@ export async function sendFcmToAll(fcmTokens, title, body, data = {}) {
   const sent = results.filter((r) => r.status === 'fulfilled' && r.value.success).length
   return { success: sent > 0, sent }
 }
-
-fcmConfigured = !!(FCM_SERVER_KEY || FCM_SERVICE_ACCOUNT)
