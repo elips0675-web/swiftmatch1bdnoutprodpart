@@ -422,7 +422,8 @@ router.get('/api/invites', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT i.id, i.invite_type as type, i.message, i.status, i.created_at,
-              i.from_user_id as sender_id, up.display_name as sender_name, up.avatar_url as sender_avatar
+              i.from_user_id as sender_id, up.display_name as sender_name, up.avatar_url as sender_avatar,
+              up.age as sender_age
        FROM invites i
        JOIN user_profiles up ON i.from_user_id = up.id
        WHERE i.to_user_id = ? AND ${activeUser('up')}
@@ -1225,7 +1226,7 @@ router.get('/api/activity', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT al.id, al.action_type, al.user_id, al.target_id, al.created_at,
-              up.display_name as user_name, up.avatar_url as user_avatar
+              up.display_name as user_name, up.avatar_url as user_avatar, up.age as user_age
        FROM activity_log al
        JOIN user_profiles up ON al.user_id = up.id
        WHERE al.target_id = ? AND (up.incognito = 0 OR up.incognito IS NULL) AND ${activeUser('up')}

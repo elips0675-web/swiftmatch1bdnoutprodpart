@@ -130,7 +130,7 @@ export const JUSTIFIED = [
   },
   {
     file: 'routes/social.js',
-    lines: [1027],
+    lines: [1028],
     expect: 'sender',
     reason: 'своё имя как отправителя в push получателю',
   },

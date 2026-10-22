@@ -407,6 +407,7 @@ describe('GET /api/activity', () => {
     const res = await request(app).get('/api/activity').set(as())
     expect(res.status).toBe(200)
     expect(res.body).toHaveLength(1)
+    expect(pool.query.mock.calls[0][0]).toContain('up.age as user_age')
   })
 
   it('ошибка БД — 500', async () => {

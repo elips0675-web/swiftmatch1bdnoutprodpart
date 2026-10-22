@@ -73,14 +73,14 @@ export default function ActivityPage() {
       fetch('/api/activity', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
       fetch('/api/invites', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
     ]).then(([activityData, invitesData]) => {
-      setActivity(activityData.map((a: { id: number; user_id: number; user_name: string; user_avatar?: string; action_type: string; created_at: string }) => ({
-        id: a.id, userId: a.user_id, user: a.user_name, img: a.user_avatar || '',
+      setActivity(activityData.map((a: { id: number; user_id: number; user_name: string; user_avatar?: string; user_age?: number | null; action_type: string; created_at: string }) => ({
+        id: a.id, userId: a.user_id, user: a.user_name, age: typeof a.user_age === 'number' ? a.user_age : null, img: a.user_avatar || '',
         type: a.action_type === 'profile_view' ? 'visit' : a.action_type,
-        time: timeAgo(a.created_at, t), seen: false,
+        time: timeAgo(a.created_at, t),
         blurred: a.action_type === 'profile_view',
       })));
-      setInvites(invitesData.map((i: { id: number; sender_id: number; sender_name: string; sender_avatar?: string; type: string; created_at: string; status: string }) => ({
-        id: i.id, userId: i.sender_id, user: i.sender_name, img: i.sender_avatar || '',
+      setInvites(invitesData.map((i: { id: number; sender_id: number; sender_name: string; sender_avatar?: string; sender_age?: number | null; type: string; created_at: string; status: string }) => ({
+        id: i.id, userId: i.sender_id, user: i.sender_name, age: typeof i.sender_age === 'number' ? i.sender_age : null, img: i.sender_avatar || '',
         type: i.type, time: timeAgo(i.created_at, t), seen: i.status !== 'pending',
       })));
     }).catch(() => {}).finally(() => setIsActivityLoading(false));
@@ -92,6 +92,9 @@ export default function ActivityPage() {
     if (activeTab === "visits") return item.type === "visit";
     return true;
   });
+
+  const unseenInvitesCount = invites.filter((item) => !item.seen).length;
+  const newItemsCount = activity.length + unseenInvitesCount;
 
   return (
     <>
@@ -106,9 +109,11 @@ export default function ActivityPage() {
               {t('activity.today_activity')}
             </p>
           </div>
-          <Badge className="gradient-bg text-white rounded-full px-3 py-1 border-0 shadow-lg shadow-primary/20 font-black text-[9px]">
-            5 {t('activity.new')}
-          </Badge>
+          {newItemsCount > 0 && (
+            <Badge className="gradient-bg text-white rounded-full px-3 py-1 border-0 shadow-lg shadow-primary/20 font-black text-[9px]">
+              {newItemsCount} {t('activity.new')}
+            </Badge>
+          )}
         </div>
 
         <Tabs defaultValue="all" className="w-full mb-6" onValueChange={setActiveTab}>
@@ -288,11 +293,9 @@ function ActivityItem({ item, onUnlock }: { item: any, onUnlock: () => void }) {
   return (
     <div className={cn(
       "flex items-center gap-3 p-3 rounded-2xl transition-all cursor-pointer group relative overflow-hidden h-[72px] anti-screenshot",
-      item.seen ? "bg-white/40 opacity-70" : "bg-white app-shadow hover:translate-y-[-1px] border border-white"
+      "bg-white app-shadow hover:translate-y-[-1px] border border-white"
     )}>
-      {!item.seen && (
-        <div className="absolute top-0 left-0 w-1.5 h-full gradient-bg opacity-40"></div>
-      )}
+      <div className="absolute top-0 left-0 w-1.5 h-full gradient-bg opacity-40"></div>
       
       <div className="relative flex-shrink-0">
         <div className={cn(
@@ -321,16 +324,14 @@ function ActivityItem({ item, onUnlock }: { item: any, onUnlock: () => void }) {
               <span><span className="font-black text-primary">{t('profile.someone')}</span> {getMessage()}</span>
             ) : (
               <>
-                <span className="font-black text-foreground">{item.user}, {item.age}</span> {getMessage()}
+                <span className="font-black text-foreground">{item.user}{item.age ? `, ${item.age}` : ''}</span> {getMessage()}
               </>
             )}
           </p>
-          {!item.seen && (
-            <div className="relative flex h-1.5 w-1.5 mt-0.5 ml-1 flex-shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary"></span>
-            </div>
-          )}
+          <div className="relative flex h-1.5 w-1.5 mt-0.5 ml-1 flex-shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary"></span>
+          </div>
         </div>
         <p className="text-xs text-muted-foreground font-black tracking-widest uppercase opacity-40 mt-1">
           {item.time.replace('мин назад', t('time.min_ago')).replace('час назад', t('time.hour_ago')).replace('дня назад', t('time.days_ago'))}
@@ -404,7 +405,7 @@ function InviteItem({ item }: { item: any }) {
       <div className="flex-1 min-w-0 pr-1 ml-1">
         <div className="flex justify-between items-start">
           <p className="text-sm leading-tight text-foreground/90 font-semibold">
-            <span className="font-black text-foreground">{item.user}, {item.age}</span> {t(`invite.msg_${item.type}`)}
+            <span className="font-black text-foreground">{item.user}{item.age ? `, ${item.age}` : ''}</span> {t(`invite.msg_${item.type}`)}
           </p>
           {!item.seen && (
             <div className="relative flex h-1.5 w-1.5 mt-0.5 ml-1 flex-shrink-0">

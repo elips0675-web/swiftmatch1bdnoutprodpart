@@ -119,6 +119,7 @@ describe('GET /api/invites и PUT /api/invites/:id/status', () => {
     expect(res.status).toBe(200)
     expect(res.body).toHaveLength(1)
     expect(res.body[0].sender_name).toBe('Маша')
+    expect(pool.query.mock.calls[0][0]).toContain('up.age as sender_age')
   })
 
   it('ошибка БД — 500', async () => {
