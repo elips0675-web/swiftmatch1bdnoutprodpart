@@ -35,6 +35,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import mysql from 'mysql2/promise'
+import { isDeadlockError, withDeadlockRetry } from '../db-retry.js'
 
 const DB_NAME = 'swiftmatch_race_test'
 const SCHEMA_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'database', 'mysql_schema.sql')
@@ -161,7 +162,7 @@ describe.skipIf(!admin && !requireMysql)('гонки на живом MySQL (P0 #
   it('два параллельных INSERT IGNORE INTO matches: обе в норме, строка одна (новый код)', async () => {
     await pool.query('DELETE FROM matches')
 
-    const insert = () => pool.query('INSERT IGNORE INTO matches (user1_id, user2_id, matched) VALUES (?, ?, 1)', [1, 2])
+    const insert = () => withDeadlockRetry(() => pool.query('INSERT IGNORE INTO matches (user1_id, user2_id, matched) VALUES (?, ?, 1)', [1, 2]))
     const results = await Promise.allSettled([insert(), insert()])
 
     expect(results.every((r) => r.status === 'fulfilled')).toBe(true)
@@ -191,4 +192,52 @@ describe.skipIf(!admin && !requireMysql)('гонки на живом MySQL (P0 #
       expect([...actual.entries()].sort()).toEqual([...expected.entries()].sort())
     }
   })
+
+  it('настоящий дедлок InnoDB отдаёт ER_LOCK_DEADLOCK, а ретрай его переживает', async () => {
+    await pool.query("INSERT IGNORE INTO likes (from_user_id, to_user_id, type) VALUES (1, 2, 'like'), (2, 1, 'like')")
+    const [rows] = await pool.query('SELECT id FROM likes ORDER BY id LIMIT 2')
+    const [id1, id2] = rows.map((r) => r.id)
+
+    let deadlockError = null
+
+    async function runDeadlock() {
+      const c1 = await pool.getConnection()
+      const c2 = await pool.getConnection()
+      try {
+        await c1.beginTransaction()
+        await c1.query('UPDATE likes SET type = ? WHERE id = ?', ['like', id1])
+        await c2.beginTransaction()
+        await c2.query('UPDATE likes SET type = ? WHERE id = ?', ['like', id2])
+        const outcomes = await Promise.allSettled([
+          c1.query('UPDATE likes SET type = ? WHERE id = ?', ['like', id2]),
+          c2.query('UPDATE likes SET type = ? WHERE id = ?', ['like', id1]),
+        ])
+        const rejected = outcomes.filter((o) => o.status === 'rejected')
+        expect(rejected).toHaveLength(1)
+        deadlockError = rejected[0].reason
+        throw deadlockError
+      } finally {
+        await c1.rollback().catch(() => {})
+        await c2.rollback().catch(() => {})
+        c1.release()
+        c2.release()
+      }
+    }
+
+    let attempts = 0
+    const result = await withDeadlockRetry(async (attempt) => {
+      attempts = attempt
+      if (attempt === 1) return runDeadlock()
+      await pool.query('UPDATE likes SET type = ? WHERE id IN (?, ?)', ['like', id1, id2])
+      return 'recovered'
+    }, { baseDelayMs: 1 })
+
+    expect(result).toBe('recovered')
+    expect(attempts).toBe(2)
+    expect(deadlockError.errno).toBe(1213)
+    expect(isDeadlockError(deadlockError)).toBe(true)
+    const [check] = await pool.query('SELECT COUNT(*) AS cnt FROM likes')
+    expect(Number(check[0].cnt)).toBeGreaterThanOrEqual(2)
+  }, 30000)
+
 })

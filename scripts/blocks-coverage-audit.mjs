@@ -118,19 +118,19 @@ export const JUSTIFIED = [
   },
   {
     file: 'routes/social.js',
-    lines: [162],
+    lines: [163],
     expect: 'attachment_style',
     reason: 'свои настройки для поиска (req.userId)',
   },
   {
     file: 'routes/social.js',
-    lines: [307],
+    lines: [308],
     expect: 'liker',
     reason: 'своё имя в push о своём лайке',
   },
   {
     file: 'routes/social.js',
-    lines: [1025],
+    lines: [1026],
     expect: 'sender',
     reason: 'своё имя как отправителя в push получателю',
   },

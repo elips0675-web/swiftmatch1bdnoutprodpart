@@ -425,3 +425,84 @@ describe('гонка повторной доставки Stripe-вебхука',
     expect(db.state.subscriptions[0].is_active).toBe(1)
   })
 })
+
+describe('дедлок InnoDB на взаимном лайке (PROD-01)', () => {
+  function deadlockErr() {
+    return Object.assign(new Error('Deadlock found when trying to get lock'), {
+      code: 'ER_LOCK_DEADLOCK',
+      errno: 1213,
+    })
+  }
+
+  function failOnceOn(fragment) {
+    const base = pool.query.getMockImplementation()
+    let fired = false
+    pool.query.mockImplementation((sql, params) => {
+      if (!fired && String(sql).includes(fragment)) {
+        fired = true
+        return Promise.reject(deadlockErr())
+      }
+      return base(sql, params)
+    })
+  }
+
+  function failAlwaysOn(fragment) {
+    const base = pool.query.getMockImplementation()
+    pool.query.mockImplementation((sql, params) => {
+      if (String(sql).includes(fragment)) return Promise.reject(deadlockErr())
+      return base(sql, params)
+    })
+  }
+
+  function matchInsertCalls() {
+    return pool.query.mock.calls.filter(([sql]) => String(sql).includes('INSERT IGNORE INTO matches')).length
+  }
+
+  function seedReciprocalLike() {
+    db.state.likes.push({ id: ++db.state.seq, from_user_id: B, to_user_id: A, type: 'like' })
+  }
+
+  it('дедлок на INSERT IGNORE INTO matches: повтор даёт 201 и один мэтч', async () => {
+    seedReciprocalLike()
+    failOnceOn('INSERT IGNORE INTO matches')
+    const app = createApp(db)
+
+    const res = await request(app)
+      .post('/api/likes')
+      .set('Authorization', authHeader(A))
+      .send({ liked_user_id: B })
+
+    expect(res.status).toBe(201)
+    expect(res.body.matched).toBe(true)
+    expect(db.state.matches).toHaveLength(1)
+    expect(matchInsertCalls()).toBe(2)
+  })
+
+  it('дедлок на INSERT IGNORE INTO likes: повтор не теряет лайк и не даёт 500', async () => {
+    failOnceOn('INSERT IGNORE INTO likes')
+    const app = createApp(db)
+
+    const res = await request(app)
+      .post('/api/likes')
+      .set('Authorization', authHeader(A))
+      .send({ liked_user_id: B })
+
+    expect(res.status).toBe(201)
+    expect(db.state.likes).toHaveLength(1)
+  })
+
+  it('повторные дедлоки исчерпывают попытки: 500, а не зависание', async () => {
+    seedReciprocalLike()
+    failAlwaysOn('INSERT IGNORE INTO matches')
+    const app = createApp(db)
+
+    const res = await request(app)
+      .post('/api/likes')
+      .set('Authorization', authHeader(A))
+      .send({ liked_user_id: B })
+
+    expect(res.status).toBe(500)
+    expect(res.body.message).toBe('Failed to send like')
+    expect(matchInsertCalls()).toBe(3)
+  })
+})

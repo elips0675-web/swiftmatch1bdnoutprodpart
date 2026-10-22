@@ -15,6 +15,7 @@ import { getPrefs, isAllowed, isAllowedIn } from '../notification-prefs.js'
 import { activeUser } from '../active-user.js'
 import { applyActivityPrivacy } from '../presence.js'
 import { wrapRouter } from '../async-handler.js'
+import { withDeadlockRetry } from '../db-retry.js'
 
 const likeLimiter = rateLimit({ store: getRateLimitStore(), windowMs: 60_000, max: 100, message: { message: 'Too many likes' } })
 
@@ -266,10 +267,10 @@ router.post('/api/likes', auth, likeLimiter, async (req, res) => {
     }
 
     const likeType = type === 'super_like' ? 'super_like' : 'like'
-    const [likeResult] = await pool.query(
+    const [likeResult] = await withDeadlockRetry(() => pool.query(
       'INSERT IGNORE INTO likes (from_user_id, to_user_id, type) VALUES (?, ?, ?)',
       [req.userId, liked_user_id, likeType],
-    )
+    ))
     const isNewLike = (likeResult?.affectedRows ?? 1) > 0
 
     const [reciprocal] = await pool.query(
@@ -279,10 +280,10 @@ router.post('/api/likes', auth, likeLimiter, async (req, res) => {
 
     let matched = false
     if (reciprocal.length > 0) {
-      await pool.query(
+      await withDeadlockRetry(() => pool.query(
         'INSERT IGNORE INTO matches (user1_id, user2_id, matched) VALUES (?, ?, 1)',
         [Math.min(req.userId, liked_user_id), Math.max(req.userId, liked_user_id)],
-      )
+      ))
       matched = true
       invalidate(`user:${req.userId}:/api/matches*`).catch(() => {})
       invalidate(`user:${liked_user_id}:/api/matches*`).catch(() => {})
