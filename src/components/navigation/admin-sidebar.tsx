@@ -39,7 +39,8 @@ export function AdminSidebar() {
     { title: t('admin.queues'), path: '/admin/queues', icon: Layers },
   ];
 
-  const isActive = (path: string, exact?: boolean) => exact ? pathname === path : pathname === path;
+  const isActive = (path: string, exact?: boolean) =>
+    exact ? pathname === path : pathname === path || pathname.startsWith(`${path}/`);
 
   return (
     <>

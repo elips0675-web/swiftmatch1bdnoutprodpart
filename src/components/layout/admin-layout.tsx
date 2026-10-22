@@ -6,7 +6,6 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { AdminSidebar } from '@/components/navigation/admin-sidebar';
-import { PanelLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/context/language-context';
 
@@ -22,10 +21,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         </Sidebar>
         <SidebarInset className="bg-slate-50">
           <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6">
-            <SidebarTrigger className="sm:hidden">
-              <PanelLeft />
-              <span className="sr-only">Toggle Menu</span>
-            </SidebarTrigger>
+            <SidebarTrigger className="md:hidden" />
             <Link to="/admin" className="flex-1">
               <h1 className="font-black text-lg uppercase tracking-tight">{t('admin.panel')}</h1>
             </Link>
