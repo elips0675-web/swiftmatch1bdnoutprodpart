@@ -67,13 +67,28 @@ export default function ProfilePage() {
   const [photoToDelete, setPhotoToDelete] = useState<number | null>(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const [photoIds, setPhotoIds] = useState<Record<string, number>>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const storiesInputRef = useRef<HTMLInputElement>(null);
 
+  const demoProfile = () => ({
+    displayName: t('profile.demo_name'),
+    age: 24,
+    city: t('profile.demo_city'),
+    height: 172,
+    gender: "female",
+    lookingFor: "male",
+    datingGoal: "goal.serious_relationship",
+    zodiac: "common.zodiac.leo",
+    bio: t('profile.demo_bio'),
+    interests: ["interest.photography", "interest.travel", "interest.coffee", "interest.music", "interest.sport"].filter(i => !BANNED_WORDS.includes(i)),
+    match: 87,
+    attachmentStyle: null,
+  });
+
   // Stories states
   const [stories, setStories] = useState<any[]>([]);
-  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [aliases, setAliases] = useState<{ id: number; alias: string; is_primary: boolean }[]>([]);
   const [photoVerified, setPhotoVerified] = useState(false);
 
@@ -156,6 +171,15 @@ function normalizeInterests(interests: InterestInput[]): string[] {
   }).filter((i: string) => !BANNED_WORDS.includes(i))
 }
 
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
   useEffect(() => {
     setIsMounted(true);
 
@@ -172,26 +196,14 @@ function normalizeInterests(interests: InterestInput[]): string[] {
         setProfile({
           ...parsed,
           displayName: parsed.displayName || parsed.name || t('profile.someone'),
-          lookingFor: parsed.gender === 'female' ? 'male' : parsed.lookingFor,
+          lookingFor: parsed.lookingFor || 'male',
         });
       } catch (e) {
         if (import.meta.env.DEV) console.error("Failed to parse profile", e);
+        setProfile(demoProfile());
       }
     } else {
-      setProfile({
-        displayName: t('profile.demo_name'),
-        age: 24,
-        city: t('profile.demo_city'),
-        height: 172,
-        gender: "female",
-        lookingFor: "male",
-        datingGoal: "goal.serious_relationship",
-        zodiac: "common.zodiac.leo",
-        bio: t('profile.demo_bio'),
-        interests: ["interest.photography", "interest.travel", "interest.coffee", "interest.music", "interest.sport"].filter(i => !BANNED_WORDS.includes(i)),
-        match: 87,
-        attachmentStyle: null,
-      });
+      setProfile(demoProfile());
     }
 
     (async () => {
@@ -202,9 +214,13 @@ function normalizeInterests(interests: InterestInput[]): string[] {
         })
         if (res.ok) {
           const data = await res.json()
-          apiPhotos = Array.isArray(data.photos)
-            ? data.photos.map((p: { url: string }) => p.url).filter(Boolean)
+          const apiPhotoRows: Array<{ id?: number; url?: string }> = Array.isArray(data.photos)
+            ? data.photos.filter((p: { id?: number; url?: string }) => p && typeof p.url === 'string' && p.url)
             : []
+          apiPhotos = apiPhotoRows.map((p) => p.url as string)
+          const ids: Record<string, number> = {}
+          apiPhotoRows.forEach((p) => { if (typeof p.id === 'number') ids[p.url as string] = p.id })
+          setPhotoIds(ids)
           const apiInterests = normalizeInterests(data.interests)
           setProfile((prev: ProfileStateFragment | null) => {
             const updated = {
@@ -246,28 +262,8 @@ function normalizeInterests(interests: InterestInput[]): string[] {
       }
     })();
 
-    const savedStories = localStorage.getItem('userProfileStories');
-    if (savedStories) {
-      setStories(JSON.parse(savedStories));
-    }
-
     const participationStatus = localStorage.getItem('contest_participation');
     if (participationStatus) setHasParticipated(true);
-
-
-    // Cleanup blob URLs on unmount
-    return () => {
-      photos.forEach(photo => {
-        if (photo.startsWith('blob:')) {
-          URL.revokeObjectURL(photo);
-        }
-      });
-      stories.forEach(story => {
-        if (story.url.startsWith('blob:')) {
-          URL.revokeObjectURL(story.url);
-        }
-      });
-    };
   }, [t]);
 
   useEffect(() => {
@@ -304,53 +300,58 @@ function normalizeInterests(interests: InterestInput[]): string[] {
   };
 
   const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
+    const input = event.target;
+    const file = input.files?.[0];
+    if (!file) return;
 
-      const previewUrl = URL.createObjectURL(file);
-      setPhotos((prev) => [...prev, previewUrl]);
+    const previewUrl = URL.createObjectURL(file);
+    setPhotos((prev) => [...prev, previewUrl]);
 
-      const formData = new FormData();
-      formData.append('photo', file);
-      formData.append('user_id', '2');
-      formData.append('sort_order', String(photos.length));
+    const formData = new FormData();
+    formData.append('photo', file);
+    formData.append('sort_order', String(photos.length));
 
-      try {
-        const res = await fetch('/api/upload', { method: 'POST', body: formData });
-        if (res.ok) {
-          toast({ title: t('toast.photo_uploaded'), description: t('toast.photo_uploaded_desc') });
-        }
-      } catch {
-        toast({ variant: 'destructive', title: t('common.error') });
+    let storedUrl = '';
+    try {
+      const token = getToken();
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data && typeof data.url === 'string') storedUrl = data.url;
+        toast({ title: t('toast.photo_uploaded'), description: t('toast.photo_uploaded_desc') });
       }
-
-      const fileToDataUrl = (f: File) =>
-        new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result));
-          reader.onerror = () => reject(new Error("Failed to read file"));
-          reader.readAsDataURL(f);
-        });
-
-      fileToDataUrl(file)
-        .then((dataUrl) => {
-          setPhotos((prev) => {
-            const next = [...prev];
-            const idx = next.lastIndexOf(previewUrl);
-            if (idx !== -1) next[idx] = dataUrl;
-
-            localStorage.setItem("userProfileGallery", JSON.stringify(next));
-            return next;
-          });
-        })
-        .catch((e) => {
-          if (import.meta.env.DEV) console.error("Photo convert error:", e);
-          // Если конвертация не удалась, оставляем preview, но оно не переживет перезагрузку.
-        })
-        .finally(() => {
-          event.target.value = "";
-        });
+    } catch {
+      toast({ variant: 'destructive', title: t('common.error') });
     }
+
+    if (!storedUrl) {
+      try {
+        storedUrl = await fileToDataUrl(file);
+      } catch (e) {
+        if (import.meta.env.DEV) console.error('Photo convert error:', e);
+      }
+    }
+
+    if (storedUrl) {
+      setPhotos((prev) => {
+        const next = [...prev];
+        const idx = next.lastIndexOf(previewUrl);
+        if (idx !== -1) next[idx] = storedUrl;
+        try {
+          localStorage.setItem('userProfileGallery', JSON.stringify(next));
+        } catch (e) {
+          if (import.meta.env.DEV) console.error('Gallery persist error:', e);
+        }
+        return next;
+      });
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    input.value = '';
   };
 
   const handleAddStoryClick = () => {
@@ -358,47 +359,15 @@ function normalizeInterests(interests: InterestInput[]): string[] {
   };
 
   const handleStoryFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
-      if (event.target.files && event.target.files[0]) {
-        const file = event.target.files[0];
-        const videoUrl = URL.createObjectURL(file);
-        const storyId = `story_${Date.now()}`;
-
-        const newStory = { id: storyId, url: videoUrl, isUploading: true };
-        setStories(prev => [newStory, ...prev]);
-
-        let progress = 0;
-        setUploadProgress(prev => ({ ...prev, [storyId]: 0 }));
-        
-        const interval = setInterval(() => {
-          progress += Math.random() * 15 + 5; // Simulate 5-15 second upload
-          if (progress > 100) progress = 100;
-          
-          setUploadProgress(prev => ({ ...prev, [storyId]: progress }));
-
-          if (progress >= 100) {
-            clearInterval(interval);
-            
-            const finalStories = stories.map(s => s.id === storyId ? { ...s, url: videoUrl, isUploading: false } : s);
-            localStorage.setItem('userProfileStories', JSON.stringify(finalStories));
-
-            setStories(prev => prev.map(s => s.id === storyId ? { ...s, isUploading: false } : s));
-            
-            setTimeout(() => {
-              setUploadProgress(prev => {
-                const newProgress = { ...prev };
-                delete newProgress[storyId];
-                return newProgress;
-              });
-            }, 1000);
-          }
-        }, 700);
-        
-        event.target.value = '';
-      }
+    const input = event.target;
+    const file = input.files?.[0];
+    if (!file) return;
+    const videoUrl = URL.createObjectURL(file);
+    setStories((prev) => [{ id: `story_${Date.now()}`, url: videoUrl }, ...prev]);
+    input.value = '';
   };
 
-
-  const handleDeletePhoto = () => {
+  const handleDeletePhoto = async () => {
     if (photoToDelete === null) return;
     
     if (photos.length <= 1) {
@@ -418,12 +387,33 @@ function normalizeInterests(interests: InterestInput[]): string[] {
 
     const newPhotos = photos.filter((_, i) => i !== photoToDelete);
     setPhotos(newPhotos);
-    
+
+    const photoId = photoIds[photoUrlToDelete];
+    setPhotoIds((prev) => {
+      const next = { ...prev };
+      delete next[photoUrlToDelete];
+      return next;
+    });
+
     const persistentPhotos = newPhotos.filter(p => !p.startsWith('blob:'));
     localStorage.setItem('userProfileGallery', JSON.stringify(persistentPhotos));
 
     toast({ title: t('toast.photo_deleted') });
     setPhotoToDelete(null);
+
+    if (photoId) {
+      try {
+        const res = await fetch(`/api/photos/${photoId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (!res.ok) {
+          toast({ variant: 'destructive', title: t('toast.error'), description: t('toast.photo_delete_failed') });
+        }
+      } catch {
+        toast({ variant: 'destructive', title: t('toast.error'), description: t('toast.photo_delete_failed') });
+      }
+    }
   };
 
   const openViewer = (index: number) => {
@@ -797,51 +787,11 @@ function normalizeInterests(interests: InterestInput[]): string[] {
                   <button onClick={handleAddStoryClick} className="h-8 rounded-lg text-[9px] font-black uppercase tracking-widest text-primary px-3 bg-primary/5 hover:bg-primary/10 transition-colors">{t('profile.add')}</button>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
-                  {stories.map((story) => {
-                    const progress = uploadProgress[story.id];
-                    const isUploading = story.isUploading;
-                    
-                    return (
-                      <div key={story.id} className="relative aspect-[9/16] rounded-xl overflow-hidden bg-muted border border-border/10 group shadow-sm">
-                        <video src={story.url} className="object-cover w-full h-full" playsInline muted loop autoPlay />
-                        
-                        {isUploading && progress < 100 && (
-                          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center backdrop-blur-sm transition-opacity duration-500">
-                              <div className="relative w-16 h-16">
-                                  <svg className="w-full h-full" viewBox="0 0 100 100">
-                                      <circle
-                                          className="text-gray-600/50"
-                                          strokeWidth="5"
-                                          stroke="currentColor"
-                                          fill="transparent"
-                                          r="40"
-                                          cx="50"
-                                          cy="50"
-                                      />
-                                      <circle
-                                          className="text-primary"
-                                          strokeWidth="5"
-                                          strokeDasharray={2 * Math.PI * 40}
-                                          strokeDashoffset={(2 * Math.PI * 40) - (progress / 100) * (2 * Math.PI * 40)}
-                                          strokeLinecap="round"
-                                          stroke="currentColor"
-                                          fill="transparent"
-                                          r="40"
-                                          cx="50"
-                                          cy="50"
-                                          style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
-                                      />
-                                  </svg>
-                                  <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold">
-                                      {Math.round(progress)}%
-                                  </span>
-                              </div>
-                                  <span className="text-white/80 text-[10px] mt-2 font-semibold uppercase tracking-wider">{t('common.loading')}</span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {stories.map((story) => (
+                    <div key={story.id} className="relative aspect-[9/16] rounded-xl overflow-hidden bg-muted border border-border/10 group shadow-sm">
+                      <video src={story.url} className="object-cover w-full h-full" playsInline muted loop autoPlay />
+                    </div>
+                  ))}
                   <div 
                     onClick={handleAddStoryClick}
                     className="aspect-[9/16] rounded-xl bg-muted/50 border-2 border-dashed border-border/30 flex flex-col items-center justify-center text-center text-muted-foreground hover:bg-muted/100 hover:border-primary/50 hover:text-primary transition-all cursor-pointer p-2"
