@@ -57,14 +57,8 @@ vi.mock('../profile-fields.js', async (importOriginal) => {
 })
 
 import premiumRoutes from '../routes/premium.js'
-import pool from '../db.js'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'test-secret'
-const SAVED = {
-  key: process.env.STRIPE_SECRET_KEY,
-  live: process.env.STRIPE_LIVE,
-  hook: process.env.STRIPE_WEBHOOK_SECRET,
-}
 
 function authToken(userId = 1) {
   return jwt.sign({ userId, role: 'user' }, JWT_SECRET, { expiresIn: '1h' })
