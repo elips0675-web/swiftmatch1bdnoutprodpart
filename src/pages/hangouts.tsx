@@ -1528,6 +1528,8 @@ export default function HangoutsPage() {
                       setHangoutType("all");
                       setDateFilter("all");
                       setSortBy("date");
+                      setPriceFilter("all");
+                      setPriceMax(null);
                       setPage(1);
                       setDebouncedSearch("");
                     }}
