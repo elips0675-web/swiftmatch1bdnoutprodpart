@@ -28,12 +28,33 @@ interface RegistrationItem {
   users: number;
 }
 
+interface ProductMetric {
+  key: string;
+  value: number | null;
+  unit: string;
+  target: number;
+  direction: 'min' | 'max';
+  status: 'ok' | 'warn' | 'unknown';
+}
+
+interface ProductMetrics {
+  cohort: {
+    registered: number;
+    liked: number;
+    matched: number;
+    messaged: number;
+    d7Cohort: number;
+  };
+  metrics: ProductMetric[];
+}
+
 export default function AdminAnalyticsPage() {
   const { t } = useLanguage();
   const [overview, setOverview] = useState<Overview | null>(null);
   const [retention, setRetention] = useState<RetentionItem[]>([]);
   const [revenueMix, setRevenueMix] = useState<RevenueMixItem[]>([]);
   const [registrations, setRegistrations] = useState<RegistrationItem[]>([]);
+  const [productMetrics, setProductMetrics] = useState<ProductMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,21 +63,24 @@ export default function AdminAnalyticsPage() {
         const token = getToken();
         const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
         const apiGet = <T,>(url: string): Promise<T> => fetch(url, { headers }).then(r => { if (!r.ok) throw new Error('fetch failed'); return r.json(); });
-        const [ov, ret, mix, reg] = await Promise.all([
+        const [ov, ret, mix, reg, prod] = await Promise.all([
           apiGet<Overview>('/api/admin/analytics/overview'),
           apiGet<RetentionItem[]>('/api/admin/analytics/retention'),
           apiGet<RevenueMixItem[]>('/api/admin/analytics/revenue-mix'),
           apiGet<RegistrationItem[]>('/api/admin/analytics/registrations'),
+          apiGet<ProductMetrics>('/api/admin/analytics/product-metrics'),
         ]);
         setOverview(ov);
         setRetention(Array.isArray(ret) ? ret : []);
         setRevenueMix(Array.isArray(mix) ? mix : []);
         setRegistrations(Array.isArray(reg) ? reg : []);
+        setProductMetrics(prod && Array.isArray(prod.metrics) ? prod : null);
       } catch {
         setOverview({ mau: '—', conversionRate: '—', arpu: '—' });
         setRetention([]);
         setRevenueMix([]);
         setRegistrations([]);
+        setProductMetrics(null);
       } finally {
         setLoading(false);
       }
@@ -73,6 +97,12 @@ export default function AdminAnalyticsPage() {
     { title: t('admin.analytics.conversion'), value: overview?.conversionRate ?? '—', sub: '', icon: Zap, color: 'text-primary', border: 'border-primary' },
     { title: t('admin.analytics.arpu'), value: overview?.arpu ?? '—', sub: '', icon: DollarSign, color: 'text-amber-500', border: 'border-amber-500' },
   ];
+
+  const statusClass = (status: ProductMetric['status']) => (
+    status === 'ok' ? 'bg-emerald-500 text-white border-0'
+      : status === 'warn' ? 'bg-amber-500 text-white border-0'
+        : 'bg-slate-400 text-white border-0'
+  );
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-24 animate-in fade-in duration-500">
@@ -99,6 +129,31 @@ export default function AdminAnalyticsPage() {
           </Card>
         ))}
       </div>
+
+      {productMetrics && (
+        <Card className="border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg font-black">{t('admin.analytics.product_metrics')}</CardTitle>
+            <CardDescription>
+              {t('admin.analytics.product_metrics_desc', { n: productMetrics.cohort.registered })}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {productMetrics.metrics.map((m) => (
+              <div key={m.key} className="bg-background p-4 rounded-2xl shadow-sm border space-y-2">
+                <p className="text-[10px] font-black text-muted-foreground uppercase">{t(`admin.analytics.metric.${m.key}`)}</p>
+                <p className="text-2xl font-black">{m.value === null ? '—' : `${m.value}${m.unit}`}</p>
+                <p className="text-[10px] text-muted-foreground font-bold">
+                  {t(m.direction === 'max' ? 'admin.analytics.metric_target_max' : 'admin.analytics.metric_target_min', { value: `${m.target}${m.unit}` })}
+                </p>
+                <Badge className={statusClass(m.status)}>
+                  {t(`admin.analytics.status.${m.status}`)}
+                </Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="border-0 shadow-sm lg:col-span-2">

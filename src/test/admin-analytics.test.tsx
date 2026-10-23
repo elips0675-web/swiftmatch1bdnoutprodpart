@@ -43,6 +43,15 @@ const registrations = [
   { day: '10.10', users: 120 },
   { day: '11.10', users: 150 },
 ];
+const productMetrics = {
+  cohort: { registered: 200, liked: 90, matched: 50, messaged: 60, d7Cohort: 100 },
+  metrics: [
+    { key: 'like_rate', value: 45, unit: '%', target: 40, direction: 'min', status: 'ok' },
+    { key: 'match_rate', value: 25, unit: '%', target: 20, direction: 'min', status: 'ok' },
+    { key: 'd7_retention', value: 12.5, unit: '%', target: 15, direction: 'min', status: 'warn' },
+    { key: 'first_message_hours', value: null, unit: 'h', target: 24, direction: 'max', status: 'unknown' },
+  ],
+};
 
 function jsonResponse(body: unknown, status = 200) {
   return Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(body) } as Response);
@@ -54,6 +63,7 @@ function mockAll() {
     if (url === '/api/admin/analytics/retention') return jsonResponse(retention);
     if (url === '/api/admin/analytics/revenue-mix') return jsonResponse(revenueMix);
     if (url === '/api/admin/analytics/registrations') return jsonResponse(registrations);
+    if (url === '/api/admin/analytics/product-metrics') return jsonResponse(productMetrics);
     return jsonResponse({});
   });
 }
@@ -65,16 +75,17 @@ describe('Страница admin-analytics', () => {
     h.token = 'test-token';
   });
 
-  it('пока грузится — спиннер, затем четыре запроса с Bearer и три метрики', async () => {
+  it('пока грузится — спиннер, затем пять запросов с Bearer и три метрики', async () => {
     mockAll();
 
     const { container } = render(<AdminAnalyticsPage />);
     expect(container.querySelector('.animate-spin')).not.toBeNull();
 
     await screen.findByText('12 480');
-    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(mockFetch).toHaveBeenCalledTimes(5);
     expect(mockFetch.mock.calls.map((call) => call[0]).sort()).toEqual([
       '/api/admin/analytics/overview',
+      '/api/admin/analytics/product-metrics',
       '/api/admin/analytics/registrations',
       '/api/admin/analytics/retention',
       '/api/admin/analytics/revenue-mix',
@@ -98,7 +109,7 @@ describe('Страница admin-analytics', () => {
     expect(mockFetch.mock.calls[0][1]).toEqual({ headers: {} });
   });
 
-  it('отказ одного из четырёх запросов — прочерки вместо значений, страница не пустая', async () => {
+  it('отказ одного из пяти запросов — прочерки вместо значений, страница не пустая', async () => {
     mockFetch.mockImplementation((url: string) => {
       if (url === '/api/admin/analytics/retention') return jsonResponse({ message: 'boom' }, 500);
       if (url === '/api/admin/analytics/overview') return jsonResponse(overview);
@@ -156,5 +167,59 @@ describe('Страница admin-analytics', () => {
     expect(screen.getByText('admin.analytics.connected')).toBeInTheDocument();
     expect(screen.getByText('admin.analytics.live_db')).toBeInTheDocument();
     expect(mockFetch.mock.calls.every((call) => String(call[0]).includes('/api/admin/analytics/'))).toBe(true);
+  });
+
+  it('воронка продукта: значения, цели и три статуса из ответа сервера', async () => {
+    mockAll();
+    render(<AdminAnalyticsPage />);
+    await screen.findByText('12 480');
+
+    expect(screen.getByText('admin.analytics.product_metrics')).toBeInTheDocument();
+    expect(screen.getByText('admin.analytics.product_metrics_desc')).toBeInTheDocument();
+    expect(screen.getByText('45%')).toBeInTheDocument();
+    expect(screen.getByText('25%')).toBeInTheDocument();
+    expect(screen.getByText('12.5%')).toBeInTheDocument();
+    expect(screen.getAllByText('—')).toHaveLength(3);
+    expect(screen.getByText('admin.analytics.metric.like_rate')).toBeInTheDocument();
+    expect(screen.getByText('admin.analytics.metric.match_rate')).toBeInTheDocument();
+    expect(screen.getByText('admin.analytics.metric.d7_retention')).toBeInTheDocument();
+    expect(screen.getByText('admin.analytics.metric.first_message_hours')).toBeInTheDocument();
+    expect(screen.getAllByText('admin.analytics.status.ok')).toHaveLength(2);
+    expect(screen.getByText('admin.analytics.status.warn')).toBeInTheDocument();
+    expect(screen.getByText('admin.analytics.status.unknown')).toBeInTheDocument();
+    expect(screen.getAllByText('admin.analytics.metric_target_min')).toHaveLength(3);
+    expect(screen.getByText('admin.analytics.metric_target_max')).toBeInTheDocument();
+  });
+
+  it('ответ без массива метрик — блок воронки не рисуется, остальная страница цела', async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url === '/api/admin/analytics/overview') return jsonResponse(overview);
+      if (url === '/api/admin/analytics/retention') return jsonResponse(retention);
+      if (url === '/api/admin/analytics/revenue-mix') return jsonResponse(revenueMix);
+      if (url === '/api/admin/analytics/registrations') return jsonResponse(registrations);
+      return jsonResponse({ cohort: { registered: 5 } });
+    });
+
+    render(<AdminAnalyticsPage />);
+
+    await screen.findByText('12 480');
+    expect(screen.queryByText('admin.analytics.product_metrics')).toBeNull();
+    expect(screen.getByText('3.4%')).toBeInTheDocument();
+  });
+
+  it('падение запроса метрик — воронки нет, прочерки вместо KPI', async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url === '/api/admin/analytics/product-metrics') return jsonResponse({ message: 'boom' }, 500);
+      if (url === '/api/admin/analytics/overview') return jsonResponse(overview);
+      if (url === '/api/admin/analytics/retention') return jsonResponse(retention);
+      if (url === '/api/admin/analytics/revenue-mix') return jsonResponse(revenueMix);
+      return jsonResponse(registrations);
+    });
+
+    render(<AdminAnalyticsPage />);
+
+    await screen.findByText('admin.analytics.title');
+    expect(screen.queryByText('admin.analytics.product_metrics')).toBeNull();
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3);
   });
 });
