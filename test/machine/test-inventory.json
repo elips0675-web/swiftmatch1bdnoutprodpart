@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-23T10:16:39.388Z",
+  "generated": "2026-10-23T10:28:28.471Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 139,
-    "tests": 2130,
-    "passed": 2130,
+    "files": 140,
+    "tests": 2154,
+    "passed": 2154,
     "failed": 0,
     "gate": {
       "files": 31,
       "tests": 769
     },
     "product": {
-      "files": 108,
-      "tests": 1361
+      "files": 109,
+      "tests": 1385
     },
     "perFile": [
       {
@@ -547,6 +547,10 @@
       {
         "file": "src/test/use-toast.test.tsx",
         "tests": 11
+      },
+      {
+        "file": "src/test/use-webrtc.test.ts",
+        "tests": 24
       },
       {
         "file": "src/test/use-websocket-url.test.tsx",
@@ -1337,7 +1341,7 @@
     ]
   },
   "total": {
-    "files": 300,
-    "tests": 4832
+    "files": 301,
+    "tests": 4856
   }
 }
