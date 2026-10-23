@@ -1,11 +1,11 @@
 {
-  "generated": "2026-10-23T08:28:58.667Z",
+  "generated": "2026-10-23T10:16:39.388Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
     "files": 139,
-    "tests": 2127,
-    "passed": 2127,
+    "tests": 2130,
+    "passed": 2130,
     "failed": 0,
     "gate": {
       "files": 31,
@@ -13,7 +13,7 @@
     },
     "product": {
       "files": 108,
-      "tests": 1358
+      "tests": 1361
     },
     "perFile": [
       {
@@ -162,7 +162,7 @@
       },
       {
         "file": "src/test/admin-analytics.test.tsx",
-        "tests": 7
+        "tests": 10
       },
       {
         "file": "src/test/admin-backup.test.tsx",
@@ -575,17 +575,17 @@
     ]
   },
   "server": {
-    "files": 160,
-    "tests": 2688,
-    "passed": 2688,
+    "files": 161,
+    "tests": 2702,
+    "passed": 2702,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 123
     },
     "product": {
-      "files": 155,
-      "tests": 2565
+      "files": 156,
+      "tests": 2579
     },
     "perFile": [
       {
@@ -602,7 +602,7 @@
       },
       {
         "file": "server/src/__tests__/admin-analytics.test.js",
-        "tests": 10
+        "tests": 15
       },
       {
         "file": "server/src/__tests__/admin-auth.test.js",
@@ -1029,6 +1029,10 @@
         "tests": 31
       },
       {
+        "file": "server/src/__tests__/product-metrics.test.js",
+        "tests": 9
+      },
+      {
         "file": "server/src/__tests__/profile-aliases.test.js",
         "tests": 27
       },
@@ -1333,7 +1337,7 @@
     ]
   },
   "total": {
-    "files": 299,
-    "tests": 4815
+    "files": 300,
+    "tests": 4832
   }
 }
