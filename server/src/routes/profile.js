@@ -764,6 +764,55 @@ router.put('/api/profile/:id', auth, async (req, res) => {
   }
 })
 
+// ─── Profile views (лента «Визиты») ────────────────────────────
+/**
+ * @openapi
+ * /api/profile/{id}/view:
+ *   post:
+ *     tags: [Profile]
+ *     summary: Record a profile view in the activity feed
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200: { description: "{ viewed: boolean } — false при повторе в течение 24 часов" }
+ *       400: { description: Invalid id / Cannot view yourself }
+ *       404: { description: Profile not found }
+ */
+router.post('/api/profile/:id/view', auth, async (req, res) => {
+  const { id } = req.params
+  if (!/^\d+$/.test(id)) return res.status(400).json({ message: 'Invalid id' })
+  if (Number(id) === req.userId) return res.status(400).json({ message: 'Cannot view yourself' })
+  const targetId = Number(id)
+  try {
+    const blockFilter = notBlocked('up', req.userId)
+    const [target] = await pool.query(
+      `SELECT up.id FROM user_profiles up WHERE up.id = ? AND ${activeUser('up')} AND ${blockFilter.sql}`,
+      [targetId, ...blockFilter.params],
+    )
+    if (target.length === 0) return res.status(404).json({ message: 'Profile not found' })
+
+    const [result] = await pool.query(
+      `INSERT INTO activity_log (user_id, target_id, action_type)
+       SELECT ?, ?, 'profile_view' FROM DUAL
+       WHERE NOT EXISTS (
+         SELECT 1 FROM activity_log
+         WHERE user_id = ? AND target_id = ? AND action_type = 'profile_view'
+           AND created_at > (NOW() - INTERVAL 24 HOUR)
+       )`,
+      [req.userId, targetId, req.userId, targetId],
+    )
+    res.json({ viewed: (result?.affectedRows ?? 0) > 0 })
+  } catch (err) {
+    logger.error('Profile view error:', err)
+    res.status(500).json({ message: 'Failed to record view' })
+  }
+})
+
 // ─── User watches («Интересуют новые люди»: подписка на профиль) ─
 /**
  * @openapi

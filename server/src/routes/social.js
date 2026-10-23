@@ -1228,15 +1228,18 @@ router.post('/api/chats/:chatId/messages/:msgId/reactions', auth, async (req, re
  */
 router.get('/api/activity', auth, async (req, res) => {
   try {
+    const blockJoin = ' LEFT JOIN user_blocks bl ON (bl.blocker_id = ? AND bl.blocked_id = up.id) OR (bl.blocker_id = up.id AND bl.blocked_id = ?)'
     const [rows] = await pool.query(
       `SELECT al.id, al.action_type, al.user_id, al.target_id, al.created_at,
               up.display_name as user_name, up.avatar_url as user_avatar, up.age as user_age
        FROM activity_log al
        JOIN user_profiles up ON al.user_id = up.id
+       ${blockJoin}
        WHERE al.target_id = ? AND (up.incognito = 0 OR up.incognito IS NULL) AND ${activeUser('up')}
+         AND bl.blocker_id IS NULL
        ORDER BY al.created_at DESC, al.id DESC
        LIMIT 50`,
-      [req.userId],
+      [req.userId, req.userId, req.userId],
     )
     res.json(rows)
   } catch (err) {

@@ -410,6 +410,16 @@ describe('GET /api/activity', () => {
     expect(pool.query.mock.calls[0][0]).toContain('up.age as user_age')
   })
 
+  it('скрывает активность заблокированных: JOIN user_blocks и bl.blocker_id IS NULL', async () => {
+    pool.query.mockResolvedValueOnce([[], []])
+    const res = await request(app).get('/api/activity').set(as())
+    expect(res.status).toBe(200)
+    const [sql, params] = pool.query.mock.calls[0]
+    expect(sql).toContain('LEFT JOIN user_blocks bl')
+    expect(sql).toContain('bl.blocker_id IS NULL')
+    expect(params).toEqual([1, 1, 1])
+  })
+
   it('ошибка БД — 500', async () => {
     pool.query.mockRejectedValueOnce(new Error('boom'))
     const res = await request(app).get('/api/activity').set(as())
