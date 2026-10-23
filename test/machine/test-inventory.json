@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-23T05:43:24.791Z",
+  "generated": "2026-10-23T07:55:52.660Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 135,
-    "tests": 2037,
-    "passed": 2037,
+    "files": 137,
+    "tests": 2076,
+    "passed": 2076,
     "failed": 0,
     "gate": {
       "files": 31,
       "tests": 769
     },
     "product": {
-      "files": 104,
-      "tests": 1268
+      "files": 106,
+      "tests": 1307
     },
     "perFile": [
       {
@@ -409,12 +409,20 @@
         "tests": 4
       },
       {
+        "file": "src/test/premium-dialog.test.tsx",
+        "tests": 19
+      },
+      {
+        "file": "src/test/premium-lib.test.ts",
+        "tests": 9
+      },
+      {
         "file": "src/test/premium-success.test.tsx",
         "tests": 3
       },
       {
         "file": "src/test/premium.test.tsx",
-        "tests": 8
+        "tests": 19
       },
       {
         "file": "src/test/profile-activity-tab.test.tsx",
@@ -560,8 +568,8 @@
   },
   "server": {
     "files": 160,
-    "tests": 2682,
-    "passed": 2682,
+    "tests": 2688,
+    "passed": 2688,
     "failed": 0,
     "gate": {
       "files": 5,
@@ -569,7 +577,7 @@
     },
     "product": {
       "files": 155,
-      "tests": 2559
+      "tests": 2565
     },
     "perFile": [
       {
@@ -986,7 +994,7 @@
       },
       {
         "file": "server/src/__tests__/premium-checkout-stripe.test.js",
-        "tests": 5
+        "tests": 7
       },
       {
         "file": "server/src/__tests__/premium-refund.test.js",
@@ -994,7 +1002,7 @@
       },
       {
         "file": "server/src/__tests__/premium-webhook-metadata.test.js",
-        "tests": 9
+        "tests": 11
       },
       {
         "file": "server/src/__tests__/premium-webhook.test.js",
@@ -1002,7 +1010,7 @@
       },
       {
         "file": "server/src/__tests__/premium.test.js",
-        "tests": 19
+        "tests": 21
       },
       {
         "file": "server/src/__tests__/presence.test.js",
@@ -1317,7 +1325,7 @@
     ]
   },
   "total": {
-    "files": 295,
-    "tests": 4719
+    "files": 297,
+    "tests": 4764
   }
 }
