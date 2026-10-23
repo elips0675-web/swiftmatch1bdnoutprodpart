@@ -72,6 +72,7 @@ export const PRICE_RANGE_PRESETS: Array<{ key: string; max: number | null }> = [
 
 function hangoutDateKey(value: string): string {
   const d = new Date(value);
+  if (isNaN(d.getTime())) return "unknown";
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -84,6 +85,7 @@ function hangoutDateKey(value: string): string {
 function hangoutGroupLabel(key: string, t: (k: string) => string): string {
   if (key === "today") return t("hangout.group.today");
   if (key === "tomorrow") return t("hangout.group.tomorrow");
+  if (key === "unknown") return t("hangout.group.unknown");
   const d = new Date(key);
   if (isNaN(d.getTime())) return key;
   return d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
