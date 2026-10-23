@@ -228,7 +228,7 @@ function UserProfileContent() {
       toast({ variant: 'destructive', title: t('error.generic_title') });
       return;
     }
-    toast({ title: t('report.toast.success_title'), description: `${t('report.toast.success_desc')} ${user.name}.` });
+    toast({ title: t('report.toast.success_title'), description: `${t('report.toast.success_desc')} ${user?.name ?? ''}.` });
     setIsReportDialogOpen(false);
     setReportReason('');
     setReportDescription('');

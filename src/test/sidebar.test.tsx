@@ -58,7 +58,7 @@ function Probe() {
       <button type="button" onClick={toggleSidebar}>
         toggle
       </button>
-      <button type="button" onClick={() => setOpen((value) => !value)}>
+      <button type="button" onClick={() => setOpen(!open)}>
         flip
       </button>
       <button type="button" onClick={() => setOpen(false)}>

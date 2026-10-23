@@ -437,7 +437,7 @@ describe("hangouts feed: действия", () => {
 
 describe("hangouts feed: шеринг и билет партнёра", () => {
   it("использует нативный share, если он есть", async () => {
-    const shareMock = vi.fn(() => Promise.resolve())
+    const shareMock = vi.fn((_data: { title: string; url: string }) => Promise.resolve())
     Object.defineProperty(navigator, "share", { value: shareMock, configurable: true })
     await renderCard({})
 
