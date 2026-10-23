@@ -1,5 +1,5 @@
 ===== Фронт (Vitest) =====
-2170 тестов в 141 файлах (зелёных 2170) (vitest --reporter=json)
+2191 тестов в 142 файлах (зелёных 2191) (vitest --reporter=json)
 
 # файл | тестов
 scripts/backup-smoke-gate.test.mjs | 34
@@ -61,6 +61,7 @@ src/test/app-header.test.tsx | 32
 src/test/app.test.tsx | 91
 src/test/auth-context.test.tsx | 34
 src/test/auth-refresh.test.ts | 8
+src/test/call-dialogs.test.tsx | 21
 src/test/category-feed.test.tsx | 49
 src/test/chat-partner-actions.test.tsx | 3
 src/test/chats-history.test.tsx | 14
