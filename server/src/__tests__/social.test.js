@@ -391,8 +391,8 @@ describe('POST /api/likes', () => {
   })
 
   it('sends like and creates notification', async () => {
-    // Очередь полная: роут делает 7 запросов (существующий лайк, insert лайка,
-    // insert уведомления, select уведомления, display_name, затем загрузка
+    // Очередь полная: роут делает 8 запросов (существующий лайк, insert лайка,
+    // insert в activity_log, select уведомления, display_name, затем загрузка
     // настроек уведомлений). Раньше шестого значения не хватало, и тест
     // добирал его остатком очереди из предыдущего теста — зелёный по чужой
     // причине и красный в одиночном прогоне.
@@ -400,6 +400,7 @@ describe('POST /api/likes', () => {
       .mockResolvedValueOnce([[{ id: 1 }], []])
       .mockResolvedValueOnce([[], []])
       .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([{ insertId: 42 }, []])
       .mockResolvedValueOnce([{ insertId: 1 }, []])
       .mockResolvedValueOnce([[{ id: 1, type: 'like', payload: '{}', created_at: new Date().toISOString() }], []])
       .mockResolvedValueOnce([[{ display_name: 'Test' }], []])

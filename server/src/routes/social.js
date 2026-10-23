@@ -291,6 +291,10 @@ router.post('/api/likes', auth, likeLimiter, async (req, res) => {
     }
 
     if (isNewLike) {
+      await pool.query(
+        'INSERT INTO activity_log (user_id, target_id, action_type, metadata) VALUES (?, ?, ?, ?)',
+        [req.userId, liked_user_id, matched ? 'match' : 'like', JSON.stringify({ like_type: likeType })],
+      )
       const prefs = await getPrefs(liked_user_id)
       const prefsMap = new Map([[Number(liked_user_id), prefs]])
 
