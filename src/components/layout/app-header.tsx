@@ -13,6 +13,7 @@ import { getToken } from "@/lib/token";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 const DropdownMenu = dynamic(() => import("@/components/ui/dropdown-menu").then((mod) => mod.DropdownMenu), { ssr: false });
@@ -21,7 +22,6 @@ const DropdownMenuItem = dynamic(() => import("@/components/ui/dropdown-menu").t
 const DropdownMenuTrigger = dynamic(() => import("@/components/ui/dropdown-menu").then((mod) => mod.DropdownMenuTrigger), { ssr: false });
 
 const PopoverContent = dynamic(() => import("@/components/ui/popover").then(mod => mod.PopoverContent), { ssr: false });
-const ScrollArea = dynamic(() => import("@/components/ui/scroll-area").then(mod => mod.ScrollArea), { ssr: false });
 
 function getPageTitle(pathname: string, t: (k: string) => string): string {
   const titles: Record<string, string> = {
