@@ -198,4 +198,168 @@ describe('Страница premium', () => {
     expect(pushMock).not.toHaveBeenCalled()
     expect(mockFetch).not.toHaveBeenCalledWith('/api/premium/create-checkout', expect.anything())
   })
+  describe('устойчивость страницы к нештатным ответам', () => {
+    beforeEach(() => {
+      vi.clearAllMocks()
+      mockFetch.mockReset()
+      isNativeMock.mockReset()
+      isNativeMock.mockReturnValue(false)
+      iapMock.mockReset()
+      Object.defineProperty(window, 'location', {
+        value: { href: '' },
+        writable: true,
+        configurable: true,
+      })
+    })
+
+    it('объект вместо массива тарифов не роняет страницу, а включает встроенные тарифы', async () => {
+      mockFetch.mockImplementation(() => jsonResponse({ error: 'bad' }))
+
+      renderPage()
+
+      await waitForTier('Platinum')
+      expect(screen.getByText(price(1499))).toBeInTheDocument()
+    })
+
+    it('пустой массив тарифов уводит в fallback и выбирает gold', async () => {
+      mockFetch.mockImplementation(() => jsonResponse([]))
+
+      renderPage()
+
+      await waitForTier('Platinum')
+      expect(screen.getByText('-20%')).toBeInTheDocument()
+    })
+
+    it('ответ оплаты с url уводит на страницу Stripe', async () => {
+      mockFetch.mockImplementation((url: string) =>
+        url === '/api/premium/tiers'
+          ? jsonResponse([goldTier])
+          : jsonResponse({ url: 'https://checkout.stripe.com/session' }),
+      )
+
+      renderPage()
+      await waitForTier('Gold')
+
+      fireEvent.click(screen.getByText('premium.start_now'))
+
+      await waitFor(() => expect(window.location.href).toBe('https://checkout.stripe.com/session'))
+      expect(pushMock).not.toHaveBeenCalled()
+      expect(toastSuccessMock).not.toHaveBeenCalled()
+    })
+
+    it('сетевая ошибка оплаты показывает premium.error', async () => {
+      mockFetch.mockImplementation((url: string) =>
+        url === '/api/premium/tiers' ? jsonResponse([goldTier]) : Promise.reject(new Error('Failed to fetch')),
+      )
+
+      renderPage()
+      await waitForTier('Gold')
+
+      fireEvent.click(screen.getByText('premium.start_now'))
+
+      await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith('premium.error'))
+    })
+
+    it('нечитаемый ответ оплаты не выводит английский SyntaxError', async () => {
+      mockFetch.mockImplementation((url: string) =>
+        url === '/api/premium/tiers'
+          ? jsonResponse([goldTier])
+          : Promise.resolve({ ok: false, status: 502, json: () => Promise.reject(new Error('bad')) } as Response),
+      )
+
+      renderPage()
+      await waitForTier('Gold')
+
+      fireEvent.click(screen.getByText('premium.start_now'))
+
+      await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith('premium.error'))
+    })
+
+    it('провал IAP с fallback уходит в веб-оплату', async () => {
+      isNativeMock.mockReturnValue(true)
+      iapMock.mockResolvedValue({ ok: false, fallback: true, message: 'IAP unavailable' })
+      mockFetch.mockImplementation((url: string) =>
+        url === '/api/premium/tiers' ? jsonResponse([goldTier]) : jsonResponse({}),
+      )
+
+      renderPage()
+      await waitForTier('Gold')
+
+      fireEvent.click(screen.getByText('premium.start_now'))
+
+      await waitFor(() => expect(mockFetch).toHaveBeenCalledWith('/api/premium/create-checkout', expect.anything()))
+      expect(toastSuccessMock).toHaveBeenCalledWith('premium.activated')
+      expect(pushMock).toHaveBeenCalledWith('/premium/success')
+    })
+
+    it('кнопка «назад» зовёт router.back()', async () => {
+      mockFetch.mockImplementation(() => jsonResponse([goldTier]))
+
+      renderPage()
+      await waitForTier('Gold')
+
+      fireEvent.click(screen.getByText('common.back'))
+
+      expect(backMock).toHaveBeenCalled()
+    })
+
+    it('бейдж «лучший выбор» локализован ключом', async () => {
+      mockFetch.mockImplementation(() => jsonResponse([goldTier, { ...goldTier, id: 'platinum', name: 'Platinum' }]))
+
+      renderPage()
+      await waitForTier('Platinum')
+
+      expect(screen.getByText('premium.best_choice')).toBeInTheDocument()
+    })
+
+    it('пока идёт оплата, кнопка блокируется от повторного клика', async () => {
+      let resolveCheckout: (value: Response) => void = () => {}
+      isNativeMock.mockReturnValue(false)
+      mockFetch.mockImplementation((url: string) => {
+        if (url === '/api/premium/tiers') return jsonResponse([goldTier])
+        return new Promise<Response>((resolve) => { resolveCheckout = resolve })
+      })
+
+      renderPage()
+      await waitForTier('Gold')
+
+      fireEvent.click(screen.getByText('premium.start_now'))
+
+      const button = screen.getByRole('button', { name: '' })
+      expect(button).toBeDisabled()
+
+      resolveCheckout({ ok: true, status: 200, json: () => Promise.resolve({}) } as Response)
+      await waitFor(() => expect(toastSuccessMock).toHaveBeenCalledWith('premium.activated'))
+    })
+
+    it('провал IAP без fallback и без message показывает premium.error', async () => {
+      isNativeMock.mockReturnValue(true)
+      iapMock.mockResolvedValue({ ok: false, fallback: false })
+      mockFetch.mockImplementation(() => jsonResponse([goldTier]))
+
+      renderPage()
+      await waitForTier('Gold')
+
+      fireEvent.click(screen.getByText('premium.start_now'))
+
+      await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith('premium.error'))
+      expect(trackMock).not.toHaveBeenCalled()
+      expect(mockFetch).not.toHaveBeenCalledWith('/api/premium/create-checkout', expect.anything())
+    })
+
+    it('клик по другой карточке переключает тариф и сбрасывает срок на месяц', async () => {
+      const platinumTier = { id: 'platinum', name: 'Platinum', price: 1499, duration_months: 1, features: [] }
+      mockFetch.mockImplementation(() => jsonResponse([goldTier, platinumTier]))
+
+      renderPage()
+      await waitForTier('Platinum')
+      expect(screen.getByText('Gold · 1 units.month_short')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByText('6 units.month_short'))
+      await waitFor(() => expect(screen.getByText('Gold · 6 units.month_short')).toBeInTheDocument())
+
+      fireEvent.click(screen.getByText('Platinum'))
+      await waitFor(() => expect(screen.getByText('Platinum · 1 units.month_short')).toBeInTheDocument())
+    })
+  })
 })

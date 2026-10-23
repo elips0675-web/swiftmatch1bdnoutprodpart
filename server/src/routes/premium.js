@@ -74,6 +74,13 @@ const TIERS = [
   { id: 'platinum', name: 'Platinum', price: 1499, duration_months: 1, features: ['∞ суперлайков', 'Без рекламы', 'Кто лайкнул меня', 'Режим невидимки', 'Приоритетные лайки', 'Персональный консьерж'] },
 ]
 
+const DURATION_DISCOUNTS = { 6: 20, 12: 40 }
+
+function priceForMonths(price, months) {
+  const discount = DURATION_DISCOUNTS[months] || 0
+  return Math.round(price * months * (1 - discount / 100))
+}
+
 router.get('/api/premium/tiers', (req, res) => {
   res.json(TIERS)
 })
@@ -115,7 +122,7 @@ router.post('/api/premium/create-checkout', auth, async (req, res) => {
       const { default: Stripe } = await import('stripe')
       const stripe = new Stripe(stripeKey)
 
-      const unitAmount = Math.round(tierConfig.price * months * 100)
+      const unitAmount = priceForMonths(tierConfig.price, months) * 100
       const session = await createBreaker(
         (params) => stripe.checkout.sessions.create(params),
         'stripe-checkout',
@@ -147,7 +154,7 @@ router.post('/api/premium/create-checkout', auth, async (req, res) => {
 
   if (refuseMockPayment(res)) return
 
-  const price = tierConfig.price * months
+  const price = priceForMonths(tierConfig.price, months)
   const conn = await pool.getConnection()
   try {
     await conn.beginTransaction()
@@ -308,7 +315,7 @@ export async function applyPremiumCheckout(event, conn) {
   }
   const tierConfig = TIERS.find(t => t.id === tier)
   const months = Number(duration_months || 1)
-  const price = tierConfig ? tierConfig.price * months : 0
+  const price = tierConfig ? priceForMonths(tierConfig.price, months) : 0
   await conn.query(
     "UPDATE subscriptions SET is_active = 0 WHERE user_id = ? AND is_active = 1 AND expires_at > NOW()",
     [Number(userId)],

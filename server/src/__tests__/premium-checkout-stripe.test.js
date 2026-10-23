@@ -103,6 +103,24 @@ describe('POST /api/premium/create-checkout со Stripe-ключом', () => {
     expect(params.cancel_url).toContain('/premium/cancel')
   })
 
+  it('6 месяцев: unit_amount со скидкой 20% (gold 699*6*0.8*100)', async () => {
+    create.mockResolvedValue({ id: 'cs_checkout_6', url: 'https://checkout.stripe.com/cs_checkout_6' })
+
+    await checkout({ tier: 'gold', duration_months: 6 })
+
+    const params = create.mock.calls[0][0]
+    expect(params.line_items[0].price_data.unit_amount).toBe(Math.round(699 * 6 * 0.8) * 100)
+  })
+
+  it('12 месяцев: unit_amount со скидкой 40% (platinum 1499*12*0.6*100)', async () => {
+    create.mockResolvedValue({ id: 'cs_checkout_12', url: 'https://checkout.stripe.com/cs_checkout_12' })
+
+    await checkout({ tier: 'platinum', duration_months: 12 })
+
+    const params = create.mock.calls[0][0]
+    expect(params.line_items[0].price_data.unit_amount).toBe(Math.round(1499 * 12 * 0.6) * 100)
+  })
+
   it('ключ есть, но STRIPE_LIVE не поднят: сбой Stripe откатывается в mock (201)', async () => {
     create.mockRejectedValue(new Error('stripe down'))
 

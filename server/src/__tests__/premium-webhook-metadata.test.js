@@ -94,6 +94,23 @@ describe('applyPremiumCheckout — отсутствие обязательных
     expect(insert[1][4]).toBe(1)
     expect(insert[1][5]).toBe(299)
   })
+
+  it('webhook применяет скидку 20% за 6 месяцев (gold 699*6*0.8)', async () => {
+    connResolving({ 'FROM subscriptions WHERE provider': [[], []] })
+    await applyPremiumCheckout({ data: { object: { id: 'cs_w6', metadata: { userId: '7', tier: 'gold', duration_months: '6' } } } }, conn)
+    const insert = conn.query.mock.calls.find((c) => String(c[0]).includes('INSERT INTO subscriptions'))
+    expect(insert[1][4]).toBe(6)
+    expect(insert[1][5]).toBe(Math.round(699 * 6 * 0.8))
+  })
+
+  it('webhook применяет скидку 40% за 12 месяцев (platinum 1499*12*0.6)', async () => {
+    connResolving({ 'FROM subscriptions WHERE provider': [[], []] })
+    await applyPremiumCheckout({ data: { object: { id: 'cs_w12', metadata: { userId: '8', tier: 'platinum', duration_months: '12' } } } }, conn)
+    const insert = conn.query.mock.calls.find((c) => String(c[0]).includes('INSERT INTO subscriptions'))
+    expect(insert[1][4]).toBe(12)
+    expect(insert[1][5]).toBe(Math.round(1499 * 12 * 0.6))
+  })
+
 })
 
 describe('POST /api/premium/webhook — граничные payload', () => {

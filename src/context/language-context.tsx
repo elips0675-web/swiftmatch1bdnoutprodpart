@@ -1576,6 +1576,7 @@ export const translations = {
 
     // Premium
     'premium.incognito': 'Инкогнито',
+    'premium.best_choice': 'Лучший выбор',
     'premium.select_plan': 'Выберите тариф',
     'premium.start_now': 'Начать сейчас',
     'premium.super_likes': 'Суперлайки',
@@ -3590,6 +3591,7 @@ export const translations = {
 
     // Premium
     'premium.incognito': 'Incognito',
+    'premium.best_choice': 'Best Choice',
     'premium.select_plan': 'Select Plan',
     'premium.start_now': 'Start Now',
     'premium.super_likes': 'Super Likes',

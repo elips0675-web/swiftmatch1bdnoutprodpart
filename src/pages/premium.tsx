@@ -11,54 +11,45 @@ import { isNative } from '@/lib/native'
 import { purchaseWithIAP } from '@/lib/iap'
 import { useTrackEvent } from '@/hooks/useExperiment'
 import { toast } from 'sonner'
-
-interface Tier {
-  id: string
-  name: string
-  price: number
-  duration_months: number
-  features: string[]
-}
-
-const DURATIONS = [
-  { months: 1, discount: 0 },
-  { months: 6, discount: 20 },
-  { months: 12, discount: 40 },
-]
-
-function formatPrice(price: number, locale: string = 'ru-RU'): string {
-  return price.toLocaleString(locale === 'EN' ? 'en-US' : 'ru-RU') + ' ₽'
-}
+import {
+  FALLBACK_PREMIUM_TIERS,
+  PREMIUM_DURATIONS,
+  checkoutErrorMessage,
+  checkoutRedirectUrl,
+  formatPrice,
+  isPremiumTierList,
+  monthlyPriceFor,
+  readJsonBody,
+  totalPriceFor,
+  type PremiumTier,
+} from '@/lib/premium'
 
 export default function Premium() {
   const { t, language } = useLanguage()
   const router = useRouter()
-  const [tiers, setTiers] = useState<Tier[]>([])
+  const [tiers, setTiers] = useState<PremiumTier[]>([])
   const [selectedTier, setSelectedTier] = useState('')
-  const [selectedDuration, setSelectedDuration] = useState(DURATIONS[0].months)
+  const [selectedDuration, setSelectedDuration] = useState(PREMIUM_DURATIONS[0].months)
   const [loading, setLoading] = useState(false)
   const trackEvent = useTrackEvent()
 
   useEffect(() => {
     fetch('/api/premium/tiers')
-      .then(r => r.json())
-      .then((data: Tier[]) => {
+      .then((res) => readJsonBody(res))
+      .then((data) => {
+        if (!isPremiumTierList(data)) throw new Error('invalid tiers')
         setTiers(data)
-        if (data.length > 0) setSelectedTier(data[0].id)
+        setSelectedTier(data[0].id)
       })
       .catch(() => {
-        setTiers([
-          { id: 'plus', name: 'Plus', price: 299, duration_months: 1, features: ['5 суперлайков в день', 'Без рекламы', 'Кто лайкнул меня'] },
-          { id: 'gold', name: 'Gold', price: 699, duration_months: 1, features: ['10 суперлайков в день', 'Без рекламы', 'Кто лайкнул меня', 'Режим невидимки', 'Приоритетные лайки'] },
-          { id: 'platinum', name: 'Platinum', price: 1499, duration_months: 1, features: ['∞ суперлайков', 'Без рекламы', 'Кто лайкнул меня', 'Режим невидимки', 'Приоритетные лайки', 'Персональный консьерж'] },
-        ])
+        setTiers(FALLBACK_PREMIUM_TIERS)
         setSelectedTier('gold')
       })
   }, [])
 
-  const activeTier = tiers.find(t => t.id === selectedTier)
-  const totalPrice = activeTier ? activeTier.price * selectedDuration * (1 - (DURATIONS.find(d => d.months === selectedDuration)?.discount || 0) / 100) : 0
-  const monthlyPrice = selectedDuration > 0 ? Math.round(totalPrice / selectedDuration) : 0
+  const activeTier = tiers.find((tier) => tier.id === selectedTier)
+  const totalPrice = activeTier ? totalPriceFor(activeTier, selectedDuration) : 0
+  const monthlyPrice = activeTier ? monthlyPriceFor(activeTier, selectedDuration) : 0
 
   const handlePurchase = async () => {
     if (!activeTier) return
@@ -77,23 +68,26 @@ export default function Premium() {
           return
         }
       }
-      const token = getToken()
       const res = await fetch('/api/premium/create-checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ tier: activeTier.id, duration_months: selectedDuration }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.code === 'STRIPE_NOT_CONFIGURED' ? t('premium.stripe_unavailable') : (data.message || t('premium.error')))
-      if (data.url) {
-        window.location.href = data.url
-      } else {
-        trackEvent('purchase_completed', { tier: activeTier.id, duration_months: selectedDuration, channel: 'web' })
-        toast.success(t('premium.activated'))
-        router.push('/premium/success')
+      const data = await readJsonBody(res)
+      if (!res.ok) {
+        toast.error(checkoutErrorMessage(data, t))
+        return
       }
-    } catch (err: any) {
-      toast.error(err?.message || t('premium.error'))
+      const redirectUrl = checkoutRedirectUrl(data)
+      if (redirectUrl) {
+        window.location.href = redirectUrl
+        return
+      }
+      trackEvent('purchase_completed', { tier: activeTier.id, duration_months: selectedDuration, channel: 'web' })
+      toast.success(t('premium.activated'))
+      router.push('/premium/success')
+    } catch {
+      toast.error(t('premium.error'))
     } finally {
       setLoading(false)
     }
@@ -117,7 +111,7 @@ export default function Premium() {
           return (
             <div
               key={tier.id}
-              onClick={() => { setSelectedTier(tier.id); setSelectedDuration(DURATIONS[0].months) }}
+              onClick={() => { setSelectedTier(tier.id); setSelectedDuration(PREMIUM_DURATIONS[0].months) }}
               className={cn(
                 "relative p-4 rounded-2xl border-2 transition-all cursor-pointer",
                 isSelected
@@ -127,7 +121,7 @@ export default function Premium() {
             >
               {idx === 1 && (
                 <Badge className="absolute -top-2.5 left-4 bg-primary text-white text-xs uppercase font-black border-2 border-white shadow-sm">
-                  Best Choice
+                  {t('premium.best_choice')}
                 </Badge>
               )}
               <div className="flex justify-between items-center">
@@ -148,9 +142,8 @@ export default function Premium() {
 
               {isSelected && (
                 <div className="flex gap-2 mt-3 pt-3 border-t">
-                  {DURATIONS.map(dur => {
-                    const durTotal = tier.price * dur.months * (1 - dur.discount / 100)
-                    const durMonthly = Math.round(durTotal / dur.months)
+                  {PREMIUM_DURATIONS.map(dur => {
+                    const durMonthly = monthlyPriceFor(tier, dur.months)
                     return (
                       <div
                         key={dur.months}
@@ -179,7 +172,7 @@ export default function Premium() {
         {activeTier && selectedDuration > 0 && (
           <div className="p-3 rounded-xl bg-muted/30 text-center">
             <span className="font-bold">{activeTier.name} · {selectedDuration} {t('units.month_short')}</span>
-            <span className="text-lg font-black ml-2">{formatPrice(Math.round(totalPrice), language)}</span>
+            <span className="text-lg font-black ml-2">{formatPrice(totalPrice, language)}</span>
             <span className="text-xs text-muted-foreground ml-1">({formatPrice(monthlyPrice, language)}{t('units.per_month')})</span>
           </div>
         )}

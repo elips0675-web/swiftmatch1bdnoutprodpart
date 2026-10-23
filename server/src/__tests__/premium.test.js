@@ -124,6 +124,36 @@ describe('POST /api/premium/create-checkout', () => {
     expect(res.body.message).toMatch(/mock/i)
     expect(pool.getConnection).toHaveBeenCalled()
   })
+
+  it('mock-подписка на 6 месяцев пишется в БД со скидкой 20%', async () => {
+    pool.query.mockResolvedValue([[], []])
+    const conn = mockTransaction()
+    conn.query.mockResolvedValue([[], []])
+
+    const res = await request(app)
+      .post('/api/premium/create-checkout')
+      .set('Authorization', `Bearer ${authToken()}`)
+      .send({ tier: 'gold', duration_months: 6 })
+
+    expect(res.status).toBe(201)
+    const insert = conn.query.mock.calls.find((call) => String(call[0]).includes('INSERT INTO subscriptions'))
+    expect(insert[1][3]).toBe(Math.round(699 * 6 * 0.8))
+  })
+
+  it('mock-подписка на 12 месяцев пишется в БД со скидкой 40%', async () => {
+    pool.query.mockResolvedValue([[], []])
+    const conn = mockTransaction()
+    conn.query.mockResolvedValue([[], []])
+
+    const res = await request(app)
+      .post('/api/premium/create-checkout')
+      .set('Authorization', `Bearer ${authToken()}`)
+      .send({ tier: 'platinum', duration_months: 12 })
+
+    expect(res.status).toBe(201)
+    const insert = conn.query.mock.calls.find((call) => String(call[0]).includes('INSERT INTO subscriptions'))
+    expect(insert[1][3]).toBe(Math.round(1499 * 12 * 0.6))
+  })
 })
 
 describe('ошибки БД на premium-роутах не отдают 200', () => {

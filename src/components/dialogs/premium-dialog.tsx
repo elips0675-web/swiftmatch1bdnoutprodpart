@@ -13,76 +13,69 @@ import { Sparkles, Check, Zap, Eye, ShieldCheck, Star, Loader2 } from "lucide-re
 import { motion } from 'framer-motion';
 import { getToken } from '@/lib/token';
 import { toast } from 'sonner';
-
-interface Tier {
-  id: string;
-  name: string;
-  price: number;
-  duration_months: number;
-  features: string[];
-}
-
-const DURATIONS = [
-  { months: 1, discount: 0 },
-  { months: 6, discount: 20 },
-  { months: 12, discount: 40 },
-];
-
-function formatPrice(price: number, locale: string = 'ru-RU'): string {
-  return price.toLocaleString(locale === 'EN' ? 'en-US' : 'ru-RU') + ' ₽';
-}
+import {
+  FALLBACK_PREMIUM_TIERS,
+  PREMIUM_DURATIONS,
+  checkoutErrorMessage,
+  checkoutRedirectUrl,
+  formatPrice,
+  isPremiumTierList,
+  monthlyPriceFor,
+  readJsonBody,
+  totalPriceFor,
+  type PremiumTier,
+} from '@/lib/premium';
 
 export function PremiumDialog({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
   const { t, language } = useLanguage();
-  const [tiers, setTiers] = useState<Tier[]>([]);
+  const [tiers, setTiers] = useState<PremiumTier[]>([]);
   const [selectedTier, setSelectedTier] = useState('');
-  const [selectedDuration, setSelectedDuration] = useState(DURATIONS[0].months);
+  const [selectedDuration, setSelectedDuration] = useState(PREMIUM_DURATIONS[0].months);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (open) {
-      fetch('/api/premium/tiers')
-        .then(r => r.json())
-        .then((data: Tier[]) => {
-          setTiers(data);
-          if (data.length > 0) setSelectedTier(data[0].id);
-        })
-        .catch(() => {
-          setTiers([
-            { id: 'plus', name: 'Plus', price: 299, duration_months: 1, features: ['5 суперлайков в день', 'Без рекламы', 'Кто лайкнул меня'] },
-            { id: 'gold', name: 'Gold', price: 699, duration_months: 1, features: ['10 суперлайков в день', 'Без рекламы', 'Кто лайкнул меня', 'Режим невидимки', 'Приоритетные лайки'] },
-            { id: 'platinum', name: 'Platinum', price: 1499, duration_months: 1, features: ['∞ суперлайков', 'Без рекламы', 'Кто лайкнул меня', 'Режим невидимки', 'Приоритетные лайки', 'Персональный консьерж'] },
-          ]);
-          setSelectedTier('gold');
-        });
-      setSelectedDuration(DURATIONS[0].months);
-    }
+    if (!open) return;
+    setSelectedDuration(PREMIUM_DURATIONS[0].months);
+    fetch('/api/premium/tiers')
+      .then((res) => readJsonBody(res))
+      .then((data) => {
+        if (!isPremiumTierList(data)) throw new Error('invalid tiers');
+        setTiers(data);
+        setSelectedTier(data[0].id);
+      })
+      .catch(() => {
+        setTiers(FALLBACK_PREMIUM_TIERS);
+        setSelectedTier('gold');
+      });
   }, [open]);
 
-  const activeTier = tiers.find(t => t.id === selectedTier);
-  const totalPrice = activeTier ? activeTier.price * selectedDuration * (1 - (DURATIONS.find(d => d.months === selectedDuration)?.discount || 0) / 100) : 0;
-  const monthlyPrice = selectedDuration > 0 ? Math.round(totalPrice / selectedDuration) : 0;
+  const activeTier = tiers.find((tier) => tier.id === selectedTier);
+  const totalPrice = activeTier ? totalPriceFor(activeTier, selectedDuration) : 0;
+  const monthlyPrice = activeTier ? monthlyPriceFor(activeTier, selectedDuration) : 0;
 
   const handlePurchase = async () => {
     if (!activeTier) return;
     setLoading(true);
     try {
-      const token = getToken();
       const res = await fetch('/api/premium/create-checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ tier: activeTier.id, duration_months: selectedDuration }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.code === 'STRIPE_NOT_CONFIGURED' ? t('premium.stripe_unavailable') : (data.message || t('premium.error')));
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        toast.success(t('premium.activated'));
-        onOpenChange(false);
+      const data = await readJsonBody(res);
+      if (!res.ok) {
+        toast.error(checkoutErrorMessage(data, t));
+        return;
       }
-    } catch (err: any) {
-      toast.error(err?.message || t('premium.error'));
+      const redirectUrl = checkoutRedirectUrl(data);
+      if (redirectUrl) {
+        window.location.href = redirectUrl;
+        return;
+      }
+      toast.success(t('premium.activated'));
+      onOpenChange(false);
+    } catch {
+      toast.error(t('premium.error'));
     } finally {
       setLoading(false);
     }
@@ -113,7 +106,7 @@ export function PremiumDialog({ open, onOpenChange }: { open: boolean, onOpenCha
             return (
               <div 
                 key={tier.id}
-                onClick={() => { setSelectedTier(tier.id); setSelectedDuration(DURATIONS[0].months); }}
+                onClick={() => { setSelectedTier(tier.id); setSelectedDuration(PREMIUM_DURATIONS[0].months); }}
                 className={cn(
                   "relative p-3 rounded-2xl border-2 transition-all cursor-pointer",
                   isSelected 
@@ -122,7 +115,7 @@ export function PremiumDialog({ open, onOpenChange }: { open: boolean, onOpenCha
                 )}
               >
                 {idx === 1 && (
-                  <Badge className="absolute -top-2.5 left-4 bg-primary text-white text-[7px] uppercase font-black border-2 border-white shadow-sm px-2 py-0.5">Best Choice</Badge>
+                  <Badge className="absolute -top-2.5 left-4 bg-primary text-white text-[7px] uppercase font-black border-2 border-white shadow-sm px-2 py-0.5">{t('premium.best_choice')}</Badge>
                 )}
                 <div className="flex justify-between items-center">
                   <div>
@@ -142,9 +135,8 @@ export function PremiumDialog({ open, onOpenChange }: { open: boolean, onOpenCha
 
                 {isSelected && (
                   <div className="flex gap-1.5 mt-2 pt-2 border-t border-muted/50">
-                    {DURATIONS.map(dur => {
-                      const durTotal = tier.price * dur.months * (1 - dur.discount / 100);
-                      const durMonthly = Math.round(durTotal / dur.months);
+                    {PREMIUM_DURATIONS.map(dur => {
+                      const durMonthly = monthlyPriceFor(tier, dur.months);
                       return (
                         <div
                           key={dur.months}
@@ -190,7 +182,7 @@ export function PremiumDialog({ open, onOpenChange }: { open: boolean, onOpenCha
           <div className="px-5 pb-1">
             <div className="p-2 rounded-xl bg-muted/30 text-center">
               <span className="text-[9px] font-black">{activeTier.name} · {selectedDuration} {t('units.month_short')}</span>
-              <span className="text-[11px] font-black ml-2">{formatPrice(Math.round(totalPrice), language)}</span>
+              <span className="text-[11px] font-black ml-2">{formatPrice(totalPrice, language)}</span>
               <span className="text-[7px] text-muted-foreground ml-1">({formatPrice(monthlyPrice, language)}{t('units.per_month')})</span>
             </div>
           </div>
