@@ -10,7 +10,6 @@
 | Tailwind CSS | 3 | `tailwind.config.ts` + `tailwindcss-animate` |
 | React Router | 7 | `react-router-dom` |
 | TanStack Query | 5 | `@tanstack/react-query` |
-| React Hook Form | 7 | только `src/components/ui/form.tsx`; валидации на `zod` нет — пакет удалён 04.10.2026 (этап 31) как мёртвая зависимость |
 | Framer Motion | 12 | анимации |
 | Socket.IO | 4 | клиент + сервер |
 | shadcn/ui | — | Radix primitives + кастомные стили |
@@ -83,7 +82,7 @@ import { cn } from "@/lib/utils"
 
 - **Серверное состояние**: TanStack Query (React Query v5)
 - **Клиентское состояние**: React Context (custom `LanguageContext`, `FeatureFlagsProvider`)
-- **Формы**: React Hook Form (без `zod` — удалён 04.10.2026, этап 31)
+- **Формы**: нативные, без библиотеки (React Hook Form удалён 23.10.2026, Stage 182; без `zod` — удалён 04.10.2026, этап 31)
 - **Локальное**: `useState`, `useReducer`
 
 ## Routing

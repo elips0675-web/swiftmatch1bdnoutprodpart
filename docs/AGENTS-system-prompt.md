@@ -12,7 +12,7 @@
 | Routing | React Router v7 |
 | Server State | TanStack React Query v5 |
 | Client State | React Context (только если Query не подходит) |
-| Forms | React Hook Form |
+| Forms | нативные (React Hook Form удалён 23.10.2026) |
 | Animations | Framer Motion или Tailwind transitions |
 | Real-time | Socket.IO (клиент: `use-websocket.ts`) |
 | Backend | Express.js / MySQL (mysql2, prepared statements) |

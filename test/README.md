@@ -30,7 +30,6 @@ Supabase), с портами 3002/8081, чтобы не мешать основ�
 | Серверное состояние | TanStack Query | 5.101.0 |
 | Роутинг | react-router-dom | 7.18.4 |
 | Real-time | socket.io-client | 4.8.4 |
-| Формы | React Hook Form | 7.78.0 |
 | Анимации | framer-motion | 12.40.0 |
 | Графики | recharts | 3.8.1 |
 | Мониторинг | @sentry/react | 9.14.0 |

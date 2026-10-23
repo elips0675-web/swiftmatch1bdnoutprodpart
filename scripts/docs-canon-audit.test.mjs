@@ -297,9 +297,9 @@ describe('версии стека сверяются с package.json', () => {
   })
 
   it('возврат «React Hook Form + Zod» в прозу — находка', () => {
-    const pc = read('project-context.md').replace('(без `zod` — удалён 04.10.2026, этап 31)', '+ Zod')
+    const pc = read('project-context.md').replace(/^-\s*\*\*Формы\*\*:.*$/m, '- **Формы**: React Hook Form + Zod')
     expect(ids(collectStackFindings(doc('project-context.md', pc), versions()))).toContain('stack-zod-forms-pc')
-    const sp = read('docs/AGENTS-system-prompt.md').replace('| Forms | React Hook Form |', '| Forms | React Hook Form + Zod |')
+    const sp = read('docs/AGENTS-system-prompt.md').replace(/^\|\s*Forms\s*\|.*$/m, '| Forms | React Hook Form + Zod |')
     expect(ids(collectStackFindings(doc('docs/AGENTS-system-prompt.md', sp), versions()))).toContain('stack-zod-forms-sp')
   })
 
