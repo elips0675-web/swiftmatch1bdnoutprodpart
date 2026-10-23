@@ -16,7 +16,14 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLanguage } from '@/context/language-context';
 import type { CallState } from '@/hooks/use-webrtc';
+
+export type CallUser = {
+  name?: string | null;
+  img?: string | null;
+  avatar?: string | null;
+};
 
 export function VideoCallDialog({
   open,
@@ -33,7 +40,7 @@ export function VideoCallDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  user: any;
+  user: CallUser | null;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
   callState: CallState;
@@ -43,6 +50,7 @@ export function VideoCallDialog({
   onToggleMute: () => void;
   onToggleVideo: () => void;
 }) {
+  const { t } = useLanguage();
   const [callDuration, setCallDuration] = useState(0);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -61,13 +69,13 @@ export function VideoCallDialog({
   }, [remoteStream]);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (open && callState === 'connected') {
-      setCallDuration(0);
-      timer = setInterval(() => {
-        setCallDuration(prev => prev + 1);
-      }, 1000);
+    if (!open || callState !== 'connected') {
+      return;
     }
+    setCallDuration(0);
+    const timer = setInterval(() => {
+      setCallDuration((prev) => prev + 1);
+    }, 1000);
     return () => clearInterval(timer);
   }, [open, callState]);
 
@@ -91,12 +99,11 @@ export function VideoCallDialog({
         )}
         onInteractOutside={(e) => e.preventDefault()}
       >
-        <DialogTitle className="sr-only">Video call with {user?.name}</DialogTitle>
+        <DialogTitle className="sr-only">{t('call.video_title', { name: user?.name || '' })}</DialogTitle>
         <motion.div
           layout
           className="relative w-full h-full rounded-3xl overflow-hidden bg-gray-900 flex items-center justify-center"
         >
-          {/* Remote user video */}
           <div className="absolute inset-0">
             {remoteStream ? (
               <video
@@ -116,7 +123,7 @@ export function VideoCallDialog({
               <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                 <div className="text-white text-center">
                   <div className="w-16 h-16 mx-auto mb-4 rounded-full border-4 border-t-transparent border-white animate-spin" />
-                  <p className="text-lg">Calling {user?.name}...</p>
+                  <p className="text-lg">{t('call.calling_name', { name: user?.name || '' })}</p>
                 </div>
               </div>
             )}
@@ -124,20 +131,18 @@ export function VideoCallDialog({
               <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                 <div className="text-white text-center">
                   <div className="w-16 h-16 mx-auto mb-4 rounded-full border-4 border-t-transparent border-white animate-spin" />
-                  <p className="text-lg">Incoming call from {user?.name}...</p>
+                  <p className="text-lg">{t('call.incoming_name', { name: user?.name || '' })}</p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Connected state info */}
           {callState === 'connected' && (
             <div className="relative z-10 flex flex-col items-center justify-center text-white pointer-events-none">
               <p className="text-lg font-mono tracking-widest mt-1">{formatDuration(callDuration)}</p>
             </div>
           )}
 
-          {/* Local user video PiP */}
           <AnimatePresence>
             {!isVideoOff && localStream && (
               <motion.div
@@ -164,12 +169,12 @@ export function VideoCallDialog({
             )}
           </AnimatePresence>
 
-          {/* Controls */}
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-black/40 backdrop-blur-md p-3 rounded-full shadow-lg">
             <Button
               variant="ghost"
               size="icon"
               onClick={onToggleMute}
+              aria-label={isMuted ? t('call.unmute') : t('call.mute')}
               className={cn(
                 "w-14 h-14 rounded-full text-white hover:bg-white/20",
                 isMuted && "bg-white/20"
@@ -181,6 +186,7 @@ export function VideoCallDialog({
               variant="ghost"
               size="icon"
               onClick={onToggleVideo}
+              aria-label={isVideoOff ? t('call.video_on') : t('call.video_off')}
               className={cn(
                 "w-14 h-14 rounded-full text-white hover:bg-white/20",
                 isVideoOff && "bg-white/20"
@@ -191,6 +197,7 @@ export function VideoCallDialog({
             <Button
               size="icon"
               onClick={handleEndCall}
+              aria-label={t('call.end')}
               className="w-16 h-14 rounded-full bg-red-500 hover:bg-red-600 text-white"
             >
               <PhoneOff size={28} />
@@ -201,6 +208,7 @@ export function VideoCallDialog({
             variant="ghost"
             size="icon"
             onClick={() => setIsFullScreen(!isFullScreen)}
+            aria-label={isFullScreen ? t('call.exit_fullscreen') : t('call.fullscreen')}
             className="absolute top-4 right-4 w-10 h-10 rounded-full text-white bg-black/40 hover:bg-white/20"
           >
             {isFullScreen ? <Minimize size={20} /> : <Maximize size={20} />}
