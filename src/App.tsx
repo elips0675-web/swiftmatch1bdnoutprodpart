@@ -146,12 +146,36 @@ const PAGE_TITLES: Record<string, string> = {
   "/admin/webhooks": "Вебхуки — SwiftMatch",
   "/admin/health": "Состояние системы — SwiftMatch",
   "/admin/queues": "Очереди заданий — SwiftMatch",
+  "/admin/experiments": "Эксперименты — SwiftMatch",
+  "/admin/photos": "Фотомодерация — SwiftMatch",
+  "/forgot-password": "Восстановление пароля — SwiftMatch",
+  "/reset-password": "Новый пароль — SwiftMatch",
+  "/verify-email": "Подтверждение почты — SwiftMatch",
+  "/unsubscribe": "Отписка — SwiftMatch",
+  "/safety": "Безопасность — SwiftMatch",
+  "/user": "Профиль — SwiftMatch",
+}
+
+const DYNAMIC_PAGE_TITLES: Array<[RegExp, string]> = [
+  [/^\/chats\/[^/]+$/, "Чат — SwiftMatch"],
+  [/^\/groups\/[^/]+$/, "Группа — SwiftMatch"],
+  [/^\/hangouts\/[^/]+\/edit$/, "Редактировать встречу — SwiftMatch"],
+  [/^\/hangouts\/[^/]+$/, "Встреча — SwiftMatch"],
+  [/^\/profile\/[^/]+$/, "Профиль — SwiftMatch"],
+]
+
+function titleFor(pathname: string) {
+  return (
+    PAGE_TITLES[pathname] ??
+    DYNAMIC_PAGE_TITLES.find(([pattern]) => pattern.test(pathname))?.[1] ??
+    "SwiftMatch"
+  )
 }
 
 function DocumentTitle() {
   const { pathname } = useLocation()
   useEffect(() => {
-    document.title = PAGE_TITLES[pathname] || "SwiftMatch"
+    document.title = titleFor(pathname)
   }, [pathname])
   return null
 }
