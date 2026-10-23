@@ -448,6 +448,10 @@ export const translations = {
     'user.block_confirm': 'Заблокировать пользователя?',
     'user.blocked': 'Пользователь заблокирован',
     'user.block_error': 'Ошибка блокировки',
+    'user.not_found': 'Профиль недоступен',
+    'user.not_found_desc': 'Возможно, пользователь удалил профиль или заблокировал вас',
+    'user.like_limit': 'Лимит лайков на сегодня. Оформите Premium.',
+    'user.like_error': 'Не удалось поставить лайк',
     // Filter
     'filter.who_to_see': 'Кого вы ищете?',
     'filter.distance': 'Расстояние',
@@ -2473,6 +2477,10 @@ export const translations = {
     'user.block_confirm': 'Block this user?',
     'user.blocked': 'User blocked',
     'user.block_error': 'Failed to block user',
+    'user.not_found': 'Profile unavailable',
+    'user.not_found_desc': 'The user may have deleted the profile or blocked you',
+    'user.like_limit': 'Daily like limit reached. Get Premium.',
+    'user.like_error': 'Could not send like',
     // Filter
     'filter.who_to_see': 'Who are you looking for?',
     'filter.distance': 'Distance',

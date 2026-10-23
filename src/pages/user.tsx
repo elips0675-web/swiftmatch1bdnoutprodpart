@@ -4,7 +4,7 @@ import { useSearchParams, useRouter } from "@/shims/next-navigation";
 import Image from "@/shims/next-image";
 import Link from "@/shims/next-link";
 import dynamic from "@/shims/next-dynamic";
-import { MapPin, CircleCheck as CheckCircle2, Star, Camera, Coffee, Music, Globe, Dumbbell, Palette, Film, Flower2, Briefcase, Gamepad2, Maximize2, X, Dog, Ruler, Target, Sparkles, Heart, MessageCircle, ChevronLeft, ChevronRight, Cpu, Anchor, Map, Sprout, BookOpen, Scissors, FlaskConical, Car, ChefHat, Brush, Mountain, Wine, Flag, Sun, User, Info, Trophy, VenetianMask, Search, ThumbsUp, ThumbsDown, RefreshCw, BrainCircuit, Trees, UtensilsCrossed, Send, ImageIcon, Ban } from "lucide-react";
+import { MapPin, CircleCheck as CheckCircle2, Star, Camera, Coffee, Music, Globe, Dumbbell, Palette, Film, Flower2, Briefcase, Gamepad2, Maximize2, X, Dog, Ruler, Target, Sparkles, Heart, MessageCircle, ChevronLeft, Cpu, Anchor, Map, Sprout, BookOpen, Scissors, FlaskConical, Car, ChefHat, Brush, Mountain, Wine, Flag, Sun, User, Info, Trophy, VenetianMask, Search, Trees, UtensilsCrossed, Send, ImageIcon, Ban } from "lucide-react";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { REPORT_REASONS, submitReport } from "@/lib/reports";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { WatchButton } from "@/components/watch-button";
 import { cn, getUserTitles } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
-import { ALL_DEMO_USERS, POLL_QUESTIONS } from "@/lib/demo-data";
+import { normalizeObjectInterests } from "@/lib/interests";
 import { ZodiacIcon } from "@/components/shared/zodiac-icon";
 import {
   Carousel,
@@ -62,66 +62,159 @@ const DataBox = React.memo(({ label, value, icon: Icon, color = "default" }: { l
 ));
 DataBox.displayName = "DataBox";
 
+type ApiProfileInterest = { name_ru?: string | null; name_en?: string | null };
+type ApiProfilePhoto = { url?: string | null };
+type ApiProfileResponse = {
+  id: number;
+  display_name?: string | null;
+  name?: string | null;
+  age?: number | null;
+  bio?: string | null;
+  city?: string | null;
+  gender?: string | null;
+  dating_goal?: string | null;
+  height?: number | null;
+  looking_for?: string | null;
+  zodiac?: string | null;
+  avatar_url?: string | null;
+  photos?: ApiProfilePhoto[];
+  interests?: ApiProfileInterest[];
+};
+type UserView = {
+  id: number;
+  name: string;
+  age?: number;
+  img: string;
+  city: string;
+  bio: string;
+  gender: string;
+  goal: string;
+  height?: number;
+  lookingFor: string;
+  zodiac: string;
+  interests: string[];
+  photos: string[];
+};
+
+function mapApiProfile(profile: ApiProfileResponse): UserView {
+  const photoUrls = (profile.photos ?? [])
+    .map((photo) => photo.url)
+    .filter((url): url is string => Boolean(url));
+  const img = profile.avatar_url || photoUrls[0] || PlaceHolderImages[0].imageUrl;
+  return {
+    id: Number(profile.id),
+    name: profile.display_name || profile.name || '',
+    age: profile.age ?? undefined,
+    img,
+    city: profile.city || '',
+    bio: profile.bio || '',
+    gender: profile.gender || '',
+    goal: profile.dating_goal || '',
+    height: profile.height ?? undefined,
+    lookingFor: profile.looking_for || '',
+    zodiac: profile.zodiac || '',
+    interests: normalizeObjectInterests(profile.interests),
+    photos: photoUrls.length > 0 ? photoUrls : [img],
+  };
+}
+
 function UserProfileContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const userId = searchParams.get('id');
   const { t, language } = useLanguage();
   
-  const user = useMemo(() => ALL_DEMO_USERS.find(u => u.id === Number(userId)) || ALL_DEMO_USERS[1], [userId]);
-  
+  const [user, setUser] = useState<UserView | null>(null);
+  const [profileStatus, setProfileStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
+
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
-  const [photos, setPhotos] = useState<string[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [matchUser, setMatchUser] = useState<any>(null);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [reportDescription, setReportDescription] = useState('');
-  const [pollIndex, setPollIndex] = useState(0);
-  const [pollSelected, setPollSelected] = useState<number | null>(null);
-  const [pollRevealed, setPollRevealed] = useState(false);
-  const [pollCanProceed, setPollCanProceed] = useState(false);
-  const [pollScore, setPollScore] = useState(0);
-  const [pollTotal, setPollTotal] = useState(0);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [showCustomInvite, setShowCustomInvite] = useState(false);
   const [customInviteText, setCustomInviteText] = useState('');
 
+  const photos = user?.photos ?? [];
+
   useEffect(() => {
-    if (!pollRevealed) { setPollCanProceed(false); return; }
-    const t = setTimeout(() => setPollCanProceed(true), 1500);
-    return () => clearTimeout(t);
-  }, [pollRevealed]);
+    let cancelled = false;
+    setProfileStatus('loading');
+    setUser(null);
+    if (!userId || !/^\d+$/.test(userId)) {
+      setProfileStatus('missing');
+      return;
+    }
+    const token = getToken();
+    fetch(`/api/profile/${userId}`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined)
+      .then(async (res) => {
+        if (cancelled) return;
+        if (!res.ok) {
+          setProfileStatus('missing');
+          return;
+        }
+        const data = (await res.json()) as ApiProfileResponse;
+        if (cancelled) return;
+        setUser(mapApiProfile(data));
+        setProfileStatus('ready');
+        if (token) {
+          fetch(`/api/profile/${userId}/view`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch(() => undefined);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setProfileStatus('missing');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   useEffect(() => {
     const saved = localStorage.getItem('userProfile');
     if (saved) {
       try {
         setCurrentUser(JSON.parse(saved));
-      } catch (e) { /* ignored */ }
+      } catch {
+        setCurrentUser(null);
+      }
     }
   }, []);
 
-  useEffect(() => {
-    const randomPhotos: string[] = [];
-    const available = [...PlaceHolderImages].filter(p => p.imageUrl !== user.img);
-    const count = Math.min(4, available.length);
-    
-    for(let i = 0; i < count; i++) {
-        const idx = Math.floor(Math.random() * available.length);
-        randomPhotos.push(available.splice(idx, 1)[0].imageUrl);
-    }
+  const earnedTitles = useMemo(
+    () => getUserTitles(user ? { bio: user.bio, interests: user.interests } : null, language),
+    [user, language],
+  );
 
-    setPhotos([user.img, ...randomPhotos]);
-  }, [user]);
-
-  const earnedTitles = useMemo(() => getUserTitles(user, language), [user, language]);
-
-  const handleLike = () => {
-    toast({ title: t('toast.you_liked', { name: user.name }) });
-    if (Math.random() > 0.7) {
-      setMatchUser(user);
+  const handleLike = async () => {
+    if (!user) return;
+    const token = getToken();
+    try {
+      const res = await fetch('/api/likes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ liked_user_id: user.id }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { matched?: boolean; code?: string };
+      if (!res.ok) {
+        toast({
+          variant: 'destructive',
+          title: data.code === 'LIKE_LIMIT' ? t('user.like_limit') : t('user.like_error'),
+        });
+        return;
+      }
+      toast({ title: t('toast.you_liked', { name: user.name }) });
+      if (data.matched) setMatchUser(user);
+    } catch {
+      toast({ variant: 'destructive', title: t('user.like_error') });
     }
   };
 
@@ -141,7 +234,23 @@ function UserProfileContent() {
     setReportDescription('');
   };
 
-  if (!user) return null;
+  if (profileStatus === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f8f9fb] px-6">
+        <p className="text-sm font-bold text-muted-foreground">{t('common.loading')}</p>
+      </div>
+    );
+  }
+
+  if (profileStatus === 'missing' || !user) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-[#f8f9fb] px-6 text-center">
+        <h1 className="text-lg font-black text-foreground">{t('user.not_found')}</h1>
+        <p className="text-sm text-muted-foreground">{t('user.not_found_desc')}</p>
+        <Button variant="outline" onClick={() => router.back()}>{t('button.back')}</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-[#f8f9fb]">
@@ -155,9 +264,6 @@ function UserProfileContent() {
             <ChevronLeft size={24} />
           </Button>
           <div className="flex items-center gap-2">
-            <Badge className="bg-orange-500 text-white border-0 px-3 py-1 font-black uppercase text-[9px] tracking-widest shadow-lg">
-              {user.match}% {t('user.match_score')}
-            </Badge>
             {Number(userId) > 0 && <WatchButton userId={Number(userId)} />}
             <Button 
               variant="ghost" 
@@ -207,18 +313,19 @@ function UserProfileContent() {
         <div className="px-5 -mt-20 relative z-10">
           <div className="text-center mb-6">
               <h3 className="text-3xl font-black font-headline text-foreground tracking-tight flex items-center justify-center gap-2">
-                {user.name}, {user.age} <CheckCircle2 size={24} className="text-primary" fill="currentColor" />
+                {user.name}{user.age ? `, ${user.age}` : ''} <CheckCircle2 size={24} className="text-primary" fill="currentColor" />
               </h3>
-              <p className="text-muted-foreground text-[10px] font-black flex items-center justify-center gap-1.5 uppercase tracking-[0.1em]">
-                  <MapPin size={12} className="text-primary" /> {user.city} • {user.distance} {t('units.km')} {t('user.from_you')}
-              </p>
+              {user.city && (
+                <p className="text-muted-foreground text-[10px] font-black flex items-center justify-center gap-1.5 uppercase tracking-[0.1em]">
+                    <MapPin size={12} className="text-primary" /> {user.city}
+                </p>
+              )}
           </div>
 
           <Tabs defaultValue="profile" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 bg-muted p-1 rounded-xl mb-6">
+            <TabsList className="grid w-full grid-cols-2 bg-muted p-1 rounded-xl mb-6">
               <TabsTrigger value="profile">{t('profile.tab.data')}</TabsTrigger>
               <TabsTrigger value="gallery">{t('profile.tab.gallery')}</TabsTrigger>
-              <TabsTrigger value="polls">{t('profile.tab.polls')}</TabsTrigger>
             </TabsList>
             <TabsContent value="profile">
               <div className="bg-white rounded-2xl p-6 app-shadow border border-border/40 text-left space-y-6 overflow-hidden">
@@ -341,91 +448,6 @@ function UserProfileContent() {
                     ))}
                   </div>
                 </div>
-            </TabsContent>
-            <TabsContent value="polls">
-              <div className="bg-white rounded-2xl p-6 app-shadow border border-border/40">
-                <div className="flex items-center gap-2 mb-3">
-                  <MessageCircle size={18} className="text-primary" />
-                  <h4 className="font-black text-[10px] uppercase tracking-widest text-muted-foreground/60">{t('profile.tab.polls')}</h4>
-                  <span className="ml-auto text-[10px] font-bold text-muted-foreground">{t('polls.score', { score: pollScore, total: pollTotal })}</span>
-                </div>
-                <p className="text-[10px] text-muted-foreground font-medium mb-4">{t('polls.tap_to_answer')}</p>
-
-                {user.pollAnswers ? (
-                  pollIndex >= POLL_QUESTIONS.length ? (
-                    <div className="py-6 flex flex-col items-center text-center gap-3">
-                      {pollScore >= Math.ceil(POLL_QUESTIONS.length / 2) ? (
-                        <><Sparkles size={48} className="text-yellow-500" /><h3 className="text-lg font-black">{t('polls.result_title_good')}</h3><p className="text-sm text-muted-foreground">{t('polls.result_desc_good')}</p></>
-                      ) : (
-                        <><BrainCircuit size={48} className="text-muted-foreground/50" /><h3 className="text-lg font-black">{t('polls.result_title_bad')}</h3><p className="text-sm text-muted-foreground">{t('polls.result_desc_bad')}</p></>
-                      )}
-                      <p className="text-2xl font-black text-primary">{pollScore}/{pollTotal}</p>
-                      <Button onClick={() => { setPollIndex(0); setPollSelected(null); setPollRevealed(false); setPollScore(0); setPollTotal(0); }} variant="outline" className="mt-2">{t('polls.play_again')} <RefreshCw size={14} /></Button>
-                    </div>
-                  ) : (() => {
-                  const q = POLL_QUESTIONS[pollIndex];
-                  const qid = q.id;
-                  const correctAnswer = user.pollAnswers[qid];
-                  return (
-                    <div className="space-y-4">
-                      <div className="p-4 bg-muted/30 rounded-xl border border-border/40">
-                        <p className="text-sm font-bold mb-3">{t(`polls.${qid}`)}</p>
-                        <div className="flex flex-wrap gap-2">
-                          {Array.from({ length: q.options }, (_, i) => (
-                            <button
-                              key={i}
-                              disabled={pollRevealed}
-                              onClick={() => {
-                                setPollSelected(i);
-                                setPollRevealed(true);
-                                if (i === correctAnswer) setPollScore(s => s + 1);
-                                setPollTotal(t => t + 1);
-                              }}
-                              className={cn(
-                                "px-3 py-2 rounded-lg text-xs font-bold transition-all border",
-                                pollRevealed && i === correctAnswer && "ring-2 ring-green-500",
-                                pollRevealed && pollSelected === i && i === correctAnswer
-                                  ? "bg-green-500 text-white border-green-500"
-                                  : pollRevealed && pollSelected === i && i !== correctAnswer
-                                    ? "bg-red-500 text-white border-red-500"
-                                    : pollSelected === i
-                                      ? "gradient-bg text-white border-0 shadow-md"
-                                      : "bg-white text-foreground border-border/40 hover:bg-muted active:scale-95"
-                              )}
-                            >
-                              {t(`polls.${qid}.${i}`)}
-                            </button>
-                          ))}
-                        </div>
-                        {pollRevealed && (
-                          <div className="mt-3 flex items-center gap-2 text-sm font-bold">
-                            {pollSelected === correctAnswer
-                              ? <><ThumbsUp size={16} className="text-green-500" /> <span className="text-green-500">{t('polls.match')}</span></>
-                              : <><ThumbsDown size={16} className="text-red-500" /> <span className="text-red-500">{t('polls.no_match')} — {t(`polls.${qid}.${correctAnswer}`)}</span></>
-                            }
-                          </div>
-                        )}
-                      </div>
-                      {pollCanProceed && (
-                        <Button
-                          onClick={() => {
-                            setPollIndex(i => i + 1);
-                            setPollSelected(null);
-                            setPollRevealed(false);
-                          }}
-                          className="w-full"
-                          size="sm"
-                        >
-                          {t('polls.next')} <ChevronRight size={14} />
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })()
-                ) : (
-                  <p className="text-xs text-muted-foreground text-center py-8">{t('polls.not_answered')}</p>
-                )}
-              </div>
             </TabsContent>
           </Tabs>
         </div>

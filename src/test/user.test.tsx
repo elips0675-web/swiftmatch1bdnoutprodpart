@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
@@ -33,7 +33,56 @@ vi.mock('@/components/watch-button', () => ({
 }));
 
 import UserProfilePage from '@/pages/user';
-import { POLL_QUESTIONS } from '@/lib/demo-data';
+import { clearToken, setToken } from '@/lib/token';
+
+const PROFILE = {
+  id: 2,
+  display_name: 'Анна',
+  age: 24,
+  city: 'Москва',
+  bio: 'Люблю закаты, хороший кофе и интересные разговоры.',
+  gender: 'female',
+  dating_goal: 'goal.serious_relationship',
+  height: 172,
+  looking_for: 'male',
+  zodiac: 'common.zodiac.leo',
+  avatar_url: '/anna.jpg',
+  photos: [
+    { url: '/anna.jpg' },
+    { url: '/anna-2.jpg' },
+    { url: '/anna-3.jpg' },
+    { url: '/anna-4.jpg' },
+    { url: '/anna-5.jpg' },
+  ],
+  interests: [
+    { name_ru: 'Спорт' },
+    { name_ru: 'Музыка' },
+    { name_ru: 'Фотография' },
+    { name_ru: 'Путешествия' },
+    { name_ru: 'Кофе' },
+  ],
+};
+
+function jsonResponse(data: unknown, ok = true, status = 200) {
+  return Promise.resolve({ ok, status, json: async () => data } as Response);
+}
+
+type FetchHandler = (url: string, init?: RequestInit) => Promise<Response> | undefined;
+
+function stubFetch(handler: FetchHandler = () => undefined) {
+  const fn = vi.fn(async (url: string, init?: RequestInit) => {
+    const custom = await handler(String(url), init);
+    if (custom) return custom;
+    const u = String(url);
+    if (u === '/api/profile/2') return jsonResponse(PROFILE);
+    if (u === '/api/profile/2/view') return jsonResponse({ viewed: true });
+    if (u === '/api/likes') return jsonResponse({ message: 'Like sent', matched: false }, true, 201);
+    if (u === '/api/reports' || u === '/api/block') return jsonResponse({ ok: true });
+    return jsonResponse({});
+  });
+  vi.stubGlobal('fetch', fn);
+  return fn;
+}
 
 const renderPage = () =>
   render(
@@ -42,15 +91,10 @@ const renderPage = () =>
     </MemoryRouter>,
   );
 
-const POLL_ANSWERS_USER_2: Record<string, number> = {
-  coffee_tea: 2,
-  cat_dog: 0,
-  morning_night: 0,
-  pizza_sushi: 2,
-  sea_mountains: 0,
-  movies_series: 1,
-  book_film: 2,
-  marvel_dc: 0,
+const renderLoaded = async () => {
+  const view = renderPage();
+  await screen.findByText(/Анна/);
+  return view;
 };
 
 describe('Страница user', () => {
@@ -59,20 +103,20 @@ describe('Страница user', () => {
     h.userId = '2';
     localStorage.clear();
     sessionStorage.clear();
+    clearToken();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-    vi.useRealTimers();
   });
 
-  it('показывает профиль запрошенного пользователя, его данные и заработанный титул', () => {
-    renderPage();
+  it('загружает профиль из API и показывает его данные, интересы и титул', async () => {
+    stubFetch();
+    await renderLoaded();
 
-    expect(screen.getByText('Анна, 24')).toBeInTheDocument();
-    expect(screen.getByText('Москва • 2 units.km user.from_you')).toBeInTheDocument();
-    expect(screen.getByText('87% user.match_score')).toBeInTheDocument();
+    expect(screen.getByText(/Анна, 24/)).toBeInTheDocument();
+    expect(screen.getByText('Москва')).toBeInTheDocument();
     expect(screen.getByText('"Люблю закаты, хороший кофе и интересные разговоры."')).toBeInTheDocument();
     expect(screen.getByText('profile.rank')).toBeInTheDocument();
     expect(screen.getByText('Душа компании')).toBeInTheDocument();
@@ -88,19 +132,65 @@ describe('Страница user', () => {
     expect(screen.getByTestId('watch-button')).toHaveTextContent('2');
   });
 
-  it('для неизвестного id откатывается ко второму пользователю демо-данных', () => {
-    h.userId = '9999';
-    renderPage();
+  it('не показывает процент совпадения: у реального профиля его нет', async () => {
+    stubFetch();
+    await renderLoaded();
 
-    expect(screen.getByText('Александр, 26')).toBeInTheDocument();
-    expect(screen.getByText('95% user.match_score')).toBeInTheDocument();
-    expect(screen.getByText('Король сердец')).toBeInTheDocument();
+    expect(screen.queryByText(/user\.match_score/)).toBeNull();
   });
 
-  it('во вкладке «Галерея» показывает пять фото и открывает просмотрщик без ошибок Radix', async () => {
-    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const user = userEvent.setup();
+  it('404 от API показывает «профиль недоступен», а не демо-человека', async () => {
+    stubFetch((url) => (url === '/api/profile/2' ? jsonResponse({}, false, 404) : undefined));
     renderPage();
+
+    expect(await screen.findByText('user.not_found')).toBeInTheDocument();
+    expect(screen.getByText('user.not_found_desc')).toBeInTheDocument();
+    expect(screen.queryByText(/Анна/)).toBeNull();
+  });
+
+  it('нечисловой id не ходит в API и показывает недоступность', async () => {
+    h.userId = 'abc';
+    const fetchMock = stubFetch();
+    renderPage();
+
+    expect(await screen.findByText('user.not_found')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('без id не ходит в API и показывает недоступность', async () => {
+    h.userId = null;
+    const fetchMock = stubFetch();
+    renderPage();
+
+    expect(await screen.findByText('user.not_found')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('с токеном пишет визит профиля после загрузки', async () => {
+    setToken('jwt');
+    const fetchMock = stubFetch();
+    await renderLoaded();
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/profile/2/view',
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+  });
+
+  it('без токена визит не пишется', async () => {
+    const fetchMock = stubFetch();
+    await renderLoaded();
+
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).not.toContain('/api/profile/2/view');
+  });
+
+  it('во вкладке «Галерея» показывает фото из API и открывает просмотрщик', async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    stubFetch();
+    const user = userEvent.setup();
+    await renderLoaded();
 
     await user.click(screen.getByText('profile.tab.gallery'));
 
@@ -117,11 +207,19 @@ describe('Страница user', () => {
     expect(messages.filter((message) => message.includes('Missing `Description`'))).toEqual([]);
   });
 
+  it('вкладки викторины нет: ответы о реальном человеке взять неоткуда', async () => {
+    stubFetch();
+    await renderLoaded();
+
+    expect(screen.queryByText('profile.tab.polls')).toBeNull();
+    expect(screen.getByText('profile.tab.data')).toBeInTheDocument();
+    expect(screen.getByText('profile.tab.gallery')).toBeInTheDocument();
+  });
+
   it('жалоба без причины не отправляется, с причиной уходит на сервер и закрывает диалог', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-    vi.stubGlobal('fetch', fetchMock);
+    const fetchMock = stubFetch();
     const user = userEvent.setup();
-    renderPage();
+    await renderLoaded();
 
     await user.click(screen.getByTestId('report-user'));
     expect(screen.getByText('report.title')).toBeInTheDocument();
@@ -133,7 +231,7 @@ describe('Страница user', () => {
       title: 'report.toast.no_reason_title',
       description: 'report.toast.no_reason_desc',
     });
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url) === '/api/reports')).toHaveLength(0);
     expect(screen.getByText('report.title')).toBeInTheDocument();
 
     await user.click(screen.getAllByRole('radio')[0]);
@@ -156,9 +254,9 @@ describe('Страница user', () => {
   });
 
   it('отказ сервера на жалобу показывает ошибку, а не ложный успех', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+    stubFetch((url) => (url === '/api/reports' ? jsonResponse({}, false, 500) : undefined));
     const user = userEvent.setup();
-    renderPage();
+    await renderLoaded();
 
     await user.click(screen.getByTestId('report-user'));
     await user.click(screen.getAllByRole('radio')[0]);
@@ -175,10 +273,9 @@ describe('Страница user', () => {
 
   it('блокировка после подтверждения шлёт POST и уводит назад', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-    vi.stubGlobal('fetch', fetchMock);
+    const fetchMock = stubFetch();
     const user = userEvent.setup();
-    renderPage();
+    await renderLoaded();
 
     await user.click(screen.getByTestId('block-user'));
 
@@ -193,15 +290,14 @@ describe('Страница user', () => {
 
   it('отказ от подтверждения и ошибка API не уводят со страницы', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
-    const fetchMock = vi.fn().mockResolvedValue({ ok: false });
-    vi.stubGlobal('fetch', fetchMock);
+    const fetchMock = stubFetch((url) => (url === '/api/block' ? jsonResponse({}, false, 500) : undefined));
     const user = userEvent.setup();
-    renderPage();
+    await renderLoaded();
 
     await user.click(screen.getByTestId('block-user'));
 
     expect(confirmSpy).toHaveBeenCalled();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url) === '/api/block')).toHaveLength(0);
     expect(h.toast).not.toHaveBeenCalled();
 
     confirmSpy.mockReturnValue(true);
@@ -211,21 +307,32 @@ describe('Страница user', () => {
     expect(h.router.back).not.toHaveBeenCalled();
   });
 
-  it('лайк показывает тост, а без совпадения не открывает диалог матча', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.1);
+  it('лайк уходит в POST /api/likes, тост показывается, без мэтча диалог не открывается', async () => {
+    const fetchMock = stubFetch();
     const user = userEvent.setup();
-    renderPage();
+    await renderLoaded();
 
     await user.click(screen.getByText('button.like'));
 
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/likes',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ liked_user_id: 2 }),
+        }),
+      ),
+    );
     expect(h.toast).toHaveBeenCalledWith({ title: 'toast.you_liked' });
     expect(screen.queryByText('match.title')).toBeNull();
   });
 
-  it('при совпадении открывает диалог матча и ведёт в чат', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.9);
+  it('взаимный лайк открывает диалог матча и ведёт в чат', async () => {
+    stubFetch((url) =>
+      url === '/api/likes' ? jsonResponse({ message: "It's a match!", matched: true }, true, 201) : undefined,
+    );
     const user = userEvent.setup();
-    renderPage();
+    await renderLoaded();
 
     await user.click(screen.getByText('button.like'));
 
@@ -235,9 +342,39 @@ describe('Страница user', () => {
     expect(h.router.push).toHaveBeenCalledWith('/chats?matchId=2');
   });
 
-  it('приглашение «кофе» сохраняется в sentInvites и подтверждается тостом', async () => {
+  it('дневной лимит лайков показывает подсказку о Premium, а не общую ошибку', async () => {
+    stubFetch((url) =>
+      url === '/api/likes' ? jsonResponse({ message: 'limit', code: 'LIKE_LIMIT' }, false, 403) : undefined,
+    );
     const user = userEvent.setup();
-    renderPage();
+    await renderLoaded();
+
+    await user.click(screen.getByText('button.like'));
+
+    await waitFor(() =>
+      expect(h.toast).toHaveBeenCalledWith({ variant: 'destructive', title: 'user.like_limit' }),
+    );
+  });
+
+  it('сетевая ошибка лайка показывает user.like_error', async () => {
+    stubFetch((url) => {
+      if (url !== '/api/likes') return undefined;
+      return Promise.reject(new Error('offline'));
+    });
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    await user.click(screen.getByText('button.like'));
+
+    await waitFor(() =>
+      expect(h.toast).toHaveBeenCalledWith({ variant: 'destructive', title: 'user.like_error' }),
+    );
+  });
+
+  it('приглашение «кофе» сохраняется в sentInvites и подтверждается тостом', async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    await renderLoaded();
 
     await user.click(screen.getByTestId('invite-user'));
     expect(screen.getByText('invite.option.coffee')).toBeInTheDocument();
@@ -252,8 +389,9 @@ describe('Страница user', () => {
   });
 
   it('своё приглашение отправляется только с текстом и сохраняется как custom', async () => {
+    stubFetch();
     const user = userEvent.setup();
-    renderPage();
+    await renderLoaded();
 
     await user.click(screen.getByTestId('invite-user'));
     await user.click(screen.getByText('invite.option.custom'));
@@ -272,42 +410,5 @@ describe('Страница user', () => {
     ]);
     expect(h.toast).toHaveBeenCalledWith({ title: 'invite.sent_title', description: 'invite.sent_desc' });
     await waitFor(() => expect(screen.queryByPlaceholderText('invite.custom_placeholder')).toBeNull());
-  });
-
-  it('викторина считает верные ответы, доходит до результата и начинается заново', async () => {
-    const user = userEvent.setup();
-    renderPage();
-
-    await user.click(screen.getByText('profile.tab.polls'));
-    expect(screen.getByText('polls.coffee_tea')).toBeInTheDocument();
-
-    vi.useFakeTimers();
-    for (const q of POLL_QUESTIONS) {
-      fireEvent.click(screen.getByText(`polls.${q.id}.${POLL_ANSWERS_USER_2[q.id]}`));
-      expect(screen.getByText('polls.match')).toBeInTheDocument();
-      act(() => {
-        vi.advanceTimersByTime(1600);
-      });
-      fireEvent.click(screen.getByText('polls.next'));
-    }
-    vi.useRealTimers();
-
-    expect(screen.getByText('polls.result_title_good')).toBeInTheDocument();
-    expect(screen.getByText('8/8')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByText('polls.play_again'));
-
-    expect(screen.getByText('polls.coffee_tea')).toBeInTheDocument();
-    expect(screen.queryByText('8/8')).toBeNull();
-  });
-
-  it('неверный ответ подсвечивает верный вариант и не даёт очко', async () => {
-    const user = userEvent.setup();
-    renderPage();
-
-    await user.click(screen.getByText('profile.tab.polls'));
-    fireEvent.click(screen.getByText('polls.coffee_tea.1'));
-
-    expect(screen.getByText('polls.no_match — polls.coffee_tea.2')).toBeInTheDocument();
   });
 });
