@@ -1,5 +1,5 @@
 ===== Фронт (Vitest) =====
-2111 тестов в 138 файлах (зелёных 2111) (vitest --reporter=json)
+2127 тестов в 139 файлах (зелёных 2127) (vitest --reporter=json)
 
 # файл | тестов
 scripts/backup-smoke-gate.test.mjs | 34
@@ -82,6 +82,7 @@ src/test/hangout-create.test.tsx | 3
 src/test/hangout-detail.test.tsx | 64
 src/test/hangout-edit.test.tsx | 7
 src/test/hangouts-card.test.tsx | 35
+src/test/hangouts-page.test.tsx | 16
 src/test/hangouts.test.tsx | 35
 src/test/home-hangouts.test.tsx | 2
 src/test/home.test.tsx | 8
