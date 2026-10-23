@@ -242,7 +242,7 @@ build: { target: 'es2020', minify: 'esbuild', chunkSizeWarningLimit: 600 }
 | Фича | Колонки | API | Описание |
 |------|---------|-----|----------|
 | **GPS tracking** | `user_locations.lat`, `lng`, `accuracy`, `geofence_events` | `PUT /api/location`, `GET /api/location` | 5min polling, geofence alerts |
-| Хук | `use-background-geolocation.ts` | Capacitor geolocation + fallback watchPosition |
+| Хук | `use-background-geolocation.ts` | — | Capacitor geolocation + fallback watchPosition |
 
 Миграция `011_add_background_gps.sql`.
 
