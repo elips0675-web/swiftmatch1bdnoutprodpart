@@ -846,6 +846,3 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
     </div>
   );
 }
-
-// Backward-compatible alias
-export const FootballFeed = CategoryFeed;
