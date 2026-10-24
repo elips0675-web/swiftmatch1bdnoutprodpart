@@ -1,11 +1,11 @@
 {
-  "generated": "2026-10-24T05:30:07.890Z",
+  "generated": "2026-10-24T12:37:08.079Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
     "files": 143,
-    "tests": 2213,
-    "passed": 2213,
+    "tests": 2216,
+    "passed": 2216,
     "failed": 0,
     "gate": {
       "files": 31,
@@ -13,7 +13,7 @@
     },
     "product": {
       "files": 112,
-      "tests": 1444
+      "tests": 1447
     },
     "perFile": [
       {
@@ -574,7 +574,7 @@
       },
       {
         "file": "src/test/user.test.tsx",
-        "tests": 19
+        "tests": 22
       },
       {
         "file": "src/test/utils.test.ts",
@@ -592,8 +592,8 @@
   },
   "server": {
     "files": 163,
-    "tests": 2713,
-    "passed": 2713,
+    "tests": 2714,
+    "passed": 2714,
     "failed": 0,
     "gate": {
       "files": 5,
@@ -601,7 +601,7 @@
     },
     "product": {
       "files": 158,
-      "tests": 2590
+      "tests": 2591
     },
     "perFile": [
       {
@@ -1190,7 +1190,7 @@
       },
       {
         "file": "server/src/__tests__/social-groups.test.js",
-        "tests": 32
+        "tests": 33
       },
       {
         "file": "server/src/__tests__/social-messages-blocks.test.js",
@@ -1362,6 +1362,6 @@
   },
   "total": {
     "files": 306,
-    "tests": 4926
+    "tests": 4930
   }
 }

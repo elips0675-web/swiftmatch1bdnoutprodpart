@@ -180,8 +180,8 @@ cd server && npm test            # серверные тесты
 
 ### Тесты
 
-- **Фронтенд (Vitest):** 2213 тестов, 143 файла — **0 failures**
-- **Сервер (Vitest):** 2713 тестов, 163 файла — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
+- **Фронтенд (Vitest):** 2216 тестов, 143 файла — **0 failures**
+- **Сервер (Vitest):** 2714 тестов, 163 файла — **0 failures** (включая cookie-auth, rotation, lockout, sanitize, дрейф схемы)
 - **E2E (Playwright):** 206 тестов, 22 spec-файла — живой прогон требует стек 3002/8081/3306; после прогона `globalTeardown` чистит `e2e_*`/`layout_*` из БД
 
 ### Зависимости
@@ -319,7 +319,7 @@ cd server && npm test            # серверные тесты
 
 ### 🗄️ База данных
 - MySQL через mysql2, пул соединений
-- **Миграции:** `database/migrations/` — 71 пронумерованных `.sql` + `migrate.js` (таблица `_migrations`)
+- **Миграции:** `database/migrations/` — 72 пронумерованных `.sql` + `migrate.js` (таблица `_migrations`)
 - Эталон схемы: `database/mysql_schema.sql` (его и сверяет дрейф-аудит)
 
 ### 📧 Коммуникации
@@ -434,7 +434,7 @@ cd server && npm test            # серверные тесты
 | `server/src/redis.js` | ioredis lazy client (main/pub/sub) |
 | `server/src/audit.js` | soft delete + audit log |
 | `server/src/seed.js` | Генератор демо-данных (50 users, 30 matches, 200 msgs) |
-| `database/` | `mysql_schema.sql` + `demo_data.sql` + `migrations/` (71 SQL) |
+| `database/` | `mysql_schema.sql` + `demo_data.sql` + `migrations/` (72 SQL) |
 | `scripts/` | Гейты и утилиты (аудит схемы/секретов/счётчиков/персистентности, бэкап, EXPLAIN) |
 | `e2e/` | Playwright-спеки (22) |
 | `android/` | Capacitor/Gradle-проект |
