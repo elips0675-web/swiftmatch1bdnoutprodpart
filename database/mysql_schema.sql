@@ -756,7 +756,7 @@ CREATE TABLE `invites` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `from_user_id` int unsigned NOT NULL,
   `to_user_id` int unsigned NOT NULL,
-  `invite_type` enum('coffee','cinema','walk','dinner','other') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `invite_type` enum('coffee','cinema','walk','dinner','picnic','exhibition','museum','other') COLLATE utf8mb4_unicode_ci NOT NULL,
   `message` text COLLATE utf8mb4_unicode_ci,
   `status` enum('pending','accepted','declined','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,

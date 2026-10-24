@@ -78,6 +78,18 @@ describe('POST /api/invites', () => {
     expect(pool.query).not.toHaveBeenCalled()
   })
 
+  it('принимает пикник, выставку и музей — их предлагает страница профиля', async () => {
+    isAllowedMock.mockResolvedValue(false)
+    for (const type of ['picnic', 'exhibition', 'museum']) {
+      pool.query.mockReset()
+      pool.query.mockResolvedValue([[], []])
+      const res = await request(app).post('/api/invites').set(as()).send({ invitee_id: 5, type })
+      expect(res.status).toBe(201)
+      const invite = pool.query.mock.calls.find((c) => String(c[0]).startsWith('INSERT INTO invites'))
+      expect(invite[1]).toEqual([1, 5, type, null, 'pending'])
+    }
+  })
+
   it('создаёт приглашение, уведомление и пушит его по WS, текст обрезан до 500', async () => {
     pool.query
       .mockResolvedValueOnce([{ insertId: 1 }, []])

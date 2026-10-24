@@ -368,7 +368,7 @@ router.get('/api/matches', auth, cacheRoutePerUser(30), async (req, res) => {
 })
 
 // ─── Invites ───────────────────────────────────────────────────
-const INVITE_TYPES = ['coffee', 'cinema', 'walk', 'dinner', 'other']
+const INVITE_TYPES = ['coffee', 'cinema', 'walk', 'dinner', 'picnic', 'exhibition', 'museum', 'other']
 
 /**
  * @openapi

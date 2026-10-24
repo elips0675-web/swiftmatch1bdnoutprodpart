@@ -371,8 +371,9 @@ describe('Страница user', () => {
     );
   });
 
-  it('приглашение «кофе» сохраняется в sentInvites и подтверждается тостом', async () => {
-    stubFetch();
+  it('приглашение «кофе» уходит в POST /api/invites и подтверждается тостом', async () => {
+    setToken('jwt');
+    const fetchMock = stubFetch();
     const user = userEvent.setup();
     await renderLoaded();
 
@@ -381,15 +382,24 @@ describe('Страница user', () => {
 
     await user.click(screen.getByText('invite.option.coffee'));
 
-    expect(JSON.parse(localStorage.getItem('sentInvites') || '[]')).toEqual([
-      expect.objectContaining({ toUserId: 2, type: 'coffee', userName: 'Анна' }),
-    ]);
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/invites',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ invitee_id: 2, type: 'coffee' }),
+        }),
+      ),
+    );
+    const init = fetchMock.mock.calls.find(([url]) => String(url) === '/api/invites')?.[1] as RequestInit;
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer jwt');
+    expect(localStorage.getItem('sentInvites')).toBeNull();
     expect(h.toast).toHaveBeenCalledWith({ title: 'invite.sent_title', description: 'invite.sent_desc' });
     await waitFor(() => expect(screen.queryByText('invite.option.coffee')).toBeNull());
   });
 
-  it('своё приглашение отправляется только с текстом и сохраняется как custom', async () => {
-    stubFetch();
+  it('своё приглашение уходит как other с текстом и без токена в заголовке', async () => {
+    const fetchMock = stubFetch();
     const user = userEvent.setup();
     await renderLoaded();
 
@@ -400,15 +410,77 @@ describe('Страница user', () => {
     expect(screen.getByText('invite.custom_title')).toBeInTheDocument();
     expect(screen.getByText('button.send')).toBeDisabled();
 
-    await user.type(screen.getByPlaceholderText('invite.custom_placeholder'), 'Пойдём в кино');
+    await user.type(screen.getByPlaceholderText('invite.custom_placeholder'), '  Пойдём в кино  ');
     expect(screen.getByText('button.send')).toBeEnabled();
 
     await user.click(screen.getByText('button.send'));
 
-    expect(JSON.parse(localStorage.getItem('sentInvites') || '[]')).toEqual([
-      expect.objectContaining({ toUserId: 2, type: 'custom', message: 'Пойдём в кино' }),
-    ]);
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/invites',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ invitee_id: 2, type: 'other', message: 'Пойдём в кино' }),
+        }),
+      ),
+    );
+    const init = fetchMock.mock.calls.find(([url]) => String(url) === '/api/invites')?.[1] as RequestInit;
+    expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
     expect(h.toast).toHaveBeenCalledWith({ title: 'invite.sent_title', description: 'invite.sent_desc' });
     await waitFor(() => expect(screen.queryByPlaceholderText('invite.custom_placeholder')).toBeNull());
+  });
+
+  it('отказ сервера на приглашение — ошибка, диалог не закрывается', async () => {
+    stubFetch((url) => (url === '/api/invites' ? jsonResponse({ message: 'Invalid invite type' }, false, 400) : undefined));
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    await user.click(screen.getByTestId('invite-user'));
+    await user.click(screen.getByText('invite.option.coffee'));
+
+    await waitFor(() =>
+      expect(h.toast).toHaveBeenCalledWith({ variant: 'destructive', title: 'invite.error_title' }),
+    );
+    expect(h.toast).not.toHaveBeenCalledWith(expect.objectContaining({ title: 'invite.sent_title' }));
+    expect(screen.getByText('invite.option.coffee')).toBeInTheDocument();
+  });
+
+  it('сетевой сбой приглашения — ошибка, а не ложный успех', async () => {
+    stubFetch((url) => {
+      if (url !== '/api/invites') return undefined;
+      return Promise.reject(new Error('offline'));
+    });
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    await user.click(screen.getByTestId('invite-user'));
+    await user.click(screen.getByText('invite.option.walk'));
+
+    await waitFor(() =>
+      expect(h.toast).toHaveBeenCalledWith({ variant: 'destructive', title: 'invite.error_title' }),
+    );
+    expect(screen.getByText('invite.option.walk')).toBeInTheDocument();
+  });
+
+  it('пока запрос в полёте, остальные варианты заблокированы', async () => {
+    let resolveInvite: (value: Response) => void = () => {};
+    stubFetch((url) => {
+      if (url !== '/api/invites') return undefined;
+      return new Promise<Response>((resolve) => {
+        resolveInvite = resolve;
+      });
+    });
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    await user.click(screen.getByTestId('invite-user'));
+    await user.click(screen.getByText('invite.option.coffee'));
+
+    expect(screen.getByText('invite.option.cinema').closest('button')).toBeDisabled();
+
+    resolveInvite({ ok: true, json: async () => ({}) } as Response);
+    await waitFor(() =>
+      expect(h.toast).toHaveBeenCalledWith({ title: 'invite.sent_title', description: 'invite.sent_desc' }),
+    );
   });
 });

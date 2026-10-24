@@ -137,6 +137,7 @@ function UserProfileContent() {
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [showCustomInvite, setShowCustomInvite] = useState(false);
   const [customInviteText, setCustomInviteText] = useState('');
+  const [inviteSending, setInviteSending] = useState(false);
 
   const photos = user?.photos ?? [];
 
@@ -215,6 +216,34 @@ function UserProfileContent() {
       if (data.matched) setMatchUser(user);
     } catch {
       toast({ variant: 'destructive', title: t('user.like_error') });
+    }
+  };
+
+  const sendInvite = async (type: string, label: string, message?: string) => {
+    if (!user) return;
+    setInviteSending(true);
+    try {
+      const token = getToken();
+      const res = await fetch('/api/invites', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ invitee_id: user.id, type, message }),
+      });
+      if (!res.ok) {
+        toast({ variant: 'destructive', title: t('invite.error_title') });
+        return;
+      }
+      setShowInviteDialog(false);
+      setShowCustomInvite(false);
+      setCustomInviteText('');
+      toast({ title: t('invite.sent_title'), description: t('invite.sent_desc', { type: label }) });
+    } catch {
+      toast({ variant: 'destructive', title: t('invite.error_title') });
+    } finally {
+      setInviteSending(false);
     }
   };
 
@@ -494,13 +523,8 @@ function UserProfileContent() {
                 return (
                   <button
                     key={type}
-                    onClick={() => {
-                      const sent = JSON.parse(localStorage.getItem('sentInvites') || '[]');
-                      sent.push({ toUserId: user.id, type, userName: user.name, sentAt: Date.now() });
-                      localStorage.setItem('sentInvites', JSON.stringify(sent));
-                      setShowInviteDialog(false);
-                      toast({ title: t('invite.sent_title'), description: t('invite.sent_desc', { type: t(`invite.option.${type}`) }) });
-                    }}
+                    disabled={inviteSending}
+                    onClick={() => void sendInvite(type, t(`invite.option.${type}`))}
                     className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 ${color} ${bg} hover:bg-muted/30 active:scale-[0.98] transition-all font-bold text-sm`}
                   >
                     <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shadow-sm">
@@ -545,16 +569,9 @@ function UserProfileContent() {
                   {t('button.cancel')}
                 </Button>
                 <Button
-                  disabled={!customInviteText.trim()}
+                  disabled={inviteSending || !customInviteText.trim()}
                   className="flex-1 rounded-xl h-11 gradient-bg text-white border-0 gap-2 shadow-lg shadow-primary/20"
-                  onClick={() => {
-                    const sent = JSON.parse(localStorage.getItem('sentInvites') || '[]');
-                    sent.push({ toUserId: user.id, type: 'custom', userName: user.name, message: customInviteText, sentAt: Date.now() });
-                    localStorage.setItem('sentInvites', JSON.stringify(sent));
-                    setShowCustomInvite(false);
-                    setCustomInviteText('');
-                    toast({ title: t('invite.sent_title'), description: t('invite.sent_desc', { type: customInviteText }) });
-                  }}
+                  onClick={() => void sendInvite('other', customInviteText.trim(), customInviteText.trim())}
                 >
                   <Send size={16} />
                   {t('button.send')}
