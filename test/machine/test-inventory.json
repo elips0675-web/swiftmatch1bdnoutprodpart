@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-23T12:17:40.250Z",
+  "generated": "2026-10-24T05:30:07.890Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 142,
-    "tests": 2191,
-    "passed": 2191,
+    "files": 143,
+    "tests": 2213,
+    "passed": 2213,
     "failed": 0,
     "gate": {
       "files": 31,
       "tests": 769
     },
     "product": {
-      "files": 111,
-      "tests": 1422
+      "files": 112,
+      "tests": 1444
     },
     "perFile": [
       {
@@ -251,6 +251,10 @@
       {
         "file": "src/test/auth-refresh.test.ts",
         "tests": 8
+      },
+      {
+        "file": "src/test/booking-dialogs.test.tsx",
+        "tests": 22
       },
       {
         "file": "src/test/call-dialogs.test.tsx",
@@ -1357,7 +1361,7 @@
     ]
   },
   "total": {
-    "files": 305,
-    "tests": 4904
+    "files": 306,
+    "tests": 4926
   }
 }
