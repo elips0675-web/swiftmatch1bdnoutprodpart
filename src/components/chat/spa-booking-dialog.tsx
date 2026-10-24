@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sparkles, Calendar, Clock, Send, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -25,11 +25,14 @@ export function SpaBookingDialog({ offer, chatId, open, onOpenChange }: Props) {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const handleBook = async () => {
-    if (!date || !time) {
-      setError(t("partner.spa.fill_required"));
-      return;
+  useEffect(() => {
+    if (open) {
+      setError(null);
+      setShared(false);
     }
+  }, [open]);
+
+  const handleBook = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -43,13 +46,17 @@ export function SpaBookingDialog({ offer, chatId, open, onOpenChange }: Props) {
         body: JSON.stringify({ offer_id: offer.id, date, time }),
       });
       if (!bookRes.ok) {
-        const data = await bookRes.json();
-        throw new Error(data.message || "Booking failed");
+        setError(t("partner.spa.error"));
+        return;
       }
-      const bookData = await bookRes.json();
+      const bookData = await bookRes.json().catch(() => ({}));
+
+      if (bookData.deeplink) {
+        window.open(bookData.deeplink, "_blank", "noopener");
+      }
 
       if (chatId) {
-        await fetch("/api/partners/booking/share", {
+        const shareRes = await fetch("/api/partners/booking/share", {
           method: "POST",
           headers,
           body: JSON.stringify({
@@ -60,14 +67,14 @@ export function SpaBookingDialog({ offer, chatId, open, onOpenChange }: Props) {
             message: `${offer.title} — ${date} ${time}`,
           }),
         });
+        if (!shareRes.ok) {
+          setError(t("partner.spa.share_error"));
+          return;
+        }
         setShared(true);
       }
-
-      if (bookData.deeplink) {
-        window.open(bookData.deeplink, "_blank", "noopener");
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t("partner.spa.error"));
+    } catch {
+      setError(t("partner.spa.error"));
     } finally {
       setLoading(false);
     }

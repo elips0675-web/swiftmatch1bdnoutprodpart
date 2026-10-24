@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Hotel, CalendarDays, Users, Send, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 import { useLanguage } from "@/context/language-context";
 import { getToken } from "@/lib/token";
 import type { PartnerOffer } from "./chat-partner-actions";
@@ -24,6 +23,10 @@ export function HotelBookingDialog({ offer, open, onOpenChange }: Props) {
 
   const today = new Date().toISOString().slice(0, 10);
 
+  useEffect(() => {
+    if (open) setError(null);
+  }, [open]);
+
   const handleBook = async () => {
     if (!checkIn || !checkOut) {
       setError(t("partner.hotel.fill_required"));
@@ -31,6 +34,11 @@ export function HotelBookingDialog({ offer, open, onOpenChange }: Props) {
     }
     if (checkOut <= checkIn) {
       setError(t("partner.hotel.checkout_after_checkin"));
+      return;
+    }
+    const guestsCount = Number(guests);
+    if (!Number.isInteger(guestsCount) || guestsCount < 1 || guestsCount > 10) {
+      setError(t("partner.hotel.guests_range"));
       return;
     }
     setLoading(true);
@@ -47,20 +55,20 @@ export function HotelBookingDialog({ offer, open, onOpenChange }: Props) {
           offer_id: offer.id,
           check_in: checkIn,
           check_out: checkOut,
-          guests: Number(guests),
+          guests: guestsCount,
         }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Booking failed");
+        setError(t("partner.hotel.error"));
+        return;
       }
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data.deeplink) {
         window.open(data.deeplink, "_blank", "noopener");
       }
       onOpenChange(false);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t("partner.hotel.error"));
+    } catch {
+      setError(t("partner.hotel.error"));
     } finally {
       setLoading(false);
     }
