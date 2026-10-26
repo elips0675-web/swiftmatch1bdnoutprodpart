@@ -1,15 +1,15 @@
 {
-  "generated": "2026-10-24T12:37:08.079Z",
+  "generated": "2026-10-26T06:38:44.622Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 143,
-    "tests": 2216,
-    "passed": 2216,
+    "files": 144,
+    "tests": 2237,
+    "passed": 2237,
     "failed": 0,
     "gate": {
-      "files": 31,
-      "tests": 769
+      "files": 32,
+      "tests": 790
     },
     "product": {
       "files": 112,
@@ -47,6 +47,10 @@
       {
         "file": "scripts/check-security-headers.test.mjs",
         "tests": 59
+      },
+      {
+        "file": "scripts/compose-logging-audit.test.mjs",
+        "tests": 21
       },
       {
         "file": "scripts/dependency-audit.test.mjs",
@@ -1361,7 +1365,7 @@
     ]
   },
   "total": {
-    "files": 306,
-    "tests": 4930
+    "files": 307,
+    "tests": 4951
   }
 }

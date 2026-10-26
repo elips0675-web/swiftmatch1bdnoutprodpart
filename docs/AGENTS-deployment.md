@@ -37,6 +37,18 @@
 
 **Чего в этой схеме нет:** истинного zero-downtime (без окна 502 на время пересоздания контейнера). Он требует двух реплик `app` за nginx с перереload, а это упирается в решение «single-instance» из-за in-memory лимитеров (`docs/rollback-plan.md`, раздел про rate-limit): `express-rate-limit` и `lockout.js` не шарят счётчики между процессами, поэтому реплик не может быть больше одной, пока лимиты не переведены на `REDIS_URL`.
 
+## Диск и логи контейнеров
+
+Логи ограничены в `docker-compose.yml` якорем `x-logging` (`driver: json-file`, `max-size: 10m`, `max-file: 3` — до 30 МБ на контейнер, у всех шести сервисов), у Prometheus задан retention тома (`--storage.tsdb.retention.time=15d`, `--storage.tsdb.retention.size=2GB`). Гейт: `npm run check:compose-logging` (`scripts/compose-logging-audit.mjs`) — падает, если у сервиса нет лимита логов, лимит бессмысленный (`max-size` > 100 МБ, `max-file` > 10), у Prometheus нет retention или в workflow появилась prune-команда.
+
+Порядок при «Docker съел диск» — от измерения к действию:
+
+1. **Измерить, а не гадать:** `docker system df -v`, `df -h`, и отдельно содержимое каталога Docker изнутри (`docker run --rm -v /var/lib/docker:/d redis:7-alpine sh -c "du -sk /d/* | sort -n | tail"`). Логи контейнеров — `find /var/lib/docker/containers -name '*-json.log' -exec du -sk {} +`.
+2. **Безопасная чистка:** `docker builder prune -f`, `docker image prune -f` (только dangling-образы без тега), `docker compose logs --tail 100 <service>`. Логи работающих контейнеров уже ротируются лимитом из compose — вручную `truncate` им не нужен.
+3. **Запрещено на VPS:** `docker system prune -a` удаляет образы, не занятые запущенным контейнером, — то есть `swiftmatch-app:rollback` и `swiftmatch-web:rollback`, единственную цель автоматического отката (снимок снимается **до** сборки, раздел выше); после него откат физически невозможен. `--volumes` / `docker volume prune` удаляют `db_data` и `uploads_data` — базу и фотографии пользователей. Гейт валит деплой, если такая команда появится в `.github/workflows/*`.
+4. **Если `docker system df` мал, а диск занят — виноват не Docker, а образ диска.** На Windows это `%LOCALAPPDATA%\Docker\wsl\disk\docker_data.vhdx` (замер 26.10.2026: файл 39.13 ГБ при 5.4 ГБ данных внутри — 33+ ГБ освобождённых прошлыми prune блоков, которые VHDX не отдал; файл не sparse). На Linux тот же класс — файлы, удалённые, но открытые процессом: `lsof +L1`.
+5. **Windows, возврат места:** `docker desktop stop` → `wsl --shutdown` → `Optimize-VHD -Path "<путь к docker_data.vhdx>" -Mode Full` от администратора → `docker desktop start`. Замер: 39.13 → 6.6 ГБ, на C: +30.2 ГБ, образы и тома целы. `Docker Desktop.exe -Quit` на 4.x не завершает движок (только показывает дашборд) — остановка через `docker desktop stop`.
+
 ## Nginx essentials
 ```nginx
 location /api {
