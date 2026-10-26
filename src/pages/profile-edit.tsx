@@ -228,8 +228,7 @@ export default function EditProfilePage() {
         body: JSON.stringify({ alias: trimmed }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        toast({ title: data.message || t("profile.alias_error"), variant: "destructive" });
+        toast({ title: t("profile.alias_error"), variant: "destructive" });
         return;
       }
       const created = await res.json();
@@ -245,30 +244,31 @@ export default function EditProfilePage() {
     const token = getToken();
     if (!token) return;
     try {
-      await fetch(`/api/profile/aliases/${aliasId}`, {
+      const res = await fetch(`/api/profile/aliases/${aliasId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (!res.ok) throw new Error(`alias delete failed: ${res.status}`);
       setAliases((prev) => prev.filter((a) => a.id !== aliasId));
       toast({ title: t("profile.alias_deleted") });
-    } catch { /* ignored */ }
+    } catch {
+      toast({ title: t("profile.alias_error"), variant: "destructive" });
+    }
   };
 
   const setPrimary = async (aliasId: number) => {
     const token = getToken();
     if (!token) return;
     try {
-      await fetch(`/api/profile/aliases/${aliasId}/primary`, {
+      const res = await fetch(`/api/profile/aliases/${aliasId}/primary`, {
         method: "PUT",
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (!res.ok) throw new Error(`alias primary failed: ${res.status}`);
       setAliases((prev) => prev.map((a) => ({ ...a, is_primary: a.id === aliasId })));
-    } catch { /* ignored */ }
-  };
-
-  const handlePhotosChange = (newPhotos: string[]) => {
-    setPhotos(newPhotos);
-    localStorage.setItem('userProfileGallery', JSON.stringify(newPhotos.filter(p => !p.startsWith('blob:'))));
+    } catch {
+      toast({ title: t("profile.alias_error"), variant: "destructive" });
+    }
   };
 
   const handleAddPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -337,7 +337,8 @@ export default function EditProfilePage() {
   };
 
   const handleGenerateBio = async () => {
-    if (!profile?.interests && !profile?.bio) return;
+    const hasInterests = Array.isArray(profile?.interests) && profile.interests.length > 0;
+    if (!hasInterests && !profile?.bio) return;
     setIsGeneratingBio(true);
     try {
       const result = await generateProfileBio({ keywords: profile.interests, description: profile.bio });
@@ -355,7 +356,8 @@ export default function EditProfilePage() {
   };
 
   const handleSave = async () => {
-    if (photos.length === 0) {
+    const persistedPhotos = photos.filter(p => !p.startsWith('blob:'));
+    if (photos.length === 0 || persistedPhotos.length === 0) {
       toast({ title: t('toast.save_error'), description: t('toast.save_error_desc'), variant: "destructive" });
       return;
     }
@@ -373,9 +375,10 @@ export default function EditProfilePage() {
     const cleanedInterests = (profile.interests || [])
       .filter((i: string) => !BANNED_WORDS.includes(i) && dynamicInterests.includes(i));
 
-    const birthDateStr = toLocalDate(profile.birthDate) || String(profile.birthDate || '').split('T')[0]
+    const rawBirthDate = toLocalDate(profile.birthDate) || String(profile.birthDate || '').split('T')[0]
+    const birthDateStr = /^\d{4}-\d{2}-\d{2}$/.test(rawBirthDate) ? rawBirthDate : ''
     let computedAge = profile.age
-    if (birthDateStr && /^\d{4}-\d{2}-\d{2}$/.test(birthDateStr)) {
+    if (birthDateStr) {
       const bd = new Date(birthDateStr)
       if (!Number.isNaN(bd.getTime())) {
         const today = new Date()
@@ -446,8 +449,7 @@ export default function EditProfilePage() {
         return;
       }
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        toast({ title: t('toast.save_error'), description: err.message || t('toast.save_error_desc'), variant: "destructive" })
+        toast({ title: t('toast.save_error'), description: t('toast.save_error_desc'), variant: "destructive" })
         setIsSaving(false)
         return
       }
@@ -569,7 +571,7 @@ export default function EditProfilePage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">{t('profile.label.gender')}</Label>
-                <Select value={profile.gender || ''} onValueChange={(val) => setProfile({ ...profile, gender: val, lookingFor: val === 'female' ? 'male' : profile.lookingFor })}>
+                <Select value={profile.gender || ''} onValueChange={(val) => setProfile({ ...profile, gender: val })}>
                   <SelectTrigger className="rounded-xl bg-muted/30 border-0 h-11 font-bold px-4"><SelectValue /></SelectTrigger>
                   <SelectContent className="rounded-xl border-0 shadow-2xl">
                     <SelectItem value="male" className="font-bold text-[11px]">{t('gender.male')}</SelectItem>
