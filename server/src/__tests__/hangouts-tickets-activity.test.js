@@ -12,11 +12,12 @@ import jwt from 'jsonwebtoken'
 
 vi.mock('../db.js', () => ({ default: { query: vi.fn(), getConnection: vi.fn() } }))
 
-const { emitMock, toMock } = vi.hoisted(() => {
+const { emitMock, toMock, ioState } = vi.hoisted(() => {
+  const state = { down: false }
   const emit = vi.fn()
-  return { emitMock: emit, toMock: vi.fn(() => ({ emit })) }
+  return { emitMock: emit, toMock: vi.fn(() => ({ emit })), ioState: state }
 })
-vi.mock('../ws.js', () => ({ getIO: vi.fn(() => ({ to: toMock })) }))
+vi.mock('../ws.js', () => ({ getIO: vi.fn(() => (ioState.down ? null : { to: toMock })) }))
 
 vi.mock('../banned-words.js', () => ({
   getBannedWords: vi.fn(async () => []),
@@ -133,6 +134,7 @@ beforeEach(() => {
   process.env.NODE_ENV = 'test'
   stripeCreate.mockReset()
   stripeCreate.mockResolvedValue({ id: 'cs_1', url: 'https://checkout.stripe.com/cs_1' })
+  ioState.down = false
   pushMock.mockResolvedValue(undefined)
 })
 
@@ -199,6 +201,24 @@ describe('POST /api/hangouts/:id/checkin', () => {
     expect(res.status).toBe(200)
   })
 
+  it('организатор отмечается на своей встрече без строки участника', async () => {
+    wire({ hangout: hangoutRow({ user_id: 1, hangout_type: 'company' }), participant: false })
+    const res = await request(app).post('/api/hangouts/5/checkin').set(as(1)).send({ lat: 43.6, lng: 39.7 })
+    expect(res.status).toBe(200)
+    const insert = pool.query.mock.calls.find((c) => String(c[0]).includes('INSERT INTO hangout_checkins'))
+    expect(insert[1]).toEqual(['5', 1, 43.6, 39.7])
+    expect(pool.query.mock.calls.some((c) => String(c[0]).includes('FROM hangout_participants WHERE hangout_id = ? AND user_id = ?'))).toBe(false)
+  })
+
+  it('сокеты не подняты — чек-ин сохраняется без эмита', async () => {
+    wire({ hangout: hangoutRow(), participant: true })
+    ioState.down = true
+    const res = await request(app).post('/api/hangouts/5/checkin').set(as()).send({ lat: 43.6, lng: 39.7 })
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ checked_in: true })
+    expect(toMock).not.toHaveBeenCalled()
+  })
+
   it('ошибка БД — 500', async () => {
     wire({ fail: 'FROM hangouts WHERE id = ?' })
     const res = await request(app).post('/api/hangouts/5/checkin').set(as()).send({ lat: 43.6, lng: 39.7 })
@@ -215,7 +235,7 @@ describe('POST /api/hangouts/:id/review', () => {
   })
 
   it('невалидные reviewee_id/rating — 400 без запросов в БД', async () => {
-    for (const body of [{ reviewee_id: 'x', rating: 5 }, { reviewee_id: 3, rating: 0 }, { reviewee_id: 3, rating: 6 }]) {
+    for (const body of [{ reviewee_id: 'x', rating: 5 }, { rating: 5 }, { reviewee_id: 3, rating: 'abc' }, { reviewee_id: 3, rating: 0 }, { reviewee_id: 3, rating: 6 }]) {
       const res = await request(app).post('/api/hangouts/5/review').set(as()).send(body)
       expect(res.status).toBe(400)
     }
@@ -238,7 +258,15 @@ describe('POST /api/hangouts/:id/review', () => {
     wire({ hangout: hangoutRow({ user_id: 1 }) })
     const res = await request(app).post('/api/hangouts/5/review').set(as(1)).send({ reviewee_id: 3, rating: 5 })
     expect(res.status).toBe(400)
+    expect(res.body.message).toBe('Organizer cannot review own hangout')
+  })
+
+  it('себя оценивать нельзя — 400 без INSERT', async () => {
+    wire({ hangout: hangoutRow() })
+    const res = await request(app).post('/api/hangouts/5/review').set(as()).send({ reviewee_id: 1, rating: 5 })
+    expect(res.status).toBe(400)
     expect(res.body.message).toBe('Cannot review yourself')
+    expect(pool.query.mock.calls.some((c) => String(c[0]).startsWith('INSERT INTO hangout_reviews'))).toBe(false)
   })
 
   it('повторный отзыв — 409', async () => {

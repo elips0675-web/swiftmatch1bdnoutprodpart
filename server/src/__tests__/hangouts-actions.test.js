@@ -12,11 +12,12 @@ import jwt from 'jsonwebtoken'
 
 vi.mock('../db.js', () => ({ default: { query: vi.fn(), getConnection: vi.fn() } }))
 
-const { emitMock, toMock } = vi.hoisted(() => {
+const { emitMock, toMock, ioState } = vi.hoisted(() => {
+  const state = { down: false }
   const emit = vi.fn()
-  return { emitMock: emit, toMock: vi.fn(() => ({ emit })) }
+  return { emitMock: emit, toMock: vi.fn(() => ({ emit })), ioState: state }
 })
-vi.mock('../ws.js', () => ({ getIO: vi.fn(() => ({ to: toMock })) }))
+vi.mock('../ws.js', () => ({ getIO: vi.fn(() => (ioState.down ? null : { to: toMock })) }))
 
 vi.mock('../banned-words.js', () => ({
   getBannedWords: vi.fn(async () => []),
@@ -58,6 +59,7 @@ app.use(hangoutsRoutes)
 const as = (userId = 1) => ({
   Authorization: `Bearer ${jwt.sign({ userId, role: 'user' }, JWT_SECRET, { expiresIn: '1h' })}`,
 })
+const flush = () => new Promise((r) => setTimeout(r, 0))
 
 const hangoutRow = (over = {}) => ({
   id: 5,
@@ -119,8 +121,8 @@ function wire(over = {}) {
     if (s.includes('INSERT IGNORE INTO chat_participants')) return [{}, []]
     if (s.includes('INSERT INTO notifications')) return [{ insertId: st.notifId }, []]
     if (s.includes('FROM notifications WHERE id = ?')) return [[{ id: st.notifId, type: 'notif' }], []]
-    if (s.includes('SELECT up.display_name FROM user_profiles up')) return [[{ display_name: st.authorName }], []]
-    if (s.includes('SELECT display_name FROM user_profiles')) return [[{ display_name: st.joinerName }], []]
+    if (s.includes('SELECT up.display_name FROM user_profiles up')) return [st.authorName ? [{ display_name: st.authorName }] : [], []]
+    if (s.includes('SELECT display_name FROM user_profiles')) return [st.joinerName ? [{ display_name: st.joinerName }] : [], []]
     if (s.includes('FROM hangout_participants WHERE hangout_id = ? AND user_id = ?')) return [[st.existing].filter(Boolean), []]
     if (s.includes("UPDATE hangout_participants SET status = 'joined'")) return [{ affectedRows: 1 }, []]
     if (s.includes('INSERT INTO hangout_participants')) return [{}, []]
@@ -145,6 +147,7 @@ beforeEach(() => {
   prefsState.inApp = true
   prefsState.push = true
   prefsState.allowed = true
+  ioState.down = false
   pushMock.mockResolvedValue(undefined)
 })
 
@@ -256,6 +259,24 @@ describe('POST /api/hangouts/:id/like', () => {
     expect(participants[1]).toEqual([88, 1, 88, 2])
     expect(emitMock).toHaveBeenCalledWith('notification:new', expect.objectContaining({ id: 7 }))
     expect(pushMock).toHaveBeenCalledWith(2, 'SwiftMatch', 'Автор liked your hangout: Кофе')
+  })
+
+  it('профиль автора лайка не найден — push без имени', async () => {
+    wire({ hangout: hangoutRow(), mutual: [{ 1: 1 }], existingPair: [{ id: 42 }], authorName: null })
+    const res = await request(app).post('/api/hangouts/5/like').set(as()).send({})
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ liked: true, mutual: true, chat_id: 42 })
+    expect(pushMock).toHaveBeenCalledWith(2, 'SwiftMatch', 'Someone liked your hangout: Кофе')
+  })
+
+  it('падение push о взаимном лайке не ломает ответ', async () => {
+    wire({ hangout: hangoutRow(), mutual: [{ 1: 1 }], existingPair: [{ id: 42 }] })
+    pushMock.mockRejectedValueOnce(new Error('push down'))
+    const res = await request(app).post('/api/hangouts/5/like').set(as()).send({})
+    await flush()
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ liked: true, mutual: true, chat_id: 42 })
+    expect(logger.error).not.toHaveBeenCalled()
   })
 
   it('дубль лайка — 200 без 500', async () => {
@@ -428,6 +449,32 @@ describe('POST /api/hangouts/:id/join', () => {
     const res = await request(app).post('/api/hangouts/5/join').set(as()).send({})
     expect(res.status).toBe(201)
     expect(pushMock).not.toHaveBeenCalled()
+  })
+
+  it('сокеты не подняты — join проходит без эмита', async () => {
+    wire({ hangout: hangoutRow({ hangout_type: 'company' }), countAfter: 2 })
+    ioState.down = true
+    const res = await request(app).post('/api/hangouts/5/join').set(as()).send({})
+    expect(res.status).toBe(201)
+    expect(res.body).toEqual({ joined: true, chat_id: 88, participant_count: 2 })
+    expect(toMock).not.toHaveBeenCalled()
+  })
+
+  it('профиль участника не найден — push без имени', async () => {
+    wire({ hangout: hangoutRow({ hangout_type: 'company' }), countAfter: 1, joinerName: null })
+    const res = await request(app).post('/api/hangouts/5/join').set(as()).send({})
+    expect(res.status).toBe(201)
+    expect(pushMock).toHaveBeenCalledWith(2, 'SwiftMatch', 'Someone joined your hangout: Кофе')
+  })
+
+  it('падение push о новом участнике не ломает ответ', async () => {
+    wire({ hangout: hangoutRow({ hangout_type: 'company' }), countAfter: 2 })
+    pushMock.mockRejectedValueOnce(new Error('push down'))
+    const res = await request(app).post('/api/hangouts/5/join').set(as()).send({})
+    await flush()
+    expect(res.status).toBe(201)
+    expect(res.body).toEqual({ joined: true, chat_id: 88, participant_count: 2 })
+    expect(logger.error).not.toHaveBeenCalled()
   })
 
   it('гонка вставки — 409 Already joined', async () => {

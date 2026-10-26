@@ -1620,15 +1620,12 @@ router.post('/api/hangouts/:id/checkin', auth, checkinLimiter, async (req, res) 
       }
     }
 
-    const isParticipant = hangout.user_id === req.userId || hangout.hangout_type === 'company'
-      ? (await pool.query(
-          "SELECT 1 FROM hangout_participants WHERE hangout_id = ? AND user_id = ? AND status = 'joined' LIMIT 1",
-          [id, req.userId],
-        ))[0].length > 0
-      : (await pool.query(
-          "SELECT 1 FROM hangout_responses WHERE hangout_id = ? AND user_id = ? AND status = 'accepted' LIMIT 1",
-          [id, req.userId],
-        ))[0].length > 0
+    const isParticipant = hangout.user_id === req.userId || (await pool.query(
+      hangout.hangout_type === 'company'
+        ? "SELECT 1 FROM hangout_participants WHERE hangout_id = ? AND user_id = ? AND status = 'joined' LIMIT 1"
+        : "SELECT 1 FROM hangout_responses WHERE hangout_id = ? AND user_id = ? AND status = 'accepted' LIMIT 1",
+      [id, req.userId],
+    ))[0].length > 0
 
     if (!isParticipant) {
       return res.status(403).json({ message: 'Not a participant of this hangout' })
@@ -1686,6 +1683,9 @@ router.post('/api/hangouts/:id/review', auth, reviewLimiter, async (req, res) =>
       return res.status(409).json({ message: 'Hangout must be active or completed to review' })
     }
     if (hangout.user_id === req.userId) {
+      return res.status(400).json({ message: 'Organizer cannot review own hangout' })
+    }
+    if (Number(reviewee_id) === req.userId) {
       return res.status(400).json({ message: 'Cannot review yourself' })
     }
 
