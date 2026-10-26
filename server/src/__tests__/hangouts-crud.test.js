@@ -51,6 +51,7 @@ vi.mock('../logger.js', () => ({
 
 import pool from '../db.js'
 import logger from '../logger.js'
+import { getIO } from '../ws.js'
 import hangoutsRoutes from '../routes/hangouts.js'
 
 const JWT_SECRET = 'test-secret'
@@ -385,6 +386,24 @@ describe('POST /api/hangouts: успешное создание', () => {
     expect(insert[1][11]).toBeNull()
   })
 
+  it('поля из одних тегов сохраняются как NULL, без getIO фид не эмитится', async () => {
+    getIO.mockReturnValueOnce(null)
+    pool.query
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ cnt: 0 }], []])
+      .mockResolvedValueOnce([{ insertId: 79 }, []])
+    const res = await request(app).post('/api/hangouts').set(as()).send(validBody({
+      description: '<b></b>',
+      place_name: '<i></i>',
+      place_address: '<p></p>',
+      city: '<span></span>',
+    }))
+    expect(res.status).toBe(201)
+    const insert = pool.query.mock.calls.find((c) => String(c[0]).startsWith('INSERT INTO hangouts'))
+    expect(insert[1].slice(3, 7)).toEqual([null, null, null, null])
+    expect(toMock).not.toHaveBeenCalled()
+  })
+
   it('premium-пользователь не может указать больше 20 компаньонов, код лимита не отдаётся', async () => {
     pool.query.mockResolvedValueOnce([[{ id: 3 }], []])
     const res = await request(app).post('/api/hangouts').set(as()).send(validBody({ max_companions: 21 }))
@@ -410,6 +429,34 @@ describe('PUT /api/hangouts/:id: успешные обновления и гра
     const res = await request(app).put('/api/hangouts/5').set(as()).send({ capacity: 10 })
     expect(res.status).toBe(200)
     expect(updateCall()[1]).toEqual([10, '5'])
+  })
+
+  it('capacity обновляется, когда проданных билетов ноль', async () => {
+    activeHangout().mockResolvedValueOnce([[{ cnt: 0 }], []])
+    const res = await request(app).put('/api/hangouts/5').set(as()).send({ capacity: 10 })
+    expect(res.status).toBe(200)
+    expect(updateCall()[1]).toEqual([10, '5'])
+  })
+
+  it('capacity, равная проданным билетам, обновляется', async () => {
+    activeHangout().mockResolvedValueOnce([[{ cnt: 10 }], []])
+    const res = await request(app).put('/api/hangouts/5').set(as()).send({ capacity: 10 })
+    expect(res.status).toBe(200)
+    expect(updateCall()[1]).toEqual([10, '5'])
+  })
+
+  it('пустые координаты сохраняются как NULL', async () => {
+    activeHangout()
+    const res = await request(app).put('/api/hangouts/5').set(as()).send({ lat: '', lng: null })
+    expect(res.status).toBe(200)
+    expect(updateCall()[1]).toEqual([null, null, '5'])
+  })
+
+  it('текстовое поле со значением null очищается без очистки строки', async () => {
+    activeHangout()
+    const res = await request(app).put('/api/hangouts/5').set(as()).send({ place_name: null })
+    expect(res.status).toBe(200)
+    expect(updateCall()[1]).toEqual([null, '5'])
   })
 
   it('premium-пользователь не может поднять лимит выше 20, код лимита не отдаётся', async () => {
