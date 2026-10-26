@@ -32,13 +32,13 @@ Node.js/Express + MySQL (mysql2) бэкенд, Socket.IO real-time, Capacitor An
 Локальная тестовая копия с реальной БД (50 демо-юзеров). Порты: фронт 8081
 (vite proxy /api→3002), API+WS 3002, MySQL 3306, Redis 6379.
 
-## Статус проверок (26.10.2026, после Stage 199)
+## Статус проверок (26.10.2026, после Stage 200)
 
-- Тесты **5195/5195**: сервер 2714/2714 (163 файла), фронт 2481/2481 (150 файлов: 32 из них — тесты гейтов в `scripts/`), E2E 206 в 22 спеках — статический счёт `--list`; последний живой полный прогон 22.10.2026 (Stage 163) — 206 passed, на HEAD **не перепрогонялся** (TEST-11). Гейты: все 27 локальных зелёные (Stage 196–199 закрыли `typecheck`, `secrets-leak`, `server/ audit:prod`, `hookTimeout`, периметр compose); 33 джобы `ci.yml` + 7 `deploy.yml`.
+- Тесты **5195/5195**: сервер 2714/2714 (163 файла), фронт 2481/2481 (150 файлов: 32 из них — тесты гейтов в `scripts/`), E2E 206 в 22 спеках — живой полный прогон на HEAD 26.10.2026 (Stage 200) за 4.7 мин, exit 0, без flaky, очистка `globalTeardown`. Гейты: все 27 локальных зелёные (Stage 196–200 закрыли `typecheck`, `secrets-leak`, `server/ audit:prod`, `hookTimeout`, периметр compose, живой E2E); 33 джобы `ci.yml` + 7 `deploy.yml`.
 - `vite build` — OK (2.08 с после Stage 196; бандл 391.8 KB initial JS из 500, 18.9 KB initial CSS из 40). **`tsc --noEmit` — 0 ошибок** (CI-02 закрыт Stage 196), eslint — 0 errors, **177 warnings** (151 из них `no-explicit-any`). Swagger — OK.
 - E2E: Playwright, storageState из global-setup (.auth/*.json), аудит console-errors на каждой странице, screenshot/video/trace на падение; независимая очистка БД `scripts/e2e-cleanup.mjs` шагом с `if: always()`.
 - Pre-flight: `npm run check:ports`, `node scripts/schema-drift-audit.mjs --offline`, `npm run check:docs`, `npm run check:enum-constraints`, `npm run check:prod-mock`, `npm run check:headers`, `node scripts/test-counter-audit.mjs`.
-- Красное на HEAD (код, не среда): TEST-11 живой E2E — раздел P0 в `Что доделать.txt`. CI-02 (`typecheck`) и CI-04 (`secrets-leak`) закрыты Stage 196, CI-03 (`server/ audit:prod`, было 2 high) — Stage 197, TEST-10 (`hookTimeout`) — Stage 198, PROD-02 (порты и пароли `docker-compose.yml`) — Stage 199 (26.10.2026).
+- Красное на HEAD (код, не среда): **нет** — Stage 200 закрыл последний пункт (TEST-11): 5 падений `pages-smoke` были устаревшими ожиданиями заголовков, не дефектом продукта. CI-02 (`typecheck`) и CI-04 (`secrets-leak`) закрыты Stage 196, CI-03 (`server/ audit:prod`, было 2 high) — Stage 197, TEST-10 (`hookTimeout`) — Stage 198, PROD-02 (порты и пароли `docker-compose.yml`) — Stage 199 (26.10.2026).
 
 ## Последние хотфиксы (26.08.2026)
 
@@ -158,7 +158,8 @@ i18n RU/EN, push VAPID + FCM hook, deep links hook, рефералка.
    `REVENUECAT_WEBHOOK_SECRET`). Без ключей всё деградирует мягко (mock/fallback),
    кроме Stripe- и RevenueCat-вебхуков (осознанные 502/503 в проде).
 2. **Релиз Android:** домен вместо LAN-IP, keystore-подпись, App Links (`assetlinks.json`), AAB + Google Play.
-3. **Кодовый бэклог (открыт):** красное на HEAD — TEST-11 (живой E2E на HEAD); CI-02 (`typecheck`)
+3. **Кодовый бэклог (открыт):** красное на HEAD снято полностью — TEST-11 закрыт Stage 200 (живой
+   E2E 206/206 на HEAD); CI-02 (`typecheck`)
    и CI-04 (`secrets-leak`) закрыты Stage 196, CI-03 (`server/ audit:prod`) — Stage 197,
    TEST-10 (`hookTimeout`) — Stage 198, PROD-02 (порты и пароли `docker-compose.yml`) — Stage 199.
    Затем LEGAL-01

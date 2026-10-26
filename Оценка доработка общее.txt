@@ -135,7 +135,7 @@ TEST-08 и TEST-09 — снова опровергнуты кодом (повт�
 2. **Stage 160 — FCM-регресс (§2.5):** при провале firebase-admin откатываться на legacy HTTP-ветку (`server/src/fcm.js:74-77` → `:80-104`) либо не создавать приложение без валидных креденшелов; критерий — зелёный `REQUIRE_INTEGRATION=1 node server/scripts/push-sms-contract-smoke.mjs` (сейчас 8 красных проверок). Фикс кодовый, ключей не требует → снимает кодовую причину красной джобы `integration-smoke`.
 3. **Stage 161 — PROD-01:** retry на `ER_LOCK_DEADLOCK` в точке записи (`server/src/routes/social.js:282`) + детерминированный `server/src/__tests__/race.mysql.test.js` (падение `:167`). Транзакции (`conn.beginTransaction()`) не затрагиваются. Снимает вторую кодовую причину красной джобы `test-server` и убирает флак, из-за которого гейт счётчиков остаётся лотереей.
 4. **Stage 162 — COV-03 (остаток):** `server/src/queue.js` — ветка `createQueue` без `REDIS_URL` (`:19-21`) и `redisReachable()` (`:100-119`); пороги только вверх («факт − 2 п.п.»).
-5. **Внешнее (владелец):** ключи (ENV-01..04) → staging → живой E2E на HEAD → Android/сторы; ротация VAPID; диск `E:`; подтверждение зелёного `ci.yml`/`deploy.yml` на `main` после проброса секретов.
+5. **Внешнее (владелец):** ключи (ENV-01..04) → staging → живой E2E на staging → Android/сторы; ротация VAPID; диск `E:`; подтверждение зелёного `ci.yml`/`deploy.yml` на `main` после проброса секретов. Живой E2E на HEAD уже пройден (Stage 200), поэтому остаётся именно staging с реальными ключами.
 
 ---
 
@@ -196,7 +196,7 @@ TEST-08 и TEST-09 — снова опровергнуты кодом (повт�
 | CI-03 | `server/ npm run audit:prod` | exit 1, **2 high**: `body-parser@1.20.8` (< 1.20.9) и `multer@2.4.0`, у обоих `fixAvailable: true`; в корне — exit 0 — **закрыто Stage 197** (`npm audit fix` без `--force`) | джоба `dependency-audit`, шаги `deploy.yml:54-56` |
 | CI-04 | `secrets-leak-audit` | exit 1 на тестовой константе `server/src/__tests__/routes-mounted.test.js:93` — `JWT_SECRET` задан значением без разрешённого префикса; `scripts/secrets-leak-audit.mjs:334` пропускает значения с префиксом `ci-`/`test-`/`demo-`/`dev-`/`local-` — **закрыто Stage 196** | джоба `secrets-leak`, шаг `deploy.yml:41` |
 | TEST-10 | полный серверный прогон | 2713/2714: `Hook timed out in 10000ms`, `server/src/__tests__/secrets-leak-audit.test.js:79`; `hookTimeout` не задан (`server/vitest.config.js:7` — только `testTimeout`) — **закрыто Stage 198** (`hookTimeout: 30000`, три полных прогона 2714/2714) | не стабильный красный, а флак под нагрузкой |
-| TEST-11 | живой E2E на HEAD | последний полный прогон — 22.10.2026 (Stage 163, 206/206); с тех пор Stages 164–199 (профиль, встречи, чаты, чат-комната, диалоги, правовые страницы, геолокация, рантайм-зависимости сервера) | `npm run test:e2e` + `scripts/e2e-cleanup.mjs` |
+| TEST-11 | живой E2E на HEAD | последний полный прогон до Stage 200 — 22.10.2026 (Stage 163, 206/206); прогон на HEAD дал 5 падений `e2e/pages-smoke.spec.ts` — спека ждала заглушку `SwiftMatch`, а `PAGE_TITLES` (`src/App.tsx:149-156`) содержат осмысленные заголовки; продукт не менялся, обновлены 5 ожиданий — **закрыто Stage 200**: 206/206 за 4.7 мин, exit 0, без flaky, очистка `globalTeardown` | нерегрессионный (устаревший тест) |
 | PROD-02 | `docker-compose.yml` | БД/Redis/API опубликованы на `0.0.0.0`, `MYSQL_ROOT_PASSWORD: root`, приложение ходит в БД `root/root`, Grafana `admin/swiftmatch`, Redis без пароля, `networks:` нет — **закрыто Stage 199**: инфраструктурные порты на `127.0.0.1`, пароли `${VAR:?}` (fail-closed), Redis `--requirepass`, БД-пользователь `swiftmatch` | прод-периметр |
 
 ### 7.4. Внешние блокеры (без изменений с 22.10.2026)
@@ -205,10 +205,10 @@ TEST-08 и TEST-09 — снова опровергнуты кодом (повт�
 
 ### 7.5. Что дописано в «Что доделать» этим раундом (26.10.2026)
 
-1. **Раздел `## 🔴 P0 — красное на HEAD`** — CI-02, CI-03, CI-04, TEST-10, TEST-11, PROD-02; у каждого `file:line`, факт и DoD. Пять из шести закрыты Stages 196–199, в P0 остался TEST-11.
+1. **Раздел `## 🔴 P0 — красное на HEAD`** — CI-02, CI-03, CI-04, TEST-10, TEST-11, PROD-02; у каждого `file:line`, факт и DoD. Все шесть закрыты Stages 196–200, раздел P0 из бэклога удалён целиком.
 2. **P3 «Гигиена HEAD»** — QA-01 (177 warning, из них 151 `@typescript-eslint/no-explicit-any` при уровне `warn` в `eslint.config.js:58`), LEGAL-02 (нет `LICENSE` и поля `license` в `package.json`), UI-02 (Recharts `width(-1)`/`height(-1)` на `src/pages/admin.tsx:164`, `:215`, `admin-analytics.tsx:162`, `admin-monetization.tsx:158`; в списке игнорируемого смоука их нет — `scripts/check-console.mjs:46-49`).
-3. **Очередь этапов** — пунктом 1 поставлено «Красное на HEAD», прежние сдвинуты: живое доказательство → 2, покрытие ядра → 3, юридические тексты → 4, шаринг брони → 5.
-4. **Шапка бэклога** — живой E2E помечен как 22.10.2026 (Stage 163) с оговоркой «на HEAD не перепрогонялся» вместо протухшего Stage 64.
+3. **Очередь этапов** — пункт «Красное на HEAD» закрыт Stages 196–200 и из очереди убран: теперь 1 — живое доказательство (ключи/staging/CI-01), 2 — покрытие ядра, 3 — юридические тексты, 4 — шаринг брони.
+4. **Шапка бэклога** — живой E2E помечен как пройденный на HEAD: Stage 200, 206/206 за 4.7 мин, exit 0 (вместо «22.10.2026, на HEAD не перепрогонялся»).
 5. **DOC-10 снят при перечитывании** — `docs/AGENTS-production.md:21`, `:120` и `AGENTS.md:34` описывают требование чек-листа, а не состояние HEAD; невыполненное требование — это CI-03. Пункт перенесён в «❌ Не брать» с причиной.
 6. **`test/Для анализа.txt`** — статус-блок переписан с «19.10.2026, всё зелёное» на факт HEAD (`tsc` 7 ошибок, 177 warnings, 26 из 27 гейтов, живой E2E 22.10.2026); «Честный список» обновлён: сняты протухшие COV-01, TEST-02 и M1, добавлено красное HEAD.
 
@@ -219,6 +219,6 @@ TEST-08 и TEST-09 — снова опровергнуты кодом (повт�
 1. ~~**CI-02 + CI-04**~~ — **закрыто Stage 196 (26.10.2026):** `page?.has_more`, внутренний `t` переименован в `token`, фикстура `hangouts-my.test.tsx` на `unknown`, тестовая константа `JWT_SECRET` получила префикс `test-`; `typecheck` и `secrets-leak` — exit 0.
 2. ~~**CI-03**~~ — **закрыто Stage 197 (26.10.2026):** `npm audit fix` в `server/` без `--force` поднял `body-parser` 1.20.8 → 1.20.9, `multer` 2.4.0 → 2.5.0, `nodemailer` 10.0.13 → 10.2.1, `fast-uri` и `ip-address` по patch; `server/ audit:prod` — exit 0 (остались 2 moderate ниже порога `high`), в корне — 0 уязвимостей.
 3. ~~**TEST-10**~~ — **закрыто Stage 198 (26.10.2026):** `hookTimeout: 30000` в `server/vitest.config.js:8`; три полных прогона подряд — 2714/2714 каждый.
-4. **TEST-11** — полный E2E на HEAD с очисткой (`scripts/e2e-cleanup.mjs`).
+4. ~~**TEST-11**~~ — **закрыто Stage 200 (26.10.2026):** полный E2E на HEAD — 206/206 за 4.7 мин, exit 0, без flaky, очистка `scripts/e2e-cleanup.mjs`. Пять падений были не дефектом продукта: `e2e/pages-smoke.spec.ts` ждал заглушку `SwiftMatch` у `/safety`, `/user`, `/verify-email`, `/admin/experiments`, `/admin/photos`, а заголовки в `src/App.tsx:149-156` осмысленные — обновлены ожидания спеки. Попутно зафиксировано ограничение: `race.mysql.test.js` на общей `swiftmatch_race_test` конфликтует при двух одновременных серверных прогонах (известное с Stage 136), одиночный зелёный.
 5. ~~**PROD-02**~~ — **закрыто Stage 199 (26.10.2026):** `prometheus`/`grafana`/`db`/`redis`/`app` публикуются на `127.0.0.1` (наружу — только nginx `8080`), `MYSQL_ROOT_PASSWORD`/`MYSQL_USER`/`MYSQL_PASSWORD`/`REDIS_PASSWORD`/`GRAFANA_ADMIN_PASSWORD`/`JWT_SECRET` берутся через `${VAR:?}` (без значения compose не стартует), Redis с `--requirepass`, приложение ходит в БД пользователем `swiftmatch`; `docker compose config` — exit 0 с заполненным `.env` и exit 1 без паролей.
 6. **Только после этого** — внешний блок: ключи → staging → домен/TLS → Android/сторы.
