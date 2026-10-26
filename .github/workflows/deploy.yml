@@ -14,7 +14,7 @@ jobs:
     name: Lint & TypeScript Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -167,7 +167,7 @@ jobs:
     name: Frontend Tests (Vitest)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -204,7 +204,7 @@ jobs:
         ports:
           - 6379:6379
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -324,7 +324,7 @@ jobs:
       DB_PASSWORD: swiftmatch_test
       DB_NAME: swiftmatch_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -370,7 +370,7 @@ jobs:
       JWT_SECRET: ci-e2e-jwt-secret
       REVENUECAT_WEBHOOK_SECRET: ci-e2e-revenuecat-webhook
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -446,7 +446,7 @@ jobs:
       # и действует на все шаги сканирования в этой джобе.
       TRIVY_TIMEOUT: 15m0s
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Сервис `app` объявляет `env_file: - .env` (docker-compose.yml:83-84), а
       # `.env` в git нет — на свежем checkout `docker compose config` падает
       # (`env file …/.env not found`) ещё до сборки образов. Bootstrap как в
@@ -580,7 +580,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Push raw files to VPS via rsync
         uses: burnett01/rsync-deployments@7.0.1
         with:
