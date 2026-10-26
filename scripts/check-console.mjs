@@ -35,7 +35,7 @@ const PAGES = [
   '/partner-order/success', '/partner-order/cancel',
   '/admin', '/admin/users', '/admin/content', '/admin/features',
   '/admin/analytics', '/admin/hangouts', '/admin/partners',
-  '/admin/reports', '/admin/teams',
+  '/admin/reports', '/admin/teams', '/admin/monetization',
 ]
 
 const BASE = process.env.BASE_URL || 'http://localhost:8081'
