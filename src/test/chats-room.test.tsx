@@ -830,7 +830,7 @@ describe("Комната чата: шапка и мелочи", () => {
     await openChat();
 
     const img = document.querySelector("img")!;
-    expect(img.getAttribute("src")).toBe("/default-avatar.png");
+    expect(img.getAttribute("src")).toBe("/default-avatar.svg");
     expect(img.getAttribute("alt")).toBe(tr("chats.unknown_user"));
   });
 

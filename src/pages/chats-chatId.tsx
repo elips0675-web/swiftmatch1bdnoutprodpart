@@ -362,7 +362,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     <div className="flex flex-col bg-[#f8f9fb]" style={{ height: viewportHeight }}>
       <header className="flex items-center gap-2 px-3 py-2 border-b border-border sticky top-0 bg-white/90 backdrop-blur-lg z-50 h-16">
         <Button variant="ghost" size="icon" onClick={() => router.push('/chats')} aria-label={t('button.back')} className="rounded-full"><ChevronLeft size={24} /></Button>
-        <Image src={chatPartner.avatar || '/default-avatar.png'} alt={chatPartner.name || t('chats.unknown_user')} width={40} height={40} className="rounded-full bg-muted" />
+        <Image src={chatPartner.avatar || '/default-avatar.svg'} alt={chatPartner.name || t('chats.unknown_user')} width={40} height={40} className="rounded-full bg-muted" />
         <div className="flex-1">
             <h3 className="font-bold text-sm truncate">{chatPartner.name}</h3>
         </div>
