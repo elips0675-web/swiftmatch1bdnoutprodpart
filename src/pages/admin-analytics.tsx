@@ -159,7 +159,7 @@ export default function AdminAnalyticsPage() {
         <Card className="border-0 shadow-sm lg:col-span-2">
           <CardHeader><CardTitle className="text-lg font-black">{t('admin.analytics.retention_rate')}</CardTitle><CardDescription>{t('admin.analytics.retention_desc')}</CardDescription></CardHeader>
           <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={300}>
               <AreaChart data={retention} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs><linearGradient id="cR" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#fe3c72" stopOpacity={0.3}/><stop offset="95%" stopColor="#fe3c72" stopOpacity={0}/></linearGradient></defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -186,7 +186,7 @@ export default function AdminAnalyticsPage() {
         <Card className="border-0 shadow-sm">
           <CardHeader><CardTitle className="text-lg font-black">{t('admin.analytics.new_users')}</CardTitle></CardHeader>
           <CardContent className="h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={250}>
               <AreaChart data={registrations} margin={{top:10,right:10,left:-20,bottom:0}}>
                 <defs><linearGradient id="cU" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient></defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>

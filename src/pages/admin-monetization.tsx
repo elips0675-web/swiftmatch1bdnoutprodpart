@@ -155,7 +155,7 @@ export default function MonetizationPage() {
           <CardTitle className="text-lg font-black">{t('admin.monetization.monthly_revenue')}</CardTitle>
         </CardHeader>
         <CardContent className="h-[350px]">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height={350}>
             <BarChart data={revenueData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
               <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} />
