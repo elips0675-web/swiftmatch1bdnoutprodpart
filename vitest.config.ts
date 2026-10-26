@@ -14,6 +14,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text-summary"],
+      reportsDirectory: "node_modules/.cache/coverage",
       include: ["src/**/*.{ts,tsx}"],
       exclude: ["src/**/*.test.{ts,tsx}", "src/test/**", "src/**/*.d.ts"],
       thresholds: {

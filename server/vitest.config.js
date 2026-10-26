@@ -9,6 +9,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text-summary'],
+      reportsDirectory: 'node_modules/.cache/coverage',
       include: ['src/**/*.js'],
       exclude: ['src/**/*.test.js'],
       thresholds: {
