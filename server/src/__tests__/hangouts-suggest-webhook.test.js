@@ -186,6 +186,86 @@ describe('POST /api/hangouts/suggest', () => {
     expect(res.status).toBe(500)
     expect(logger.error).toHaveBeenCalledWith('Hangout suggest error:', expect.any(Error))
   })
+
+  it('поля профиля отсутствуют и user_id нечисловой — в промте unknown, партнёр не читается', async () => {
+    wireSuggest({ me: { display_name: 'Аня', age: 27, city: null, bio: null, dating_goal: null } })
+    openaiCreate.mockResolvedValueOnce({ choices: [{ message: { content: '[{"title":"Кино"}]' } }] })
+    const res = await request(app).post('/api/hangouts/suggest').set(as()).send({ user_id: '12abc' })
+    expect(res.status).toBe(200)
+    expect(res.body.source).toBe('openai')
+    const content = openaiCreate.mock.calls[0][0].messages[1].content
+    expect(content).toContain('User A: Аня, 27 y.o., unknown, bio: "", goal: unknown.')
+    expect(content).toContain('User B: unknown.')
+    expect(pool.query.mock.calls.filter((c) => String(c[0]).includes('FROM user_profiles'))).toHaveLength(1)
+  })
+
+  it('нет своего профиля, партнёр без города/био/цели — обе строки промта с fallback', async () => {
+    wireSuggest({ me: null, partner: { display_name: 'Игорь', age: 30, city: null, bio: null, dating_goal: null } })
+    openaiCreate.mockResolvedValueOnce({ choices: [{ message: { content: '[{"title":"Театр"}]' } }] })
+    const res = await request(app).post('/api/hangouts/suggest').set(as()).send({ user_id: 3 })
+    expect(res.status).toBe(200)
+    const content = openaiCreate.mock.calls[0][0].messages[1].content
+    expect(content).toContain('User A: unknown.')
+    expect(content).toContain('User B: Игорь, 30 y.o., unknown, bio: "", goal: unknown.')
+  })
+
+  it('OpenAI вернул пустой content — статические подсказки как fallback', async () => {
+    wireSuggest()
+    openaiCreate.mockResolvedValueOnce({ choices: [] })
+    const res = await request(app).post('/api/hangouts/suggest').set(as()).send({})
+    expect(res.status).toBe(200)
+    expect(res.body.source).toBe('static')
+    expect(res.body.suggestions).toHaveLength(3)
+    expect(logger.warn).not.toHaveBeenCalled()
+  })
+
+  it('афиша без места и категории: «рядом», category other, пустое place', async () => {
+    wireSuggest({ rows: [{ title: 'Прогулка', category: null, place_name: null, city: null }] })
+    openaiCreate.mockResolvedValueOnce({ choices: [{ message: { content: '[]' } }] })
+    const sortSpy = vi.spyOn(Array.prototype, 'sort').mockImplementation(function () {
+      return this.reverse()
+    })
+    try {
+      const res = await request(app).post('/api/hangouts/suggest').set(as()).send({})
+      expect(res.status).toBe(200)
+      expect(res.body.source).toBe('db')
+      const fromFeed = res.body.suggestions.find((s) => s.title === 'Прогулка (рядом)')
+      expect(fromFeed).toEqual({
+        title: 'Прогулка (рядом)',
+        category: 'other',
+        place: '',
+        description: 'Встреча рядом из афиши.',
+      })
+    } finally {
+      sortSpy.mockRestore()
+    }
+  })
+
+  it('афиша с заголовком статической подсказки не дублируется', async () => {
+    wireSuggest({ rows: [{ title: 'Концерт живой музыки', category: 'concert', place_name: 'Клуб', city: 'Сочи' }] })
+    openaiCreate.mockResolvedValueOnce({ choices: [{ message: { content: '[]' } }] })
+    const sortSpy = vi.spyOn(Array.prototype, 'sort').mockImplementation(function () {
+      return this.reverse()
+    })
+    try {
+      const res = await request(app).post('/api/hangouts/suggest').set(as()).send({})
+      expect(res.status).toBe(200)
+      expect(res.body.source).toBe('db')
+      expect(res.body.suggestions).toHaveLength(3)
+      expect(res.body.suggestions.filter((s) => s.title === 'Концерт живой музыки')).toHaveLength(1)
+      expect(res.body.suggestions.some((s) => s.title.startsWith('Концерт живой музыки ('))).toBe(false)
+    } finally {
+      sortSpy.mockRestore()
+    }
+  })
+
+  it('без тела запроса — читает профиль и отдаёт подсказки', async () => {
+    wireSuggest()
+    openaiCreate.mockResolvedValueOnce({ choices: [{ message: { content: '[]' } }] })
+    const res = await request(app).post('/api/hangouts/suggest').set(as())
+    expect(res.status).toBe(200)
+    expect(res.body.source).toBe('static')
+  })
 })
 
 describe('POST /api/hangouts/order/webhook', () => {
@@ -326,6 +406,24 @@ describe('POST /api/hangouts/order/webhook', () => {
     const ticketUpdate = conn.query.mock.calls.find((c) => String(c[0]).includes("UPDATE hangout_tickets SET status = 'paid'"))
     expect(ticketUpdate[1]).toEqual([undefined, undefined, 'cs_1'])
     expect(conn.commit).toHaveBeenCalled()
+  })
+
+  it('событие без id: пустой eventId в журнале и отметке processed', async () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_x'
+    process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test'
+    constructEventMock.mockReturnValueOnce({
+      type: 'checkout.session.completed',
+      data: { object: { id: 'cs_9', payment_status: 'paid', metadata: { hangout_id: '5', user_id: '3' } } },
+    })
+    const res = await request(app)
+      .post('/api/hangouts/order/webhook')
+      .set('stripe-signature', 'sig')
+      .send({})
+    expect(res.status).toBe(200)
+    expect(logDelivery).toHaveBeenCalledWith(expect.objectContaining({ eventId: '' }))
+    expect(markProcessed).toHaveBeenCalledWith('hangout_ticket', '')
+    const ignoreInsert = conn.query.mock.calls.find((c) => String(c[0]).includes('INSERT IGNORE INTO webhook_events'))
+    expect(ignoreInsert[1]).toEqual(['hangout_ticket', ''])
   })
 })
 
