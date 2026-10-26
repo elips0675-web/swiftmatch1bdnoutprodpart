@@ -552,6 +552,30 @@ describe("машинный инвентарь (test-inventory.json / *-tests.txt
     );
   });
 
+  it("txt-инвентарь краснеет на устаревшем числе зелёных", () => {
+    const spec = {
+      id: "front",
+      file: "test/machine/frontend-tests.txt",
+      title: "Фронт (Vitest)",
+      runner: "vitest --reporter=json",
+    };
+    const text = renderPerFileTxt(spec, counts.front);
+    expect(checkPerFileTxt(spec.file, spec, text, counts.front)).toEqual([]);
+
+    const stale = text.replace("(зелёных 3)", "(зелёных 2)");
+    expect(checkPerFileTxt(spec.file, spec, stale, counts.front).map((p) => p.message)).toContain(
+      "зелёных: в прогоне 3, в файле 2"
+    );
+
+    const flakyRun = { ...counts.front, passed: 2, failed: 1 };
+    expect(checkPerFileTxt(spec.file, spec, stale, flakyRun)).toEqual([]);
+
+    const noGreen = text.replace(" (зелёных 3)", "");
+    expect(checkPerFileTxt(spec.file, spec, noGreen, counts.front).map((p) => p.message)).toContain(
+      "нет отметки «зелёных N» — провалы прогона в файле не видны"
+    );
+  });
+
   it("writeInventoryArtifacts обновляет generated на новой дате при неизменных числах", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "counter-audit-"));
     try {

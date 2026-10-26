@@ -932,6 +932,14 @@ export function checkPerFileTxt(relPath, spec, text, countData) {
   if (Number(head[2]) !== countData.files) {
     problems.push({ file: relPath, claim: 'inventory-txt', line: 0, message: `файлов: в прогоне ${countData.files}, в файле ${head[2]}` })
   }
+  if (countData.passed !== undefined) {
+    const green = /\(зелёных (\d+)\)/.exec(text)
+    if (!green) {
+      problems.push({ file: relPath, claim: 'inventory-txt', line: 0, message: 'нет отметки «зелёных N» — провалы прогона в файле не видны' })
+    } else if (Number(green[1]) !== countData.passed) {
+      problems.push({ file: relPath, claim: 'inventory-txt', line: 0, message: `зелёных: в прогоне ${countData.passed}, в файле ${green[1]}` })
+    }
+  }
   const parsed = new Map()
   for (const m of text.matchAll(/^(\S+) \| (\d+)$/gm)) parsed.set(m[1], Number(m[2]))
   const expected = new Map(perFileList(countData.perFile).map((r) => [r.file, r.tests]))
@@ -1195,6 +1203,10 @@ function main() {
     }
     console.log(`\nИтог: документация разошлась с прогоном (${problems.length} расхождений). Починить: node scripts/test-counter-audit.mjs --fix`)
     process.exit(1)
+  }
+  if (options.skipPerFile || options.skipE2E) {
+    console.log('\nИтог: проверена только шапка счётчиков — пофайловый слой и машинный инвентарь не сверялись (--skip-e2e/--no-per-file). Финальный прогон без флагов обязателен.')
+    return
   }
   console.log('\nИтог: счётчики в документации совпадают с прогоном.')
 }

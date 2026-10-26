@@ -27,6 +27,7 @@ const RESPONSE_STATUS_KEYS: Record<string, string> = {
   pending: "hangout.response.pending",
   accepted: "hangout.response.accepted",
   declined: "hangout.response.declined",
+  cancelled: "hangout.response.cancelled",
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -151,6 +152,7 @@ export default function HangoutsMyPage() {
       const rData = rRes.ok ? await rRes.json() : [];
       setListings(Array.isArray(lData) ? lData : []);
       setResponses(Array.isArray(rData) ? rData : []);
+      if (!lRes.ok || !rRes.ok) toast.error(t("hangout.error.load"));
     } catch {
       toast.error(t("hangout.error.load"));
     } finally {
@@ -188,7 +190,7 @@ export default function HangoutsMyPage() {
       setCancelTarget(null);
       load();
     } catch {
-      toast.error(t("hangout.error.load"));
+      toast.error(t("hangout.error.cancel"));
     } finally {
       setCancelling(false);
     }
@@ -211,14 +213,14 @@ export default function HangoutsMyPage() {
         } else if (res.status === 409 && data?.code === "BOOST_LIMIT") {
           toast.error(t("hangout.boost.limit"));
         } else {
-          toast.error(data?.message || t("hangout.error.load"));
+          toast.error(t("hangout.error.boost"));
         }
         return;
       }
       toast.success(isBoosted ? t("hangout.boost.toast.unboosted") : t("hangout.boost.toast.boosted"));
       load();
     } catch {
-      toast.error(t("hangout.error.load"));
+      toast.error(t("hangout.error.boost"));
     } finally {
       setBoosingId(null);
     }
@@ -291,7 +293,7 @@ export default function HangoutsMyPage() {
                                 : "bg-yellow-100 text-yellow-800 border-transparent"
                           }
                         >
-                          {t(RESPONSE_STATUS_KEYS[r.response_status] || "")}
+                          {t(RESPONSE_STATUS_KEYS[r.response_status] || "hangout.response.pending")}
                         </Badge>
                         <Badge variant="outline" className="text-[10px]">{t(`hangout.category.${r.category}`)}</Badge>
                         {r.hangout_status !== "active" && (
