@@ -10,11 +10,16 @@ import jwt from 'jsonwebtoken'
 
 vi.mock('../db.js', () => ({ default: { query: vi.fn(), getConnection: vi.fn() } }))
 
-const { emitMock, toMock } = vi.hoisted(() => {
+const { emitMock, toMock, ioState } = vi.hoisted(() => {
+  const state = { down: false, throwOnTo: false }
   const emit = vi.fn()
-  return { emitMock: emit, toMock: vi.fn(() => ({ emit })) }
+  const to = vi.fn(() => {
+    if (state.throwOnTo) throw new Error('io down')
+    return { emit }
+  })
+  return { emitMock: emit, toMock: to, ioState: state }
 })
-vi.mock('../ws.js', () => ({ getIO: vi.fn(() => ({ to: toMock })) }))
+vi.mock('../ws.js', () => ({ getIO: vi.fn(() => (ioState.down ? null : { to: toMock })) }))
 
 const { bannedState } = vi.hoisted(() => ({ bannedState: { banned: false } }))
 vi.mock('../banned-words.js', () => ({
@@ -89,6 +94,8 @@ beforeEach(() => {
   bannedState.banned = false
   prefsState.inApp = true
   prefsState.push = true
+  ioState.down = false
+  ioState.throwOnTo = false
   pushMock.mockResolvedValue(undefined)
 })
 
@@ -259,6 +266,56 @@ describe('POST /api/hangouts/:id/respond', () => {
     const res = await request(app).post('/api/hangouts/5/respond').set(as(1)).send({})
     expect(res.status).toBe(500)
     expect(logger.error).toHaveBeenCalledWith('Hangout respond error:', expect.any(Error))
+  })
+
+  it('падение realtime-эмита не отменяет сохранённый отклик: 201 и warn', async () => {
+    pool.query.mockImplementation(async (sql) => {
+      const s = String(sql)
+      if (s.includes('FROM hangouts WHERE id = ?')) return [[hangoutRow()], []]
+      if (s.startsWith('INSERT INTO hangout_responses')) return [{ insertId: 11 }, []]
+      if (s.includes('SELECT c.id FROM chats c')) return [[{ id: 42 }], []]
+      if (s.includes('SELECT display_name FROM user_profiles')) return [[{ display_name: 'Маша' }], []]
+      if (s.startsWith('INSERT INTO notifications')) return [{ insertId: 5 }, []]
+      return [[], []]
+    })
+    ioState.throwOnTo = true
+    const res = await request(app).post('/api/hangouts/5/respond').set(as(1)).send({})
+    expect(res.status).toBe(201)
+    expect(res.body).toEqual({ id: 11, message: 'Response sent', chat_id: 42 })
+    expect(logger.warn).toHaveBeenCalledWith('Hangout respond realtime emit failed (non-fatal):', expect.any(Error))
+    expect(logger.error).not.toHaveBeenCalled()
+  })
+
+  it('профиль откликнувшегося не найден — push с «Someone»', async () => {
+    pool.query.mockImplementation(async (sql) => {
+      const s = String(sql)
+      if (s.includes('FROM hangouts WHERE id = ?')) return [[hangoutRow()], []]
+      if (s.startsWith('INSERT INTO hangout_responses')) return [{ insertId: 11 }, []]
+      if (s.includes('SELECT c.id FROM chats c')) return [[{ id: 42 }], []]
+      if (s.includes('SELECT display_name FROM user_profiles')) return [[], []]
+      return [[], []]
+    })
+    prefsState.inApp = false
+    const res = await request(app).post('/api/hangouts/5/respond').set(as(1)).send({})
+    expect(res.status).toBe(201)
+    expect(pushMock).toHaveBeenCalledWith(2, 'SwiftMatch', 'Someone wants to join: Кофе')
+  })
+
+  it('сокеты не подняты — отклик сохраняется, эмитов нет', async () => {
+    pool.query.mockImplementation(async (sql) => {
+      const s = String(sql)
+      if (s.includes('FROM hangouts WHERE id = ?')) return [[hangoutRow()], []]
+      if (s.startsWith('INSERT INTO hangout_responses')) return [{ insertId: 11 }, []]
+      if (s.includes('SELECT c.id FROM chats c')) return [[{ id: 42 }], []]
+      if (s.includes('SELECT display_name FROM user_profiles')) return [[{ display_name: 'Маша' }], []]
+      if (s.startsWith('INSERT INTO notifications')) return [{ insertId: 5 }, []]
+      return [[], []]
+    })
+    ioState.down = true
+    const res = await request(app).post('/api/hangouts/5/respond').set(as(1)).send({})
+    expect(res.status).toBe(201)
+    expect(toMock).not.toHaveBeenCalled()
+    expect(pool.query.mock.calls.some((c) => String(c[0]).startsWith('INSERT INTO notifications'))).toBe(true)
   })
 })
 
@@ -468,5 +525,47 @@ describe('PUT /api/hangouts/:id/responses/:responseId', () => {
     expect(res.status).toBe(500)
     expect(conn.release).toHaveBeenCalled()
     expect(logger.error).toHaveBeenCalledWith('Hangout response decision error:', expect.any(Error))
+  })
+
+  it('повторное принятие без строки hangout_chats отдаёт chat_id null', async () => {
+    wire({ response: responseRow({ status: 'accepted' }) })
+    conn.query.mockImplementation(async () => [[], []])
+    const res = await request(app).put(route()).set(as(1)).send({ status: 'accepted' })
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ message: 'Already accepted', chat_id: null })
+    expect(conn.release).toHaveBeenCalled()
+  })
+
+  it('принятие при выключенном in-app: без уведомления и эмита, push остаётся', async () => {
+    wire()
+    prefsState.inApp = false
+    ioState.down = true
+    const res = await request(app).put(route()).set(as(1)).send({ status: 'accepted' })
+    expect(res.status).toBe(200)
+    expect(pool.query.mock.calls.some((c) => String(c[0]).startsWith('INSERT INTO notifications'))).toBe(false)
+    expect(toMock).not.toHaveBeenCalled()
+    expect(pushMock).toHaveBeenCalledWith(3, 'SwiftMatch', 'Автор accepted your response!')
+  })
+
+  it('принятие при выключенном push: уведомление есть, push нет', async () => {
+    wire()
+    prefsState.push = false
+    const res = await request(app).put(route()).set(as(1)).send({ status: 'accepted' })
+    expect(res.status).toBe(200)
+    expect(pushMock).not.toHaveBeenCalled()
+    expect(pool.query.mock.calls.some((c) => String(c[0]).startsWith('INSERT INTO notifications'))).toBe(true)
+  })
+
+  it('автор без профиля — push с «The author»', async () => {
+    wire()
+    pool.query.mockImplementation(async (sql) => {
+      const s = String(sql)
+      if (s.includes('SELECT display_name FROM user_profiles')) return [[], []]
+      if (s.startsWith('INSERT INTO notifications')) return [{ insertId: 7 }, []]
+      return [[], []]
+    })
+    const res = await request(app).put(route()).set(as(1)).send({ status: 'accepted' })
+    expect(res.status).toBe(200)
+    expect(pushMock).toHaveBeenCalledWith(3, 'SwiftMatch', 'The author accepted your response!')
   })
 })

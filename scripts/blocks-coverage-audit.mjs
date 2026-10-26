@@ -58,19 +58,19 @@ export const JUSTIFIED = [
   },
   {
     file: 'routes/hangouts.js',
-    lines: [1014, 1231, 1533],
+    lines: [1014, 1235, 1537],
     expect: '[req.userId]',
     reason: 'своё имя автора действия для уведомления/push получателю (req.userId)',
   },
   {
     file: 'routes/hangouts.js',
-    lines: [1380],
+    lines: [1384],
     expect: "activeUser('up')",
     reason: 'имя получателя push о взаимном лайке: получатель сам и есть этот профиль',
   },
   {
     file: 'routes/hangouts.js',
-    lines: [1941],
+    lines: [1945],
     expect: 'dating_goal',
     reason: 'собственный профиль (req.userId) для персональных подсказок',
   },

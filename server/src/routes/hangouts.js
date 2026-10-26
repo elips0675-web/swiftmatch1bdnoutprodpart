@@ -1016,23 +1016,27 @@ router.post('/api/hangouts/:id/respond', auth, respondLimiter, async (req, res) 
     const responsePrefs = await getPrefs(hangout.user_id)
     const responsePrefsMap = new Map([[Number(hangout.user_id), responsePrefs]])
     const io = getIO()
-    if (isAllowedIn(responsePrefsMap, hangout.user_id, 'hangout_response', 'inApp')) {
-      const [notifResult] = await pool.query(
-        'INSERT INTO notifications (user_id, type, payload) VALUES (?, ?, ?)',
-        [hangout.user_id, 'hangout_response', JSON.stringify({ from_user_id: req.userId, hangout_id: Number(id), response_id: result.insertId })],
-      )
-      if (io) {
-        const [[notif]] = await pool.query('SELECT id, type, payload, created_at FROM notifications WHERE id = ?', [notifResult.insertId])
-        io.to(`user:${hangout.user_id}`).emit('notification:new', notif)
+    try {
+      if (isAllowedIn(responsePrefsMap, hangout.user_id, 'hangout_response', 'inApp')) {
+        const [notifResult] = await pool.query(
+          'INSERT INTO notifications (user_id, type, payload) VALUES (?, ?, ?)',
+          [hangout.user_id, 'hangout_response', JSON.stringify({ from_user_id: req.userId, hangout_id: Number(id), response_id: result.insertId })],
+        )
+        if (io) {
+          const [[notif]] = await pool.query('SELECT id, type, payload, created_at FROM notifications WHERE id = ?', [notifResult.insertId])
+          io.to(`user:${hangout.user_id}`).emit('notification:new', notif)
+        }
       }
-    }
-    if (io) {
-      io.to(`user:${hangout.user_id}`).emit('hangout:new_response', {
-        hangoutId: Number(id),
-        responseId: result.insertId,
-        fromUserId: req.userId,
-        fromName: respondent?.display_name || null,
-      })
+      if (io) {
+        io.to(`user:${hangout.user_id}`).emit('hangout:new_response', {
+          hangoutId: Number(id),
+          responseId: result.insertId,
+          fromUserId: req.userId,
+          fromName: respondent?.display_name || null,
+        })
+      }
+    } catch (emitErr) {
+      logger.warn('Hangout respond realtime emit failed (non-fatal):', emitErr)
     }
 
     if (isAllowedIn(responsePrefsMap, hangout.user_id, 'hangout_response', 'push')) {
