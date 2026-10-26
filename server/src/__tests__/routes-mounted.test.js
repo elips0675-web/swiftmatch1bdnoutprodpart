@@ -90,7 +90,7 @@ beforeAll(async () => {
       ...process.env,
       PORT: String(port),
       NODE_ENV: 'test',
-      JWT_SECRET: 'routes-mounted-test-secret',
+      JWT_SECRET: 'test-routes-mounted-secret',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })

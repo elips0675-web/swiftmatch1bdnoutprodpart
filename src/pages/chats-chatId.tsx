@@ -197,7 +197,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       if (pageMessages.length > 0) {
         restoreScrollRef.current = beforeHeight;
         setOlderMessages(prev => [...pageMessages, ...prev]);
-        if (!page.has_more) setHistoryExhausted(true);
+        if (!page?.has_more) setHistoryExhausted(true);
         if (el) el.scrollTop = beforeTop;
       } else {
         setHistoryExhausted(true);
@@ -284,10 +284,10 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
   const toggleReaction = async (msgId: number, emoji: string) => {
     try {
-      const t = getToken();
+      const token = getToken();
       const res = await fetch(`/api/chats/${params.chatId}/messages/${msgId}/reactions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}) },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ emoji }),
       })
       if (res.ok) {

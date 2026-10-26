@@ -136,8 +136,8 @@ function response(overrides: Record<string, unknown> = {}) {
   };
 }
 
-let listingsData: unknown[] = [listing()];
-let responsesData: unknown[] = [];
+let listingsData: unknown = [listing()];
+let responsesData: unknown = [];
 
 function routeFetch(url: string, opts?: { method?: string }) {
   const u = String(url);
