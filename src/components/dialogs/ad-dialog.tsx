@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -21,8 +21,17 @@ function isNative(): boolean {
 export function AdDialog({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
   const { t } = useLanguage();
   const [isAdLoading, setIsAdLoading] = useState(false);
+  const runTokenRef = useRef(0);
+
+  useEffect(() => {
+    if (!open) runTokenRef.current += 1;
+  }, [open]);
+
+  useEffect(() => () => { runTokenRef.current += 1 }, []);
 
   const handleWatchAd = async () => {
+    const token = runTokenRef.current + 1;
+    runTokenRef.current = token;
     setIsAdLoading(true);
 
     if (isNative()) {
@@ -35,6 +44,11 @@ export function AdDialog({ open, onOpenChange }: { open: boolean, onOpenChange: 
       }
     } else {
       await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+
+    if (runTokenRef.current !== token) {
+      setIsAdLoading(false);
+      return;
     }
 
     setIsAdLoading(false);
