@@ -38,7 +38,7 @@ Node.js/Express + MySQL (mysql2) бэкенд, Socket.IO real-time, Capacitor An
 - `vite build` — OK (2.08 с после Stage 196; бандл 391.8 KB initial JS из 500, 18.9 KB initial CSS из 40). **`tsc --noEmit` — 0 ошибок** (CI-02 закрыт Stage 196), eslint — 0 errors, **177 warnings** (151 из них `no-explicit-any`). Swagger — OK.
 - E2E: Playwright, storageState из global-setup (.auth/*.json), аудит console-errors на каждой странице, screenshot/video/trace на падение; независимая очистка БД `scripts/e2e-cleanup.mjs` шагом с `if: always()`.
 - Pre-flight: `npm run check:ports`, `node scripts/schema-drift-audit.mjs --offline`, `npm run check:docs`, `npm run check:enum-constraints`, `npm run check:prod-mock`, `npm run check:headers`, `node scripts/test-counter-audit.mjs`.
-- Красное на HEAD (код, не среда): TEST-10 `hookTimeout`, TEST-11 живой E2E, PROD-02 порты и пароли `docker-compose.yml` — раздел P0 в `Что доделать.txt`. CI-02 (`typecheck`) и CI-04 (`secrets-leak`) закрыты Stage 196, CI-03 (`server/ audit:prod`, было 2 high) — Stage 197 (26.10.2026, оба `audit:prod` — exit 0).
+- Красное на HEAD (код, не среда): TEST-11 живой E2E, PROD-02 порты и пароли `docker-compose.yml` — раздел P0 в `Что доделать.txt`. CI-02 (`typecheck`) и CI-04 (`secrets-leak`) закрыты Stage 196, CI-03 (`server/ audit:prod`, было 2 high) — Stage 197, TEST-10 (`hookTimeout`) — Stage 198 (26.10.2026).
 
 ## Последние хотфиксы (26.08.2026)
 
@@ -158,11 +158,11 @@ i18n RU/EN, push VAPID + FCM hook, deep links hook, рефералка.
    `REVENUECAT_WEBHOOK_SECRET`). Без ключей всё деградирует мягко (mock/fallback),
    кроме Stripe- и RevenueCat-вебхуков (осознанные 502/503 в проде).
 2. **Релиз Android:** домен вместо LAN-IP, keystore-подпись, App Links (`assetlinks.json`), AAB + Google Play.
-3. **Кодовый бэклог (открыт):** красное на HEAD — TEST-10 (`hookTimeout`), TEST-11 (живой E2E на HEAD),
-   PROD-02 (порты и пароли `docker-compose.yml`); CI-02 (`typecheck`) и CI-04 (`secrets-leak`) закрыты
-   Stage 196, CI-03 (`server/ audit:prod`) — Stage 197. Затем LEGAL-01 (юридические тексты — решение
-   владельца), шаринг брони в чат, L1 (ротация VAPID-ключа), M4 (`csrfGuard` при выносе API). Порядок —
-   в `Что доделать.txt`.
+3. **Кодовый бэклог (открыт):** красное на HEAD — TEST-11 (живой E2E на HEAD) и PROD-02 (порты
+   и пароли `docker-compose.yml`); CI-02 (`typecheck`) и CI-04 (`secrets-leak`) закрыты Stage 196,
+   CI-03 (`server/ audit:prod`) — Stage 197, TEST-10 (`hookTimeout`) — Stage 198. Затем LEGAL-01
+   (юридические тексты — решение владельца), шаринг брони в чат, L1 (ротация VAPID-ключа),
+   M4 (`csrfGuard` при выносе API). Порядок — в `Что доделать.txt`.
 4. **Осознанно отложено (не «забыто»):** полная CSRF-защита (double-submit token) — до выноса API
    на отдельный домен. См. `Что доделать.txt`.
 5. **Не начато:** Design System / Storybook.

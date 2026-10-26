@@ -195,7 +195,7 @@ TEST-08 и TEST-09 — снова опровергнуты кодом (повт�
 | CI-02 | `npm run typecheck` | exit 2, **7 ошибок**: `src/pages/chats-chatId.tsx:200`, `:296` (×2 — внутренний `t` перекрыт `const t = getToken()` на `:287`), `src/test/hangouts-my.test.tsx:212-213` — **закрыто Stage 196** | джоба `lint` в `ci.yml`, шаг `deploy.yml:31` |
 | CI-03 | `server/ npm run audit:prod` | exit 1, **2 high**: `body-parser@1.20.8` (< 1.20.9) и `multer@2.4.0`, у обоих `fixAvailable: true`; в корне — exit 0 — **закрыто Stage 197** (`npm audit fix` без `--force`) | джоба `dependency-audit`, шаги `deploy.yml:54-56` |
 | CI-04 | `secrets-leak-audit` | exit 1 на тестовой константе `server/src/__tests__/routes-mounted.test.js:93` — `JWT_SECRET` задан значением без разрешённого префикса; `scripts/secrets-leak-audit.mjs:334` пропускает значения с префиксом `ci-`/`test-`/`demo-`/`dev-`/`local-` — **закрыто Stage 196** | джоба `secrets-leak`, шаг `deploy.yml:41` |
-| TEST-10 | полный серверный прогон | 2713/2714: `Hook timed out in 10000ms`, `server/src/__tests__/secrets-leak-audit.test.js:79`; `hookTimeout` не задан (`server/vitest.config.js:7` — только `testTimeout`) | не стабильный красный, а флак под нагрузкой |
+| TEST-10 | полный серверный прогон | 2713/2714: `Hook timed out in 10000ms`, `server/src/__tests__/secrets-leak-audit.test.js:79`; `hookTimeout` не задан (`server/vitest.config.js:7` — только `testTimeout`) — **закрыто Stage 198** (`hookTimeout: 30000`, три полных прогона 2714/2714) | не стабильный красный, а флак под нагрузкой |
 | TEST-11 | живой E2E на HEAD | последний полный прогон — 22.10.2026 (Stage 163, 206/206); HEAD — Stage 194, расхождение 65 коммитов | `npm run test:e2e` + `scripts/e2e-cleanup.mjs` |
 | PROD-02 | `docker-compose.yml` | БД/Redis/API опубликованы на `0.0.0.0` (`:16,37,58,77,100,146`), `MYSQL_ROOT_PASSWORD: root` (`:56`), приложение ходит в БД `root/root` (`:116-117`), Grafana `admin/swiftmatch` (`:41`), Redis без пароля (`:75-78`), `networks:` нет — API доступен мимо nginx | прод-периметр |
 
@@ -218,7 +218,7 @@ TEST-08 и TEST-09 — снова опровергнуты кодом (повт�
 
 1. ~~**CI-02 + CI-04**~~ — **закрыто Stage 196 (26.10.2026):** `page?.has_more`, внутренний `t` переименован в `token`, фикстура `hangouts-my.test.tsx` на `unknown`, тестовая константа `JWT_SECRET` получила префикс `test-`; `typecheck` и `secrets-leak` — exit 0.
 2. ~~**CI-03**~~ — **закрыто Stage 197 (26.10.2026):** `npm audit fix` в `server/` без `--force` поднял `body-parser` 1.20.8 → 1.20.9, `multer` 2.4.0 → 2.5.0, `nodemailer` 10.0.13 → 10.2.1, `fast-uri` и `ip-address` по patch; `server/ audit:prod` — exit 0 (остались 2 moderate ниже порога `high`), в корне — 0 уязвимостей.
-3. **TEST-10** — `hookTimeout: 30000` в `server/vitest.config.js`, три полных прогона подряд.
+3. ~~**TEST-10**~~ — **закрыто Stage 198 (26.10.2026):** `hookTimeout: 30000` в `server/vitest.config.js:8`; три полных прогона подряд — 2714/2714 каждый.
 4. **TEST-11** — полный E2E на HEAD с очисткой (`scripts/e2e-cleanup.mjs`).
 5. **PROD-02** — bind `127.0.0.1` для инфраструктурных портов, непривилегированный DB-пользователь, `requirepass` у Redis, пароли из env.
 6. **Только после этого** — внешний блок: ключи → staging → домен/TLS → Android/сторы.
