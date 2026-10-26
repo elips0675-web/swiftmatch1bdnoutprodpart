@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-26T17:34:29.112Z",
+  "generated": "2026-10-26T17:41:44.181Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
@@ -620,8 +620,8 @@
   },
   "server": {
     "files": 163,
-    "tests": 2722,
-    "passed": 2722,
+    "tests": 2729,
+    "passed": 2729,
     "failed": 0,
     "gate": {
       "files": 5,
@@ -629,7 +629,7 @@
     },
     "product": {
       "files": 158,
-      "tests": 2599
+      "tests": 2606
     },
     "perFile": [
       {
@@ -874,7 +874,7 @@
       },
       {
         "file": "server/src/__tests__/hangouts-responses.test.js",
-        "tests": 36
+        "tests": 43
       },
       {
         "file": "server/src/__tests__/hangouts-suggest-webhook.test.js",
@@ -1390,6 +1390,6 @@
   },
   "total": {
     "files": 313,
-    "tests": 5203
+    "tests": 5210
   }
 }

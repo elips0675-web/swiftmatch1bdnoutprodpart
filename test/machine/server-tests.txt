@@ -1,5 +1,5 @@
 ===== Сервер (Vitest) =====
-2722 тестов в 163 файлах (зелёных 2722) (vitest --reporter=json)
+2729 тестов в 163 файлах (зелёных 2729) (vitest --reporter=json)
 
 # файл | тестов
 server/src/__tests__/active-user.test.js | 33
@@ -62,7 +62,7 @@ server/src/__tests__/hangout-suggest.test.js | 6
 server/src/__tests__/hangouts-actions.test.js | 42
 server/src/__tests__/hangouts-crud.test.js | 41
 server/src/__tests__/hangouts-feed-series.test.js | 12
-server/src/__tests__/hangouts-responses.test.js | 36
+server/src/__tests__/hangouts-responses.test.js | 43
 server/src/__tests__/hangouts-suggest-webhook.test.js | 22
 server/src/__tests__/hangouts-tickets-activity.test.js | 50
 server/src/__tests__/hangouts-watchers-relations.test.js | 34
