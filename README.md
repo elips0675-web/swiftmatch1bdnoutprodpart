@@ -502,10 +502,13 @@ REDIS_URL=redis://localhost:6379
 ```
 
 > В контейнере подключение к БД подставляет **сам compose**:
-> `DB_HOST=db`, `DB_USER=root`, `DB_PASSWORD=root`, `DB_NAME=swiftmatch1bd`
-> (`docker-compose.yml:85-94`), и эти ключи `environment:` перекрывают
-> `env_file`. Поэтому на VPS от корневого `.env` реально нужны `JWT_SECRET`
-> и `CORS_ORIGIN`, остальное compose достраивает сам.
+> `DB_HOST=db`, `DB_USER=${MYSQL_USER:-swiftmatch}`, `DB_PASSWORD=${MYSQL_PASSWORD}`, `DB_NAME=swiftmatch1bd`
+> (`docker-compose.yml`, сервис `app`), и эти ключи `environment:` перекрывают
+> `env_file`. Поэтому на VPS от корневого `.env` реально нужны `JWT_SECRET`,
+> `CORS_ORIGIN`, `MYSQL_ROOT_PASSWORD`, `MYSQL_USER`, `MYSQL_PASSWORD`,
+> `REDIS_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`: без любого из паролей
+> `docker compose up` падает на `${VAR:?}` (это намеренный fail-closed —
+> `docs/AGENTS-deployment.md`, «Периметр портов и пароли»).
 
 Полный список переменных с назначением — `server/.env.example` и
 `docs/environment-setup.md`. Значения секретов в репозитории не хранятся:

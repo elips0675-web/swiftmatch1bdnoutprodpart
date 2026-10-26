@@ -40,25 +40,31 @@ mock/fallback, а в проде — в честный fail-closed-отказ с 
 =====================================================================
 1. ГДЕ ЖИВЁТ .env ДЛЯ DOCKER (проверено по коду)
 =====================================================================
-`docker-compose.yml`, сервис `app`:
-  env_file:            (строки 89-90) — читается КОРНЕВОЙ `.env` (в корне репо)
-  environment:         (строки 91-104) — перекрывает env_file:
+`docker-compose.yml`, сервис `app` (номера строк не приводятся — они уезжают
+при каждой правке compose; срез 26.10.2026):
+  env_file:            — читается КОРНЕВОЙ `.env` (в корне репо)
+  environment:         — перекрывает env_file:
       PORT: 3002
       DB_HOST: db
-      DB_USER: root
-      DB_PASSWORD: root
+      DB_USER: ${MYSQL_USER:-swiftmatch}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?…}
       DB_NAME: swiftmatch1bd
       NODE_ENV: production
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD:?…}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:?…}
 
 Следствия (все — по коду, а не по памяти):
   - **Корневой `.env` и `server/.env` — два разных файла.** Docker читает корневой
-    (compose, `docker-compose.yml:90`); локальный запуск (`node server/src/index.js`)
+    (compose, `env_file`); локальный запуск (`node server/src/index.js`)
     читает `server/.env`. В контейнер `server/.env` не едет. Не путать.
-  - **`DB_*`, `NODE_ENV`, `REDIS_URL`, `CORS_ORIGIN` (частично) compose задаёт сам**
-    (`environment:`, строки 91-104) и перекрывает то, что лежит в корневом `.env`.
+  - **`DB_*`, `NODE_ENV`, `REDIS_URL`, `JWT_SECRET`, `CORS_ORIGIN` (частично) compose задаёт сам**
+    (`environment:`) и перекрывает то, что лежит в корневом `.env`.
     Писать их в `.env` можно, но они не действуют так, как выглядит.
+  - **Пароли compose берёт из `.env` и без них не стартует** (`${VAR:?}`):
+    `JWT_SECRET`, `MYSQL_ROOT_PASSWORD`, `MYSQL_USER`, `MYSQL_PASSWORD`,
+    `REDIS_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`. Это fail-closed после PROD-02
+    (было `root/root` и Grafana `admin/swiftmatch` прямо в репозитории).
   - **`NODE_ENV` в корневом `.env` НЕ переключает режим** — compose жёстко ставит
     `NODE_ENV: production` (строка 98). Чтобы получить dev-режим контейнера, нужно
     править `docker-compose.yml`, а не `.env`. (дипсик предлагал «меняется только
