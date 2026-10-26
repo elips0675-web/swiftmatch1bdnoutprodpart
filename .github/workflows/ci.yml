@@ -572,6 +572,22 @@ jobs:
           node-version: 22
       - run: npm run check:alerts
 
+  # Логи контейнеров и том Prometheus (26.10.2026). Docker выглядит виновником
+  # «съеденного диска», а `docker system df` показывает 4 ГБ образов и ноль
+  # контейнеров — смотреть некуда. Причина: нет `logging:` у сервиса (json-file
+  # растёт без предела, `prune` логи работающего контейнера не трогает), нет
+  # retention у Prometheus, а `docker system prune -a` в деплое уносит образ
+  # `:rollback` (цель автоматического отката) и тома `db_data`/`uploads_data`.
+  # Зависимости не нужны: гейт читает compose и workflow.
+  compose-logging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm run check:compose-logging
+
   # Зеркала `test/` побайтово. Раньше гейт лежал только локально и скипал на
   # отсутствии зеркал (свежий клон получал часть пар, остальные молча
   # пропускались) — «гейт зелёный, потому что проверять нечего». Теперь все 8

@@ -1,3 +1,15 @@
+# Ротация логов контейнеров. Без `logging` драйвер json-file пишет лог
+# бесконечно, а `docker system prune` логи РАБОТАЮЩЕГО контейнера не трогает:
+# на VPS диск выедается молча, и `Docker` выглядит виновником без единого
+# большого файла в `docker system df`. Разбор и безопасная чистка —
+# docs/AGENTS-deployment.md, «Диск и логи контейнеров».
+# Гейт: `npm run check:compose-logging` (каждый сервис обязан иметь лимит).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   prometheus:
     image: prom/prometheus:v3.15.0
@@ -10,7 +22,13 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
+      # Без явного retention том prometheus_data растёт по дефолту драйвера и
+      # никем не ограничен: забитый диск VPS виден только по `df`, а не по
+      # алертам (своей метрики «мало места» у Prometheus нет).
+      - '--storage.tsdb.retention.time=15d'
+      - '--storage.tsdb.retention.size=2GB'
     restart: unless-stopped
+    logging: *default-logging
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -28,6 +46,7 @@ services:
       - ./monitoring/grafana-dashboard.json:/var/lib/grafana/dashboards/swiftmatch.json
       - grafana_data:/var/lib/grafana
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       - prometheus
 
@@ -51,6 +70,7 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+    logging: *default-logging
 
   redis:
     image: redis:7-alpine
@@ -62,6 +82,7 @@ services:
       timeout: 3s
       retries: 3
     restart: unless-stopped
+    logging: *default-logging
     volumes:
       - redis_data:/data
 
@@ -75,6 +96,7 @@ services:
       context: .
       target: server
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "3002:3002"
     mem_limit: 512m
@@ -120,6 +142,7 @@ services:
       context: .
       target: web
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "8080:80"
     depends_on:

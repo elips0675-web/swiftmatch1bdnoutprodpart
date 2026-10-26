@@ -157,6 +157,11 @@ jobs:
       # читает (не в rule_files) или не находит (путь не смонтирован), либо
       # метрика в expr написана с опечаткой и правило не сработает никогда.
       - run: npm run check:alerts
+      # Логи контейнеров: без `logging:` json-file растёт без предела, а
+      # `docker system prune` логи РАБОТАЮЩЕГО контейнера не удаляет. Тот же
+      # гейт держит retention Prometheus и запрещает prune-команды, которые
+      # уносят `:rollback` (цель отката) и тома `db_data`/`uploads_data`.
+      - run: npm run check:compose-logging
 
   frontend-test:
     name: Frontend Tests (Vitest)
