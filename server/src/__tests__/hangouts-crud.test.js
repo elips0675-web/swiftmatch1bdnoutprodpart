@@ -346,3 +346,92 @@ describe('DELETE /api/hangouts/:id: границы и уведомления', (
     expect(logger.error).toHaveBeenCalledWith('Hangout cancel error:', expect.any(Error))
   })
 })
+
+describe('POST /api/hangouts: успешное создание', () => {
+  it('сохраняет все необязательные поля и отдаёт встречу в фид', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ id: 3 }], []])
+      .mockResolvedValueOnce([{ insertId: 77 }, []])
+    const res = await request(app).post('/api/hangouts').set(as()).send(validBody({
+      description: 'Встретимся у входа',
+      place_name: 'Кафе Пушкин',
+      place_address: 'Тверская, 1',
+      city: 'Москва',
+      lat: '55.75',
+      lng: 37.61,
+      price: 1500,
+      capacity: 30,
+      partner_offer_id: '12',
+      hangout_type: 'company',
+    }))
+    expect(res.status).toBe(201)
+    expect(res.body.id).toBe(77)
+    const insert = pool.query.mock.calls.find((c) => String(c[0]).startsWith('INSERT INTO hangouts'))
+    expect(insert[1]).toEqual([
+      1, 'cafe', 'Кофе', 'Встретимся у входа', 'Кафе Пушкин', 'Тверская, 1', 'Москва',
+      55.75, 37.61, new Date(FUTURE), 2, 12, 'company', 1500, 30,
+    ])
+    expect(toMock).toHaveBeenCalledWith('hangout:feed')
+  })
+
+  it('нечисловой partner_offer_id сохраняется как NULL', async () => {
+    pool.query
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ cnt: 0 }], []])
+      .mockResolvedValueOnce([{ insertId: 78 }, []])
+    const res = await request(app).post('/api/hangouts').set(as()).send(validBody({ partner_offer_id: 'abc' }))
+    expect(res.status).toBe(201)
+    const insert = pool.query.mock.calls.find((c) => String(c[0]).startsWith('INSERT INTO hangouts'))
+    expect(insert[1][11]).toBeNull()
+  })
+
+  it('premium-пользователь не может указать больше 20 компаньонов, код лимита не отдаётся', async () => {
+    pool.query.mockResolvedValueOnce([[{ id: 3 }], []])
+    const res = await request(app).post('/api/hangouts').set(as()).send(validBody({ max_companions: 21 }))
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('max_companions can be up to 20 for your plan')
+    expect(res.body.code).toBeUndefined()
+  })
+})
+
+describe('PUT /api/hangouts/:id: успешные обновления и границы плана', () => {
+  const activeHangout = () => pool.query.mockResolvedValueOnce([[{ user_id: 1, status: 'active' }], []])
+  const updateCall = () => pool.query.mock.calls.find((c) => String(c[0]).startsWith('UPDATE hangouts SET'))
+
+  it('координаты строкой и числом сохраняются числами', async () => {
+    activeHangout()
+    const res = await request(app).put('/api/hangouts/5').set(as()).send({ lat: '55.7', lng: 37.6 })
+    expect(res.status).toBe(200)
+    expect(updateCall()[1]).toEqual([55.7, 37.6, '5'])
+  })
+
+  it('capacity выше проданных билетов обновляется', async () => {
+    activeHangout().mockResolvedValueOnce([[{ cnt: 2 }], []])
+    const res = await request(app).put('/api/hangouts/5').set(as()).send({ capacity: 10 })
+    expect(res.status).toBe(200)
+    expect(updateCall()[1]).toEqual([10, '5'])
+  })
+
+  it('premium-пользователь не может поднять лимит выше 20, код лимита не отдаётся', async () => {
+    activeHangout().mockResolvedValueOnce([[{ id: 1 }], []])
+    const res = await request(app).put('/api/hangouts/5').set(as()).send({ max_companions: 21 })
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('max_companions can be up to 20 for your plan')
+    expect(res.body.code).toBeUndefined()
+  })
+
+  it('event_date в прошлом — 400, как при создании', async () => {
+    activeHangout()
+    const res = await request(app).put('/api/hangouts/5').set(as()).send({ event_date: '2020-01-01T12:00:00.000Z' })
+    expect(res.status).toBe(400)
+    expect(res.body.message).toBe('event_date must be in the future')
+    expect(updateCall()).toBeUndefined()
+  })
+
+  it('будущая event_date обновляется', async () => {
+    activeHangout()
+    const res = await request(app).put('/api/hangouts/5').set(as()).send({ event_date: FUTURE })
+    expect(res.status).toBe(200)
+    expect(updateCall()[1]).toEqual([new Date(FUTURE), '5'])
+  })
+})

@@ -797,6 +797,7 @@ router.put('/api/hangouts/:id', auth, async (req, res) => {
       } else if (field === 'event_date') {
         const d = new Date(value)
         if (isNaN(d.getTime())) return res.status(400).json({ message: 'Invalid event_date' })
+        if (d.getTime() <= Date.now()) return res.status(400).json({ message: 'event_date must be in the future' })
         value = d
       } else if (field === 'max_companions') {
         const c = Number(value)
