@@ -39,10 +39,13 @@ const PARTNER_TO_HANGOUT_CATEGORY: Record<string, HangoutCategory> = {
   event: "other",
 };
 
-function defaultDateTime(): string {
-  const d = new Date(Date.now() + 24 * 60 * 60 * 1000);
+function toLocalInputValue(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function defaultDateTime(): string {
+  return toLocalInputValue(new Date(Date.now() + 24 * 60 * 60 * 1000));
 }
 
 export default function HangoutCreatePage() {
@@ -99,7 +102,7 @@ export default function HangoutCreatePage() {
 
   const canProceed = (s: number) => {
     if (s === 0) return title.trim().length > 0;
-    if (s === 2) return Boolean(eventDate) && eventDate >= defaultDateTime().slice(0, 16);
+    if (s === 2) return Boolean(eventDate) && eventDate > toLocalInputValue(new Date());
     return true;
   };
 
@@ -108,7 +111,7 @@ export default function HangoutCreatePage() {
       toast.error(t(step === 0 ? "hangout.form.required" : "hangout.form.date_invalid"));
       return;
     }
-    if (step < TOTAL_STEPS) setStep((s) => s + 1);
+    if (step < TOTAL_STEPS - 1) setStep((s) => s + 1);
   };
 
   const prev = () => setStep((s) => Math.max(0, s - 1));
@@ -123,7 +126,8 @@ export default function HangoutCreatePage() {
       const res = await fetch("/api/partners/offers?placement=hangout", {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      setListings(res.ok ? await res.json() : []);
+      const data = res.ok ? await res.json() : [];
+      setListings(Array.isArray(data) ? data : []);
     } catch {
       setListings([]);
     } finally {
@@ -134,6 +138,7 @@ export default function HangoutCreatePage() {
   const applyListing = async (offer: { id: number; category: string; title: string; description?: string; partner_name: string }) => {
     setCategory(PARTNER_TO_HANGOUT_CATEGORY[offer.category] ?? "other");
     setTitle(offer.title);
+    setSelectedOfferId(offer.id);
     if (offer.description) setDescription(offer.description);
     setPlaceName((prev) => prev || offer.partner_name);
     setListingsOpen(false);
@@ -153,8 +158,18 @@ export default function HangoutCreatePage() {
       toast.error(t("hangout.form.required"));
       return;
     }
-    if (price && (Number(price) <= 0 || Number.isNaN(Number(price)))) {
+    if (eventDate <= toLocalInputValue(new Date())) {
+      toast.error(t("hangout.form.date_invalid"));
+      return;
+    }
+    const priceValue = price.trim() === "" ? null : Number(price);
+    if (priceValue !== null && (!Number.isFinite(priceValue) || priceValue < 0 || (priceValue > 0 && priceValue < 1))) {
       toast.error(t("hangout.form.price_invalid"));
+      return;
+    }
+    const capacityValue = capacity.trim() === "" ? null : Number(capacity);
+    if (capacityValue !== null && (!Number.isInteger(capacityValue) || capacityValue < 1 || capacityValue > 1000)) {
+      toast.error(t("hangout.form.capacity_invalid"));
       return;
     }
     setSubmitting(true);
@@ -188,8 +203,8 @@ export default function HangoutCreatePage() {
           lng,
           event_date: new Date(eventDate).toISOString(),
           max_companions: maxCompanions,
-          price: price ? Number(price) : undefined,
-          capacity: capacity ? Number(capacity) : undefined,
+          price: priceValue !== null && priceValue > 0 ? priceValue : undefined,
+          capacity: capacityValue ?? undefined,
           partner_offer_id: selectedOfferId ?? undefined,
         }),
       });
@@ -210,7 +225,7 @@ export default function HangoutCreatePage() {
       toast.success(t("hangout.toast.created"));
       navigate("/hangouts/my");
     } catch {
-      toast.error(t("hangout.error.load"));
+      toast.error(t("hangout.error.create"));
     } finally {
       setSubmitting(false);
     }
@@ -515,7 +530,7 @@ export default function HangoutCreatePage() {
           <div className="max-h-80 overflow-y-auto space-y-2">
             {listingsLoading && <Loader2 size={20} className="mx-auto animate-spin text-muted-foreground" />}
             {!listingsLoading && listings.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">{t("error.generic_title")}</p>
+              <p className="text-sm text-muted-foreground text-center py-4" data-testid="listings-empty">{t("partner.no_offers")}</p>
             )}
             {listings.map((offer) => (
               <button
