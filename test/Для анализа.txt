@@ -1,9 +1,9 @@
 # SwiftMatch1BD — снимок для AI-анализа
 
 > **О чтении файла.** Историческая часть (хотфиксы 26.08, этапы 30–47) — это
-> датированный срез августа 2026 и оставлена как есть. **Числа тестов актуализированы
-> 17.10.2026, раздел «Честный список "не сделано"» — 17.10.2026** (см. блоки «Статус
-> проверок» и «Честный список» ниже): ложные пункты сняты — партнёрская
+> датированный срез августа 2026 и оставлена как есть. **Числа тестов и статус
+> проверок актуализированы 26.10.2026 (HEAD `acd611d`), раздел «Честный список
+> "не сделано"» — 26.10.2026** (см. блоки «Статус проверок» и «Честный список» ниже): ложные пункты сняты — партнёрская
 > экосистема (Wave 1–4), Admin TOTP 2FA, наблюдаемость очередей, модерация фото,
 > live schema-drift и Node в CI уже **закрыты**. Единственный источник истины по
 > открытым пунктам — `Что доделать.txt` рядом в `test/`; история — `Что сделано.txt`
@@ -32,12 +32,13 @@ Node.js/Express + MySQL (mysql2) бэкенд, Socket.IO real-time, Capacitor An
 Локальная тестовая копия с реальной БД (50 демо-юзеров). Порты: фронт 8081
 (vite proxy /api→3002), API+WS 3002, MySQL 3306, Redis 6379.
 
-## Статус проверок (19.10.2026, всё зелёное)
+## Статус проверок (26.10.2026, HEAD `acd611d`)
 
-- Тесты **5195/5195**: сервер 2714/2714 (163 файла), фронт 2481/2481 (150 файла: 881 продуктовый тест в 95 файлах + 682 теста гейтов в 27 файлах `scripts/`), E2E 206 в 22 спеках (живой полный прогон 18.10.2026 — 206 passed). Гейты: все зелёные — 33 джобы `ci.yml` + 7 `deploy.yml` (на 19.10.2026, `compose-logging` добавлена 26.10.2026) + локальные `check:console`/`check:bundle`.
-- vite build ✅, tsc --noEmit 0 ошибок, eslint 0 errors (197 warnings — стилевые), Swagger ✅
+- Тесты **5195/5195**: сервер 2714/2714 (163 файла), фронт 2481/2481 (150 файлов: 32 из них — тесты гейтов в `scripts/`), E2E 206 в 22 спеках — статический счёт `--list`; последний живой полный прогон 22.10.2026 (Stage 163) — 206 passed, на HEAD **не перепрогонялся** (TEST-11). Гейты: 26 из 27 локальных зелёные, `secrets-leak` красный (CI-04); 33 джобы `ci.yml` + 7 `deploy.yml`.
+- `vite build` — OK (15.45 с; бандл 391.8 KB initial JS из 500, 18.9 KB initial CSS из 40). **`tsc --noEmit` — 7 ошибок** (CI-02), eslint — 0 errors, **177 warnings** (151 из них `no-explicit-any`). Swagger — OK.
 - E2E: Playwright, storageState из global-setup (.auth/*.json), аудит console-errors на каждой странице, screenshot/video/trace на падение; независимая очистка БД `scripts/e2e-cleanup.mjs` шагом с `if: always()`.
 - Pre-flight: `npm run check:ports`, `node scripts/schema-drift-audit.mjs --offline`, `npm run check:docs`, `npm run check:enum-constraints`, `npm run check:prod-mock`, `npm run check:headers`, `node scripts/test-counter-audit.mjs`.
+- Красное на HEAD (код, не среда): CI-02 `typecheck`, CI-03 `server/ audit:prod` (2 high), CI-04 `secrets-leak`, TEST-10 `hookTimeout`, TEST-11 живой E2E, PROD-02 порты и пароли `docker-compose.yml` — раздел P0 в `Что доделать.txt`.
 
 ## Последние хотфиксы (26.08.2026)
 
@@ -147,21 +148,22 @@ Video Date Scheduling, Safety Check-in, Profile Score, Ghost Mode + Passport Mod
 GDPR: consent при регистрации (consent_log), data export, erasure requests — покрыто E2E.
 i18n RU/EN, push VAPID + FCM hook, deep links hook, рефералка.
 
-## Честный список «не сделано» (актуализировано 17.10.2026)
+## Честный список «не сделано» (актуализировано 26.10.2026)
 
 Полный и единственный актуальный список открытых пунктов — `Что доделать.txt`
-(чистый бэклог; закрытые пункты там не живут). Кратко на 17.10.2026:
+(чистый бэклог; закрытые пункты там не живут). Кратко на 26.10.2026:
 
 1. **Блокеры среды (не решаются кодом):** staging-VPS + secrets `DEPLOY_HOST/USER/SSH_KEY`;
    реальные ключи (Stripe LIVE, SMTP, Sentry DSN, S3, Twilio, OpenAI/Rekognition, FCM,
    `REVENUECAT_WEBHOOK_SECRET`). Без ключей всё деградирует мягко (mock/fallback),
    кроме Stripe- и RevenueCat-вебхуков (осознанные 502/503 в проде).
 2. **Релиз Android:** домен вместо LAN-IP, keystore-подпись, App Links (`assetlinks.json`), AAB + Google Play.
-3. **Кодовый бэклог (открыт):** L1 (ротация VAPID-ключа), M1 (окно чек-ина — продуктовый вопрос),
-   M4 (`csrfGuard` при выносе API), P3 #32 / COV-01 (пороги покрытия ядра), TEST-02 (backup-restore smoke);
-   порядок — в `Что доделать.txt`.
+3. **Кодовый бэклог (открыт):** красное на HEAD — CI-02 (`typecheck`, 7 ошибок), CI-03 (`server/ audit:prod`,
+   2 high), CI-04 (`secrets-leak`), TEST-10 (`hookTimeout`), TEST-11 (живой E2E на HEAD), PROD-02 (порты
+   и пароли `docker-compose.yml`); затем LEGAL-01 (юридические тексты — решение владельца), шаринг брони
+   в чат, L1 (ротация VAPID-ключа), M4 (`csrfGuard` при выносе API). Порядок — в `Что доделать.txt`.
 4. **Осознанно отложено (не «забыто»):** полная CSRF-защита (double-submit token) — до выноса API
-   на отдельный домен; окно времени у check-in (продуктовое решение). См. `Что доделать.txt`.
+   на отдельный домен. См. `Что доделать.txt`.
 5. **Не начато:** Design System / Storybook.
 
 Что **уже закрыто** и не должно читаться как «не сделано»: партнёрская экосистема Wave 1–4
