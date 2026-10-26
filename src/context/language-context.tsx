@@ -376,6 +376,7 @@ export const translations = {
     'chats.cancel_reply': 'Отменить ответ',
     'chats.add_reaction': 'Добавить реакцию',
     'chats.you': 'Вы',
+    'chats.unknown_user': 'Пользователь',
     'chats.edit': 'Редактировать',
     'chats.edited': 'изменено',
     'schedule.title': 'Видеосвидания',
@@ -1225,6 +1226,8 @@ export const translations = {
     'error.generic_title': 'Что-то пошло не так',
     'error.send_message': 'Не удалось отправить сообщение',
     'error.edit_message': 'Не удалось изменить сообщение',
+    'error.reaction': 'Не удалось поставить реакцию',
+    'error.load_messages': 'Не удалось загрузить сообщения',
 
     // Gallery
     'gallery.viewer': 'Просмотр фото',
@@ -2428,6 +2431,7 @@ export const translations = {
     'chats.cancel_reply': 'Cancel reply',
     'chats.add_reaction': 'Add reaction',
     'chats.you': 'You',
+    'chats.unknown_user': 'User',
     'chats.edit': 'Edit',
     'chats.edited': 'edited',
     'schedule.title': 'Video Dates',
@@ -3279,6 +3283,8 @@ export const translations = {
     'error.generic_title': 'Something went wrong',
     'error.send_message': 'Could not send message',
     'error.edit_message': 'Could not edit message',
+    'error.reaction': 'Could not add the reaction',
+    'error.load_messages': 'Could not load messages',
 
     // Gallery
     'gallery.viewer': 'Photo Viewer',

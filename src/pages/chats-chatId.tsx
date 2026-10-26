@@ -149,7 +149,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   // состояние курсора расходилось бы с картинкой: второй скролл повторил бы
   // первый запрос (`before` первой страницы) и сообщения добавились бы дважды.
   const historyCursor = olderMessages.length > 0 ? olderMessages[0].id : messagePage?.next_before ?? null;
-  const { data: chatPartner, loading: partnerLoading, error: partnerError } = useApi<any>(
+  const { data: chatPartner, loading: partnerLoading } = useApi<any>(
     `/api/chats/${params.chatId}?lang=${language === 'EN' ? 'en' : 'ru'}`
   );
   const [hangoutCtx, setHangoutCtx] = useState<{ id: number; title: string; event_date: string; category: string; status: string } | null>(null);
@@ -189,9 +189,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       const beforeHeight = el?.scrollHeight ?? 0;
       const beforeTop = el?.scrollTop ?? 0;
       const page = await fetchOlderPage(params.chatId, getToken(), cursor);
-      if (page && page.messages.length > 0) {
+      const pageMessages = Array.isArray(page?.messages) ? page.messages : null;
+      if (!pageMessages) {
+        toast({ title: t('error.generic_title'), description: t('error.load_messages'), variant: "destructive" });
+        return;
+      }
+      if (pageMessages.length > 0) {
         restoreScrollRef.current = beforeHeight;
-        setOlderMessages(prev => [...page.messages, ...prev]);
+        setOlderMessages(prev => [...pageMessages, ...prev]);
         if (!page.has_more) setHistoryExhausted(true);
         if (el) el.scrollTop = beforeTop;
       } else {
@@ -269,6 +274,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       toast({ title: t('error.generic_title'), description: t('error.send_message'), variant: "destructive" });
       setOptimisticMessages(prev => prev.filter(m => m.id !== tempId));
       if (reply) setReplyTo(reply);
+      if (!textOverride) setInputValue(content);
     } finally {
       refetchMessages();
       setOptimisticMessages([]);
@@ -284,8 +290,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}) },
         body: JSON.stringify({ emoji }),
       })
-      if (res.ok) refetchMessages()
-    } catch { /* ignored */ }
+      if (res.ok) {
+        refetchMessages()
+      } else {
+        toast({ title: t('error.generic_title'), description: t('error.reaction'), variant: "destructive" });
+      }
+    } catch {
+      toast({ title: t('error.generic_title'), description: t('error.reaction'), variant: "destructive" });
+    }
     setReactionMsgId(null)
   }
 
@@ -304,12 +316,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         return;
       }
       refetchMessages();
-    } catch { /* ignored */ }
+    } catch {
+      toast({ title: t('error.generic_title'), description: t('error.edit_message'), variant: "destructive" });
+    }
   };
 
   const getReactionsGrouped = (reactions: any[]) => {
     const grouped: Record<string, { emoji: string; count: number; users: number[] }> = {}
-    for (const r of reactions || []) {
+    for (const r of reactions) {
       if (!grouped[r.emoji]) grouped[r.emoji] = { emoji: r.emoji, count: 0, users: [] }
       grouped[r.emoji].count++
       grouped[r.emoji].users.push(r.user_id)
@@ -327,35 +341,35 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     webrtc.startCall(chatPartner?.user_id, 'audio');
   };
 
-  const isLoading = messagesLoading || partnerLoading;
+  const isInitialLoading = (!chatPartner && partnerLoading) || (!messagePage && messagesLoading);
 
-  if (isLoading) {
+  if (isInitialLoading) {
     return <ChatRoomSkeleton />
   }
 
-  if (messagesError || partnerError || !chatPartner) {
+  if (!chatPartner || (!messagePage && messagesError)) {
     return (
       <div className="flex flex-col items-center justify-center bg-muted" style={{ height: viewportHeight }}>
-          <p className="text-muted-foreground font-medium">{t('error.chat_not_found')}</p>
+          <p className="text-muted-foreground font-medium">{t(chatPartner ? 'error.load_messages' : 'error.chat_not_found')}</p>
           <Button onClick={() => router.back()} className="mt-4">{t('button.back')}</Button>
       </div>
     )
   }
 
-  const allMessages = [...olderMessages, ...(messages || []), ...optimisticMessages];
+  const allMessages = [...olderMessages, ...messages, ...optimisticMessages];
 
   return (
     <div className="flex flex-col bg-[#f8f9fb]" style={{ height: viewportHeight }}>
       <header className="flex items-center gap-2 px-3 py-2 border-b border-border sticky top-0 bg-white/90 backdrop-blur-lg z-50 h-16">
-        <Button variant="ghost" size="icon" onClick={() => router.push('/chats')} className="rounded-full"><ChevronLeft size={24} /></Button>
-        <Image src={chatPartner.avatar || '/default-avatar.png'} alt={chatPartner.name || 'User'} width={40} height={40} className="rounded-full bg-muted" />
+        <Button variant="ghost" size="icon" onClick={() => router.push('/chats')} aria-label={t('button.back')} className="rounded-full"><ChevronLeft size={24} /></Button>
+        <Image src={chatPartner.avatar || '/default-avatar.png'} alt={chatPartner.name || t('chats.unknown_user')} width={40} height={40} className="rounded-full bg-muted" />
         <div className="flex-1">
             <h3 className="font-bold text-sm truncate">{chatPartner.name}</h3>
         </div>
-        <Button variant="ghost" size="icon" onClick={handleStartVideoCall} className="rounded-full text-muted-foreground hover:bg-muted/50"><Video size={18} /></Button>
-        <Button variant="ghost" size="icon" onClick={handleStartVoiceCall} className="rounded-full text-muted-foreground hover:bg-muted/50"><Phone size={18} /></Button>
+        <Button variant="ghost" size="icon" onClick={handleStartVideoCall} aria-label={t('chats.video_call')} className="rounded-full text-muted-foreground hover:bg-muted/50"><Video size={18} /></Button>
+        <Button variant="ghost" size="icon" onClick={handleStartVoiceCall} aria-label={t('chats.voice_call')} className="rounded-full text-muted-foreground hover:bg-muted/50"><Phone size={18} /></Button>
         <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="rounded-full"><MoreVertical size={18} /></Button></DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={t('chats.actions')} className="rounded-full"><MoreVertical size={18} /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end" />
         </DropdownMenu>
       </header>
@@ -404,16 +418,16 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                     <>
                       {msg.text}
                       <div className="absolute -bottom-3 right-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button data-testid="reply-button" onClick={() => setReplyTo({ id: msg.id, name: msg.sender_id !== chatPartner.user_id ? t('chats.you') : (chatPartner.name || ''), text: msg.text || '' })}
+                        <button data-testid="reply-button" aria-label={t('chats.reply')} onClick={() => setReplyTo({ id: msg.id, name: msg.sender_id !== chatPartner.user_id ? t('chats.you') : (chatPartner.name || ''), text: msg.text || '' })}
                           className={cn("text-[10px]", msg.sender_id !== chatPartner.user_id ? "text-white" : "text-muted-foreground")}>
                           <CornerUpLeft size={12} />
                         </button>
-                        <button onClick={() => setReactionMsgId(reactionMsgId === msg.id ? null : msg.id)}
+                        <button aria-label={t('chats.add_reaction')} onClick={() => setReactionMsgId(reactionMsgId === msg.id ? null : msg.id)}
                           className={cn("text-[10px]", msg.sender_id !== chatPartner.user_id ? "text-white" : "text-muted-foreground")}>
                           😊
                         </button>
                         {msg.sender_id !== chatPartner.user_id && Date.now() - new Date(msg.created_at).getTime() <= MESSAGE_EDIT_WINDOW_MS && (
-                          <button data-testid="edit-message-button" onClick={() => setEditingMsg({ id: msg.id, text: msg.text || '' })}
+                          <button data-testid="edit-message-button" aria-label={t('chats.edit')} onClick={() => setEditingMsg({ id: msg.id, text: msg.text || '' })}
                             className="text-[10px] text-white">
                             <Pencil size={12} />
                           </button>
@@ -422,7 +436,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                     </>
                   )}
                   {reactionMsgId === msg.id && (
-                    <div className={cn("absolute bottom-full right-0 mb-1 flex gap-0.5 bg-white rounded-full shadow-lg border p-1 z-10", msg.sender_id !== chatPartner.user_id ? "" : "")}>
+                    <div className="absolute bottom-full right-0 mb-1 flex gap-0.5 bg-white rounded-full shadow-lg border p-1 z-10">
                       {QUICK_REACTIONS.map(r => (
                         <button key={r.id} onClick={(e) => { e.stopPropagation(); toggleReaction(msg.id, r.label); }} className="p-1 hover:bg-muted rounded-full text-sm">{r.label}</button>
                       ))}
@@ -471,7 +485,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1">
               <OpeningLinesPicker firstName={firstNameOf(chatPartner?.name)} commonInterest={chatPartner?.common_interest ?? null} onPick={(text) => setInputValue(text)} />
               <Popover>
-                <PopoverTrigger asChild><button className={cn("text-muted-foreground hover:text-primary transition-colors", selectedTtl && "text-primary")}><Timer size={16} /></button></PopoverTrigger>
+                <PopoverTrigger asChild><button aria-label={t('chats.ttl')} className={cn("text-muted-foreground hover:text-primary transition-colors", selectedTtl && "text-primary")}><Timer size={16} /></button></PopoverTrigger>
                 <PopoverContent side="top" align="end" className="w-40 p-1.5 rounded-2xl border-0 shadow-2xl bg-white">
                   <div className="space-y-0.5">
                     {[{label: t('chats.ttl_off'), value: null}, {label: t('chats.ttl_5s'), value: 5}, {label: t('chats.ttl_30s'), value: 30}, {label: t('chats.ttl_1m'), value: 60}, {label: t('chats.ttl_5m'), value: 300}, {label: t('chats.ttl_1h'), value: 3600}, {label: t('chats.ttl_24h'), value: 86400}].map(opt => (
@@ -481,14 +495,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                 </PopoverContent>
               </Popover>
               <Popover>
-                <PopoverTrigger asChild><button className="text-muted-foreground"><Smile size={16} /></button></PopoverTrigger>
+                <PopoverTrigger asChild><button aria-label={t('chats.add_reaction')} className="text-muted-foreground"><Smile size={16} /></button></PopoverTrigger>
                 <PopoverContent side="top" align="end" className="p-2 w-auto">
-                  <div className="grid grid-cols-6 gap-1">{QUICK_REACTIONS.map(r => <button key={r.id} onClick={() => handleSendMessage(r.label)} className="p-2 hover:bg-muted rounded-lg"><r.icon size={22} className={r.color}/></button>)}</div>
+                  <div className="grid grid-cols-6 gap-1">{QUICK_REACTIONS.map(r => <button key={r.id} aria-label={r.label} onClick={() => handleSendMessage(r.label)} className="p-2 hover:bg-muted rounded-lg"><r.icon size={22} className={r.color}/></button>)}</div>
                 </PopoverContent>
               </Popover>
             </div>
           </div>
-          <Button data-testid="send-button" size="icon" onClick={() => handleSendMessage()} disabled={!inputValue.trim() && !isSending} className="h-11 w-11 rounded-xl gradient-bg text-white">
+          <Button data-testid="send-button" size="icon" aria-label={t('button.send')} onClick={() => handleSendMessage()} disabled={!inputValue.trim() || isSending} className="h-11 w-11 rounded-xl gradient-bg text-white">
             <Send size={18} />
           </Button>
         </div>
