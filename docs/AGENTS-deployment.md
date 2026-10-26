@@ -13,11 +13,36 @@
 | Railway / Fly.io | Простота, SSL | Меньше контроля |
 
 ## Docker + VPS (рекомендованный путь для staging)
-1. `.env` в корне: `DB_*`, `JWT_SECRET`, `CORS_ORIGIN`, `REDIS_URL`, ключи (Twilio/AWS/Stripe/OpenAI/Sentry).
+1. `.env` в корне: `DB_*`, `JWT_SECRET`, `CORS_ORIGIN`, `REDIS_URL`, `MYSQL_ROOT_PASSWORD`, `MYSQL_USER`, `MYSQL_PASSWORD`, `REDIS_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`, ключи (Twilio/AWS/Stripe/OpenAI/Sentry). Пароли compose подставляет через `${VAR:?}` и **без них не стартует** — это намеренный fail-closed (было `root/root` и Grafana `admin/swiftmatch` в репозитории).
 2. `docker compose build && docker compose up -d` — поднимает `app` (миграции применяются автоматически при старте), `db` (mysql:8.4 + schema/миграции при первом volume), `redis`, `nginx` (:8080, статика из `dist/`), `prometheus` (:9090), `grafana` (:3001).
 3. Миграции: `node database/migrations/migrate.js` выполняется в CMD образа перед сервером; идемпотентно (таблица `_migrations`), безопасен для существующей БД.
 4. Healthcheck: `GET /health` (curl в образе, `USER node`), compose-зависимости ждут healthy `db`.
-5. Нагрузочный тест: `k6 run scripts/k6/load-staging.js` (smoke) или `k6 run --env MODE=load --env STAGING_URL=https://… scripts/k6/load-staging.js` (100 VU, пороги p95<500ms и <1% ошибок).
+5. Нагрузочный тест: `k6 run scripts/k6/load-staging.js` (smoke) или `k6 run --env MODE=load --env STAGING_URL=https://… scripts/k6/load-staging.js` 100 VU, пороги p95<500ms и <1% ошибок.
+
+### Периметр портов и пароли (PROD-02, Stage 199)
+
+Наружу смотрит **только nginx** (`8080`, за ним TLS-прокси хоста). Всё остальное привязано к `127.0.0.1` и доступно лишь с самого VPS (диагностика, health-проба деплоя, `ssh -L` туннель для Grafana):
+
+| Сервис | Порт | Привязка | Зачем |
+|---|---|---|---|
+| nginx | 8080 | `0.0.0.0` | единственная публичная точка |
+| app | 3002 | `127.0.0.1` | health-проба `deploy.yml`, обход `limit_req`/TLS снаружи закрыт |
+| db | 3307 | `127.0.0.1` | отладка, нельзя ходить снаружи |
+| redis | 6379 | `127.0.0.1` | `requirepass` обязателен, `REDIS_URL` собирается из `REDIS_PASSWORD` |
+| prometheus / grafana | 9090 / 3001 | `127.0.0.1` | только через SSH-туннель |
+
+UI-креды Grafana — `${GRAFANA_ADMIN_USER:-admin}` / `${GRAFANA_ADMIN_PASSWORD}`; приложение ходит в БД пользователем `swiftmatch` (`MYSQL_USER`), не `root`. MySQL-образ выдаёт ему `ALL` на `MYSQL_DATABASE`, этого хватает и на `migrate.js` (DDL), и на `schema-validate`.
+
+**Существующий volume `db_data`:** `MYSQL_USER`/`MYSQL_PASSWORD` создаются только при инициализации пустого каталога. Если база уже развёрнута, пользователя нужно завести один раз вручную:
+
+```sql
+CREATE USER IF NOT EXISTS 'swiftmatch'@'%' IDENTIFIED BY '<MYSQL_PASSWORD>';
+GRANT ALL PRIVILEGES ON swiftmatch1bd.* TO 'swiftmatch'@'%';
+FLUSH PRIVILEGES;
+```
+
+**Redis с паролем и старым `redis_data`:** пароль задаётся флагом `--requirepass` при старте, данные не мигрируют; после смены пароля приложение просто переподключается.
+
 
 ## Деплой и откат (безопасная выкладка)
 

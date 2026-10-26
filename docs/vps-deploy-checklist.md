@@ -103,7 +103,8 @@
 - [ ] FCM: `FCM_SERVER_KEY`, `FCM_SERVICE_ACCOUNT` (base64 — см. runbook-keys §FCM).
 - [ ] Twilio: `TWILIO_ACCOUNT_SID/AUTH_TOKEN/PHONE_NUMBER`.
 - [ ] RevenueCat: `REVENUECAT_WEBHOOK_SECRET` + `VITE_REVENUECAT_API_KEY` (front).
-- [ ] Redis: `REDIS_URL=redis://db:6379` (контейнер) — в compose Redis уже есть, убедиться, что сервис включён.
+- [ ] Redis: `REDIS_PASSWORD` (compose передаёт его в `redis-server --requirepass` и собирает `REDIS_URL=redis://:<пароль>@redis:6379`; пароль только hex — `openssl rand -hex 24`).
+- [ ] Compose-пароли (без них `docker compose up` падает на `${VAR:?}`): `MYSQL_ROOT_PASSWORD`, `MYSQL_USER=swiftmatch`, `MYSQL_PASSWORD`, `REDIS_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`.
 
 **После ввода каждой группы:** `docker compose restart app` (или рестарт через scheduler) + целевой смоук.
 
@@ -135,7 +136,7 @@
 
 - [ ] cron на VPS (ежедневный дамп DB-контейнера в `/var/backups`):
   ```bash
-  0 3 * * * docker exec $(docker compose -f /app/swiftmatch/docker-compose.yml ps -q db) mysqldump -uroot -proot swiftmatch1bd | gzip > /var/backups/swiftmatch_$(date +\%F).sql.gz
+  0 3 * * * set -a; . /app/swiftmatch/.env; set +a; docker exec $(docker compose -f /app/swiftmatch/docker-compose.yml ps -q db) mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" swiftmatch1bd | gzip > /var/backups/swiftmatch_$(date +\%F).sql.gz
   ```
 - [ ] Retention 30 дней (`find /var/backups -name 'swiftmatch_*.sql.gz' -mtime +30 -delete`).
 - [ ] Выгрузка НА ДРУГОЙ диск/бакет (rclone/S3 sync).
@@ -153,8 +154,8 @@
 ## 10. Мониторинг + алерты
 
 - [ ] UptimeRobot: HTTP(s) монитор на `https://<domain>/health` + порт проверки WS → алерты на почту/Telegram.
-- [ ] Grafana уже в compose (логин `admin`/`swiftmatch`): зайти, убедиться, что dashboards provisioned, добавить alert-канал Telegram/Slack (CPU, 5xx, DB connections).
-- [ ] Prometheus: закрыть порт 9090 наружу (`ufw deny 9090` / только internal).
+- [ ] Grafana уже в compose (логин `${GRAFANA_ADMIN_USER:-admin}`, пароль — `GRAFANA_ADMIN_PASSWORD` из `.env`, дефолта нет): зайти через `ssh -L 3001:127.0.0.1:3001`, убедиться, что dashboards provisioned, добавить alert-канал Telegram/Slack (CPU, 5xx, DB connections).
+- [ ] Порты 9090/3001/3307/6379/3002 уже привязаны к `127.0.0.1` в `docker-compose.yml` — проверить `docker compose ps` и `ss -tlnp | grep -E '9090|3001|3307|6379|3002'` (в колонке Local Address должен быть `127.0.0.1`, не `0.0.0.0`).
 - [ ] Sentry: убедиться, что события приходят, `beforeSend` не утекает secrets.
 
 ---

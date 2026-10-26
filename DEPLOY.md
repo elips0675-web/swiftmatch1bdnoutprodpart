@@ -88,11 +88,11 @@ Remote-путь в workflow: `/app/swiftmatch`.
 
 ## 6. Мониторинг
 
-Prometheus (9090) + Grafana (3001) поднимаются вместе с compose:
+Prometheus (9090) + Grafana (3001) поднимаются вместе с compose, оба порта привязаны к `127.0.0.1` (снаружи не отвечают):
 - Prometheus собирает `/metrics` с API-контейнера.
-- Grafana: логин `admin` / пароль из `GF_SECURITY_ADMIN_PASSWORD` (в compose `swiftmatch`).
+- Grafana: логин `${GRAFANA_ADMIN_USER:-admin}` / пароль `GRAFANA_ADMIN_PASSWORD` из `.env` (дефолта в compose нет — без переменной сервис не стартует).
   Dashboard уже зарегистрирована (`monitoring/grafana-dashboard.json`).
-- Для публичного доступа — закройте 9090/3001 (только internal) или за reverse-proxy.
+- Доступ — через SSH-туннель (`ssh -L 3001:127.0.0.1:3001 …`) или reverse-proxy с авторизацией.
 
 ## 7. Нагрузочное тестирование (k6)
 
@@ -114,8 +114,8 @@ k6 run k6/load-test.js -e API_URL=http://localhost:8080 -e USER_EMAIL=user5@mail
 например ежедневный дамп из DB-контейнера:
 
 ```bash
-0 3 * * * docker exec $(docker compose -f /app/swiftmatch/docker-compose.yml ps -q db) \
-  mysqldump -uroot -proot swiftmatch1bd | gzip > /var/backups/swiftmatch_$(date +\%F).sql.gz
+0 3 * * * set -a; . /app/swiftmatch/.env; set +a; docker exec $(docker compose -f /app/swiftmatch/docker-compose.yml ps -q db) \
+  mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" swiftmatch1bd | gzip > /var/backups/swiftmatch_$(date +\%F).sql.gz
 ```
 
 ## Быстрые команды

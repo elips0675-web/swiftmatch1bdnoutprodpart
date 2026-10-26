@@ -9,7 +9,7 @@
 
 ## 0. Что уже готово в коде (не нужно делать заново)
 
-- `docker-compose.yml` — db (MySQL 8 на хост-порту 3307) + redis + app + nginx + Prometheus + Grafana, именованные volume'ы `db_data`/`redis_data`/`uploads_data`/`prometheus_data`/`grafana_data` (валиден, но НЕ прогонялся end-to-end)
+- `docker-compose.yml` — db (MySQL 8 на `127.0.0.1:3307`) + redis (`127.0.0.1:6379`, `--requirepass`) + app (`127.0.0.1:3002`) + nginx (`8080`, единственный публичный порт) + Prometheus (`127.0.0.1:9090`) + Grafana (`127.0.0.1:3001`), именованные volume'ы `db_data`/`redis_data`/`uploads_data`/`prometheus_data`/`grafana_data` (валиден, но НЕ прогонялся end-to-end). Пароли (`MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD`, `REDIS_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`, `JWT_SECRET`) обязательны через `${VAR:?}` — без них `docker compose up` падает
 - `nginx/swiftmatch.http.conf` — конфиг, который реально едет в образ (`Dockerfile`): WS timeout `proxy_read_timeout 86400s`, `client_max_body_size 20M`, `limit_req` 60r/s (`/api`) и 10r/s (`/api/auth`). Корневой `nginx.conf` (`127.0.0.1:3002`) — эталон хостового nginx на VPS (TLS 443); `nginx/swiftmatch.conf` (`app:3002`) — альтернатива с TLS-терминацией внутри контейнера. Ни один из них в образ не попадает. С этапа 44 все три согласованы по лимитам, `client_max_body_size` и WS-таймауту (проверка 6 в `npm run check:headers`)
 - `.github/workflows/deploy.yml` — CI: lint → test → build → migrate (на сервере) → restart; нужны только secrets
 - `scripts/backup-mysql.ps1` / `.sh` — бэкап, retention 30 дней; `verify-backup.mjs` — restore smoke
@@ -88,7 +88,7 @@
 ## 8. Redis — поднять постоянно
 
 - [ ] В docker-compose redis уже есть — включить сервис (или ubuntu `apt install redis-server` + systemd)
-- [ ] `REDIS_URL=redis://<host>:6379` в `server/.env`
+- [ ] `REDIS_URL` в `server/.env` для локального запуска — `redis://localhost:6379` (без пароля, локальный Redis); в compose пароль задан и URL собирается сам: `redis://:<REDIS_PASSWORD>@redis:6379`
 - [ ] **Проверка:** лог `[ws] Redis adapter attached` (этап 68) + `connected_clients > 0`
 
 ## 9. Бэкапы
