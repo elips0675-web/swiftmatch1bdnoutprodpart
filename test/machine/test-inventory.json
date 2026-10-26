@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-26T08:34:53.591Z",
+  "generated": "2026-10-26T09:44:56.026Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 149,
-    "tests": 2453,
-    "passed": 2453,
+    "files": 150,
+    "tests": 2481,
+    "passed": 2481,
     "failed": 0,
     "gate": {
       "files": 32,
       "tests": 791
     },
     "product": {
-      "files": 117,
-      "tests": 1662
+      "files": 118,
+      "tests": 1690
     },
     "perFile": [
       {
@@ -143,6 +143,10 @@
       {
         "file": "scripts/typecheck-gate-audit.test.mjs",
         "tests": 17
+      },
+      {
+        "file": "src/hooks/__tests__/use-background-geolocation.test.tsx",
+        "tests": 28
       },
       {
         "file": "src/hooks/__tests__/use-fcm-token.test.tsx",
@@ -1385,7 +1389,7 @@
     ]
   },
   "total": {
-    "files": 312,
-    "tests": 5167
+    "files": 313,
+    "tests": 5195
   }
 }
