@@ -30,7 +30,7 @@ export default function DataProcessingConsentPage() {
               <>
                 <p>Нажимая кнопку «Продолжить» при регистрации или используя Приложение, вы даете свое полное и осознанное согласие на автоматизированную обработку ваших персональных данных.</p>
                 <section>
-                  <h3 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">Что мы обрабатываем:</h3>
+                  <h2 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">Что мы обрабатываем:</h2>
                   <ul className="list-disc pl-5 space-y-1">
                     <li>ФИО (или псевдоним);</li>
                     <li>Контактный email или номер телефона;</li>
@@ -39,11 +39,11 @@ export default function DataProcessingConsentPage() {
                   </ul>
                 </section>
                 <section>
-                  <h3 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">Цели обработки:</h3>
+                  <h2 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">Цели обработки:</h2>
                   <p>Оказание услуг сервиса знакомств, подбор наиболее подходящих анкет, отправка уведомлений и улучшение качества работы продукта.</p>
                 </section>
                 <section>
-                  <h3 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">Ваши права:</h3>
+                  <h2 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">Ваши права:</h2>
                   <p>Вы имеете право отозвать согласие в любой момент, удалив свой профиль в настройках Приложения. Мы храним ваши данные только до тех пор, пока это необходимо для функционирования вашего аккаунта.</p>
                 </section>
               </>
@@ -51,7 +51,7 @@ export default function DataProcessingConsentPage() {
               <>
                 <p>By clicking "Continue" during registration or by using the Application, you give your full and informed consent to the automated processing of your personal data.</p>
                 <section>
-                  <h3 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">What we process:</h3>
+                  <h2 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">What we process:</h2>
                   <ul className="list-disc pl-5 space-y-1">
                     <li>Full name (or pseudonym);</li>
                     <li>Contact email or phone number;</li>
@@ -60,11 +60,11 @@ export default function DataProcessingConsentPage() {
                   </ul>
                 </section>
                 <section>
-                  <h3 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">Processing purposes:</h3>
+                  <h2 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">Processing purposes:</h2>
                   <p>Providing dating services, selecting the most suitable profiles, sending notifications, and improving the quality of the product.</p>
                 </section>
                 <section>
-                  <h3 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">Your rights:</h3>
+                  <h2 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">Your rights:</h2>
                   <p>You have the right to withdraw your consent at any time by deleting your profile in the Application settings. We store your data only as long as necessary for your account to function.</p>
                 </section>
               </>

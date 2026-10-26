@@ -29,11 +29,11 @@ export default function PrivacyPolicyPage() {
             {language === 'RU' ? (
               <>
                 <section>
-                  <h3 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">1. Общие положения</h3>
+                  <h2 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">1. Общие положения</h2>
                   <p>Настоящая Политика конфиденциальности определяет, как приложение SwiftMatch (далее — «Приложение») собирает, использует и защищает информацию о пользователях.</p>
                 </section>
                 <section>
-                  <h3 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">2. Сбор информации</h3>
+                  <h2 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">2. Сбор информации</h2>
                   <p>Мы собираем информацию, которую вы предоставляете при регистрации и использовании Приложения:</p>
                   <ul className="list-disc pl-5 space-y-1">
                     <li>Профильные данные (имя, возраст, пол, интересы, био);</li>
@@ -43,7 +43,7 @@ export default function PrivacyPolicyPage() {
                   </ul>
                 </section>
                 <section>
-                  <h3 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">3. Использование данных</h3>
+                  <h2 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">3. Использование данных</h2>
                   <p>Ваши данные используются исключительно для:</p>
                   <ul className="list-disc pl-5 space-y-1">
                     <li>Обеспечения работы алгоритмов подбора (мэтчинга);</li>
@@ -53,22 +53,22 @@ export default function PrivacyPolicyPage() {
                   </ul>
                 </section>
                 <section>
-                  <h3 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">4. Защита информации</h3>
+                  <h2 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">4. Защита информации</h2>
                   <p>Мы используем современные протоколы шифрования и облачные технологии Firebase (Google Cloud) для обеспечения безопасности ваших данных. Доступ к вашим личным сообщениям имеет только вы и ваш собеседник.</p>
                 </section>
                 <section>
-                  <h3 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">5. Хранение и удаление</h3>
+                  <h2 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">5. Хранение и удаление</h2>
                   <p>Вы можете в любой момент изменить или удалить свои данные через настройки профиля. При удалении аккаунта вся ваша личная информация безвозвратно удаляется из наших баз данных.</p>
                 </section>
               </>
             ) : (
               <>
                 <section>
-                  <h3 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">1. General Provisions</h3>
+                  <h2 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">1. General Provisions</h2>
                   <p>This Privacy Policy defines how the SwiftMatch application (hereinafter — "Application") collects, uses, and protects information about users.</p>
                 </section>
                 <section>
-                  <h3 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">2. Information Collection</h3>
+                  <h2 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">2. Information Collection</h2>
                   <p>We collect information that you provide during registration and use of the Application:</p>
                   <ul className="list-disc pl-5 space-y-1">
                     <li>Profile data (name, age, gender, interests, bio);</li>
@@ -78,7 +78,7 @@ export default function PrivacyPolicyPage() {
                   </ul>
                 </section>
                 <section>
-                  <h3 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">3. Use of Data</h3>
+                  <h2 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">3. Use of Data</h2>
                   <p>Your data is used exclusively for:</p>
                   <ul className="list-disc pl-5 space-y-1">
                     <li>Operation of matching algorithms;</li>
@@ -88,11 +88,11 @@ export default function PrivacyPolicyPage() {
                   </ul>
                 </section>
                 <section>
-                  <h3 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">4. Information Protection</h3>
+                  <h2 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">4. Information Protection</h2>
                   <p>We use modern encryption protocols and Firebase (Google Cloud) technologies to ensure the security of your data. Only you and your correspondent have access to your private messages.</p>
                 </section>
                 <section>
-                  <h3 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">5. Storage and Deletion</h3>
+                  <h2 className="font-black text-foreground uppercase tracking-wider text-xs mb-2">5. Storage and Deletion</h2>
                   <p>You can change or delete your data at any time via profile settings. Upon account deletion, all your personal information is permanently removed from our databases.</p>
                 </section>
               </>
