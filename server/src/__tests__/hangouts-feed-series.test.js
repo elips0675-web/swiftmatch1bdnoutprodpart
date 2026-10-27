@@ -98,6 +98,20 @@ describe('GET /api/hangouts: фильтры и пагинация', () => {
     expect(params).toEqual([50, 0])
   })
 
+  it('координаты без радиуса дают радиус по умолчанию в основном и счётном запросах', async () => {
+    pool.query
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ total: 0 }], []])
+    const res = await request(app).get('/api/hangouts').query({ lat: '55.75', lng: '37.61' })
+    expect(res.status).toBe(200)
+    const [sql, params] = pool.query.mock.calls[0]
+    expect(sql).toContain('HAVING distance_km <= ?')
+    expect(params).toEqual([37.61, 55.75, 50, 20, 0])
+    const [countSql, countParams] = pool.query.mock.calls[1]
+    expect(countSql).toContain('<= ?')
+    expect(countParams).toEqual([37.61, 55.75, 50])
+  })
+
   it('ошибка БД — 500', async () => {
     pool.query.mockRejectedValueOnce(new Error('boom'))
     const res = await request(app).get('/api/hangouts')
@@ -142,6 +156,30 @@ describe('Серии: ошибки', () => {
     const res = await request(app).put('/api/hangouts/5/series').set(as()).send({ series_id: 3 })
     expect(res.status).toBe(500)
     expect(logger.error).toHaveBeenCalledWith('Hangout series assign error:', expect.any(Error))
+  })
+})
+
+describe('Серии: создание', () => {
+  it('описание очищается и сохраняется вместе с заголовком', async () => {
+    pool.query.mockResolvedValueOnce([{ insertId: 42 }, []])
+    const res = await request(app)
+      .post('/api/hangouts/series')
+      .set(as())
+      .send({ title: 'Серия', description: 'Кино по пятницам' })
+    expect(res.status).toBe(201)
+    expect(res.body).toEqual({ id: 42, title: 'Серия', description: 'Кино по пятницам' })
+    expect(pool.query.mock.calls[0][1]).toEqual(['Серия', 'Кино по пятницам', 1])
+  })
+
+  it('описание из одних тегов сохраняется как NULL', async () => {
+    pool.query.mockResolvedValueOnce([{ insertId: 43 }, []])
+    const res = await request(app)
+      .post('/api/hangouts/series')
+      .set(as())
+      .send({ title: 'Серия', description: '<b></b>' })
+    expect(res.status).toBe(201)
+    expect(res.body.description).toBeNull()
+    expect(pool.query.mock.calls[0][1]).toEqual(['Серия', null, 1])
   })
 })
 
