@@ -340,6 +340,21 @@ describe('DELETE /api/hangouts/:id: границы и уведомления', (
     expect(logger.error).toHaveBeenCalledWith('Hangout cancel realtime emit failed:', expect.any(Error))
   })
 
+  it('сокеты не подняты — уведомление сохраняется, эмитов нет', async () => {
+    getIO.mockReturnValueOnce(null)
+    pool.query
+      .mockResolvedValueOnce([[{ user_id: 1, status: 'active' }], []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([[{ user_id: 2 }], []])
+      .mockResolvedValueOnce([{ insertId: 200 }, []])
+      .mockResolvedValueOnce([[{ id: 200, user_id: 2, type: 'hangout_cancelled' }], []])
+    const res = await request(app).delete('/api/hangouts/5').set(as())
+    expect(res.status).toBe(200)
+    expect(pool.query.mock.calls.some((c) => String(c[0]).startsWith('INSERT INTO notifications'))).toBe(true)
+    expect(toMock).not.toHaveBeenCalled()
+    expect(logger.error).not.toHaveBeenCalled()
+  })
+
   it('ошибка БД — 500', async () => {
     pool.query.mockRejectedValueOnce(new Error('boom'))
     const res = await request(app).delete('/api/hangouts/5').set(as())

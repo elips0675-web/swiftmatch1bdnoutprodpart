@@ -244,6 +244,23 @@ describe('POST /api/hangouts/:id/respond', () => {
     expect(logger.warn).toHaveBeenCalledWith('Hangout pre-accept chat error (non-fatal):', expect.any(Error))
   })
 
+  it('нулевой id найденного чата не привязывает его к отклику', async () => {
+    pool.query.mockImplementation(async (sql) => {
+      const s = String(sql)
+      if (s.includes('FROM hangouts WHERE id = ?')) return [[hangoutRow()], []]
+      if (s.startsWith('INSERT INTO hangout_responses')) return [{ insertId: 11 }, []]
+      if (s.includes('SELECT c.id FROM chats c')) return [[{ id: 0 }], []]
+      if (s.includes('SELECT display_name FROM user_profiles')) return [[], []]
+      return [[], []]
+    })
+    prefsState.inApp = false
+    prefsState.push = false
+    const res = await request(app).post('/api/hangouts/5/respond').set(as(1)).send({})
+    expect(res.status).toBe(201)
+    expect(res.body.chat_id).toBe(0)
+    expect(pool.query.mock.calls.some((c) => String(c[0]).includes('INSERT IGNORE INTO hangout_chats'))).toBe(false)
+  })
+
   it('пустое сообщение сохраняется как NULL', async () => {
     pool.query.mockImplementation(async (sql) => {
       const s = String(sql)
@@ -545,6 +562,16 @@ describe('PUT /api/hangouts/:id/responses/:responseId', () => {
     expect(pool.query.mock.calls.some((c) => String(c[0]).startsWith('INSERT INTO notifications'))).toBe(false)
     expect(toMock).not.toHaveBeenCalled()
     expect(pushMock).toHaveBeenCalledWith(3, 'SwiftMatch', 'Автор accepted your response!')
+  })
+
+  it('принятие без сокетов: уведомление пишется, эмита нет', async () => {
+    wire()
+    ioState.down = true
+    const res = await request(app).put(route()).set(as(1)).send({ status: 'accepted' })
+    expect(res.status).toBe(200)
+    expect(pool.query.mock.calls.some((c) => String(c[0]).startsWith('INSERT INTO notifications'))).toBe(true)
+    expect(pool.query.mock.calls.some((c) => String(c[0]).includes('FROM notifications WHERE id = ?'))).toBe(false)
+    expect(toMock).not.toHaveBeenCalled()
   })
 
   it('принятие при выключенном push: уведомление есть, push нет', async () => {
