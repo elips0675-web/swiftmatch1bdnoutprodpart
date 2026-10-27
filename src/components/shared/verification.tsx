@@ -40,6 +40,12 @@ export function VerificationDialog({ open, onClose }: { open: boolean; onClose: 
       .finally(() => setLoading(false))
   }, [open])
 
+  const refreshStatus = async (token: string | null) => {
+    const res = await fetch('/api/profile/verification', { headers: token ? { Authorization: `Bearer ${token}` } : {} }).catch(() => null)
+    const payload = res?.ok ? await res.json().catch(() => null) : null
+    if (payload) setStatus(payload)
+  }
+
   const submit = async () => {
     if (!photoUrl.trim()) { toast.error(t('verification.photo_required')); return }
     setSubmitting(true)
@@ -51,13 +57,17 @@ export function VerificationDialog({ open, onClose }: { open: boolean; onClose: 
         body: JSON.stringify({ photo_url: photoUrl.trim() }),
       })
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: '' }))
-        toast.error(err.message || t('verification.submit_error')); return
+        if (res.status === 409) {
+          toast.error(t('verification.already_pending'))
+          await refreshStatus(token)
+        } else {
+          toast.error(t('verification.submit_error'))
+        }
+        return
       }
       toast.success(t('verification.submitted'))
       setPhotoUrl('')
-      const updated = await fetch('/api/profile/verification', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-      if (updated.ok) setStatus(await updated.json())
+      await refreshStatus(token)
     } catch {
       toast.error(t('verification.submit_error'))
     } finally { setSubmitting(false) }
