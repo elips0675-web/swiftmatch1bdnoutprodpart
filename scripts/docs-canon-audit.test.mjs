@@ -615,6 +615,31 @@ describe('структурный гейт бэклога (Что доделат�
     const text = '| ID | P | Что | Проверено |\n|---|---|---|---|\n'
     expect(ids(collectBacklogFindings(text, ''))).not.toContain('backlog-item-verified')
   })
+
+  it('пересказ «Stage N закрыл …» в открытом пункте — находка', () => {
+    const text = '2. **Покрытие ядра.** Stage 210 закрыл `iap.ts` и `push-notifications.ts`\n'
+    expect(ids(collectBacklogFindings(text, ''))).toContain('backlog-stage-history')
+  })
+
+  it('«Закрыт `файл` (Stage N…)» в открытом пункте — находка', () => {
+    const text = '- **COV-02:** Закрыт `admin-users.tsx` (Stage 164, 22.10.2026: 167 операторов)\n'
+    expect(ids(collectBacklogFindings(text, ''))).toContain('backlog-stage-history')
+  })
+
+  it('обратный порядок «закрыт … Stage N» — тоже находка', () => {
+    const text = 'Остаток закрыт на Stage 194 по всем веткам.\n'
+    expect(ids(collectBacklogFindings(text, ''))).toContain('backlog-stage-history')
+  })
+
+  it('заголовок с маркером закрытия и шапка-блокквот — не находка', () => {
+    const text = '> **Точка остановки:** этапы закрыты по Stage 211 включительно\n\n### COV-03 — остаток (закрыт Stage 162, 22.10.2026)\n'
+    expect(collectBacklogFindings(text, '')).toEqual([])
+  })
+
+  it('раздел «Принятые решения» и правила цитируют этап законно', () => {
+    const text = '## ✅ Принятые решения\n\n- **Замена BullMQ:** Stage 116 закрыл вопрос — отклонена, нужен Redis ≥ 6.2\n\n## Правила работы с журналами и бэклогом\n\n- **Бэклог ≠ история.** Stage 210 закрыл файл — пишем в хронику.\n'
+    expect(collectBacklogFindings(text, '')).toEqual([])
+  })
 })
 
 describe('CHANGELOG.md — публичная сводка по релизам', () => {

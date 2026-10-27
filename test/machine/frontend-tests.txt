@@ -1,5 +1,5 @@
 ===== Фронт (Vitest) =====
-2539 тестов в 153 файлах (зелёных 2539) (vitest --reporter=json)
+2575 тестов в 155 файлах (зелёных 2575) (vitest --reporter=json)
 
 # файл | тестов
 scripts/backup-smoke-gate.test.mjs | 34
@@ -13,7 +13,7 @@ scripts/check-security-headers.test.mjs | 59
 scripts/compose-logging-audit.test.mjs | 21
 scripts/dependency-audit.test.mjs | 29
 scripts/deploy-rollout-audit.test.mjs | 23
-scripts/docs-canon-audit.test.mjs | 113
+scripts/docs-canon-audit.test.mjs | 118
 scripts/e2e-cleanup.test.mjs | 11
 scripts/e2e-gate-audit.test.mjs | 36
 scripts/env-consistency-audit.test.mjs | 18
@@ -32,10 +32,10 @@ scripts/stage-facts.test.mjs | 15
 scripts/stage-preflight.test.mjs | 18
 scripts/stage-section.test.mjs | 10
 scripts/swagger-coverage-audit.test.mjs | 9
-scripts/test-counter-audit.test.mjs | 56
+scripts/test-counter-audit.test.mjs | 59
 scripts/typecheck-gate-audit.test.mjs | 17
 src/hooks/__tests__/use-background-geolocation.test.tsx | 28
-src/hooks/__tests__/use-fcm-token.test.tsx | 3
+src/hooks/__tests__/use-fcm-token.test.tsx | 15
 src/test/a11y-smoke.test.tsx | 8
 src/test/about.test.tsx | 5
 src/test/activity-list.test.tsx | 3
@@ -59,6 +59,7 @@ src/test/admin-teams.test.tsx | 14
 src/test/admin-users-merge.test.tsx | 3
 src/test/admin-users.test.tsx | 41
 src/test/admin-webhooks.test.tsx | 2
+src/test/ai-flows.test.ts | 9
 src/test/anti-screenshot.test.tsx | 7
 src/test/api.test.ts | 17
 src/test/app-header.test.tsx | 32
@@ -138,6 +139,7 @@ src/test/sessions-section.test.tsx | 17
 src/test/settings-privacy.test.tsx | 23
 src/test/settings.test.tsx | 12
 src/test/sidebar.test.tsx | 48
+src/test/supabase.test.ts | 7
 src/test/support-chat.test.tsx | 7
 src/test/token.test.ts | 7
 src/test/two-fa-settings.test.tsx | 2

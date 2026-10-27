@@ -97,6 +97,10 @@ describe("normalizeEol", () => {
   it("нормализует CRLF и запоминает стиль для обратной записи", () => {
     expect(normalizeEol("a\r\nb\r\n")).toEqual({ eol: "\r\n", text: "a\nb\n" });
   });
+
+  it("снимает задвоенный CR: иначе `--fix` молча не дописывает строки", () => {
+    expect(normalizeEol("a\r\r\nb\r\r\n")).toEqual({ eol: "\r\n", text: "a\nb\n" });
+  });
 });
 
 describe("countsFromVitestReport", () => {
@@ -374,6 +378,24 @@ describe("fixInventoryRows", () => {
     expect(problems.map((p) => p.message)).toEqual([
       "server/src/__tests__/b.test.js: описание — заглушка «требует описания», впиши, что покрывают тесты",
     ]);
+  });
+
+  it("CRLF-таблица: строка дописывается, окончания не портятся", () => {
+    const crlf = threeSections.replace(/\n/g, "\r\n");
+    const fixed = fixInventoryRows(crlf, perFile);
+    expect(fixed.split("\r\n")).toContain("| `server/src/__tests__/b.test.js` | ⚠️ требует описания | 3 |");
+    expect(fixed.split("\r\n")).toContain("| `server/src/__tests__/a.test.js` | старое | 16 |");
+    expect(fixed.includes("\r\r\n")).toBe(false);
+    expect(fixed.replace(/\r\n/g, "")).not.toContain("\r");
+  });
+
+  it("CRLF-таблица после `--fix`: правка числа и вставка строки не задваивают CR", () => {
+    const messy = threeSections.replace(/\n/g, "\r\r\n");
+    const { text } = normalizeEol(messy);
+    const fixed = fixInventoryRows(text, perFile);
+    expect(fixed).toContain("| `server/src/__tests__/a.test.js` | старое | 16 |");
+    expect(fixed).toContain("| `server/src/__tests__/b.test.js` | ⚠️ требует описания | 3 |");
+    expect(normalizeEol(fixed).text).toBe(fixed);
   });
 });
 

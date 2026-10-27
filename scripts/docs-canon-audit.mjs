@@ -401,6 +401,16 @@ export function collectArchiveFindings(text) {
  *     там маркеры цитируются как правило. Проверка закрыла дыру, через которую
  *     шесть закрытых пунктов (P1, P2 #17–23, P3 #26–31/#37) лежали в бэклоге
  *     как описания и копились с каждым этапом.
+ *  8. **Пересказ закрытого этапа в теле бэклога** (`backlog-stage-history`):
+ *     фразы «Stage N закрыл/закрыт …», «Закрыт `файл` …» и обратный порядок
+ *     «закрыт … Stage N» в открытом пункте — та же история, только без маркера
+ *     `✅`/`ЗАКРЫТО`, поэтому правила 6–7 её не видели. Проверка появилась
+ *     после того, как очередь этапов накопила пересказ Stage 180–208, а список
+ *     «остаются без тестов» продолжал называть файлы, закрытые Stage 210.
+ *     Исключения: заголовки (у закрытого пункта маркер живёт в заголовке),
+ *     шапка-блокквот, раздел «Правила…» (там правило цитируется) и разделы
+ *     «Принятые решения»/«Не брать» (там этап — обоснование решения, а не
+ *     пересказ закрытой работы).
  */
 export const TODO_JOURNAL = 'Что доделать.txt'
 export const DONE_JOURNAL = 'Что сделано.txt'
@@ -422,6 +432,14 @@ export const STRIKETHROUGH_RE = /~~/
  */
 export const REOPENED_MARKER_RE = /открыт[оа]\s*:/i
 export const RULES_SECTION_RE = /^##\s+Правила работы с журналами/
+/**
+ * Пересказ закрытого этапа в открытом пункте: «Stage N закрыл/закрыт …»,
+ * «Закрыт `файл` …» или «закрыт … Stage N». Маркера `✅`/`ЗАКРЫТО` тут нет,
+ * поэтому `backlog-closed-line` и `backlog-closed-body` такие строки пропускают.
+ */
+export const STAGE_HISTORY_RE = /(?:Stage\s+\d+[^\n]{0,60}?(?:закрыл|закрыт)|(?:закрыл|закрыт)[^\n]{0,40}?Stage\s+\d+|Закрыт[аоы]?\s+`[^`]+`)/i
+/** Разделы, где номер этапа — обоснование решения, а не пересказ закрытой работы. */
+export const DECISION_SECTION_RE = /(?:Принятые решения|Не брать)/
 
 /** Объём бэклога: сигнал, что в него снова пишут историю, а не открытые пункты. */
 export const BACKLOG_MAX_LINES = 1500
@@ -455,6 +473,22 @@ export function collectBacklogFindings(todoText, doneText) {
     for (let j = rulesAt + 1; j < lines.length; j++) {
       if (/^##\s/.test(lines[j])) { rulesEnd = j; break }
     }
+  }
+  const decisionStarts = lines
+    .map((line, i) => (/^##\s/.test(line) && DECISION_SECTION_RE.test(line) ? i : -1))
+    .filter((i) => i >= 0)
+  const inDecisionSection = (i) => {
+    if (!decisionStarts.length) return false
+    let head = -1
+    for (const start of decisionStarts) {
+      if (start > i) break
+      if (head === -1 || start > head) head = start
+    }
+    if (head === -1) return false
+    for (let j = head + 1; j < lines.length; j++) {
+      if (/^##\s/.test(lines[j])) return i < j
+    }
+    return true
   }
 
   const seenIds = new Map()
@@ -503,6 +537,10 @@ export function collectBacklogFindings(todoText, doneText) {
       }
     }
     const inRulesSection = rulesAt >= 0 && i >= rulesAt && i < rulesEnd
+    const isProse = !/^#{1,6}\s/.test(line) && !line.trimStart().startsWith('>')
+    if (isProse && !inRulesSection && !inDecisionSection(i) && STAGE_HISTORY_RE.test(line)) {
+      findings.push({ id: 'backlog-stage-history', file: TODO_JOURNAL, line: i + 1, text: 'пересказ закрытого этапа в теле бэклога — история живёт в «Что сделано.txt», в открытом пункте остаётся только то, что ещё не сделано' })
+    }
     const isBacklogItem = line.startsWith('|') || /^\s*(?:[-*]|\d+\.)\s/.test(line)
     if (isBacklogItem && !inRulesSection) {
       const struck = STRIKETHROUGH_RE.test(line) && !REOPENED_MARKER_RE.test(line)

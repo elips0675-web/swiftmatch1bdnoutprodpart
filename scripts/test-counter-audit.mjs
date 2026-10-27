@@ -642,10 +642,11 @@ export function fixInventoryRows(text, perFile) {
     const range = sectionRange(out, section.re)
     if (!range) continue
     const block = out.slice(range.start, range.end)
+    const eol = block.includes('\r\n') ? '\r\n' : '\n'
     const lines = block.split('\n')
     let lastRow = -1
     for (let i = 0; i < lines.length; i += 1) {
-      if (ROW_LINE_RE.test(lines[i])) lastRow = i
+      if (ROW_LINE_RE.test(lines[i].replace(/\r+$/, ''))) lastRow = i
     }
     const present = parseInventoryRows(out)
     const missing = []
@@ -656,7 +657,8 @@ export function fixInventoryRows(text, perFile) {
     }
     if (missing.length && lastRow !== -1) {
       missing.sort()
-      lines.splice(lastRow + 1, 0, ...missing)
+      const inserted = missing.map((line) => (eol === '\r\n' ? `${line}\r` : line))
+      lines.splice(lastRow + 1, 0, ...inserted)
       out = out.slice(0, range.start) + lines.join('\n') + out.slice(range.end)
     }
   }
@@ -711,13 +713,18 @@ function toPosix(p) {
 }
 
 /**
- * Документы в репозитории смешанные: часть в CRLF, `test/ИНВЕНТАРЬ-ТЕСТОВ.md`
- * — в LF. Многострочные шаблоны с `\n` не находят блок в CRLF-файле, поэтому
- * чтение нормализует окончания, а запись возвращает исходный стиль — иначе
- * фикс превратил бы весь файл в дифф из 400 строк.
+ * Документы в репозитории смешанные: часть в CRLF, часть в LF. Многострочные
+ * шаблоны с `\n` не находят блок в CRLF-файле, поэтому чтение нормализует
+ * окончания, а запись возвращает исходный стиль — иначе фикс превратил бы
+ * весь файл в дифф из 400 строк. `\r+\n`, а не `\r\n`: файл с задвоенным
+ * `\r\r\n` (так писал старый фикс) после снятия одного `\r` оставлял `\r`
+ * в конце каждой строки, `ROW_LINE_RE` переставал видеть таблицу, и `--fix`
+ * молча не дописывал ни одной строки, отчитываясь об успехе.
  */
 export function normalizeEol(raw) {
-  return raw.includes('\r\n') ? { eol: '\r\n', text: raw.replace(/\r\n/g, '\n') } : { eol: '\n', text: raw }
+  return raw.includes('\r\n')
+    ? { eol: '\r\n', text: raw.replace(/\r+\n/g, '\n') }
+    : { eol: '\n', text: raw }
 }
 
 export function countsFromVitestReport(report, root) {

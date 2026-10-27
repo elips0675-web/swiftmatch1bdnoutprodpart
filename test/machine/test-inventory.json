@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-27T06:19:29.833Z",
+  "generated": "2026-10-27T06:50:21.555Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 153,
-    "tests": 2539,
-    "passed": 2539,
+    "files": 155,
+    "tests": 2575,
+    "passed": 2575,
     "failed": 0,
     "gate": {
       "files": 32,
-      "tests": 791
+      "tests": 799
     },
     "product": {
-      "files": 121,
-      "tests": 1748
+      "files": 123,
+      "tests": 1776
     },
     "perFile": [
       {
@@ -62,7 +62,7 @@
       },
       {
         "file": "scripts/docs-canon-audit.test.mjs",
-        "tests": 113
+        "tests": 118
       },
       {
         "file": "scripts/e2e-cleanup.test.mjs",
@@ -138,7 +138,7 @@
       },
       {
         "file": "scripts/test-counter-audit.test.mjs",
-        "tests": 56
+        "tests": 59
       },
       {
         "file": "scripts/typecheck-gate-audit.test.mjs",
@@ -150,7 +150,7 @@
       },
       {
         "file": "src/hooks/__tests__/use-fcm-token.test.tsx",
-        "tests": 3
+        "tests": 15
       },
       {
         "file": "src/test/a11y-smoke.test.tsx",
@@ -243,6 +243,10 @@
       {
         "file": "src/test/admin-webhooks.test.tsx",
         "tests": 2
+      },
+      {
+        "file": "src/test/ai-flows.test.ts",
+        "tests": 9
       },
       {
         "file": "src/test/anti-screenshot.test.tsx",
@@ -559,6 +563,10 @@
       {
         "file": "src/test/sidebar.test.tsx",
         "tests": 48
+      },
+      {
+        "file": "src/test/supabase.test.ts",
+        "tests": 7
       },
       {
         "file": "src/test/support-chat.test.tsx",
@@ -1401,7 +1409,7 @@
     ]
   },
   "total": {
-    "files": 316,
-    "tests": 5298
+    "files": 318,
+    "tests": 5334
   }
 }
