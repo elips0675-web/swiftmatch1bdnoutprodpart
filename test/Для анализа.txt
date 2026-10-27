@@ -34,7 +34,7 @@ Node.js/Express + MySQL (mysql2) бэкенд, Socket.IO real-time, Capacitor An
 
 ## Статус проверок (26.10.2026, после Stage 200)
 
-- Тесты **5249/5249**: сервер 2759/2759 (163 файла), фронт 2490/2490 (150 файлов: 32 из них — тесты гейтов в `scripts/`), E2E 206 в 22 спеках — живой полный прогон на HEAD 26.10.2026 (Stage 200) за 4.7 мин, exit 0, без flaky, очистка `globalTeardown`. Гейты: все 27 локальных зелёные (Stage 196–200 закрыли `typecheck`, `secrets-leak`, `server/ audit:prod`, `hookTimeout`, периметр compose, живой E2E); 33 джобы `ci.yml` + 7 `deploy.yml`.
+- Тесты **5298/5298**: сервер 2759/2759 (163 файла), фронт 2539/2539 (153 файлов: 32 из них — тесты гейтов в `scripts/`), E2E 206 в 22 спеках — живой полный прогон на HEAD 26.10.2026 (Stage 200) за 4.7 мин, exit 0, без flaky, очистка `globalTeardown`. Гейты: все 27 локальных зелёные (Stage 196–200 закрыли `typecheck`, `secrets-leak`, `server/ audit:prod`, `hookTimeout`, периметр compose, живой E2E); 33 джобы `ci.yml` + 7 `deploy.yml`.
 - `vite build` — OK (2.08 с после Stage 196; бандл 391.8 KB initial JS из 500, 18.9 KB initial CSS из 40). **`tsc --noEmit` — 0 ошибок** (CI-02 закрыт Stage 196), eslint — 0 errors, **177 warnings** (151 из них `no-explicit-any`). Swagger — OK.
 - E2E: Playwright, storageState из global-setup (.auth/*.json), аудит console-errors на каждой странице, screenshot/video/trace на падение; независимая очистка БД `scripts/e2e-cleanup.mjs` шагом с `if: always()`.
 - Смоук консоли (`npm run check:console`): **39 страниц**, console-ошибок/pageerror/5xx — 0, предупреждений Recharts `width(-1)`/`height(-1)` нет (UI-02 закрыт Stage 201); страница `/admin/monetization` добавлена в список проверки — раньше она не проверялась вовсе.

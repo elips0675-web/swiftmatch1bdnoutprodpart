@@ -1,19 +1,19 @@
 {
-  "generated": "2026-10-27T05:58:33.648Z",
+  "generated": "2026-10-27T06:19:29.833Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 150,
-    "tests": 2490,
-    "passed": 2490,
+    "files": 153,
+    "tests": 2539,
+    "passed": 2539,
     "failed": 0,
     "gate": {
       "files": 32,
       "tests": 791
     },
     "product": {
-      "files": 118,
-      "tests": 1699
+      "files": 121,
+      "tests": 1748
     },
     "perFile": [
       {
@@ -245,6 +245,10 @@
         "tests": 2
       },
       {
+        "file": "src/test/anti-screenshot.test.tsx",
+        "tests": 7
+      },
+      {
         "file": "src/test/api.test.ts",
         "tests": 17
       },
@@ -385,6 +389,10 @@
         "tests": 11
       },
       {
+        "file": "src/test/iap.test.ts",
+        "tests": 26
+      },
+      {
         "file": "src/test/impersonation-banner.test.tsx",
         "tests": 2
       },
@@ -487,6 +495,10 @@
       {
         "file": "src/test/profile.test.tsx",
         "tests": 65
+      },
+      {
+        "file": "src/test/push-notifications.test.ts",
+        "tests": 16
       },
       {
         "file": "src/test/pwa-install-banner.test.tsx",
@@ -1389,7 +1401,7 @@
     ]
   },
   "total": {
-    "files": 313,
-    "tests": 5249
+    "files": 316,
+    "tests": 5298
   }
 }

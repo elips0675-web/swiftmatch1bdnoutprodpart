@@ -1,5 +1,5 @@
 ===== Фронт (Vitest) =====
-2490 тестов в 150 файлах (зелёных 2490) (vitest --reporter=json)
+2539 тестов в 153 файлах (зелёных 2539) (vitest --reporter=json)
 
 # файл | тестов
 scripts/backup-smoke-gate.test.mjs | 34
@@ -59,6 +59,7 @@ src/test/admin-teams.test.tsx | 14
 src/test/admin-users-merge.test.tsx | 3
 src/test/admin-users.test.tsx | 41
 src/test/admin-webhooks.test.tsx | 2
+src/test/anti-screenshot.test.tsx | 7
 src/test/api.test.ts | 17
 src/test/app-header.test.tsx | 32
 src/test/app.test.tsx | 91
@@ -94,6 +95,7 @@ src/test/hangouts.test.tsx | 35
 src/test/home-hangouts.test.tsx | 2
 src/test/home.test.tsx | 8
 src/test/i18n-parity.test.ts | 11
+src/test/iap.test.ts | 26
 src/test/impersonation-banner.test.tsx | 2
 src/test/impersonation.test.ts | 4
 src/test/language-context.test.tsx | 6
@@ -120,6 +122,7 @@ src/test/profile-attachment-test.test.tsx | 10
 src/test/profile-edit.test.tsx | 62
 src/test/profile-watching.test.tsx | 4
 src/test/profile.test.tsx | 65
+src/test/push-notifications.test.ts | 16
 src/test/pwa-install-banner.test.tsx | 18
 src/test/register.test.tsx | 9
 src/test/reset-password.test.tsx | 7

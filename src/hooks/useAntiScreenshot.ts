@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useRef, useEffect, useCallback } from "react";
 
 let styleInjected = false;
 
@@ -61,33 +61,4 @@ export function useAntiScreenshot<T extends HTMLElement>() {
   }, [handleContextMenu, handleCopy, handleKeyDown]);
 
   return ref;
-}
-
-export function useScreenshotDetection(callback?: () => void) {
-  const [isBlurred, setIsBlurred] = useState(false);
-
-  useEffect(() => {
-    const handleVisibility = () => {
-      const hidden = document.hidden;
-      setIsBlurred(hidden);
-      if (hidden) callback?.();
-    };
-    const handleBlur = () => {
-      setIsBlurred(true);
-      callback?.();
-    };
-    const handleFocus = () => setIsBlurred(false);
-
-    document.addEventListener("visibilitychange", handleVisibility);
-    window.addEventListener("blur", handleBlur);
-    window.addEventListener("focus", handleFocus);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibility);
-      window.removeEventListener("blur", handleBlur);
-      window.removeEventListener("focus", handleFocus);
-    };
-  }, [callback]);
-
-  return isBlurred;
 }

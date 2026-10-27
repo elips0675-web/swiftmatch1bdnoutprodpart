@@ -27,15 +27,18 @@ async function loadPurchases(): Promise<boolean> {
   } catch {
     Purchases = null
   }
-  purchasesLoaded = true
-  return !!Purchases
+  purchasesLoaded = !!Purchases
+  return purchasesLoaded
 }
 
 function decodeUserIdFromToken(): number | null {
   const token = getToken()
   if (!token) return null
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
+    const part = token.split('.')[1]
+    if (!part) return null
+    const base64 = part.replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=')))
     return typeof payload.userId === 'number' ? payload.userId : null
   } catch {
     return null

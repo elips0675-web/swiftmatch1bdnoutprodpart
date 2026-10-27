@@ -68,12 +68,15 @@ export async function unsubscribeFromPush() {
     if (subscription) {
       const token = getToken()
       const subJSON = subscription.toJSON()
-      await fetch('/api/push/subscribe', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ endpoint: subJSON.endpoint }),
-      })
-      await subscription.unsubscribe()
+      try {
+        await fetch('/api/push/subscribe', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ endpoint: subJSON.endpoint }),
+        })
+      } finally {
+        await subscription.unsubscribe()
+      }
     }
   } catch (err) {
     if (import.meta.env.DEV) console.error('Push unsubscribe failed:', err)
