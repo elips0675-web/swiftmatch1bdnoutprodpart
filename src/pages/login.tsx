@@ -22,6 +22,18 @@ import { useLanguage } from "@/context/language-context";
 import { setToken } from "@/lib/token";
 import { useTrackEvent } from "@/hooks/useExperiment";
 
+interface LoginResponse {
+  token: string;
+  refresh_token?: string;
+  email_verified?: boolean;
+  message?: string;
+}
+
+const AUTH_ERROR_KEYS: Record<string, string> = {
+  TOTP_REQUIRED: 'auth.totp_required',
+  TOTP_INVALID: 'auth.totp_invalid',
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -54,7 +66,7 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
+      const data = await response.json() as LoginResponse;
 
       if (response.ok) {
         setToken(data.token);
@@ -70,9 +82,10 @@ export default function LoginPage() {
           description: t('auth.welcome_back_desc'),
         });
       } else {
+        const descriptionKey = AUTH_ERROR_KEYS[data.message || ''] || (response.status === 429 ? 'auth.too_many_attempts' : 'auth.login_error_desc');
         toast({
           title: t('auth.login_error'),
-          description: data.message || t('auth.login_error_desc'),
+          description: t(descriptionKey),
           variant: "destructive",
         });
       }
@@ -94,16 +107,16 @@ export default function LoginPage() {
       const { getSupabase } = await import('@/lib/supabase')
       const supabase = getSupabase()
       if (!supabase) {
-        toast({ title: 'Supabase not configured', variant: "destructive" })
+        toast({ title: t('auth.google_unavailable'), variant: "destructive" })
         return
       }
       const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' })
       if (error) throw error
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (import.meta.env.DEV) console.error("Google Sign-In Error:", error);
       toast({
           title: t('auth.login_error'),
-          description: error.message || t('auth.google_login_error'),
+          description: t('auth.google_login_error'),
         variant: "destructive",
       });
     } finally {

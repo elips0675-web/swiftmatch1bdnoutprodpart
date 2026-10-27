@@ -277,6 +277,11 @@ async function main() {
       body: JSON.stringify({ email, password }),
     })
     check('POST /api/auth/login → 200 (чтение users + bcrypt)', login.status === 200, `status=${login.status}`)
+    check(
+      'login отдаёт boolean email_verified (иначе фронт всегда рисует баннер «подтвердите email»)',
+      login.body?.email_verified === false,
+      `email_verified=${JSON.stringify(login.body?.email_verified)}`,
+    )
 
     const me = await jsonFetch(`${API}/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },

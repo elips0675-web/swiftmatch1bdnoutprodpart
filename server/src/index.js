@@ -184,7 +184,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   try {
     const [rows] = await pool.query(
-      'SELECT id, email, role, password_hash, totp_secret, totp_enabled FROM users WHERE email = ? AND is_active = 1',
+      'SELECT id, email, role, password_hash, totp_secret, totp_enabled, verification_token FROM users WHERE email = ? AND is_active = 1',
       [email],
     )
     if (rows.length === 0) {
@@ -217,7 +217,7 @@ app.post('/api/auth/login', async (req, res) => {
     const fp = crypto.createHash('sha256').update((req.ip || '') + '|' + (req.headers['user-agent'] || '')).digest('hex').slice(0, 32)
     const refresh_token = await createRefreshToken(user.id, undefined, fp, req)
     setAuthCookies(res, token, refresh_token)
-    res.json({ token, refresh_token, role: user.role })
+    res.json({ token, refresh_token, role: user.role, email_verified: user.verification_token === null })
   } catch (err) {
     rootLogger.error('Login error: ' + err.message)
     res.status(500).json({ message: 'Internal server error' })
