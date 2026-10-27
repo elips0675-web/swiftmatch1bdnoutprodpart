@@ -70,5 +70,77 @@
 ## Где промты для внешних моделей
 
 Свод готовых промтов (стратегический «вывод в прод» + точечные аудиты, гейты и публикация),
-сведённый из наборов qwen и дипсик, лежит в `Промты общее.txt`. Это **библиотека промтов
+сведённый из наборов qwen и дипсик, лежит в `docs/archive/Промты общее.txt`. Это **библиотека промтов
 для внешних моделей, а не источник правил**: канон — в таблице выше.
+
+## X. Что ещё нужно проверить (приоритетно для этого проекта)
+
+> Источник тестовой приоритизации: это не перечень "всех возможных тестов", а список реально недостающих проверок, которые закрывают риск на проде. Если AI используется в конкретном сценарии — тесты нужны; если AI не участвует — фокус на функциональные регрессии и продовые сценарии.
+
+### Критично и без этого нельзя выпускать
+
+1. **Auth / session / refresh**
+   - refresh rotation + reuse detection + family invalidation;
+   - cookie vs Bearer в дев/прод и нативной сборке;
+   - logout-all / revoke-on-password-change;
+   - lockout после 5 неудачных входов.
+2. **Payments / subscriptions / webhooks**
+   - Stripe checkout success/failure/replay;
+   - webhook idempotency и double-delivery;
+   - RevenueCat / IAP live path после ключей;
+   - `STRIPE_NOT_CONFIGURED` fail-closed в prod без ключей.
+3. **Uploads / photos / S3**
+   - local vs S3, resize/cleanup, dead links, deletion cleanup;
+   - moderation flow safe/unsafe/null;
+   - file size, mime validation and permission boundaries.
+4. **Push / notifications / WS**
+   - delivery to real devices, quiet hours, unread counters, WS reconnect and session reverify;
+   - fallback when push provider is unavailable.
+5. **Hangouts / partners / booking**
+   - create → response → accept → chat flow;
+   - capacity, date validation, payment gating, partner deeplink and bookings;
+   - permissions for one user to another user’s offer or private data.
+6. **Admin + moderation**
+   - ban/unban/impersonation, audit logs, moderation queues, report flow, admin-auth scopes.
+
+### AI / prompt проверки — только там, где AI реально используется
+
+- `icebreakers` / suggest flows: openai empty, timeout, fallback to DB, language switching.
+- `hangouts suggest` / AI matching: fallback path, prompt sanitation, empty content, unknown data.
+- `moderateText` / `moderateImage`: unsafe vs safe vs null; fail-closed without keys.
+- `profile bio` / content generation injections: prompt injection boundaries, sanitized output, no raw HTML.
+
+### Можно отложить, но не забыть
+
+- cross-browser smoke;
+- mobile native WebView-only spec;
+- deep analytics style assertions, not critical for first release;
+- broad Storybook/design-system pass;
+- cosmetic i18n exhaustiveness beyond live routes.
+
+### Порядок запуска
+
+1. auth/session/refresh;
+2. payments + webhooks;
+3. upload + S3 + moderation;
+4. push/WS;
+5. hangouts/partners/booking;
+6. admin/moderation;
+7. AI/prompt tests only for actual AI entry points.
+
+### Критерий готовности
+
+Релиз нельзя считать готовым, пока не зелёные:
+- 1) живой smoke auth/session/refresh;
+- 2) live payment webhook smoke;
+- 3) upload + moderation smoke;
+- 4) push + notification smoke;
+- 5) one full happy-path E2E for key monetization and matching flow.
+
+## Универсальный промт этапа
+
+> Источник истины: `docs/AGENTS-workflow.md` — секция `## Универсальный промт этапа (цикл, не привязанный к пункту очереди)`.
+>
+> Если в любом запросе написано: «сделай всё этапами автоматически», «по универсальному промту этапа», «по очереди этапов» — использовать именно этот блок, а не локальные копии, не пересказы и не архивные файлы.
+>
+> Правило: один источник → один цикл → одна логика проверки: чтение → план → фиксы → тесты → верификация → журнал → следующий этап.

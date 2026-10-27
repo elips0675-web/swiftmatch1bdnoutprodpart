@@ -76,7 +76,7 @@ import { execFileSync } from 'node:child_process'
 
 export const PROMPTS_INDEX = 'Промты.txt'
 export const ROADMAP_FILE = 'docs/product-roadmap.md'
-export const ARCHIVE_FILE = 'context.txt'
+export const ARCHIVE_FILE = 'docs/archive/context.txt'
 export const CI_WORKFLOW = '.github/workflows/ci.yml'
 export const DEPLOY_WORKFLOW = '.github/workflows/deploy.yml'
 export const CI_JOB = 'docs-canon'
