@@ -223,6 +223,28 @@ describe('GET /api/chats/:chatId/messages', () => {
     expect(res.body.messages[0].reply_text).toBe('orig')
     expect(res.body.messages[0].reply_sender_name).toBe('Bob')
   })
+
+  it('карточка брони: SQL отдаёт card_type/card_payload, а не только текст', async () => {
+    pool.query
+      .mockResolvedValueOnce([[{ chat_id: 1 }], []])
+      .mockResolvedValueOnce([[{
+        id: 9,
+        sender_id: 1,
+        text: 'Ужин на двоих',
+        card_type: 'booking',
+        card_payload: '{"title":"Ужин на двоих"}',
+        created_at: new Date().toISOString(),
+      }], []])
+      .mockResolvedValueOnce([[{ user_id: 2, last_read_at: null }], []])
+      .mockResolvedValueOnce([[], []])
+    const res = await get()
+    expect(res.status).toBe(200)
+    const [sql] = pool.query.mock.calls[1]
+    expect(sql).toMatch(/m\.card_type/)
+    expect(sql).toMatch(/m\.card_payload/)
+    expect(res.body.messages[0].card_type).toBe('booking')
+    expect(res.body.messages[0].card_payload).toContain('Ужин на двоих')
+  })
 })
 
 describe('POST /api/chats/:chatId/messages', () => {
@@ -243,6 +265,9 @@ describe('POST /api/chats/:chatId/messages', () => {
     const insertCall = pool.query.mock.calls.find(([sql]) => /INSERT INTO messages/.test(sql))
     expect(insertCall).toBeTruthy()
     expect(insertCall[1]).toEqual(['1', 1, 'hi', null, null, null])
+    const selectCall = pool.query.mock.calls.find(([sql]) => /FROM messages m/.test(sql))
+    expect(String(selectCall[0])).toMatch(/m\.card_type/)
+    expect(String(selectCall[0])).toMatch(/m\.card_payload/)
     expect(pool.query.mock.calls.filter(([sql]) => /SELECT id FROM messages WHERE id = \? AND chat_id = \?/.test(sql))).toHaveLength(0)
   })
 
@@ -313,6 +338,9 @@ describe('PUT /api/chats/:chatId/messages/:msgId', () => {
     expect(res.status).toBe(200)
     expect(res.body.text).toBe('новый текст')
     expect(res.body.edited_at).toBeTruthy()
+    const selectCall = pool.query.mock.calls.find(([sql]) => /FROM messages m/.test(sql))
+    expect(String(selectCall[0])).toMatch(/m\.card_type/)
+    expect(String(selectCall[0])).toMatch(/m\.card_payload/)
     expect(io.to).toHaveBeenCalledWith('user:2')
     expect(emit).toHaveBeenCalledWith('chat:message-edited', { chatId: 1, message: expect.objectContaining({ text: 'новый текст' }) })
   })

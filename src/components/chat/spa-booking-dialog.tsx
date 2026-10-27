@@ -13,9 +13,10 @@ interface Props {
   chatId?: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onShared?: () => void;
 }
 
-export function SpaBookingDialog({ offer, chatId, open, onOpenChange }: Props) {
+export function SpaBookingDialog({ offer, chatId, open, onOpenChange, onShared }: Props) {
   const { t } = useLanguage();
   const [date, setDate] = useState("");
   const [time, setTime] = useState("12:00");
@@ -72,6 +73,7 @@ export function SpaBookingDialog({ offer, chatId, open, onOpenChange }: Props) {
           return;
         }
         setShared(true);
+        onShared?.();
       }
     } catch {
       setError(t("partner.spa.error"));

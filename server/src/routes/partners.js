@@ -709,7 +709,7 @@ router.post('/api/partners/booking', auth, async (req, res) => {
  * /api/partners/booking/share:
  *   post:
  *     tags: [Partners]
- *     summary: Share a restaurant booking card in a chat (WS event)
+ *     summary: Share a booking card as a chat message
  *     security:
  *       - bearerAuth: []
  */
@@ -723,12 +723,12 @@ router.post('/api/partners/booking/share', auth, async (req, res) => {
   }
   try {
     const [[offer]] = await pool.query(
-      `SELECT o.id, o.title, o.deeplink, o.city, p.name AS partner_name
+      `SELECT o.id, o.title, o.deeplink, o.city, o.category, p.name AS partner_name
        FROM partner_offers o JOIN partners p ON p.id = o.partner_id
-       WHERE o.id = ? AND o.category = 'restaurant' AND o.status = 'active' LIMIT 1`,
+       WHERE o.id = ? AND o.category IN ('restaurant','spa','experience') AND o.status = 'active' LIMIT 1`,
       [offerId],
     )
-    if (!offer) return res.status(404).json({ message: 'Restaurant not found' })
+    if (!offer) return res.status(404).json({ message: 'Offer not found' })
 
     const [[participant]] = await pool.query(
       'SELECT user_id FROM chat_participants WHERE chat_id = ? AND user_id = ? LIMIT 1',
@@ -738,8 +738,9 @@ router.post('/api/partners/booking/share', auth, async (req, res) => {
 
     const guestsCount = Math.min(Math.max(Number(guests) || 2, 1), 20)
     const card = {
-      type: 'restaurant_shared',
-      restaurant: offer.title,
+      type: 'booking',
+      category: offer.category,
+      title: offer.title,
       partner_name: offer.partner_name,
       date: date || null,
       time: time || null,
@@ -748,18 +749,40 @@ router.post('/api/partners/booking/share', auth, async (req, res) => {
       city: offer.city,
     }
 
-    try {
-      const ws = getIO()
-      if (ws) {
-        ws.to(`chat:${chatId}`).emit('partner:restaurant_shared', {
-          chatId: Number(chatId),
-          senderId: req.userId,
-          card,
-        })
-      }
-    } catch {}
+    const [inserted] = await pool.query(
+      'INSERT INTO messages (chat_id, sender_id, text, card_type, card_payload) VALUES (?, ?, ?, ?, ?)',
+      [chatId, req.userId, offer.title, 'booking', JSON.stringify(card)],
+    )
+    await pool.query(
+      'UPDATE chats SET last_message = ?, last_sender_id = ?, updated_at = NOW() WHERE id = ?',
+      [offer.title, req.userId, chatId],
+    )
 
-    res.json({ shared: true })
+    const [[msg]] = await pool.query(
+      `SELECT m.id, m.chat_id, m.sender_id, m.text, m.card_type, m.card_payload, m.created_at,
+              up.display_name AS sender_name
+       FROM messages m JOIN user_profiles up ON m.sender_id = up.id
+       WHERE m.id = ?`,
+      [inserted.insertId],
+    )
+
+    const [others] = await pool.query(
+      'SELECT user_id FROM chat_participants WHERE chat_id = ? AND user_id != ? LIMIT 1',
+      [chatId, req.userId],
+    )
+    if (others.length > 0) {
+      try {
+        const ws = getIO()
+        if (ws) {
+          ws.to(`user:${others[0].user_id}`).emit('chat:message', {
+            chatId: Number(chatId),
+            message: msg,
+          })
+        }
+      } catch {}
+    }
+
+    res.status(201).json({ shared: true, message: msg, card })
   } catch (err) {
     logger.error('Partner booking share error:', err)
     res.status(500).json({ message: 'Failed to share booking' })

@@ -41,6 +41,7 @@ vi.mock('../cache.js', () => ({
 
 import pool from '../db.js'
 import logger from '../logger.js'
+import { getIO } from '../ws.js'
 import partnersRoutes from '../routes/partners.js'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'test-secret'
@@ -346,36 +347,92 @@ describe('POST /api/partners/booking/share', () => {
     expect(pool.query).not.toHaveBeenCalled()
   })
 
-  it('ресторан не найден — 404', async () => {
-    const res = await request(app).post('/api/partners/booking/share').set(as()).send({ chat_id: 5, offer_id: 8 })
+  const shareOffer = (over = {}) => ({
+    id: 8, title: 'Ресторан', deeplink: '', city: 'Сочи', category: 'restaurant', partner_name: 'R', ...over,
+  })
+  const shareMessage = {
+    id: 101, chat_id: 5, sender_id: 1, text: 'Ресторан', card_type: 'booking', card_payload: {}, created_at: '2026-11-01T10:00:00.000Z', sender_name: 'Я',
+  }
+
+  const wireShare = (over = {}) => {
+    const state = { offer: shareOffer(), participant: [{ user_id: 1 }], others: [{ user_id: 2 }], message: shareMessage, ...over }
+    pool.query.mockImplementation(async (sql) => {
+      const s = String(sql)
+      if (s.includes('FROM partner_offers o')) {
+        const allowed = ['restaurant', 'spa', 'experience'].filter((c) => s.includes(`'${c}'`))
+        return state.offer && allowed.includes(state.offer.category) ? [[state.offer], []] : [[], []]
+      }
+      if (s.includes('user_id != ?')) return [state.others, []]
+      if (s.includes('FROM chat_participants')) return [state.participant, []]
+      if (s.startsWith('INSERT INTO messages')) return [{ insertId: 101 }, []]
+      if (s.startsWith('UPDATE chats')) return [{}, []]
+      if (s.includes('FROM messages m JOIN user_profiles')) return [[state.message], []]
+      return [[], []]
+    })
+    return state
+  }
+
+  it('оффер не найден или категория не из бронируемых — 404', async () => {
+    wireShare({ offer: null })
+    let res = await request(app).post('/api/partners/booking/share').set(as()).send({ chat_id: 5, offer_id: 8 })
     expect(res.status).toBe(404)
+
+    wireShare({ offer: shareOffer({ category: 'hotel' }) })
+    res = await request(app).post('/api/partners/booking/share').set(as()).send({ chat_id: 5, offer_id: 8 })
+    expect(res.status).toBe(404)
+    expect(pool.query.mock.calls.some((c) => String(c[0]).startsWith('INSERT INTO messages'))).toBe(false)
   })
 
   it('не участник чата — 403', async () => {
-    pool.query
-      .mockResolvedValueOnce([[{ id: 8, title: 'Ресторан', deeplink: '', city: 'Сочи', partner_name: 'R' }], []])
-      .mockResolvedValueOnce([[], []])
+    wireShare({ participant: [] })
     const res = await request(app).post('/api/partners/booking/share').set(as()).send({ chat_id: 5, offer_id: 8 })
     expect(res.status).toBe(403)
     expect(emitMock).not.toHaveBeenCalled()
+    expect(pool.query.mock.calls.some((c) => String(c[0]).startsWith('INSERT INTO messages'))).toBe(false)
   })
 
-  it('карточка брони уходит в комнату чата по WS', async () => {
-    pool.query
-      .mockResolvedValueOnce([[{ id: 8, title: 'Ресторан', deeplink: '', city: 'Сочи', partner_name: 'R' }], []])
-      .mockResolvedValueOnce([[{ user_id: 1 }], []])
+  it('бронь пишется в messages карточкой и уходит получателю по WS', async () => {
+    wireShare()
     const res = await request(app)
       .post('/api/partners/booking/share')
       .set(as())
       .send({ chat_id: 5, offer_id: 8, date: '2026-11-01', time: '19:00', guests: 2, message: 'идём?' })
-    expect(res.status).toBe(200)
-    expect(res.body).toEqual({ shared: true })
-    expect(toMock).toHaveBeenCalledWith('chat:5')
-    expect(emitMock).toHaveBeenCalledWith('partner:restaurant_shared', expect.objectContaining({
-      chatId: 5,
-      senderId: 1,
-      card: expect.objectContaining({ type: 'restaurant_shared', restaurant: 'Ресторан', message: 'идём?' }),
-    }))
+
+    expect(res.status).toBe(201)
+    expect(res.body).toEqual({ shared: true, message: shareMessage, card: expect.objectContaining({ type: 'booking', title: 'Ресторан', message: 'идём?' }) })
+
+    const insert = pool.query.mock.calls.find((c) => String(c[0]).startsWith('INSERT INTO messages'))
+    expect(insert[1]).toEqual([5, 1, 'Ресторан', 'booking', expect.any(String)])
+    expect(JSON.parse(insert[1][4])).toMatchObject({ type: 'booking', category: 'restaurant', date: '2026-11-01', time: '19:00', message: 'идём?' })
+    expect(pool.query.mock.calls.some((c) => String(c[0]).startsWith('UPDATE chats'))).toBe(true)
+    expect(toMock).toHaveBeenCalledWith('user:2')
+    expect(emitMock).toHaveBeenCalledWith('chat:message', { chatId: 5, message: shareMessage })
+  })
+
+  it('спа и впечатления бронируются так же, как ресторан', async () => {
+    for (const category of ['spa', 'experience']) {
+      vi.clearAllMocks()
+      wireShare({ offer: shareOffer({ category, title: category }) })
+      const res = await request(app).post('/api/partners/booking/share').set(as()).send({ chat_id: 5, offer_id: 8 })
+      expect(res.status).toBe(201)
+      expect(res.body.card.category).toBe(category)
+    }
+  })
+
+  it('без второго участника — 201 и ни одного эмита', async () => {
+    wireShare({ others: [] })
+    const res = await request(app).post('/api/partners/booking/share').set(as()).send({ chat_id: 5, offer_id: 8 })
+    expect(res.status).toBe(201)
+    expect(toMock).not.toHaveBeenCalled()
+  })
+
+  it('сокеты не подняты — сообщение сохраняется, ответ 201', async () => {
+    wireShare()
+    getIO.mockReturnValueOnce(null)
+    const res = await request(app).post('/api/partners/booking/share').set(as()).send({ chat_id: 5, offer_id: 8 })
+    expect(res.status).toBe(201)
+    expect(pool.query.mock.calls.some((c) => String(c[0]).startsWith('INSERT INTO messages'))).toBe(true)
+    expect(emitMock).not.toHaveBeenCalled()
   })
 
   it('ошибка БД — 500', async () => {

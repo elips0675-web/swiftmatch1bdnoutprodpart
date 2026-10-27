@@ -830,6 +830,8 @@ CREATE TABLE `messages` (
   `sender_id` int unsigned NOT NULL,
   `text` text COLLATE utf8mb4_unicode_ci NOT NULL,
   `image_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `card_type` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `card_payload` json DEFAULT NULL,
   `reply_to` int unsigned DEFAULT NULL,
   `ttl_seconds` int unsigned DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,

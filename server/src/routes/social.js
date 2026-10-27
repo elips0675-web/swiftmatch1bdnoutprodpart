@@ -889,7 +889,7 @@ router.get('/api/chats/:chatId/messages', auth, async (req, res) => {
     }
 
     const [fetched] = await pool.query(
-      `SELECT m.id, m.sender_id, m.text, m.image_url, m.reply_to, m.ttl_seconds, m.created_at, m.edited_at,
+      `SELECT m.id, m.sender_id, m.text, m.image_url, m.card_type, m.card_payload, m.reply_to, m.ttl_seconds, m.created_at, m.edited_at,
               up.display_name as sender_name,
               rup.display_name as reply_sender_name,
               CASE WHEN rup.id IS NOT NULL THEN rm.text END as reply_text,
@@ -1011,7 +1011,7 @@ router.post('/api/chats/:chatId/messages', auth, chatMessageLimiter, async (req,
     )
 
     const [[msg]] = await pool.query(
-      `SELECT m.id, m.sender_id, m.text, m.image_url, m.reply_to, m.ttl_seconds, m.created_at, m.edited_at,
+      `SELECT m.id, m.sender_id, m.text, m.image_url, m.card_type, m.card_payload, m.reply_to, m.ttl_seconds, m.created_at, m.edited_at,
               up.display_name as sender_name,
               rup.display_name as reply_sender_name,
               CASE WHEN rup.id IS NOT NULL THEN rm.text END as reply_text,
@@ -1136,7 +1136,7 @@ router.put('/api/chats/:chatId/messages/:msgId', auth, async (req, res) => {
     )
 
     const [[msg]] = await pool.query(
-      `SELECT m.id, m.sender_id, m.text, m.image_url, m.reply_to, m.ttl_seconds, m.created_at, m.edited_at,
+      `SELECT m.id, m.sender_id, m.text, m.image_url, m.card_type, m.card_payload, m.reply_to, m.ttl_seconds, m.created_at, m.edited_at,
               up.display_name as sender_name,
               rup.display_name as reply_sender_name,
               CASE WHEN rup.id IS NOT NULL THEN rm.text END as reply_text,

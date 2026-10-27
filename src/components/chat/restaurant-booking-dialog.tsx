@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { UtensilsCrossed, Calendar, Clock, Users, Send, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,9 +14,10 @@ interface Props {
   chatId?: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onShared?: () => void;
 }
 
-export function RestaurantBookingDialog({ offer, chatId, open, onOpenChange }: Props) {
+export function RestaurantBookingDialog({ offer, chatId, open, onOpenChange, onShared }: Props) {
   const { t } = useLanguage();
   const [date, setDate] = useState("");
   const [time, setTime] = useState("19:00");
@@ -27,6 +28,13 @@ export function RestaurantBookingDialog({ offer, chatId, open, onOpenChange }: P
   const [shared, setShared] = useState(false);
 
   const today = new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    if (open) {
+      setError(null);
+      setShared(false);
+    }
+  }, [open]);
 
   const handleBook = async () => {
     if (!date || !time) {
@@ -57,8 +65,12 @@ export function RestaurantBookingDialog({ offer, chatId, open, onOpenChange }: P
       }
       const bookData = await bookRes.json();
 
+      if (bookData.deeplink) {
+        window.open(bookData.deeplink, "_blank", "noopener");
+      }
+
       if (chatId) {
-        await fetch("/api/partners/booking/share", {
+        const shareRes = await fetch("/api/partners/booking/share", {
           method: "POST",
           headers,
           body: JSON.stringify({
@@ -70,11 +82,12 @@ export function RestaurantBookingDialog({ offer, chatId, open, onOpenChange }: P
             message: message.trim() || undefined,
           }),
         });
+        if (!shareRes.ok) {
+          setError(t("partner.booking.share_error"));
+          return;
+        }
         setShared(true);
-      }
-
-      if (bookData.deeplink) {
-        window.open(bookData.deeplink, "_blank", "noopener");
+        onShared?.();
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t("partner.booking.error"));

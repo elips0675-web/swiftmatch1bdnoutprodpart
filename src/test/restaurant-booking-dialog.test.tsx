@@ -82,9 +82,10 @@ describe('RestaurantBookingDialog', () => {
   })
 
   it('shares booking into chat with message and closes via partner.close', async () => {
+    const onShared = vi.fn()
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
-    render(<RestaurantBookingDialog offer={mockOffer} chatId={42} open={true} onOpenChange={onOpenChange} />)
+    render(<RestaurantBookingDialog offer={mockOffer} chatId={42} open={true} onOpenChange={onOpenChange} onShared={onShared} />)
     fillDate()
     fireEvent.change(screen.getByTestId('booking-message'), { target: { value: 'Столик у окна' } })
     fireEvent.click(screen.getByTestId('confirm-booking'))
@@ -92,8 +93,40 @@ describe('RestaurantBookingDialog', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
     const shareBody = JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body))
     expect(shareBody).toMatchObject({ chat_id: 42, offer_id: 3, message: 'Столик у окна' })
+    expect(onShared).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByText('partner.close'))
     expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  it('отказ share не выдаётся за успех: ошибка, deeplink уже открыт, комнату не дёргаем', async () => {
+    const onShared = vi.fn()
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ deeplink: 'https://book.example/b2' }) })
+    fetchMock.mockResolvedValueOnce({ ok: false, json: async () => ({ message: 'Not a participant of this chat' }) })
+    render(<RestaurantBookingDialog offer={mockOffer} chatId={42} open={true} onOpenChange={onOpenChange} onShared={onShared} />)
+    fillDate()
+    fireEvent.click(screen.getByTestId('confirm-booking'))
+
+    expect(await screen.findByText('partner.booking.share_error')).toBeInTheDocument()
+    expect(screen.queryByText('partner.booking.shared')).toBeNull()
+    expect(openSpy).toHaveBeenCalledWith('https://book.example/b2', '_blank', 'noopener')
+    expect(onShared).not.toHaveBeenCalled()
+    expect(screen.getByTestId('confirm-booking')).not.toBeDisabled()
+    openSpy.mockRestore()
+  })
+
+  it('повторное открытие сбрасывает экран «отправлено» и прошлую ошибку', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+    const { rerender } = render(<RestaurantBookingDialog offer={mockOffer} chatId={42} open={true} onOpenChange={onOpenChange} />)
+    fillDate()
+    fireEvent.click(screen.getByTestId('confirm-booking'))
+    expect(await screen.findByText('partner.booking.shared')).toBeInTheDocument()
+
+    rerender(<RestaurantBookingDialog offer={mockOffer} chatId={42} open={false} onOpenChange={onOpenChange} />)
+    rerender(<RestaurantBookingDialog offer={mockOffer} chatId={42} open={true} onOpenChange={onOpenChange} />)
+    expect(screen.queryByText('partner.booking.shared')).toBeNull()
+    expect(screen.getByTestId('confirm-booking')).toBeInTheDocument()
   })
 
   it('shares booking without message: message dropped from both payloads', async () => {

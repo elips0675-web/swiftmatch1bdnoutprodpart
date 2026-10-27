@@ -227,28 +227,32 @@ describe('POST /api/partners/spa/book — фоллбэки брони', () => {
 describe('POST /api/partners/booking/share — карточка брони', () => {
   it('незаполненные дата, время и сообщение уходят в карточке как null', async () => {
     pool.query
-      .mockResolvedValueOnce([[{ id: 30, title: 'Ресторан', deeplink: '', city: 'Сочи', partner_name: 'R' }], []])
+      .mockResolvedValueOnce([[{ id: 30, title: 'Ресторан', deeplink: '', city: 'Сочи', category: 'restaurant', partner_name: 'R' }], []])
       .mockResolvedValueOnce([[{ user_id: 5 }], []])
+      .mockResolvedValueOnce([{ insertId: 77 }, []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([[{ id: 77, chat_id: 5, sender_id: 5, text: 'Ресторан', card_type: 'booking', card_payload: '{}' }], []])
+      .mockResolvedValueOnce([[{ user_id: 6 }], []])
 
     const res = await request(app)
       .post('/api/partners/booking/share')
       .set(as(5))
       .send({ chat_id: 5, offer_id: 30 })
 
-    expect(res.status).toBe(200)
-    expect(toMock).toHaveBeenCalledWith('chat:5')
-    expect(emitMock).toHaveBeenCalledWith('partner:restaurant_shared', expect.objectContaining({
-      chatId: 5,
-      senderId: 5,
-      card: expect.objectContaining({
-        type: 'restaurant_shared',
-        restaurant: 'Ресторан',
-        date: null,
-        time: null,
-        message: null,
-        guests: 2,
-      }),
+    expect(res.status).toBe(201)
+    expect(res.body.card).toEqual(expect.objectContaining({
+      type: 'booking',
+      category: 'restaurant',
+      title: 'Ресторан',
+      date: null,
+      time: null,
+      message: null,
+      guests: 2,
     }))
+    const insert = pool.query.mock.calls.find((c) => String(c[0]).startsWith('INSERT INTO messages'))
+    expect(JSON.parse(insert[1][4])).toMatchObject({ date: null, time: null, message: null, guests: 2 })
+    expect(toMock).toHaveBeenCalledWith('user:6')
+    expect(emitMock).toHaveBeenCalledWith('chat:message', expect.objectContaining({ chatId: 5 }))
   })
 })
 

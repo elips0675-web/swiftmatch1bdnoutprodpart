@@ -80,4 +80,48 @@ describe("ChatPartnerActions", () => {
       expect(container.textContent).toBe("")
     })
   })
+
+  it("передаёт chatId и onShared в диалог ресторана", async () => {
+    const onShared = vi.fn()
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([{ id: 3, partner_name: "R", category: "restaurant", title: "Ужин", description: null }]),
+      })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ shared: true }) })
+
+    render(<ChatPartnerActions placement="chat" chatId={42} onShared={onShared} />)
+    await waitFor(() => expect(screen.getByTestId("partner-action-restaurant")).toBeTruthy())
+
+    fireEvent.click(screen.getByTestId("partner-action-restaurant"))
+    fireEvent.change(screen.getByTestId("booking-date"), { target: { value: "2026-12-31" } })
+    fireEvent.click(screen.getByTestId("confirm-booking"))
+
+    await waitFor(() => expect(onShared).toHaveBeenCalledTimes(1))
+    const shareCall = mockFetch.mock.calls.find(([url]) => String(url).includes("/api/partners/booking/share"))
+    expect(JSON.parse(shareCall![1].body)).toMatchObject({ chat_id: 42, offer_id: 3 })
+  })
+
+  it("передаёт chatId и onShared в диалог спа", async () => {
+    const onShared = vi.fn()
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([{ id: 4, partner_name: "S", category: "spa", title: "Спа", description: null }]),
+      })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ shared: true }) })
+
+    render(<ChatPartnerActions placement="chat" chatId={42} onShared={onShared} />)
+    await waitFor(() => expect(screen.getByTestId("partner-action-spa")).toBeTruthy())
+
+    fireEvent.click(screen.getByTestId("partner-action-spa"))
+    fireEvent.change(screen.getByTestId("spa-date"), { target: { value: "2026-12-31" } })
+    fireEvent.click(screen.getByTestId("spa-book"))
+
+    await waitFor(() => expect(onShared).toHaveBeenCalledTimes(1))
+    const shareCall = mockFetch.mock.calls.find(([url]) => String(url).includes("/api/partners/booking/share"))
+    expect(JSON.parse(shareCall![1].body)).toMatchObject({ chat_id: 42, offer_id: 4 })
+  })
 })

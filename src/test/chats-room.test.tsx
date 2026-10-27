@@ -28,10 +28,11 @@ const h = vi.hoisted(() => {
   };
   const trackEventMock = vi.fn();
   const toastMock = vi.fn();
-  return { tokenState, authState, flagsState, wsHandlers, wsSocket, wsState, webrtcMock, trackEventMock, toastMock };
+  const partnerProps = { value: null as null | { placement?: string; chatId?: number; onShared?: () => void } };
+  return { tokenState, authState, flagsState, wsHandlers, wsSocket, wsState, webrtcMock, trackEventMock, toastMock, partnerProps };
 });
 
-const { tokenState, authState, flagsState, wsHandlers, wsSocket, wsState, webrtcMock, trackEventMock, toastMock } = h;
+const { tokenState, authState, flagsState, wsHandlers, wsSocket, wsState, webrtcMock, trackEventMock, toastMock, partnerProps } = h;
 
 vi.mock("@/lib/token", () => ({ getToken: () => h.tokenState.value }));
 
@@ -59,7 +60,10 @@ vi.mock("@/hooks/useAntiScreenshot", async () => {
 });
 
 vi.mock("@/components/chat/chat-partner-actions", () => ({
-  ChatPartnerActions: () => <div data-testid="partner-actions" />,
+  ChatPartnerActions: (props: { placement?: string; chatId?: number; onShared?: () => void }) => {
+    h.partnerProps.value = props;
+    return <div data-testid="partner-actions" />;
+  },
 }));
 
 vi.mock("@/components/opening-lines-picker", () => ({
@@ -147,6 +151,8 @@ const mockTranslations: Record<string, string> = {
   "chats.ttl_1h": "1 час",
   "chats.ttl_24h": "24 часа",
   "chats.hangout_context": "Встреча: «{title}»",
+  "partner.card.guests": "Гостей: {count}",
+  "partner.booking.title": "Бронирование",
 };
 
 const languageState = { value: "RU" as "RU" | "EN" };
@@ -265,6 +271,7 @@ beforeEach(() => {
   languageState.value = "RU";
   wsState.socket = wsSocket;
   Object.keys(wsHandlers).forEach((k) => delete wsHandlers[k]);
+  partnerProps.value = null;
   partnerState.user_id = 8;
   partnerState.name = "Аня";
   partnerState.avatar = "/a.png";
@@ -381,14 +388,18 @@ describe("Комната чата: realtime", () => {
     const before = messageGets().length;
 
     act(() => wsHandlers["chat:message-deleted"]?.({ chatId: 999, messageIds: [] }));
+    act(() => wsHandlers["chat:message"]?.({ chatId: 999, message: message() }));
     await new Promise((r) => setTimeout(r, 20));
     expect(messageGets()).toHaveLength(before);
 
-    act(() => wsHandlers["chat:message-deleted"]?.({ chatId: Number(CHAT_ID), messageIds: [50] }));
+    act(() => wsHandlers["chat:message"]?.({ chatId: Number(CHAT_ID), message: message({ id: 60 }) }));
     await waitFor(() => expect(messageGets().length).toBe(before + 1));
 
-    act(() => wsHandlers["chat:message-edited"]?.({ chatId: Number(CHAT_ID) }));
+    act(() => wsHandlers["chat:message-deleted"]?.({ chatId: Number(CHAT_ID), messageIds: [50] }));
     await waitFor(() => expect(messageGets().length).toBe(before + 2));
+
+    act(() => wsHandlers["chat:message-edited"]?.({ chatId: Number(CHAT_ID) }));
+    await waitFor(() => expect(messageGets().length).toBe(before + 3));
   });
 
   it("без сокета подписок нет", async () => {
@@ -403,8 +414,78 @@ describe("Комната чата: realtime", () => {
 
     view.unmount();
 
+    expect(wsSocket.off).toHaveBeenCalledWith("chat:message", expect.any(Function));
     expect(wsSocket.off).toHaveBeenCalledWith("chat:message-deleted", expect.any(Function));
     expect(wsSocket.off).toHaveBeenCalledWith("chat:message-edited", expect.any(Function));
+  });
+});
+
+describe("Комната чата: карточка брони", () => {
+  const bookingMessage = (payload: unknown, overrides: Record<string, unknown> = {}) =>
+    message({ id: 61, sender_id: 8, text: "Ужин на двоих", card_type: "booking", card_payload: payload, ...overrides })
+
+  it("card_type=booking рисует карточку из payload, а не сырой текст", async () => {
+    firstPage = {
+      messages: [bookingMessage(JSON.stringify({
+        title: "Ужин на двоих",
+        partner_name: "Restoclub",
+        date: "2026-11-01",
+        time: "19:00",
+        guests: 2,
+        message: "идём?",
+      }))],
+      has_more: false,
+      next_before: 50,
+    };
+    renderChat();
+    const cards = await screen.findAllByTestId("booking-card");
+    expect(cards).toHaveLength(1);
+
+    const card = screen.getByTestId("booking-card");
+    expect(card.textContent).toContain("Ужин на двоих");
+    expect(card.textContent).toContain("Restoclub");
+    expect(card.textContent).toContain("2026-11-01 19:00");
+    expect(card.textContent).toContain("Гостей: 2");
+    expect(card.textContent).toContain("идём?");
+  });
+
+  it("payload уже объектом: карточка рисуется без парсинга строки", async () => {
+    firstPage = {
+      messages: [bookingMessage({ title: "Спа на двоих" })],
+      has_more: false,
+      next_before: 50,
+    };
+    renderChat();
+
+    expect((await screen.findByTestId("booking-card")).textContent).toContain("Спа на двоих");
+  });
+
+  it("битый payload не роняет комнату и не рисует пустую карточку", async () => {
+    firstPage = {
+      messages: [bookingMessage("{не json")],
+      has_more: false,
+      next_before: 50,
+    };
+    renderChat();
+
+    await waitFor(() => expect(messageGets().length).toBeGreaterThan(0));
+    expect(screen.queryByTestId("booking-card")).toBeNull();
+    expect(screen.getByTestId("message-list")).toBeInTheDocument();
+  });
+
+  it("у карточки брони нет кнопки правки, у обычного своего сообщения есть", async () => {
+    firstPage = {
+      messages: [
+        bookingMessage({ title: "Ужин" }, { id: 62, sender_id: 7 }),
+        message({ id: 63, sender_id: 7, text: "обычное" }),
+      ],
+      has_more: false,
+      next_before: 50,
+    };
+    renderChat();
+
+    expect(await screen.findByText("обычное")).toBeInTheDocument();
+    expect(screen.getAllByTestId("edit-message-button")).toHaveLength(1);
   });
 });
 
@@ -846,6 +927,19 @@ describe("Комната чата: шапка и мелочи", () => {
     );
 
     expect(await screen.findByTestId("partner-actions")).toBeTruthy();
+  });
+
+  it("блоку действий передаются chatId комнаты и перезагрузка после шаринга", async () => {
+    flagsState.partnerOffersEnabled = true;
+    await openChat();
+    await screen.findByTestId("partner-actions");
+
+    expect(partnerProps.value?.chatId).toBe(Number(CHAT_ID));
+    expect(partnerProps.value?.placement).toBe("chat");
+
+    const before = messageGets().length;
+    act(() => partnerProps.value?.onShared?.());
+    await waitFor(() => expect(messageGets().length).toBe(before + 1));
   });
 
   it("кнопка «Назад» в шапке уводит в список чатов", async () => {

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { ChevronLeft, Send, MoreVertical, Smile, Heart, Laugh, Zap, Star, Flame, Eye, CheckCheck, Phone, Video, Timer, Clock, CornerUpLeft, X, Pencil } from "lucide-react";
+import { ChevronLeft, Send, MoreVertical, Smile, Heart, Laugh, Zap, Star, Flame, Eye, CheckCheck, Phone, Video, Timer, Clock, CornerUpLeft, X, Pencil, CalendarHeart } from "lucide-react";
 import Image from "@/shims/next-image";
 import { useRouter } from "@/shims/next-navigation";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,6 @@ import { VideoCallDialog } from "@/components/video-call";
 import { VoiceCallDialog } from "@/components/voice-call";
 import { useTrackEvent } from "@/hooks/useExperiment";
 import { formatEventDate } from "@/lib/hangouts";
-import { CalendarHeart } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useFeatureFlags } from "@/context/feature-flags-context";
 import { ChatPartnerActions } from "@/components/chat/chat-partner-actions";
@@ -79,6 +78,46 @@ function ChatRoomSkeleton() {
         </div>
       </div>
     );
+}
+
+type BookingCardPayload = {
+  title?: string;
+  partner_name?: string;
+  date?: string | null;
+  time?: string | null;
+  guests?: number;
+  message?: string | null;
+};
+
+function parseBookingCard(raw: unknown): BookingCardPayload | null {
+  if (!raw) return null;
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as BookingCardPayload;
+    } catch {
+      return null;
+    }
+  }
+  return typeof raw === "object" ? (raw as BookingCardPayload) : null;
+}
+
+function BookingCard({ raw }: { raw: unknown }) {
+  const { t } = useLanguage();
+  const card = parseBookingCard(raw);
+  if (!card) return null;
+  const when = [card.date, card.time].filter(Boolean).join(" ");
+  return (
+    <div data-testid="booking-card" className="min-w-[200px] space-y-1">
+      <div className="flex items-center gap-1.5 font-semibold">
+        <CalendarHeart size={14} />
+        <span>{card.title || t("partner.booking.title")}</span>
+      </div>
+      {card.partner_name && <div className="text-xs opacity-80">{card.partner_name}</div>}
+      {when && <div className="text-xs opacity-80">{when}</div>}
+      {card.guests ? <div className="text-xs opacity-80">{t("partner.card.guests", { count: card.guests })}</div> : null}
+      {card.message && <div className="text-xs opacity-90">{card.message}</div>}
+    </div>
+  );
 }
 
 export default function ChatPage({ params }: { params: { chatId: string } }) {
@@ -234,6 +273,17 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     }
     socket.on('chat:message-deleted', handler)
     return () => { socket.off('chat:message-deleted', handler) }
+  }, [socket, params.chatId])
+
+  useEffect(() => {
+    if (!socket) return
+    const handler = (data: { chatId: number }) => {
+      if (data.chatId === Number(params.chatId)) {
+        refetchMessages()
+      }
+    }
+    socket.on('chat:message', handler)
+    return () => { socket.off('chat:message', handler) }
   }, [socket, params.chatId])
 
   useEffect(() => {
@@ -416,7 +466,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                     </div>
                   ) : (
                     <>
-                      {msg.text}
+                      {msg.card_type === 'booking' ? <BookingCard raw={msg.card_payload} /> : msg.text}
                       <div className="absolute -bottom-3 right-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button data-testid="reply-button" aria-label={t('chats.reply')} onClick={() => setReplyTo({ id: msg.id, name: msg.sender_id !== chatPartner.user_id ? t('chats.you') : (chatPartner.name || ''), text: msg.text || '' })}
                           className={cn("text-[10px]", msg.sender_id !== chatPartner.user_id ? "text-white" : "text-muted-foreground")}>
@@ -426,7 +476,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                           className={cn("text-[10px]", msg.sender_id !== chatPartner.user_id ? "text-white" : "text-muted-foreground")}>
                           😊
                         </button>
-                        {msg.sender_id !== chatPartner.user_id && Date.now() - new Date(msg.created_at).getTime() <= MESSAGE_EDIT_WINDOW_MS && (
+                        {msg.sender_id !== chatPartner.user_id && msg.card_type !== 'booking' && Date.now() - new Date(msg.created_at).getTime() <= MESSAGE_EDIT_WINDOW_MS && (
                           <button data-testid="edit-message-button" aria-label={t('chats.edit')} onClick={() => setEditingMsg({ id: msg.id, text: msg.text || '' })}
                             className="text-[10px] text-white">
                             <Pencil size={12} />
@@ -469,7 +519,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         </main>
 
       <div className="p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] bg-white border-t">
-        {partnerOffersEnabled && <div className="mb-2"><ChatPartnerActions placement="chat" /></div>}
+        {partnerOffersEnabled && <div className="mb-2"><ChatPartnerActions placement="chat" chatId={Number(params.chatId)} onShared={refetchMessages} /></div>}
         {replyTo && (
           <div data-testid="reply-bar" className="mb-2 flex items-center gap-2 rounded-lg border-l-4 border-primary bg-muted/50 px-3 py-1.5">
             <div className="min-w-0 flex-1">

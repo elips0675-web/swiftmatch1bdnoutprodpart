@@ -33,7 +33,7 @@ export interface PartnerOffer {
   price?: string | number;
 }
 
-export function ChatPartnerActions({ placement = "chat" }: { placement?: string }) {
+export function ChatPartnerActions({ placement = "chat", chatId, onShared }: { placement?: string; chatId?: number; onShared?: () => void }) {
   const { t } = useLanguage();
   const { data: offers, loading } = useApi<PartnerOffer[]>(
     `/api/partners/offers?placement=${placement}`
@@ -165,8 +165,10 @@ export function ChatPartnerActions({ placement = "chat" }: { placement?: string 
       {restaurantOffer && (
         <RestaurantBookingDialog
           offer={restaurantOffer}
+          chatId={chatId}
           open={!!restaurantOffer}
           onOpenChange={(open) => { if (!open) setRestaurantOffer(null); }}
+          onShared={onShared}
         />
       )}
 
@@ -181,8 +183,10 @@ export function ChatPartnerActions({ placement = "chat" }: { placement?: string 
       {spaOffer && (
         <SpaBookingDialog
           offer={spaOffer}
+          chatId={chatId}
           open={!!spaOffer}
           onOpenChange={(open) => { if (!open) setSpaOffer(null); }}
+          onShared={onShared}
         />
       )}
     </div>

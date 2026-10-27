@@ -220,13 +220,14 @@ describe('SpaBookingDialog', () => {
     openSpy.mockRestore()
   })
 
-  const renderSpa = (props: { chatId?: number; open?: boolean } = {}) =>
+  const renderSpa = (props: { chatId?: number; open?: boolean; onShared?: () => void } = {}) =>
     render(
       <SpaBookingDialog
         offer={spaOffer}
         chatId={props.chatId}
         open={props.open ?? true}
         onOpenChange={onOpenChange}
+        onShared={props.onShared}
       />
     )
 
@@ -270,14 +271,16 @@ describe('SpaBookingDialog', () => {
   })
 
   it('с chatId делится бронью в чат и показывает подтверждение', async () => {
+    const onShared = vi.fn()
     fetchMock.mockResolvedValueOnce(okJson({}))
     fetchMock.mockResolvedValueOnce(okJson({ shared: true }))
-    renderSpa({ chatId: 42 })
+    renderSpa({ chatId: 42, onShared })
     fillDate()
     fireEvent.click(screen.getByTestId('spa-book'))
 
     expect(await screen.findByText('partner.spa.shared')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(onShared).toHaveBeenCalledTimes(1)
     const [shareUrl, shareInit] = fetchMock.mock.calls[1]
     expect(shareUrl).toBe('/api/partners/booking/share')
     expect(JSON.parse(String(shareInit.body))).toEqual({
@@ -293,15 +296,17 @@ describe('SpaBookingDialog', () => {
   })
 
   it('отказ share не выдаётся за успех: ошибка вместо «отправлено»', async () => {
+    const onShared = vi.fn()
     fetchMock.mockResolvedValueOnce(okJson({ deeplink: 'https://spa.example/b/1' }))
     fetchMock.mockResolvedValueOnce(failJson({ message: 'Restaurant not found' }))
-    renderSpa({ chatId: 42 })
+    renderSpa({ chatId: 42, onShared })
     fillDate()
     fireEvent.click(screen.getByTestId('spa-book'))
 
     expect(await screen.findByText('partner.spa.share_error')).toBeInTheDocument()
     expect(screen.queryByText('partner.spa.shared')).toBeNull()
     expect(openSpy).toHaveBeenCalledWith('https://spa.example/b/1', '_blank', 'noopener')
+    expect(onShared).not.toHaveBeenCalled()
   })
 
   it('отказ записи (404) — локализованная ошибка', async () => {
