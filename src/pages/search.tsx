@@ -46,14 +46,14 @@ const attachmentCompatibilityScores: Record<AttachmentStyle, Record<AttachmentSt
     avoidant: { secure: 2, avoidant: 1, anxious: 0 },
 };
 
-function calculateAttachmentCompatibility(style1?: AttachmentStyle, style2?: AttachmentStyle): number {
+export function calculateAttachmentCompatibility(style1?: AttachmentStyle, style2?: AttachmentStyle): number {
     if (!style1 || !style2 || !attachmentCompatibilityScores[style1] || attachmentCompatibilityScores[style1][style2] === undefined) {
         return 0; // No info or invalid style, no bonus
     }
     return attachmentCompatibilityScores[style1][style2];
 }
 
-interface AutoSearchFilters {
+export interface AutoSearchFilters {
   ageRange: [number, number];
   selectedCity: string;
   selectedCountry: string;
@@ -61,7 +61,7 @@ interface AutoSearchFilters {
   selectedDatingGoal: string;
   selectedInterests: string[];
 }
-interface SearchUser {
+export interface SearchUser {
   id: number;
   gender: string;
   lookingFor: string;
@@ -82,7 +82,7 @@ interface SavedSearchFilters {
   selectedInterests?: string[];
 }
 
-function fromSavedSearchFilters(raw: string | null): AutoSearchFilters | null {
+export function fromSavedSearchFilters(raw: string | null): AutoSearchFilters | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as SavedSearchFilters;
@@ -104,7 +104,7 @@ function fromSavedSearchFilters(raw: string | null): AutoSearchFilters | null {
   }
 }
 
-function performAutosearch(filters: AutoSearchFilters, allUsers: SearchUser[], currentUser: SearchUser) {
+export function performAutosearch(filters: AutoSearchFilters, allUsers: SearchUser[], currentUser: SearchUser) {
     if (!filters || !currentUser) return [];
 
     const { ageRange, selectedCity, selectedCountry, distance, selectedDatingGoal, selectedInterests } = filters;
@@ -142,8 +142,8 @@ function performAutosearch(filters: AutoSearchFilters, allUsers: SearchUser[], c
         })
         .filter(user => user.isCandidate)
         .sort((a, b) => {
-            const aIsBoosted = a.boost && a.boost.boostedUntil && new Date(a.boost.boostedUntil) > new Date();
-            const bIsBoosted = b.boost && b.boost.boostedUntil && new Date(b.boost.boostedUntil) > new Date();
+            const aIsBoosted = Boolean(a.boost && a.boost.boostedUntil && new Date(a.boost.boostedUntil) > new Date());
+            const bIsBoosted = Boolean(b.boost && b.boost.boostedUntil && new Date(b.boost.boostedUntil) > new Date());
             if (aIsBoosted !== bIsBoosted) return aIsBoosted ? -1 : 1;
 
             if (a.hasMatchingGoal !== b.hasMatchingGoal) return a.hasMatchingGoal ? -1 : 1;
@@ -499,7 +499,7 @@ function SearchContent() {
                     data-testid={`search-profile-btn-${user.id}`}
                     className="w-[3.5rem] h-[3.5rem] rounded-full bg-white shadow-xl border-0 text-blue-400 hover:text-blue-600 active:scale-90 transition-all flex items-center justify-center"
                 >
-                    <Link href={`/user?id=${user.id}`} prefetch={true} onClick={(e) => e.stopPropagation()}>
+                    <Link href={`/user?id=${user.id}`} prefetch={true}>
                         <UserIcon size={26} strokeWidth={2} />
                     </Link>
                 </Button>
