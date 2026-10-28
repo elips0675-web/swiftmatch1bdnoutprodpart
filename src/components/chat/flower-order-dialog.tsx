@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/context/language-context";
 import { getToken } from "@/lib/token";
+import { toast } from "@/hooks/use-toast";
 import type { PartnerOffer } from "./chat-partner-actions";
 
 interface Props {
@@ -45,17 +46,21 @@ export function FlowerOrderDialog({ offer, open, onOpenChange }: Props) {
         }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Order failed");
+        setError(t("partner.order.error"));
+        return;
       }
-      const data = await res.json();
+      const data = await res.json() as { url?: string; deeplink?: string };
       if (data.url) {
         window.location.href = data.url;
-      } else {
-        onOpenChange(false);
+        return;
       }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t("partner.order.error"));
+      if (data.deeplink) {
+        window.open(data.deeplink, "_blank", "noopener");
+      }
+      toast({ title: t("partner.order.success_title"), description: t("partner.order.success_desc") });
+      onOpenChange(false);
+    } catch {
+      setError(t("partner.order.error"));
     } finally {
       setLoading(false);
     }
