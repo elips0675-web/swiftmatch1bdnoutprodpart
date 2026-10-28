@@ -1,11 +1,11 @@
 {
-  "generated": "2026-10-27T20:29:19.795Z",
+  "generated": "2026-10-28T05:58:18.127Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
     "files": 157,
-    "tests": 2656,
-    "passed": 2656,
+    "tests": 2680,
+    "passed": 2680,
     "failed": 0,
     "gate": {
       "files": 32,
@@ -13,7 +13,7 @@
     },
     "product": {
       "files": 125,
-      "tests": 1857
+      "tests": 1881
     },
     "perFile": [
       {
@@ -194,7 +194,7 @@
       },
       {
         "file": "src/test/admin-hangouts-merge.test.tsx",
-        "tests": 2
+        "tests": 10
       },
       {
         "file": "src/test/admin-health.test.tsx",
@@ -342,7 +342,7 @@
       },
       {
         "file": "src/test/flower-order-dialog.test.tsx",
-        "tests": 4
+        "tests": 20
       },
       {
         "file": "src/test/forgot-password.test.tsx",
@@ -1418,6 +1418,6 @@
   },
   "total": {
     "files": 320,
-    "tests": 5415
+    "tests": 5439
   }
 }
