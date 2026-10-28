@@ -598,4 +598,86 @@ describe("Страница чатов (переписка)", () => {
 
     await waitFor(() => expect(screen.queryByTestId("report-description")).toBeNull())
   })
+
+  it("показывает пустой список чатов без ошибок", async () => {
+    mockApi({ chats: [] })
+    render(<ChatsPage />)
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledWith("/api/chats"))
+    expect(screen.getByTestId("app-header")).toBeInTheDocument()
+    expect(screen.getByTestId("bottom-nav")).toBeInTheDocument()
+  })
+
+  it("открывает существующий чат по openChat параметру", async () => {
+    nav.search = "openChat=5"
+    mockApi({ chats: [chat(5, "Миша")] })
+    render(<ChatsPage />)
+    expect(await screen.findByTestId("messages-scroll")).toBeInTheDocument()
+    expect(screen.getByText("Миша")).toBeInTheDocument()
+  })
+
+  it("создаёт чат по openChat при отсутствии в списке и открывает его", async () => {
+    nav.search = "openChat=777"
+    mockApi({ chats: [chat(1, "Аня")], createdChat: { id: 88, existing: false } })
+    render(<ChatsPage />)
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/chats",
+        expect.objectContaining({ method: "POST", body: JSON.stringify({ participant_id: 777 }) }),
+      ),
+    )
+    expect(await screen.findByTestId("messages-scroll")).toBeInTheDocument()
+  })
+
+  it("добавляет реакцию с другого эмодзи", async () => {
+    await openThread([chat(1, "Аня")], {
+      pages: { first: { messages: [message(11, "Привет", { reactions: [{ emoji: "🔥" }] })], has_more: false, next_before: null } },
+      reaction: { action: "added", emoji: "❤️", count: 1 },
+    })
+
+    fireEvent.click(screen.getByText("Привет"))
+    fireEvent.click(screen.getByTestId("reaction-quick-like"))
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/chats/1/messages/11/reactions",
+        expect.objectContaining({ body: JSON.stringify({ emoji: "👍" }) }),
+      ),
+    )
+  })
+
+  it("отправляет сообщение по клику send", async () => {
+    await openThread([chat(1, "Аня")], {
+      pages: { first: { messages: [message(11, "Привет")], has_more: false, next_before: null } },
+    })
+    const input = screen.getByTestId("message-input")
+    fireEvent.change(input, { target: { value: "Тест" } })
+    fireEvent.click(screen.getByTestId("send-button"))
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/chats/1/messages",
+        expect.objectContaining({ method: "POST", body: JSON.stringify({ text: "Тест" }) }),
+      ),
+    )
+  })
+
+  it("не отправляет сообщение при пустом тексте", async () => {
+    await openThread()
+    const input = screen.getByTestId("message-input")
+    fireEvent.change(input, { target: { value: "   " } })
+    fireEvent.click(screen.getByTestId("send-button"))
+    const postCalls = mockFetch.mock.calls.filter(call => String(call[0]).includes("/messages") && call[1]?.method === "POST")
+    expect(postCalls.length).toBe(0)
+  })
+
+  it("обновляет список чатов по событию chat:list:invalidate", async () => {
+    await openThread()
+    const before = mockFetch.mock.calls.filter(call => call[0] === "/api/chats").length
+    ws.send("chat:list:invalidate", {})
+    await waitFor(() => expect(mockFetch.mock.calls.filter(call => call[0] === "/api/chats").length).toBeGreaterThan(before))
+  })
+
+  it("обрабатывает chat:typing событие без ошибок", async () => {
+    await openThread()
+    ws.send("chat:typing", { chatId: 1, userId: 500 })
+    expect(screen.getByTestId("messages-scroll")).toBeInTheDocument()
+  })
 })
