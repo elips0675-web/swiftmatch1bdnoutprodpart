@@ -24,13 +24,21 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<{ size?: number | strin
   experience: Wine,
 };
 
+const hasCategory = (category: string) => Object.prototype.hasOwnProperty.call(CATEGORY_ICONS, category);
+
+const categoryIcon = (category: string) =>
+  hasCategory(category) ? CATEGORY_ICONS[category] : Sparkles;
+
+const categoryLabel = (category: string, t: (key: string) => string) =>
+  t(hasCategory(category) ? `partner.category.${category}` : "partner.category.other");
+
 export interface PartnerOffer {
   id: number;
   partner_name: string;
   category: string;
   title: string;
-  description?: string;
-  price?: string | number;
+  description?: string | null;
+  price?: string | number | null;
 }
 
 export function ChatPartnerActions({ placement = "chat", chatId, onShared }: { placement?: string; chatId?: number; onShared?: () => void }) {
@@ -39,7 +47,7 @@ export function ChatPartnerActions({ placement = "chat", chatId, onShared }: { p
     `/api/partners/offers?placement=${placement}`
   );
   const [pendingId, setPendingId] = useState<number | null>(null);
-  const [fallbackOffer, setFallbackOffer] = useState<PartnerOffer | null>(null);
+  const [fallback, setFallback] = useState<{ offer: PartnerOffer; deeplink: string } | null>(null);
   const [flowerOffer, setFlowerOffer] = useState<PartnerOffer | null>(null);
   const [restaurantOffer, setRestaurantOffer] = useState<PartnerOffer | null>(null);
   const [hotelOffer, setHotelOffer] = useState<PartnerOffer | null>(null);
@@ -79,9 +87,12 @@ export function ChatPartnerActions({ placement = "chat", chatId, onShared }: { p
         body: JSON.stringify({ offer_id: offer.id, ...coords }),
       });
       if (!res.ok) throw new Error("track failed");
-      const { deeplink } = await res.json();
+      const { deeplink } = await res.json() as { deeplink?: string };
+      if (typeof deeplink !== "string" || !deeplink) throw new Error("no deeplink");
       if (/^https?:\/\//i.test(deeplink)) {
-        window.open(deeplink, "_blank", "noopener");
+        if (!window.open(deeplink, "_blank", "noopener")) {
+          setFallback({ offer, deeplink });
+        }
       } else {
         let leftPage = false;
         const onBlur = () => { leftPage = true; };
@@ -89,7 +100,7 @@ export function ChatPartnerActions({ placement = "chat", chatId, onShared }: { p
         window.location.href = deeplink;
         window.setTimeout(() => {
           window.removeEventListener("blur", onBlur);
-          if (!leftPage && !document.hidden) setFallbackOffer(offer);
+          if (!leftPage && !document.hidden) setFallback({ offer, deeplink });
         }, 1500);
       }
     } catch {
@@ -110,7 +121,8 @@ export function ChatPartnerActions({ placement = "chat", chatId, onShared }: { p
         ))}
       {!loading &&
         list.map((offer) => {
-          const Icon = CATEGORY_ICONS[offer.category] ?? Sparkles;
+          const Icon = categoryIcon(offer.category);
+          const label = categoryLabel(offer.category, t);
           return (
             <button
               key={offer.id}
@@ -118,41 +130,47 @@ export function ChatPartnerActions({ placement = "chat", chatId, onShared }: { p
               data-testid={`partner-action-${offer.category}`}
               onClick={() => handleAction(offer)}
               disabled={pendingId === offer.id}
-              aria-label={t(`partner.category.${offer.category}`)}
+              aria-label={label}
               className={cn(
                 "shrink-0 inline-flex items-center gap-1 rounded-full border bg-white px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary",
                 pendingId === offer.id && "opacity-60"
               )}
             >
               {pendingId === offer.id ? <Loader2 size={12} className="animate-spin" /> : <Icon size={12} />}
-              <span className="truncate max-w-[120px]">{t(`partner.category.${offer.category}`)}</span>
+              <span className="truncate max-w-[120px]">{label}</span>
             </button>
           );
         })}
 
-      <Dialog open={!!fallbackOffer} onOpenChange={(open) => !open && setFallbackOffer(null)}>
-        <DialogContent className="max-w-xs rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-base flex items-center gap-2">
-              <ExternalLink size={16} /> {fallbackOffer && t(`partner.category.${fallbackOffer.category}`)}
-            </DialogTitle>
-            <DialogDescription>{t("partner.fallback_desc")}</DialogDescription>
-          </DialogHeader>
-          {fallbackOffer?.description && (
-            <p className="text-xs text-muted-foreground -mt-1">{fallbackOffer.description}</p>
-          )}
-          <Button
-            variant="outline"
-            className="rounded-full"
-            onClick={() => {
-              navigator.clipboard.writeText(fallbackOffer?.title ?? "").catch(() => {});
-              setFallbackOffer(null);
-            }}
-          >
-            <Copy size={14} className="mr-1" /> {t("partner.close")}
-          </Button>
-        </DialogContent>
-      </Dialog>
+      {fallback && (
+        <Dialog open onOpenChange={(open) => { if (!open) setFallback(null); }}>
+          <DialogContent className="max-w-xs rounded-2xl" data-testid="partner-fallback-dialog">
+            <DialogHeader>
+              <DialogTitle className="text-base flex items-center gap-2">
+                <ExternalLink size={16} /> {categoryLabel(fallback.offer.category, t)}
+              </DialogTitle>
+              <DialogDescription>{t("partner.fallback_desc")}</DialogDescription>
+            </DialogHeader>
+            {fallback.offer.description && (
+              <p className="text-xs text-muted-foreground -mt-1">{fallback.offer.description}</p>
+            )}
+            <p className="text-xs break-all text-muted-foreground" data-testid="partner-fallback-link">
+              {fallback.deeplink}
+            </p>
+            <Button
+              variant="outline"
+              className="rounded-full"
+              data-testid="partner-fallback-copy"
+              onClick={() => {
+                void navigator.clipboard?.writeText(fallback.deeplink).catch(() => {});
+                setFallback(null);
+              }}
+            >
+              <Copy size={14} className="mr-1" /> {t("partner.copy_link")}
+            </Button>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {flowerOffer && (
         <FlowerOrderDialog

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { FlowerOrderDialog } from '@/components/chat/flower-order-dialog'
+import type { PartnerOffer } from '@/components/chat/chat-partner-actions'
 
-const baseOffer = {
+const baseOffer: PartnerOffer = {
   id: 8,
   partner_name: 'Flowwow',
   category: 'flowers',
@@ -47,7 +48,7 @@ function failOrder(status = 400, body: Record<string, unknown> = { message: 'Fai
   })
 }
 
-function renderDialog(offer: Record<string, unknown> = baseOffer, onOpenChange = vi.fn()) {
+function renderDialog(offer: PartnerOffer = baseOffer, onOpenChange = vi.fn()) {
   render(<FlowerOrderDialog offer={offer} open={true} onOpenChange={onOpenChange} />)
   return onOpenChange
 }
