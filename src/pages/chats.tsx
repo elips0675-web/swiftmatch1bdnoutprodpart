@@ -62,6 +62,8 @@ function toChatMessage(m: any, myId?: number) {
     sender: m.sender_id === myId ? 'me' : 'other',
     time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     reactions: m.reactions || [],
+    image_url: m.image_url ?? null,
+    ttl_seconds: m.ttl_seconds ?? null,
     reply_to: m.reply_to ?? null,
     reply_text: m.reply_text ?? null,
     reply_sender_name: m.reply_sender_name ?? null,
@@ -217,7 +219,6 @@ function ChatsContent() {
   const [inputValue, setInputValue] = useState("");
   const [selectedTtl, setSelectedTtl] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
   const [showTopicsDialog, setShowTopicsDialog] = useState(false);
 
   useEffect(() => {
@@ -736,7 +737,6 @@ function ChatsContent() {
                 <span className="flex items-center gap-1 text-[9px] text-muted-foreground mt-1 px-1 font-bold uppercase tracking-tighter opacity-60">{msg.ttl_seconds && <Clock size={10} className="inline" />}{msg.time}<button data-testid="reply-button" onClick={() => setReplyTo({ id: msg.id, name: msg.sender === "me" ? t('chats.you') : (selectedChat?.name || ''), text: msg.text || '' })} className="ml-1 hover:text-foreground transition-colors"><CornerUpLeft size={10} /></button></span>
               </motion.div>
             )})}</AnimatePresence></div>
-            {isTyping && (<motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-1.5 text-muted-foreground"><div className="flex gap-1 bg-white px-3 py-2.5 rounded-lg border border-border/40 shadow-sm rounded-bl-none"><span className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce"></span><span className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce [animation-delay:0.2s]"></span><span className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce [animation-delay:0.4s]"></span></div><span className="text-[9px] font-bold uppercase tracking-widest">{t('chats.typing')}</span></motion.div>)}
             <div ref={messagesEndRef} />
           </div>
         </main>
