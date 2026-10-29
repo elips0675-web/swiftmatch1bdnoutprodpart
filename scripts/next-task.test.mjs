@@ -7,6 +7,7 @@ import {
   listRows,
   parseBacklog,
   pickTask,
+  readBacklogFile,
   resolveBarePaths,
   walkInventory,
 } from './next-task.mjs'
@@ -286,5 +287,41 @@ describe('listRows', () => {
     expect(qa.files).toBe(3)
     expect(rows.find((row) => row.id === 'ENV-01').status).toBe('blocked')
     expect(rows.find((row) => row.id === 'COV-02').queue).toBe(true)
+  })
+})
+
+describe('readBacklogFile', () => {
+  const failWith = (code) => () => {
+    const error = new Error(`boom: ${code}`)
+    error.code = code
+    throw error
+  }
+
+  it('возвращает текст, когда файл читается', () => {
+    const result = readBacklogFile(() => '# бэклог', 'backlog.txt')
+    expect(result).toEqual({ ok: true, text: '# бэклог' })
+  })
+
+  it('EBUSY считает блокировкой (файл открыт в другой программе)', () => {
+    const result = readBacklogFile(failWith('EBUSY'), 'backlog.txt')
+    expect(result.ok).toBe(false)
+    expect(result.locked).toBe(true)
+  })
+
+  it('EPERM и EACCES тоже считает блокировкой', () => {
+    expect(readBacklogFile(failWith('EPERM'), 'b.txt').locked).toBe(true)
+    expect(readBacklogFile(failWith('EACCES'), 'b.txt').locked).toBe(true)
+  })
+
+  it('прочие ошибки не выдаёт за блокировку и сохраняет исходную ошибку', () => {
+    const result = readBacklogFile(failWith('ENOSPC'), 'b.txt')
+    expect(result.locked).toBe(false)
+    expect(result.error.code).toBe('ENOSPC')
+  })
+
+  it('ошибка без code не ломает проверку', () => {
+    const result = readBacklogFile(() => { throw new Error('нет кода') }, 'b.txt')
+    expect(result.locked).toBe(false)
+    expect(result.error.message).toBe('нет кода')
   })
 })

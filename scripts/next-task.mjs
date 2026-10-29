@@ -448,6 +448,15 @@ function parseArgs(argv) {
   return options
 }
 
+export function readBacklogFile(read, filePath) {
+  try {
+    return { ok: true, text: read(filePath) }
+  } catch (error) {
+    const code = error && typeof error.code === 'string' ? error.code : ''
+    return { ok: false, error, locked: code === 'EBUSY' || code === 'EPERM' || code === 'EACCES' }
+  }
+}
+
 function main() {
   const options = parseArgs(process.argv.slice(2))
   if (options.error) {
@@ -463,7 +472,16 @@ function main() {
     process.stderr.write(`Бэклог не найден: ${backlogPath}\n`)
     process.exit(2)
   }
-  const parsed = parseBacklog(fs.readFileSync(backlogPath, 'utf8'))
+  const backlogRead = readBacklogFile((file) => fs.readFileSync(file, 'utf8'), backlogPath)
+  if (!backlogRead.ok) {
+    if (backlogRead.locked) {
+      process.stderr.write(`Файл бэклога заблокирован другой программой: ${backlogPath}\n`)
+      process.stderr.write('Закройте его (Excel, Word, редактор, синхронизация) и повторите.\n')
+      process.exit(2)
+    }
+    throw backlogRead.error
+  }
+  const parsed = parseBacklog(backlogRead.text)
   const inventory = walkInventory(ROOT)
   const items = parsed.map((item) => ({ ...item, files: resolveBarePaths(item.files, inventory) }))
   if (!items.length) {
