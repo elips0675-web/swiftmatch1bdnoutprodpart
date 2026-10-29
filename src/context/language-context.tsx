@@ -1435,6 +1435,11 @@ export const translations = {
     'common.loading': 'Загрузка...',
     'common.someone': 'Кто-то',
 
+    // Not found
+    'notfound.home': 'На главную',
+    'notfound.text': 'Такой страницы нет или она была удалена',
+    'notfound.title': 'Страница не найдена',
+
     // Cookie
     'cookie.accept_all': 'Принять все',
     'cookie.description': 'Мы используем куки для улучшения работы',
@@ -3502,6 +3507,11 @@ export const translations = {
     'common.km': 'km',
     'common.loading': 'Loading...',
     'common.someone': 'Someone',
+
+    // Not found
+    'notfound.home': 'Back to Home',
+    'notfound.text': 'This page does not exist or has been removed',
+    'notfound.title': 'Page not found',
 
     // Cookie
     'cookie.accept_all': 'Accept All',
