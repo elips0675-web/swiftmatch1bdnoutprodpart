@@ -1266,6 +1266,8 @@ export const translations = {
     'groups.category_not_found': 'Категория не найдена',
     'groups.tab.feed': 'Лента',
     'groups.tab.groups': 'Группы',
+    'groups.prev_page': 'Предыдущая страница',
+    'groups.next_page': 'Следующая страница',
 
     // Time units
     'time.just_now': 'только что',
@@ -3332,6 +3334,8 @@ export const translations = {
     'groups.category_not_found': 'Category not found',
     'groups.tab.feed': 'Feed',
     'groups.tab.groups': 'Groups',
+    'groups.prev_page': 'Previous page',
+    'groups.next_page': 'Next page',
 
     // Time units
     'time.just_now': 'just now',

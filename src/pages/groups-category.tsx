@@ -1,5 +1,5 @@
 
-import { Suspense, useState, useMemo } from 'react';
+import { Suspense, useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from "@/shims/next-navigation";
 import Link from "@/shims/next-link";
 import {
@@ -12,7 +12,6 @@ import {
     CreditCard
 } from 'lucide-react';
 import { GROUP_CATEGORIES } from '@/lib/demo-data';
-import { AppHeader } from '@/components/layout/app-header';
 import { BottomNav } from '@/components/navigation/bottom-nav';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/context/language-context';
@@ -25,7 +24,7 @@ import { CategoryFeed } from "@/components/feeds/category-feed";
 
 const ITEMS_PER_PAGE = 10;
 
-function Pagination({ current, total, onChange }: { current: number, total: number, onChange: (p: number) => void }) {
+export function Pagination({ current, total, onChange, t }: { current: number, total: number, onChange: (p: number) => void, t: (key: string) => string }) {
   if (total <= 1) return null;
 
   const pages = [];
@@ -40,6 +39,7 @@ function Pagination({ current, total, onChange }: { current: number, total: numb
         size="icon"
         className="w-8 h-8 rounded-lg border-muted bg-white"
         disabled={current === 1}
+        aria-label={t('groups.prev_page')}
         onClick={() => onChange(current - 1)}
       >
         <ChevronLeft size={14} />
@@ -65,6 +65,7 @@ function Pagination({ current, total, onChange }: { current: number, total: numb
         size="icon"
         className="w-8 h-8 rounded-lg border-muted bg-white"
         disabled={current === total}
+        aria-label={t('groups.next_page')}
         onClick={() => onChange(current + 1)}
       >
         <ChevronRight size={14} />
@@ -82,6 +83,10 @@ function SubGroupsContent() {
     const [showPremiumDialog, setShowPremiumDialog] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [viewMode, setViewMode] = useState<'feed' | 'list'>('list');
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [categoryId]);
 
     const category = useMemo(() => GROUP_CATEGORIES.find(c => c.id === categoryId), [categoryId]);
 
@@ -154,7 +159,15 @@ function SubGroupsContent() {
                     <div className="px-5 pt-6 pb-24">
                         {/* Promo Banner */}
                         <div
+                            role="button"
+                            tabIndex={0}
                             onClick={() => setShowPremiumDialog(true)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setShowPremiumDialog(true);
+                                }
+                            }}
                             className="mb-6 bg-gradient-to-r from-blue-500 to-teal-500 p-4 rounded-xl text-white flex items-center gap-4 cursor-pointer hover:scale-[1.01] transition-transform app-shadow"
                         >
                             <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm border border-white/20">
@@ -195,7 +208,7 @@ function SubGroupsContent() {
                         </div>
 
                         {/* Pagination */}
-                        <Pagination current={currentPage} total={totalPages} onChange={setCurrentPage} />
+                        <Pagination current={currentPage} total={totalPages} onChange={setCurrentPage} t={t} />
                     </div>
                 )}
             </main>
@@ -235,7 +248,7 @@ function SubGroupsContent() {
     )
 }
 
-function LoadingSkeleton() {
+export function LoadingSkeleton() {
     return (
         <div className="flex flex-col h-screen bg-[#f8f9fb]">
             <header className="flex items-center gap-2 px-3 py-2 border-b border-border sticky top-0 bg-white/90 backdrop-blur-lg z-50 h-16">
