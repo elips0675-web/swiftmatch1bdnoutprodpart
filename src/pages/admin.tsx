@@ -51,11 +51,31 @@ interface ActivityItem {
   time: string;
 }
 
+const EMPTY_STATS: Stats = {
+  totalUsers: 0,
+  activeToday: 0,
+  totalMatches: 0,
+  revenue: 0,
+  activeSubs: 0,
+  newToday: 0,
+};
+
+const authHeaders = (token: string | null): Record<string, string> =>
+  token ? { Authorization: `Bearer ${token}` } : {};
+
+const fetchJson = async <T,>(url: string, token: string | null): Promise<T> => {
+  const res = await fetch(url, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error('fetch failed');
+  return res.json();
+};
+
+const asArray = <T,>(value: unknown): T[] => Array.isArray(value) ? value as T[] : [];
+
 export default function AdminDashboardPage() {
   const [trendPeriod, setTrendPeriod] = useState<'7' | '30' | '90'>('7');
   const { t } = useLanguage();
 
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [stats, setStats] = useState<Stats>(EMPTY_STATS);
   const [trendData, setTrendData] = useState<TrendItem[]>([]);
   const [cityData, setCityData] = useState<CityItem[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
@@ -64,28 +84,23 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     const fetchData = async () => {
+      const token = getToken();
       try {
-        const token = getToken();
-        const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-        const f = <T,>(url: string): Promise<T> => fetch(url, { headers }).then(r => { if (!r.ok) throw new Error('fetch failed'); return r.json(); });
-        const ensureArray = (v: unknown): any[] => Array.isArray(v) ? v : [];
-        const [s, trend, cities, act, rev] = await Promise.all([
-          f<Stats>('/api/admin/stats'),
-          f<TrendItem[]>(`/api/admin/registration-trend?period=${trendPeriod}`),
-          f<CityItem[]>('/api/admin/city-distribution'),
-          f<ActivityItem[]>('/api/admin/recent-activity'),
-          f<RevenueMonth[]>('/api/admin/revenue-by-month'),
+        const [s, cities, act, rev] = await Promise.all([
+          fetchJson<Stats>('/api/admin/stats', token),
+          fetchJson<CityItem[]>('/api/admin/city-distribution', token),
+          fetchJson<ActivityItem[]>('/api/admin/recent-activity', token),
+          fetchJson<RevenueMonth[]>('/api/admin/revenue-by-month', token),
         ]);
         setStats(s);
-        setTrendData(ensureArray(trend));
-        setCityData(ensureArray(cities));
-        setActivity(ensureArray(act));
-        setRevenueByMonth(ensureArray(rev));
+        setCityData(asArray<CityItem>(cities));
+        setActivity(asArray<ActivityItem>(act));
+        setRevenueByMonth(asArray<RevenueMonth>(rev));
       } catch {
-        setStats({ totalUsers: 0, activeToday: 0, totalMatches: 0, revenue: 0, activeSubs: 0, newToday: 0 });
-        setTrendData([]);
+        setStats(EMPTY_STATS);
         setCityData([]);
         setActivity([]);
+        setRevenueByMonth([]);
       } finally {
         setLoading(false);
       }
@@ -94,13 +109,9 @@ export default function AdminDashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (!trendPeriod) return;
     const token = getToken();
-    fetch(`/api/admin/registration-trend?period=${trendPeriod}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then(r => r.json())
-      .then((d: unknown) => setTrendData(Array.isArray(d) ? d : []))
+    fetchJson<TrendItem[]>(`/api/admin/registration-trend?period=${trendPeriod}`, token)
+      .then(data => setTrendData(asArray<TrendItem>(data)))
       .catch(() => setTrendData([]));
   }, [trendPeriod]);
 
@@ -113,16 +124,16 @@ export default function AdminDashboardPage() {
   }
 
   const dSuffix = t('units.d_short');
-  const currency = stats?.revenue != null
+  const currency = stats.revenue != null
     ? `${stats.revenue.toLocaleString()} ₽`
     : t('admin.dash.revenue_value');
 
   const kpis = [
-    { title: t('admin.dash.total_users'), value: (stats?.totalUsers ?? 0).toLocaleString(), icon: Users, color: 'text-blue-500', change: '' },
-    { title: t('admin.dash.new_today'), value: stats?.newToday ?? 0, icon: UserPlus, color: 'text-sky-500', change: '' },
-    { title: t('admin.dash.active_today'), value: stats?.activeToday ?? 0, icon: UserCheck, color: 'text-emerald-500', change: stats?.totalUsers ? `${Math.round((stats.activeToday / stats.totalUsers) * 100)}% ${t('admin.dash.from_all')}` : '' },
-    { title: t('admin.dash.active_subs'), value: (stats?.activeSubs ?? 0).toLocaleString(), icon: Crown, color: 'text-yellow-500', change: '' },
-    { title: t('admin.dash.total_matches'), value: (stats?.totalMatches ?? 0).toLocaleString(), icon: Heart, color: 'text-primary', change: '' },
+    { title: t('admin.dash.total_users'), value: stats.totalUsers.toLocaleString(), icon: Users, color: 'text-blue-500', change: '' },
+    { title: t('admin.dash.new_today'), value: stats.newToday, icon: UserPlus, color: 'text-sky-500', change: '' },
+    { title: t('admin.dash.active_today'), value: stats.activeToday, icon: UserCheck, color: 'text-emerald-500', change: stats.totalUsers ? `${Math.round((stats.activeToday / stats.totalUsers) * 100)}% ${t('admin.dash.from_all')}` : '' },
+    { title: t('admin.dash.active_subs'), value: stats.activeSubs.toLocaleString(), icon: Crown, color: 'text-yellow-500', change: '' },
+    { title: t('admin.dash.total_matches'), value: stats.totalMatches.toLocaleString(), icon: Heart, color: 'text-primary', change: '' },
     { title: t('admin.dash.revenue_month'), value: currency, icon: DollarSign, color: 'text-amber-500', change: '' },
   ];
 
@@ -162,7 +173,7 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={trendData || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorReg" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#fe3c72" stopOpacity={0.3}/>
@@ -186,14 +197,14 @@ export default function AdminDashboardPage() {
           <CardContent className="h-[300px] flex flex-col items-center">
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
-                <Pie data={cityData || []} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
-                  {(cityData || []).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                <Pie data={cityData} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
+                  {cityData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Tooltip contentStyle={{ borderRadius: '12px', border: 'none' }} />
               </PieChart>
             </ResponsiveContainer>
             <div className="w-full space-y-1.5 mt-2">
-              {(cityData || []).slice(0, 5).map((c, i) => (
+              {cityData.slice(0, 5).map((c, i) => (
                 <div key={c.name} className="flex items-center justify-between text-[10px] font-bold">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i] }} />
@@ -213,7 +224,7 @@ export default function AdminDashboardPage() {
         </CardHeader>
         <CardContent className="h-[250px]">
           <ResponsiveContainer width="100%" height={250}>
-            <AreaChart data={revenueByMonth || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart data={revenueByMonth} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
@@ -236,7 +247,7 @@ export default function AdminDashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {(activity || []).map(item => (
+            {activity.map(item => (
               <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors">
                 <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
                   {activityIcons[item.type] || <Flag size={14} className="text-muted-foreground" />}
