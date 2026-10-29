@@ -58,6 +58,10 @@ const offers = [
     id: 11, partner_id: 1, partner_name: 'ТаксиПартнёр', category: 'taxi', title: 'Скидка 10%',
     placement: 'chat', status: 'active', pinned: 0, clicks_total: 5,
   },
+  {
+    id: 12, partner_id: 2, partner_name: 'Цветы', category: 'flowers', title: 'Букет недели',
+    placement: 'hangout', status: 'paused', pinned: 1, clicks_total: 0,
+  },
 ];
 
 const conversions = [
@@ -66,6 +70,11 @@ const conversions = [
     user_email: 'u@x.ru', conversion_type: 'order', external_order_id: 'ORD-1', amount: 1000, commission: 150,
     status: 'approved', created_at: '2026-10-01T10:00:00.000Z',
   },
+  {
+    id: 22, partner_id: 2, partner_name: 'Цветы', offer_id: null, offer_title: null, user_id: null,
+    user_email: null, conversion_type: 'click', external_order_id: null, amount: null, commission: null,
+    status: 'pending', created_at: '2026-10-03T10:00:00.000Z',
+  },
 ];
 
 const payouts = [
@@ -73,16 +82,25 @@ const payouts = [
     id: 31, partner_id: 1, partner_name: 'ТаксиПартнёр', amount: 500, currency: 'RUB', method: 'bank', details: null,
     status: 'pending', admin_note: null, created_at: '2026-10-02T10:00:00.000Z', processed_at: null,
   },
+  {
+    id: 32, partner_id: 2, partner_name: 'Цветы', amount: 1000, currency: 'RUB', method: 'card', details: 'Сбер',
+    status: 'completed', admin_note: 'выплачено', created_at: '2026-10-04T10:00:00.000Z', processed_at: '2026-10-05T10:00:00.000Z',
+  },
+  {
+    id: 33, partner_id: 2, partner_name: 'Цветы', amount: 700, currency: 'RUB', method: 'manual', details: null,
+    status: 'rejected', admin_note: null, created_at: '2026-10-06T10:00:00.000Z', processed_at: null,
+  },
 ];
 
 const dailyStats = [
   { date: '2026-10-01', total: 10, clicks: 100, conversions: 5, revenue: 5000, commission: 750 },
 ];
 
-function mockAll(opts: { partners?: unknown; postStatus?: number; getStatus?: number } = {}) {
+function mockAll(opts: { partners?: unknown; postStatus?: number; getStatus?: number; allNonArray?: boolean } = {}) {
   mockFetch.mockImplementation((url: string, init?: RequestInit) => {
     if (init?.method === 'POST' || init?.method === 'PUT') return jsonResponse({}, opts.postStatus ?? 200);
     if (opts.getStatus && opts.getStatus >= 400) return jsonResponse({}, opts.getStatus);
+    if (opts.allNonArray) return jsonResponse({ message: 'nope' });
     if (url === '/api/admin/partners') return jsonResponse(opts.partners ?? partners);
     if (url === '/api/admin/offers') return jsonResponse(offers);
     if (url === '/api/admin/conversions') return jsonResponse(conversions);
@@ -342,5 +360,269 @@ describe('Страница admin-partners', () => {
     await screen.findByText('—');
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
     expect(screen.queryByTestId('admin-partner-1')).toBeNull();
+  });
+
+  it('пустые ответы всех пяти GET дают прочерк в каждой вкладке', async () => {
+    mockAll({ allNonArray: true });
+    render(<AdminPartnersPage />);
+
+    await screen.findByText('—');
+    expect(screen.queryByTestId('admin-partner-1')).toBeNull();
+
+    await openTab(/^admin\.partners\.offers_list$/);
+    expect(screen.getByText('—')).toBeInTheDocument();
+
+    await openTab(/^admin\.partners\.conversions$/);
+    expect(screen.getByText('—')).toBeInTheDocument();
+
+    await openTab(/^admin\.partners\.payouts$/);
+    expect(screen.getByText('—')).toBeInTheDocument();
+
+    await openTab(/^admin\.partners\.stats$/);
+    expect(screen.getByText('—')).toBeInTheDocument();
+  });
+
+  it('сетевая ошибка загрузки показывает тост и оставляет таблицы пустыми', async () => {
+    mockFetch.mockImplementation(() => Promise.reject(new Error('offline')));
+    render(<AdminPartnersPage />);
+
+    await waitFor(() => expect(h.toastError).toHaveBeenCalledWith('error.generic_title'));
+    expect(await screen.findByText('—')).toBeInTheDocument();
+    expect(screen.queryByTestId('admin-partner-1')).toBeNull();
+  });
+
+  it('активация партнёра без токена шлёт PUT active без Authorization', async () => {
+    h.token = null;
+    await renderLoaded();
+
+    await userEvent.click(screen.getByTestId('activate-partner-2'));
+
+    await waitFor(() => expect(mutationCall('PUT', '/api/admin/partners/2')).toBeDefined());
+    const put = mutationCall('PUT', '/api/admin/partners/2');
+    expect(JSON.parse(String(put?.[1].body))).toEqual({ status: 'active' });
+    expect(put?.[1].headers).toEqual({ 'Content-Type': 'application/json' });
+  });
+
+  it('создание партнёра без токена не шлёт Authorization', async () => {
+    h.token = null;
+    await renderLoaded();
+
+    await userEvent.click(screen.getByTestId('add-partner-button'));
+    fireEvent.change(screen.getByTestId('partner-name'), { target: { value: 'БезТокена' } });
+    fireEvent.click(screen.getByTestId('submit-create-partner'));
+
+    await waitFor(() => expect(mutationCall('POST', '/api/admin/partners')).toBeDefined());
+    expect(mutationCall('POST', '/api/admin/partners')?.[1].headers).toEqual({ 'Content-Type': 'application/json' });
+  });
+
+  it('создание оффера без токена: категория и размещение из селектов', async () => {
+    h.token = null;
+    await renderLoaded();
+
+    await userEvent.click(screen.getByTestId('add-offer-button'));
+    const selects = screen.getAllByRole('combobox');
+    fireEvent.change(selects[0], { target: { value: '2' } });
+    fireEvent.change(selects[1], { target: { value: 'cinema' } });
+    fireEvent.change(screen.getByTestId('offer-title'), { target: { value: 'Премьера' } });
+    fireEvent.change(screen.getByTestId('offer-deeplink'), { target: { value: 'https://swiftmatch.app/o/2' } });
+    fireEvent.change(selects[2], { target: { value: 'hangout' } });
+    fireEvent.click(screen.getByTestId('submit-create-offer'));
+
+    await waitFor(() => expect(h.toastSuccess).toHaveBeenCalledWith('admin.features.saved'));
+    const post = mutationCall('POST', '/api/admin/partners/2/offers');
+    expect(JSON.parse(String(post?.[1].body))).toEqual({
+      category: 'cinema',
+      title: 'Премьера',
+      deeplink: 'https://swiftmatch.app/o/2',
+      placement: 'hangout',
+    });
+    expect(post?.[1].headers).toEqual({ 'Content-Type': 'application/json' });
+  });
+
+  it('отказ создания оффера — тост generic, диалог не подтверждает успех', async () => {
+    await renderLoaded({ postStatus: 500 });
+
+    await userEvent.click(screen.getByTestId('add-offer-button'));
+    const selects = screen.getAllByRole('combobox');
+    fireEvent.change(selects[0], { target: { value: '1' } });
+    fireEvent.change(screen.getByTestId('offer-title'), { target: { value: 'Акция' } });
+    fireEvent.change(screen.getByTestId('offer-deeplink'), { target: { value: 'https://swiftmatch.app/o/1' } });
+    fireEvent.click(screen.getByTestId('submit-create-offer'));
+
+    await waitFor(() => expect(h.toastError).toHaveBeenCalledWith('error.generic_title'));
+    expect(h.toastSuccess).not.toHaveBeenCalled();
+    expect(screen.getByTestId('submit-create-offer')).toBeInTheDocument();
+  });
+
+  it('активация приостановленного оффера — PUT active', async () => {
+    await renderLoaded();
+    await openTab(/^admin\.partners\.offers_list$/);
+
+    await userEvent.click(screen.getByTestId('activate-offer-12'));
+
+    await waitFor(() => expect(mutationCall('PUT', '/api/admin/offers/12')).toBeDefined());
+    expect(JSON.parse(String(mutationCall('PUT', '/api/admin/offers/12')?.[1].body))).toEqual({ status: 'active' });
+  });
+
+  it('отказ переключения оффера — тост generic', async () => {
+    await renderLoaded({ postStatus: 500 });
+    await openTab(/^admin\.partners\.offers_list$/);
+
+    await userEvent.click(screen.getByTestId('pause-offer-11'));
+
+    await waitFor(() => expect(h.toastError).toHaveBeenCalledWith('error.generic_title'));
+  });
+
+  it('закреплённый оффер показывает «спонсируется» и снимается PUT pinned false', async () => {
+    await renderLoaded();
+    await openTab(/^admin\.partners\.offers_list$/);
+
+    const pinnedRow = screen.getByTestId('admin-offer-12');
+    expect(within(pinnedRow).getByText('admin.partners.sponsored_on')).toBeInTheDocument();
+    expect(within(pinnedRow).getByText('admin.partners.activate')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('pin-offer-12'));
+
+    await waitFor(() => expect(mutationCall('PUT', '/api/admin/offers/12')).toBeDefined());
+    expect(JSON.parse(String(mutationCall('PUT', '/api/admin/offers/12')?.[1].body))).toEqual({ pinned: false });
+  });
+
+  it('пауза оффера без токена не шлёт Authorization', async () => {
+    h.token = null;
+    await renderLoaded();
+    await openTab(/^admin\.partners\.offers_list$/);
+
+    await userEvent.click(screen.getByTestId('pause-offer-11'));
+
+    await waitFor(() => expect(mutationCall('PUT', '/api/admin/offers/11')).toBeDefined());
+    expect(mutationCall('PUT', '/api/admin/offers/11')?.[1].headers).toEqual({ 'Content-Type': 'application/json' });
+  });
+
+  it('снятие закрепления без токена и отказ — тост generic', async () => {
+    h.token = null;
+    await renderLoaded({ postStatus: 500 });
+    await openTab(/^admin\.partners\.offers_list$/);
+
+    await userEvent.click(screen.getByTestId('pin-offer-12'));
+
+    await waitFor(() => expect(h.toastError).toHaveBeenCalledWith('error.generic_title'));
+    expect(mutationCall('PUT', '/api/admin/offers/12')?.[1].headers).toEqual({ 'Content-Type': 'application/json' });
+  });
+
+  it('создание выплаты без токена: метод и детали из формы', async () => {
+    h.token = null;
+    await renderLoaded();
+    await openTab(/^admin\.partners\.payouts$/);
+
+    await userEvent.click(screen.getByTestId('add-payout-button'));
+    const selects = screen.getAllByRole('combobox');
+    fireEvent.change(selects[0], { target: { value: '2' } });
+    fireEvent.change(screen.getByTestId('payout-amount'), { target: { value: '1200' } });
+    fireEvent.change(selects[1], { target: { value: 'card' } });
+    fireEvent.change(screen.getByTestId('payout-details'), { target: { value: 'Сбер, 1234' } });
+    fireEvent.click(screen.getByTestId('submit-create-payout'));
+
+    await waitFor(() => expect(h.toastSuccess).toHaveBeenCalledWith('admin.features.saved'));
+    const post = mutationCall('POST', '/api/admin/payouts');
+    expect(JSON.parse(String(post?.[1].body))).toEqual({
+      partner_id: 2, amount: 1200, method: 'card', details: 'Сбер, 1234',
+    });
+    expect(post?.[1].headers).toEqual({ 'Content-Type': 'application/json' });
+  });
+
+  it('отказ создания выплаты — тост generic, успеха нет', async () => {
+    await renderLoaded({ postStatus: 500 });
+    await openTab(/^admin\.partners\.payouts$/);
+
+    await userEvent.click(screen.getByTestId('add-payout-button'));
+    const selects = screen.getAllByRole('combobox');
+    fireEvent.change(selects[0], { target: { value: '1' } });
+    fireEvent.change(screen.getByTestId('payout-amount'), { target: { value: '500' } });
+    fireEvent.click(screen.getByTestId('submit-create-payout'));
+
+    await waitFor(() => expect(h.toastError).toHaveBeenCalledWith('error.generic_title'));
+    expect(h.toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it('отрицательная и дробная сумма ниже min блокируют выплату', async () => {
+    await renderLoaded();
+    await openTab(/^admin\.partners\.payouts$/);
+
+    await userEvent.click(screen.getByTestId('add-payout-button'));
+    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: '1' } });
+
+    const submit = screen.getByTestId('submit-create-payout');
+    const amount = screen.getByTestId('payout-amount');
+
+    fireEvent.change(amount, { target: { value: '-500' } });
+    expect(submit).toBeDisabled();
+
+    fireEvent.change(amount, { target: { value: '0.5' } });
+    expect(submit).toBeDisabled();
+
+    fireEvent.click(submit);
+    expect(mutationCall('POST', '/api/admin/payouts')).toBeUndefined();
+
+    fireEvent.change(amount, { target: { value: '1' } });
+    expect(submit).not.toBeDisabled();
+  });
+
+  it('отклонение выплаты — PUT rejected и тост успеха', async () => {
+    await renderLoaded();
+    await openTab(/^admin\.partners\.payouts$/);
+
+    await userEvent.click(screen.getByRole('button', { name: /admin\.partners\.reject/ }));
+
+    await waitFor(() => expect(h.toastSuccess).toHaveBeenCalledWith('admin.features.saved'));
+    expect(JSON.parse(String(mutationCall('PUT', '/api/admin/payouts/31')?.[1].body))).toEqual({ status: 'rejected' });
+  });
+
+  it('подтверждение выплаты без токена и отказ — тост generic', async () => {
+    h.token = null;
+    await renderLoaded({ postStatus: 500 });
+    await openTab(/^admin\.partners\.payouts$/);
+
+    await userEvent.click(screen.getByRole('button', { name: /admin\.partners\.approve/ }));
+
+    await waitFor(() => expect(h.toastError).toHaveBeenCalledWith('error.generic_title'));
+    expect(mutationCall('PUT', '/api/admin/payouts/31')?.[1].headers).toEqual({ 'Content-Type': 'application/json' });
+  });
+
+  it('конверсия без оффера, суммы и комиссии показывает прочерки', async () => {
+    await renderLoaded();
+    await openTab(/^admin\.partners\.conversions$/);
+
+    const row = screen.getByTestId('admin-conversion-22');
+    expect(within(row).getAllByText('—')).toHaveLength(4);
+    expect(within(row).getByText('pending')).toBeInTheDocument();
+  });
+
+  it('выплаты показывают завершённую и отклонённую без кнопок решения', async () => {
+    await renderLoaded();
+    await openTab(/^admin\.partners\.payouts$/);
+
+    const completed = screen.getByTestId('admin-payout-32');
+    expect(within(completed).getByText('completed')).toBeInTheDocument();
+    expect(within(completed).getByText('выплачено')).toBeInTheDocument();
+    expect(within(completed).queryByRole('button')).toBeNull();
+
+    const rejected = screen.getByTestId('admin-payout-33');
+    expect(within(rejected).getByText('rejected')).toBeInTheDocument();
+    expect(within(rejected).getByText('—')).toBeInTheDocument();
+    expect(within(rejected).queryByRole('button')).toBeNull();
+  });
+
+  it('активная вкладка объявляется через aria-pressed', async () => {
+    await renderLoaded();
+
+    const partnersTab = screen.getByRole('button', { name: /^admin\.partners$/ });
+    const offersTab = screen.getByRole('button', { name: /^admin\.partners\.offers_list$/ });
+    expect(partnersTab).toHaveAttribute('aria-pressed', 'true');
+    expect(offersTab).toHaveAttribute('aria-pressed', 'false');
+
+    await userEvent.click(offersTab);
+
+    expect(offersTab).toHaveAttribute('aria-pressed', 'true');
+    expect(partnersTab).toHaveAttribute('aria-pressed', 'false');
   });
 });

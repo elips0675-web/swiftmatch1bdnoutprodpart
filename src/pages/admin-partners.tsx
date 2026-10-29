@@ -61,6 +61,11 @@ interface AdminConversion {
 const OFFER_CATEGORIES = ['cinema', 'restaurant', 'flowers', 'taxi', 'hotel', 'spa', 'photo', 'gift', 'event', 'experience'];
 const PLACEMENT_OPTIONS = ['chat', 'hangout', 'profile', 'passport'];
 
+function isValidPayoutAmount(value: string) {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 1;
+}
+
 interface AdminPayout {
   id: number;
   partner_id: number;
@@ -235,7 +240,7 @@ export default function AdminPartnersPage() {
   };
 
   const createPayout = async () => {
-    if (!payoutForm.partner_id || !Number(payoutForm.amount)) return;
+    if (!payoutForm.partner_id || !isValidPayoutAmount(payoutForm.amount)) return;
     setBusy(true);
     try {
       const token = getToken();
@@ -321,6 +326,7 @@ export default function AdminPartnersPage() {
             key={tb.key}
             type="button"
             onClick={() => setTab(tb.key)}
+            aria-pressed={tab === tb.key}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap transition-colors ${tab === tb.key ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted"}`}
           >
             {tb.icon} {tb.label}
@@ -673,7 +679,7 @@ export default function AdminPartnersPage() {
               <Label>{t('admin.partners.details')}</Label>
               <Textarea data-testid="payout-details" value={payoutForm.details} onChange={(e) => setPayoutForm((f) => ({ ...f, details: e.target.value }))} className="rounded-xl resize-none" rows={2} />
             </div>
-            <Button data-testid="submit-create-payout" onClick={createPayout} disabled={busy || !payoutForm.partner_id || !Number(payoutForm.amount)} className="w-full rounded-full font-bold">
+            <Button data-testid="submit-create-payout" onClick={createPayout} disabled={busy || !payoutForm.partner_id || !isValidPayoutAmount(payoutForm.amount)} className="w-full rounded-full font-bold">
               {busy && <Loader2 size={14} className="mr-2 animate-spin" />} {t('admin.features.save_btn')}
             </Button>
           </div>
