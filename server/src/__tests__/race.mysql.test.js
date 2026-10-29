@@ -140,8 +140,9 @@ describe.skipIf(!admin && !requireMysql)('гонки на живом MySQL (P0 #
 
     const [first, second] = await Promise.all([insert(1, 2), insert(1, 2)])
 
-    expect(first[0].affectedRows).toBe(1)
-    expect(second[0].affectedRows).toBe(0)
+    // Порядок ответов не гарантирован: вторая вставка может выполниться на
+    // сервере первой, поэтому affectedRows сравниваются как мультимножество.
+    expect([first[0].affectedRows, second[0].affectedRows].sort()).toEqual([0, 1])
     const [rows] = await pool.query('SELECT COUNT(*) AS cnt FROM likes')
     expect(Number(rows[0].cnt)).toBe(1)
   })

@@ -1,5 +1,5 @@
 ===== Сервер (Vitest) =====
-2759 тестов в 163 файлах (зелёных 2759) (vitest --reporter=json)
+2807 тестов в 165 файлах (зелёных 2807) (vitest --reporter=json)
 
 # файл | тестов
 server/src/__tests__/active-user.test.js | 33
@@ -72,6 +72,8 @@ server/src/__tests__/icebreakers.test.js | 11
 server/src/__tests__/idempotency.test.js | 6
 server/src/__tests__/idor.test.js | 21
 server/src/__tests__/image-pipeline.test.js | 8
+server/src/__tests__/index-app.test.js | 47
+server/src/__tests__/index-cors-failfast.test.js | 1
 server/src/__tests__/jwt-rotation.test.js | 12
 server/src/__tests__/likes-activity.test.js | 4
 server/src/__tests__/limiters-failopen.test.js | 7

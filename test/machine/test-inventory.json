@@ -1,15 +1,15 @@
 {
-  "generated": "2026-10-29T02:56:35.385Z",
+  "generated": "2026-10-29T07:27:46.689Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 161,
-    "tests": 2798,
-    "passed": 2798,
+    "files": 162,
+    "tests": 2832,
+    "passed": 2832,
     "failed": 0,
     "gate": {
-      "files": 32,
-      "tests": 799
+      "files": 33,
+      "tests": 833
     },
     "product": {
       "files": 129,
@@ -91,6 +91,10 @@
       {
         "file": "scripts/n-plus-one-audit.test.mjs",
         "tests": 31
+      },
+      {
+        "file": "scripts/next-task.test.mjs",
+        "tests": 34
       },
       {
         "file": "scripts/prod-mock-audit.test.mjs",
@@ -663,17 +667,17 @@
     ]
   },
   "server": {
-    "files": 163,
-    "tests": 2759,
-    "passed": 2759,
+    "files": 165,
+    "tests": 2807,
+    "passed": 2807,
     "failed": 0,
     "gate": {
       "files": 5,
       "tests": 123
     },
     "product": {
-      "files": 158,
-      "tests": 2636
+      "files": 160,
+      "tests": 2684
     },
     "perFile": [
       {
@@ -955,6 +959,14 @@
       {
         "file": "server/src/__tests__/image-pipeline.test.js",
         "tests": 8
+      },
+      {
+        "file": "server/src/__tests__/index-app.test.js",
+        "tests": 47
+      },
+      {
+        "file": "server/src/__tests__/index-cors-failfast.test.js",
+        "tests": 1
       },
       {
         "file": "server/src/__tests__/jwt-rotation.test.js",
@@ -1433,7 +1445,7 @@
     ]
   },
   "total": {
-    "files": 324,
-    "tests": 5557
+    "files": 327,
+    "tests": 5639
   }
 }
