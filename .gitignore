@@ -36,6 +36,7 @@ pnpm-lock.yaml
 *.hex
 
 # Local artifacts
+tmp/
 backups/
 server/.jwt-dev-secret
 test-results/

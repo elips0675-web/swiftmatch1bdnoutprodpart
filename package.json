@@ -54,7 +54,8 @@
     "retent:check": "node scripts/retention-gate.mjs",
     "stage:facts": "node scripts/stage-facts.mjs",
     "stage:section": "node scripts/stage-section.mjs",
-    "stage:checkpoint": "node scripts/stage-checkpoint.mjs"
+    "stage:checkpoint": "node scripts/stage-checkpoint.mjs",
+    "task:next": "node scripts/next-task.mjs"
   },
   "dependencies": {
     "@capacitor-community/admob": "^6.0.0",
