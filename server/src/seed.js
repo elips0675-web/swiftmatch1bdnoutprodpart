@@ -1,5 +1,6 @@
 import mysql from 'mysql2/promise'
 import bcrypt from 'bcryptjs'
+import { pathToFileURL } from 'node:url'
 
 const {
   DB_HOST = 'localhost',
@@ -9,11 +10,11 @@ const {
   DB_NAME = 'swiftmatch',
 } = process.env
 
-const TOTAL_USERS = 50
-const TARGET_MATCHES = 30
-const TARGET_MESSAGES = 200
+export const TOTAL_USERS = 50
+export const TARGET_MATCHES = 30
+export const TARGET_MESSAGES = 200
 
-const INTERESTS = [
+export const INTERESTS = [
   [1, 'Спорт', 'Sport', 'sport', 'Dumbbell'],
   [2, 'Музыка', 'Music', 'music', 'Music'],
   [3, 'Кино', 'Movies', 'movies', 'Film'],
@@ -59,8 +60,28 @@ const GENDERS = ['male', 'female']
 const DATING_GOALS = ['serious_relationship', 'dating', 'just_talk', 'new_friends']
 const CIRCADIAN = ['lark', 'owl', 'flexible']
 
-const DEMO_PASSWORD = 'demo123456'
-const ADMIN_EMAIL = 'admin@mail.ru'
+export const DEMO_PASSWORD = 'demo123456'
+export const ADMIN_EMAIL = 'admin@mail.ru'
+
+export const TABLES_TO_TRUNCATE = [
+  'messages', 'message_reactions', 'chat_participants', 'chats', 'chat_groups',
+  'matches',
+  'likes', 'user_interests', 'user_photos', 'user_stories', 'user_profiles',
+  'notifications', 'notification_preferences', 'reports', 'moderation_log', 'moderation_team_members',
+  'invites', 'push_subscriptions', 'fcm_tokens', 'email_unsubscribes', 'consent_log',
+  'subscriptions', 'user_blocks', 'saved_filters', 'compatibility_scores',
+  'activity_log', 'analytics_events', 'campaigns', 'contest_entries', 'data_erase_requests',
+  'emergency_contacts', 'date_checkins', 'date_schedules',
+  'posts', 'post_images', 'post_comments', 'post_likes', 'poll_answers',
+  'group_members', 'group_posts', 'group_post_likes', 'group_post_comments',
+  'hangouts', 'hangout_series', 'hangout_chats', 'hangout_participants', 'hangout_likes',
+  'hangout_responses', 'hangout_checkins', 'hangout_reviews', 'hangout_tickets', 'hangout_watchers',
+  'users', 'refresh_tokens', 'sms_verification',
+  'user_aliases', 'user_titles', 'user_verifications', 'user_watches',
+  'partner_payouts', 'partner_orders', 'partner_subscriptions', 'partner_conversions',
+  'event_tickets', 'partner_offers', 'partners',
+  'experiment_assignments', 'experiments',
+]
 
 const MOSCOW_COORDS = [
   [55.7558, 37.6173], [55.7612, 37.6105], [55.7500, 37.6300], [55.7700, 37.5900],
@@ -125,7 +146,7 @@ function pickN(arr, n) {
   return shuffled.slice(0, n)
 }
 
-async function main() {
+export async function main() {
   const conn = await mysql.createConnection({ host: DB_HOST, port: Number(DB_PORT), user: DB_USER, password: DB_PASSWORD, database: DB_NAME })
   console.log('Connected to MySQL')
 
@@ -172,24 +193,11 @@ async function main() {
 
   console.log('Truncating tables...')
   await conn.execute('SET FOREIGN_KEY_CHECKS = 0')
-  const tables = [
-    'messages', 'chat_participants', 'chats', 'matches',
-    'likes', 'user_interests', 'user_photos', 'user_stories', 'user_profiles',
-    'notifications', 'reports', 'moderation_log', 'invites', 'push_subscriptions',
-    'subscriptions', 'user_blocks', 'saved_filters', 'compatibility_scores',
-    'activity_log', 'analytics_events', 'posts', 'post_images',
-    'post_comments', 'post_likes', 'group_members', 'group_posts', 'group_post_likes',
-    'group_post_comments', 'users', 'refresh_tokens', 'sms_verification',
-    'partner_payouts', 'partner_orders', 'partner_subscriptions',
-    'partner_conversions', 'event_tickets', 'partner_offers', 'partners',
-    'experiment_assignments', 'experiments',
-  ]
-  for (const t of tables) {
+  for (const t of TABLES_TO_TRUNCATE) {
     await conn.execute(`DELETE FROM \`${t}\``).catch(() => {})
   }
 
-  // Reset AUTO_INCREMENT for all tables
-  for (const t of [...tables, 'interests', 'compatibility_scores', 'content_config', 'feature_flags', 'message_reactions'].reverse()) {
+  for (const t of new Set([...TABLES_TO_TRUNCATE, 'interests', 'content_config', 'feature_flags'])) {
     await conn.execute(`ALTER TABLE \`${t}\` AUTO_INCREMENT = 1`).catch(() => {})
   }
   await conn.execute('SET FOREIGN_KEY_CHECKS = 1')
@@ -298,7 +306,6 @@ async function main() {
   for (let i = 0; i < TARGET_MATCHES; i++) {
     const fromId = i + 3
     const toId = (i + 3 + rand(1, 15)) % (TOTAL_USERS - 1) + 3
-    if (fromId === toId) continue
 
     if (i < TARGET_MATCHES / 2) {
       await conn.execute(
@@ -310,6 +317,10 @@ async function main() {
     await conn.execute(
       'INSERT INTO likes (from_user_id, to_user_id, type) VALUES (?, ?, ?)',
       [fromId, toId, 'like'],
+    )
+    await conn.execute(
+      'INSERT IGNORE INTO matches (user1_id, user2_id, matched) VALUES (?, ?, 1)',
+      [fromId, toId],
     )
     matchCount++
 
@@ -339,7 +350,13 @@ async function main() {
   await conn.end()
 }
 
-main().catch((err) => {
-  console.error('Seed failed:', err.message)
-  process.exit(1)
-})
+export function runCli() {
+  main().catch((err) => {
+    console.error('Seed failed:', err.message)
+    process.exit(1)
+  })
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  runCli()
+}
