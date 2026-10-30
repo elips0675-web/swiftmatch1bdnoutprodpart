@@ -27,6 +27,7 @@ import { getJobSection, jobCode } from './e2e-gate-audit.mjs'
 
 const CI_WORKFLOW = '.github/workflows/ci.yml'
 const SMOKE_SCRIPT = 'server/scripts/queue-smoke.mjs'
+const LIVE_TEST = 'server/src/__tests__/admin-queues-redis.test.js'
 const JOB = 'test-server'
 
 function readRepoFile(root, relPath) {
@@ -97,6 +98,31 @@ export function auditSmokeSource(source) {
   return problems
 }
 
+/**
+ * Проверки живого теста admin-роутов: он обязан читать тот же флаг и падать без
+ * Redis, когда флаг задан. Пропуск без флага — норма для локальной машины, но
+ * `describe.skipIf` не должен оставаться единственным поведением: иначе в CI
+ * файл зеленеет, не выполнив ни одного запроса к живому движку.
+ */
+export function auditLiveAdminQueuesTest(source) {
+  const code = stripJsLineComments(source)
+  const problems = []
+
+  if (!/process\.env\.REQUIRE_REDIS === '1'/.test(code)) {
+    problems.push(`${LIVE_TEST}: REQUIRE_REDIS не читается строго как '1' — в CI файл может пропуститься молча`)
+  }
+
+  if (!/describe\.skipIf\(!reachable/.test(code)) {
+    problems.push(`${LIVE_TEST}: describe.skipIf не привязан к доступности Redis — файл либо не пропустится локально, либо пропустится всегда`)
+  }
+
+  if (!/if \(!reachable\) \{[^}]*throw new Error\(/.test(code)) {
+    problems.push(`${LIVE_TEST}: падения при недоступном Redis нет в самой ветке !reachable — REQUIRE_REDIS=1 останется декларацией`)
+  }
+
+  return problems
+}
+
 export function audit(root) {
   const ci = readRepoFile(root, CI_WORKFLOW)
   const jobSection = getJobSection(ci, JOB)
@@ -104,7 +130,7 @@ export function audit(root) {
   if (!jobSection) {
     return { facts, problems: [`${JOB}: джобы нет в ${CI_WORKFLOW} — смоук очередей не запускается в CI`] }
   }
-  return { facts, problems: [...auditTestServerJob(jobSection), ...auditSmokeSource(readRepoFile(root, SMOKE_SCRIPT))] }
+  return { facts, problems: [...auditTestServerJob(jobSection), ...auditSmokeSource(readRepoFile(root, SMOKE_SCRIPT)), ...auditLiveAdminQueuesTest(readRepoFile(root, LIVE_TEST))] }
 }
 
 function main() {
@@ -113,6 +139,7 @@ function main() {
 
   console.log(`джоба ${JOB} в ${CI_WORKFLOW}: ${facts.jobFound ? 'найдена' : 'НЕ НАЙДЕНА'}`)
   console.log(`смоук очередей: ${SMOKE_SCRIPT}`)
+  console.log(`живой тест admin-очередей: ${LIVE_TEST}`)
 
   if (problems.length) {
     console.log('')

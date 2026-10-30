@@ -7,6 +7,8 @@ const DEFAULT_TTL = 60_000
 // Держим больше (настраиваемо), чтобы их было видно в /api/admin/queues и можно было повторить.
 const KEEP_FAILED = Number(process.env.QUEUE_KEEP_FAILED) > 0 ? Number(process.env.QUEUE_KEEP_FAILED) : 1000
 
+export const KEEP_FAILED_JOBS = KEEP_FAILED
+
 export let emailQueue = null
 export let pushQueue = null
 export let imageQueue = null
@@ -15,7 +17,7 @@ export const redisConfigured = Boolean(REDIS_URL)
 
 const queues = []
 
-function createQueue(name) {
+export function createQueue(name) {
   if (!REDIS_URL) {
     rootLogger.info(`[queue] Redis not configured — ${name} queue disabled`)
     return null
