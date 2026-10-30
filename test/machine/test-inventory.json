@@ -1,11 +1,11 @@
 {
-  "generated": "2026-10-30T02:20:21.220Z",
+  "generated": "2026-10-30T02:54:42.382Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
     "files": 162,
-    "tests": 2844,
-    "passed": 2844,
+    "tests": 2857,
+    "passed": 2857,
     "failed": 0,
     "gate": {
       "files": 33,
@@ -13,7 +13,7 @@
     },
     "product": {
       "files": 129,
-      "tests": 1999
+      "tests": 2012
     },
     "perFile": [
       {
@@ -602,7 +602,7 @@
       },
       {
         "file": "src/test/two-fa-settings.test.tsx",
-        "tests": 2
+        "tests": 15
       },
       {
         "file": "src/test/unsubscribe-page.test.tsx",
@@ -668,8 +668,8 @@
   },
   "server": {
     "files": 167,
-    "tests": 2824,
-    "passed": 2824,
+    "tests": 2829,
+    "passed": 2829,
     "failed": 0,
     "gate": {
       "files": 5,
@@ -677,7 +677,7 @@
     },
     "product": {
       "files": 162,
-      "tests": 2701
+      "tests": 2706
     },
     "perFile": [
       {
@@ -1298,7 +1298,7 @@
       },
       {
         "file": "server/src/__tests__/totp.test.js",
-        "tests": 20
+        "tests": 25
       },
       {
         "file": "server/src/__tests__/trust-proxy.test.js",
@@ -1454,6 +1454,6 @@
   },
   "total": {
     "files": 329,
-    "tests": 5668
+    "tests": 5686
   }
 }
