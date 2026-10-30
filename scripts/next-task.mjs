@@ -262,7 +262,7 @@ export function pickTask(items, options = {}) {
     .filter((item) => (options.includeBlocked ? true : item.status !== 'blocked'))
     .filter((item) => (options.queueOnly ? item.queue : true))
     .filter((item) => (options.allowNoEvidence ? true : item.status !== 'no-evidence'))
-    .filter((item) => (options.local ? item.status === 'ready' && item.evidence === 'file:line' : true))
+    .filter((item) => (options.local ? item.status === 'ready' && routeFor(item).target === 'local' : true))
     .filter((item) => (options.id ? item.id.toUpperCase() === String(options.id).toUpperCase() : true))
   const sorted = [...pool].sort((a, b) => {
     const knownA = a.status === 'ready' ? 0 : 1
@@ -343,6 +343,61 @@ function buildPrompt(item, slice) {
   return lines.join('\n')
 }
 
+const RISK_DOMAINS = [
+  {
+    code: 'money',
+    label: 'платежи и деньги',
+    pattern: /stripe|плат[её]ж|подписк|premium|оплат|возврат средств|refund|выплат|комисси|invoice|billing/iu,
+  },
+  {
+    code: 'access',
+    label: 'доступ и секреты',
+    pattern: /jwt|oauth|\bauth\b|csrf|adminauth|секрет|\bтокен|уязвим|\bidor\b|rate.?limit|парол|sanitiz|xss|sql-?инъекц/iu,
+  },
+  {
+    code: 'schema',
+    label: 'схема БД и миграции',
+    pattern: /миграц|mysql_schema|alter table|create table|\benum\b|\bcheck\s*\(|schema|схем[аыуе]|индекс/iu,
+  },
+  {
+    code: 'infra',
+    label: 'деплой и инфраструктура',
+    pattern: /docker|compose\.ya?ml|deploy\.ya?ml|nginx|деплой|kubernetes/iu,
+  },
+]
+
+export function riskyDomain(item) {
+  const haystack = [item.title, item.body, item.section || '', ...item.files.map((file) => file.path)].join('\n')
+  return RISK_DOMAINS.find((domain) => domain.pattern.test(haystack)) || null
+}
+
+export function routeFor(item) {
+  const count = item.files.length
+  if (item.evidence !== 'file:line') {
+    return {
+      target: 'cloud',
+      reason: 'no-citation',
+      text: 'облако: нет цитаты file:line, по правилу проекта такой пункт не берут',
+    }
+  }
+  const risk = riskyDomain(item)
+  if (risk) {
+    return {
+      target: 'cloud',
+      reason: risk.code,
+      text: `облако (/next-cloud): ${risk.label} — 14B тут ошибается молча; скрипт смотрит ключевые слова, сложность он не оценивает`,
+    }
+  }
+  if (count <= 1) {
+    return { target: 'local', reason: 'single-file', text: '3060: один файл, один подход' }
+  }
+  return {
+    target: 'local',
+    reason: 'stepwise',
+    text: `3060 по одному файлу, подходов: ${count} (если нужен обзор всех сразу — /next-cloud)`,
+  }
+}
+
 export function buildCard(item) {
   const ordered = sortFilesForSlice(item.files)
   const slice = ordered.length ? ordered[0].path : ''
@@ -355,6 +410,7 @@ export function buildCard(item) {
   out.push(`Проверено: ${item.verified || 'дата не указана'}`)
   out.push(`Цитата кода: ${item.evidence === 'file:line' ? 'да (file:line)' : item.evidence === 'file' ? 'только путь, без строки' : 'нет'}`)
   out.push(`Файлов в пункте: ${item.files.length}`)
+  out.push(`Маршрут: ${routeFor(item).text}`)
   out.push('='.repeat(80))
   out.push('')
   out.push('СУТЬ')
@@ -405,7 +461,8 @@ function printHelp() {
     '',
     'Использование:',
     '  node scripts/next-task.mjs                      карточка следующей задачи',
-    '  node scripts/next-task.mjs --local              только то, что по силам локальной модели',
+    '  node scripts/next-task.mjs --local              только то, что скрипт отправляет на 3060',
+    '  node scripts/next-task.mjs --route              только решение «локально / облако»',
     '  node scripts/next-task.mjs --list                таблица всех пунктов со статусами',
     '  node scripts/next-task.mjs --json                карточка в JSON',
     '  node scripts/next-task.mjs --id QA-01            конкретный пункт',
@@ -423,7 +480,7 @@ function printHelp() {
 }
 
 function parseArgs(argv) {
-  const options = { list: false, json: false, queueOnly: false, includeBlocked: false, allowNoEvidence: false, local: false }
+  const options = { list: false, json: false, queueOnly: false, includeBlocked: false, allowNoEvidence: false, local: false, route: false }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     const next = () => {
@@ -437,6 +494,7 @@ function parseArgs(argv) {
     else if (arg === '--include-blocked') options.includeBlocked = true
     else if (arg === '--allow-no-evidence') options.allowNoEvidence = true
     else if (arg === '--local') options.local = true
+    else if (arg === '--route') options.route = true
     else if (arg === '--id') options.id = next()
     else if (arg === '--out') options.out = next()
     else if (arg === '--backlog') options.backlog = next()
@@ -519,7 +577,13 @@ function main() {
     process.exit(1)
   }
 
-  const payload = options.json ? JSON.stringify({ task, gates: gatesFor(task), card: buildCard(task) }, null, 2) : buildCard(task)
+  if (options.route) {
+    const route = routeFor(task)
+    process.stdout.write(`${route.target}\t${route.text}\n`)
+    process.exit(0)
+  }
+
+  const payload = options.json ? JSON.stringify({ task, route: routeFor(task), gates: gatesFor(task), card: buildCard(task) }, null, 2) : buildCard(task)
   if (options.out) {
     const outPath = path.resolve(ROOT, options.out)
     fs.mkdirSync(path.dirname(outPath), { recursive: true })

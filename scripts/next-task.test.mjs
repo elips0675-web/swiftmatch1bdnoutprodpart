@@ -9,6 +9,7 @@ import {
   pickTask,
   readBacklogFile,
   resolveBarePaths,
+  routeFor,
   walkInventory,
 } from './next-task.mjs'
 
@@ -275,6 +276,101 @@ describe('buildCard', () => {
 
   it('для принятого решения честно пишет, что это не задача', () => {
     expect(buildCard(byId(items, 'DEPS-02'))).toContain('Статус: принятое решение, не задача')
+  })
+
+  it('печатает маршрут рядом с числом файлов', () => {
+    const card = buildCard(byId(items, 'QA-01'))
+    expect(card).toContain('Маршрут: 3060 по одному файлу, подходов: 3')
+  })
+})
+
+describe('routeFor', () => {
+  const items = parseBacklog(FIXTURE)
+  const withText = (id, text, files) => ({
+    ...byId(items, id),
+    title: text,
+    body: text,
+    files: files || byId(items, id).files,
+  })
+
+  it('один файл с цитатой — на 3060 одним подходом', () => {
+    expect(routeFor({ ...byId(items, 'QA-01'), files: [{ path: 'a.ts' }] })).toEqual({
+      target: 'local',
+      reason: 'single-file',
+      text: '3060: один файл, один подход',
+    })
+  })
+
+  it('несколько файлов — 3060 по одному подходу, с указанием на /next-cloud', () => {
+    const route = routeFor(byId(items, 'QA-01'))
+    expect(route.target).toBe('local')
+    expect(route.reason).toBe('stepwise')
+    expect(route.text).toContain('подходов: 3')
+    expect(route.text).toContain('/next-cloud')
+  })
+
+  it('без цитаты file:line маршрут — облако', () => {
+    const route = routeFor({ ...byId(items, 'QA-01'), evidence: 'file' })
+    expect(route.target).toBe('cloud')
+    expect(route.reason).toBe('no-citation')
+    expect(route.text).toContain('нет цитаты file:line')
+  })
+
+  it('платежи и деньги уходят в облако даже на одном файле', () => {
+    const route = routeFor(withText('QA-01', 'Проверить возврат средств и подписку Stripe', [{ path: 'server/src/routes/premium.js' }]))
+    expect(route.target).toBe('cloud')
+    expect(route.reason).toBe('money')
+    expect(route.text).toContain('платежи и деньги')
+  })
+
+  it('доступ и секреты уходят в облако', () => {
+    const route = routeFor(withText('QA-01', 'Сверить CSRF и JWT в adminAuth', [{ path: 'server/src/middleware.js' }]))
+    expect(route.target).toBe('cloud')
+    expect(route.reason).toBe('access')
+  })
+
+  it('схема БД и миграции уходят в облако', () => {
+    const route = routeFor(withText('QA-01', 'Добавить миграцию под новый ENUM', [{ path: 'database/migrations/042_x.sql' }]))
+    expect(route.target).toBe('cloud')
+    expect(route.reason).toBe('schema')
+  })
+
+  it('деплой и инфраструктура уходят в облако', () => {
+    const route = routeFor(withText('QA-01', 'Поправить health-gate в deploy.yml', [{ path: '.github/workflows/deploy.yml' }]))
+    expect(route.target).toBe('cloud')
+    expect(route.reason).toBe('infra')
+  })
+
+  it('ключевое слово в пути файла тоже считается', () => {
+    const route = routeFor({ ...byId(items, 'QA-01'), title: 'Мелкая правка', body: 'Мелкая правка', files: [{ path: 'src/lib/auth-refresh.ts' }] })
+    expect(route.target).toBe('cloud')
+    expect(route.reason).toBe('access')
+  })
+
+  it('облачный маршрут честно говорит, что это ключевые слова, а не оценка сложности', () => {
+    const route = routeFor(withText('QA-01', 'Stripe checkout'))
+    expect(route.text).toContain('сложность он не оценивает')
+  })
+})
+
+describe('pickTask --local', () => {
+  const items = parseBacklog(FIXTURE)
+
+  it('оставляет только пункты, которые скрипт отправляет на 3060', () => {
+    const payment = {
+      ...byId(items, 'QA-01'),
+      id: 'PAY-01',
+      title: 'Stripe',
+      body: 'Stripe',
+      files: [{ path: 'server/src/routes/premium.js' }],
+    }
+    const picked = pickTask([payment], { local: true })
+    expect(picked).toBeNull()
+  })
+
+  it('безопасный однофайловый пункт остаётся локальным', () => {
+    const safe = { ...byId(items, 'QA-01'), id: 'SAFE-01', title: 'Убрать warning', body: 'Убрать warning', files: [{ path: 'src/pages/a.tsx' }] }
+    expect(pickTask([safe], { local: true }).id).toBe('SAFE-01')
   })
 })
 
