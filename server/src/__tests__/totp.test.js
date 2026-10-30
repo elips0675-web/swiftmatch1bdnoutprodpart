@@ -95,12 +95,55 @@ describe('POST /api/auth/2fa/* (router)', () => {
   const app = createApp()
 
   it('setup: без мока adminAuth был бы 401; с моком возвращает otpauth URL и секрет', async () => {
-    pool.query.mockResolvedValue([{ affectedRows: 1 }, []])
+    pool.query
+      .mockResolvedValueOnce([[{ totp_enabled: 0 }], []])
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []])
     const res = await request(app).post('/api/auth/2fa/setup').send({})
     expect(res.status).toBe(200)
     expect(res.body.otpauthUrl).toMatch(/^otpauth:\/\/totp\//)
     expect(res.body.secret).toMatch(/^[A-Z2-7]+$/)
-    expect(pool.query.mock.calls[0][0]).toMatch(/UPDATE users SET totp_secret/)
+    expect(pool.query.mock.calls[0][0]).toMatch(/SELECT totp_enabled/)
+    expect(pool.query.mock.calls[1][0]).toMatch(/UPDATE users SET totp_secret/)
+  })
+
+  it('setup: включённая 2FA не сбрасывается — 409 ALREADY_ENABLED без UPDATE', async () => {
+    pool.query.mockResolvedValue([[{ totp_enabled: 1 }], []])
+    const res = await request(app).post('/api/auth/2fa/setup').send({})
+    expect(res.status).toBe(409)
+    expect(res.body.message).toBe('ALREADY_ENABLED')
+    expect(pool.query).toHaveBeenCalledTimes(1)
+    expect(pool.query.mock.calls[0][0]).toMatch(/SELECT totp_enabled/)
+  })
+
+  it('status: включённая 2FA -> enabled:true по id админа', async () => {
+    pool.query.mockResolvedValue([[{ totp_enabled: 1 }], []])
+    const res = await request(app).get('/api/auth/2fa/status')
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ enabled: true })
+    expect(pool.query.mock.calls[0][0]).toMatch(/SELECT totp_enabled FROM users WHERE id = \?/)
+    expect(pool.query.mock.calls[0][1]).toEqual([1])
+  })
+
+  it('status: выключенная 2FA -> enabled:false', async () => {
+    pool.query.mockResolvedValue([[{ totp_enabled: 0 }], []])
+    const res = await request(app).get('/api/auth/2fa/status')
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ enabled: false })
+  })
+
+  it('status: строки профиля нет -> enabled:false, а не падение', async () => {
+    pool.query.mockResolvedValue([[], []])
+    const res = await request(app).get('/api/auth/2fa/status')
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ enabled: false })
+  })
+
+  it('status: падение БД -> 500 и лог', async () => {
+    pool.query.mockRejectedValue(new Error('db down'))
+    const res = await request(app).get('/api/auth/2fa/status')
+    expect(res.status).toBe(500)
+    expect(res.body.message).toBe('Internal server error')
+    expect(rootLogger.error).toHaveBeenCalledWith(expect.stringContaining('2FA status error'))
   })
 
   it('enable: код обязателен', async () => {
@@ -219,7 +262,9 @@ describe('POST /api/auth/2fa/setup — фолбэк email', () => {
   it('без req.admin.email issuer-метка берёт "admin"', async () => {
     globalThis.__adminOverride = { role: 'admin' }
     try {
-      pool.query.mockResolvedValue([{ affectedRows: 1 }, []])
+      pool.query
+        .mockResolvedValueOnce([[{ totp_enabled: 0 }], []])
+        .mockResolvedValueOnce([{ affectedRows: 1 }, []])
       const res = await request(createApp()).post('/api/auth/2fa/setup').send({})
       expect(res.status).toBe(200)
       expect(res.body.otpauthUrl).toContain(':admin?')

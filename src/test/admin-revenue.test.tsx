@@ -79,14 +79,18 @@ afterEach(() => {
 })
 
 const trendCalls = () => requests.filter(r => r.url.includes('/api/admin/registration-trend'))
+const dashboardCalls = () => requests.filter(r => r.url.includes('/api/admin/'))
 
 describe('AdminDashboardPage', () => {
   it('показывает выручку в рублях, без деления на 100', async () => {
     render(<AdminDashboardPage />)
     await waitFor(() => expect(screen.getByText('699 ₽')).toBeTruthy())
     expect(screen.queryByText('6.99 ₽')).toBeNull()
-    expect(requests).toHaveLength(5)
-    requests.forEach(r => expect(r.init?.headers).toEqual({ Authorization: 'Bearer admin-token' }))
+    expect(dashboardCalls()).toHaveLength(5)
+    dashboardCalls().forEach(r => expect(r.init?.headers).toEqual({ Authorization: 'Bearer admin-token' }))
+    const statusCalls = requests.filter(r => r.url === '/api/auth/2fa/status')
+    expect(statusCalls).toHaveLength(1)
+    expect(statusCalls[0].init?.headers).toEqual({ Authorization: 'Bearer admin-token' })
   })
 
   it('показывает ключ заглушки, если выручка пришла пустой', async () => {
