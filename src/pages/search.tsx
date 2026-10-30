@@ -54,12 +54,15 @@ export function calculateAttachmentCompatibility(style1?: AttachmentStyle, style
 }
 
 export interface AutoSearchFilters {
-  ageRange: [number, number];
+  ageRange: number[];
   selectedCity: string;
   selectedCountry: string;
-  distance: [number];
+  distance: number[];
   selectedDatingGoal: string;
   selectedInterests: string[];
+  genderPref?: string;
+  selectedCircadian?: string;
+  selectedAttachment?: string;
 }
 export interface SearchUser {
   id: number;
@@ -72,7 +75,19 @@ export interface SearchUser {
   goal?: string;
   circadian?: string;
   attachmentStyle?: AttachmentStyle;
-  boost?: { boostedUntil?: string };
+  boost?: { boostedUntil?: string | null };
+  name?: string;
+  displayName?: string;
+  img?: string;
+  photoURL?: string;
+  zodiac?: string;
+  match?: number;
+  superLikes?: number;
+  isCandidate?: boolean;
+  commonInterests?: number;
+  hasMatchingGoal?: boolean;
+  hasMatchingCircadian?: boolean;
+  attachmentCompatibility?: number;
 }
 
 interface SavedSearchFilters {
@@ -104,7 +119,7 @@ export function fromSavedSearchFilters(raw: string | null): AutoSearchFilters | 
   }
 }
 
-export function performAutosearch(filters: AutoSearchFilters, allUsers: SearchUser[], currentUser: SearchUser) {
+export function performAutosearch(filters: AutoSearchFilters, allUsers: SearchUser[], currentUser: SearchUser | null) {
     if (!filters || !currentUser) return [];
 
     const { ageRange, selectedCity, selectedCountry, distance, selectedDatingGoal, selectedInterests } = filters;
@@ -134,7 +149,7 @@ export function performAutosearch(filters: AutoSearchFilters, allUsers: SearchUs
             const normalizedSelectedInterests = (selectedInterests || []).map((i: string) => i.startsWith('interest.') ? i.slice(9) : i);
             const commonInterests = normalizedUserInterests.filter((i: string) => normalizedSelectedInterests.includes(i)).length;
             const hasMatchingGoal = selectedDatingGoal !== "all" && user.goal === selectedDatingGoal;
-            const hasMatchingCircadian = currentUser.circadian && user.circadian && currentUser.circadian === user.circadian;
+            const hasMatchingCircadian = Boolean(currentUser.circadian && user.circadian && currentUser.circadian === user.circadian);
             const attachmentCompatibility = calculateAttachmentCompatibility(currentUser.attachmentStyle, user.attachmentStyle);
             const narrowsByInterests = normalizedSelectedInterests.length > 0 || selectedDatingGoal !== "all";
             const isCandidate = !narrowsByInterests || hasMatchingGoal || (commonInterests > 0);
@@ -166,22 +181,22 @@ function SearchContent() {
   const searchParams = useSearchParams();
   const { t, language } = useLanguage();
   const trackEvent = useTrackEvent();
-  const [userList, setUserList] = useState<any[]>([]);
+  const [userList, setUserList] = useState<SearchUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [pageTitle, setPageTitle] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(0);
-  const [matchUser, setMatchUser] = useState<any>(null);
+  const [matchUser, setMatchUser] = useState<SearchUser | null>(null);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [reportDescription, setReportDescription] = useState('');
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<SearchUser | null>(null);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [votedEntries, setVotedEntries] = useState<number[]>([]);
   const [hasError, setHasError] = useState(false);
 
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
-  const [searchFilters, setSearchFilters] = useState(null);
+  const [searchFilters, setSearchFilters] = useState<AutoSearchFilters | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('userProfile');
@@ -212,7 +227,7 @@ function SearchContent() {
   useEffect(() => {
     if (!currentUser) return;
     const mode = searchParams.get('mode');
-    let initialUsers: any[] = [];
+    let initialUsers: SearchUser[] = [];
     setIsLoading(true);
     if (mode === 'autosearch') {
         setPageTitle(t('button.autosearch'));
@@ -248,7 +263,7 @@ function SearchContent() {
     return () => clearTimeout(timer);
   }, [isLoading, userList.length]);
   
-  const handleApplyFilters = (newFilters: any) => {
+  const handleApplyFilters = (newFilters: AutoSearchFilters) => {
       sessionStorage.setItem('autosearchFilters', JSON.stringify(newFilters));
       setSearchFilters(newFilters);
       setIsLoading(true);
@@ -301,10 +316,11 @@ function SearchContent() {
   };
   
   const handleSuperLike = async () => {
-    if (!user) return;
+    if (!user || !currentUser) return;
     trackEvent('swipe_super_like', { target_user_id: user.id });
-    if ((currentUser.superLikes || 0) > 0) {
-      const updatedUser = { ...currentUser, superLikes: currentUser.superLikes - 1 };
+    const superLikes = currentUser.superLikes ?? 0;
+    if (superLikes > 0) {
+      const updatedUser = { ...currentUser, superLikes: superLikes - 1 };
       setCurrentUser(updatedUser);
       localStorage.setItem('userProfile', JSON.stringify(updatedUser));
       toast({ title: t('toast.super_like'), description: t('toast.super_like_desc', { name: user.name }) });
@@ -414,8 +430,8 @@ function SearchContent() {
                   onClick={() => router.push(`/user?id=${user.id}`)}
                 >
                   <Image 
-                    src={user.img} 
-                    alt={user.name} 
+                    src={user.img || user.photoURL || ''} 
+                    alt={user.name || ''} 
                     fill 
                     sizes="(max-width: 360px) 100vw, 360px"
                     priority={currentIndex === 0}

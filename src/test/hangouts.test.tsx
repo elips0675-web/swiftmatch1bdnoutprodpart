@@ -9,14 +9,16 @@ import { __resetFeedCache } from "@/pages/hangouts"
 const mockFetch = vi.fn()
 globalThis.fetch = mockFetch
 
+type MockResponse = { ok: boolean; status?: number; json: () => Promise<unknown> }
+
 vi.mock("@/lib/token", () => ({
   getToken: () => "test-token",
 }))
 
 const mockWs = vi.hoisted(() => {
-  const handlers: Record<string, (payload?: any) => void> = {}
+  const handlers: Record<string, (payload?: unknown) => void> = {}
   const socket = {
-    on: vi.fn((ev: string, cb: (payload?: any) => void) => { handlers[ev] = cb }),
+    on: vi.fn((ev: string, cb: (payload?: unknown) => void) => { handlers[ev] = cb }),
     off: vi.fn(),
     emit: vi.fn(),
   }
@@ -28,7 +30,7 @@ vi.mock("@/hooks/use-websocket", () => ({
 }))
 
 const mockUseLanguage = {
-  t: (key: string, options?: Record<string, any>) => {
+  t: (key: string, options?: Record<string, unknown>) => {
     let value = (mockTranslations as Record<string, string>)[key] || key
     if (options) {
       Object.entries(options).forEach(([k, v]) => {
@@ -142,7 +144,7 @@ describe("HangoutsPage", () => {
     mockFlags.hangoutsEnabled = true
     mockIsPremium = true
     __resetFeedCache()
-    ;(navigator as any).geolocation = undefined
+    Object.defineProperty(navigator, 'geolocation', { value: undefined, configurable: true })
   })
 
   it("renders feed with hangout cards", async () => {
@@ -578,13 +580,13 @@ describe("HangoutsPage", () => {
     const offers = [
       { id: 28, category: "restaurant", title: "Ресторан для первого свидания", deeplink: "https://go/x", price: 2500, city: "Москва", partner_name: "Restoclub", commission_rate: 12 },
     ]
-    const bookingCalls: any[] = []
-    mockFetch.mockImplementation((url: string, opts?: any) => {
+    const bookingCalls: Array<{ url: string; body: { offer_id?: number } }> = []
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
       const u = String(url)
       if (u.includes("/api/affiliate/offers")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ offers }) })
       if (u.includes("/api/profile/me")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ city: "Москва" }) })
       if (u.includes("/api/partners/booking")) {
-        bookingCalls.push({ url: u, body: JSON.parse(opts?.body || "{}") })
+        bookingCalls.push({ url: u, body: JSON.parse(String(opts?.body ?? "{}")) })
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ deeplink: "https://go/x?date=2026-09-01&time=19:00&guests=2", offer_id: 28 }) })
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
@@ -692,8 +694,8 @@ describe("HangoutsPage", () => {
   })
 
   it("applies optimistic join immediately and keeps it on success (этап 106)", async () => {
-    let resolvePost: (v: any) => void = () => {}
-    const postPromise = new Promise<any>((res) => { resolvePost = res })
+    let resolvePost: (v: MockResponse) => void = () => {}
+    const postPromise = new Promise<MockResponse>((res) => { resolvePost = res })
     const joinable = [{ ...sampleHangouts[0], hangout_type: "company", participant_count: 1, like_count: 0, my_participant_status: null, is_author: false }]
     mockFetch.mockImplementation((url: string, options?: RequestInit) => {
       const u = String(url)
@@ -714,8 +716,8 @@ describe("HangoutsPage", () => {
   })
 
   it("rolls back optimistic join when the request fails (этап 106)", async () => {
-    let resolvePost: (v: any) => void = () => {}
-    const postPromise = new Promise<any>((res) => { resolvePost = res })
+    let resolvePost: (v: MockResponse) => void = () => {}
+    const postPromise = new Promise<MockResponse>((res) => { resolvePost = res })
     const joinable = [{ ...sampleHangouts[0], hangout_type: "company", participant_count: 1, like_count: 0, my_participant_status: null, is_author: false }]
     mockFetch.mockImplementation((url: string, options?: RequestInit) => {
       const u = String(url)

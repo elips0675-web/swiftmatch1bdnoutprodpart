@@ -1,14 +1,14 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { ALL_TITLES, type TitleMetadata } from "./constants"
-import type { UserProfile, Language } from "@/types"
+import type { Language } from "@/types"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
 export function getUserTitles(
-  user: Partial<UserProfile> | null,
+  user: { match?: number; interests?: string[]; bio?: string } | null,
   language: Language,
 ): (TitleMetadata & { displayName: string })[] {
   if (!user) return []

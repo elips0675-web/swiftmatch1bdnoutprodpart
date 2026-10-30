@@ -12,9 +12,9 @@ vi.mock("@/lib/token", () => ({
 }));
 
 const mockWs = vi.hoisted(() => {
-  const handlers: Record<string, (payload?: any) => void> = {};
+  const handlers: Record<string, (payload?: unknown) => void> = {};
   const socket = {
-    on: vi.fn((ev: string, cb: (payload?: any) => void) => { handlers[ev] = cb; }),
+    on: vi.fn((ev: string, cb: (payload?: unknown) => void) => { handlers[ev] = cb; }),
     off: vi.fn(),
     emit: vi.fn(),
   };
@@ -60,7 +60,7 @@ const mockTranslations: Record<string, string> = {
 };
 
 const mockUseLanguage = {
-  t: (key: string, options?: Record<string, any>) => {
+  t: (key: string, options?: Record<string, unknown>) => {
     let value = (mockTranslations as Record<string, string>)[key] || key;
     if (options) {
       Object.entries(options).forEach(([k, v]) => {

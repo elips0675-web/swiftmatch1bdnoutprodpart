@@ -21,7 +21,48 @@ function generatePollAnswers(seed: number): Record<string, number> {
   return answers;
 }
 
-const BASE_USERS: any[] = [
+export type DemoUser = {
+  id: number;
+  name: string;
+  age: number;
+  img: string;
+  hint: string;
+  online: boolean;
+  distance: number;
+  match: number;
+  city: string;
+  zodiac: string;
+  interests: string[];
+  bio?: string;
+  height: number;
+  goal: string;
+  gender: string;
+  lookingFor: string;
+  superLikes: number;
+  boost: { boostedUntil: string | null };
+  circadian: string;
+};
+
+export type DemoGroupSubcategory = {
+  id: number;
+  name_ru: string;
+  name_en: string;
+  members: number;
+  online: number;
+  href?: string;
+};
+
+export type DemoGroupCategory = {
+  id: string;
+  name_ru: string;
+  name_en: string;
+  icon: string;
+  img: string;
+  hint: string;
+  subgroups: DemoGroupSubcategory[];
+};
+
+const BASE_USERS: DemoUser[] = [
   { id: 2, name: 'Анна', age: 24, img: '/demo/people/anna.png', hint: 'woman portrait', online: true, distance: 2, match: 87, city: 'Москва', zodiac: 'common.zodiac.leo', interests: ['interest.photography', 'interest.travel', 'interest.coffee', 'interest.music', 'interest.sport'], bio: 'Люблю закаты, хороший кофе и интересные разговоры.', height: 172, goal: 'goal.serious_relationship', gender: 'female', lookingFor: 'male', superLikes: 5, boost: { boostedUntil: futureDate }, circadian: 'lark' },
   
   // 10 Men for Anna (Москва, совпадающие интересы и цели)
@@ -59,7 +100,7 @@ export const TOP_OF_THE_WEEK = [
   { id: 'top4', name_ru: 'React-разработчики', name_en: 'React Developers', members: 6543, img: 'https://picsum.photos/seed/top_week_4/600/400' },
 ];
 
-export const GROUP_CATEGORIES: any[] = [
+export const GROUP_CATEGORIES: DemoGroupCategory[] = [
   {
     id: 'music', name_ru: 'Музыка', name_en: 'Music', icon: 'Music', img: 'https://picsum.photos/seed/cat_music/600/400', hint: 'concert crowd',
     subgroups: [

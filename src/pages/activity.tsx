@@ -33,6 +33,28 @@ import { useLanguage } from "@/context/language-context";
 import { useFeatureFlags } from "@/context/feature-flags-context";
 import { usePremium } from "@/hooks/use-premium";
 
+type ActivityEntry = {
+  id: number;
+  userId: number;
+  user: string;
+  age: number | null;
+  img: string;
+  type: string;
+  time: string;
+  blurred: boolean;
+};
+
+type InviteEntry = {
+  id: number;
+  userId: number;
+  user: string;
+  age: number | null;
+  img: string;
+  type: string;
+  seen: boolean;
+  time: string;
+};
+
 const PremiumDialog = dynamic(() => import('@/components/dialogs/premium-dialog').then(mod => mod.PremiumDialog), { ssr: false });
 const AdDialog = dynamic(() => import('@/components/dialogs/ad-dialog').then(mod => mod.AdDialog), { ssr: false });
 
@@ -57,8 +79,8 @@ export default function ActivityPage() {
   const [showAd, setShowAd] = useState(false);
   const [isIncognito, setIsIncognito] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const [invites, setInvites] = useState<any[]>([]);
-  const [activity, setActivity] = useState<any[]>([]);
+  const [invites, setInvites] = useState<InviteEntry[]>([]);
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [isActivityLoading, setIsActivityLoading] = useState(true);
 
   useEffect(() => {
@@ -260,7 +282,7 @@ export default function ActivityPage() {
   );
 }
 
-function ActivityItem({ item, onUnlock }: { item: any, onUnlock: () => void }) {
+function ActivityItem({ item, onUnlock }: { item: ActivityEntry, onUnlock: () => void }) {
   const { t } = useLanguage();
   
   const getIcon = () => {
@@ -352,7 +374,7 @@ function ActivityItem({ item, onUnlock }: { item: any, onUnlock: () => void }) {
   );
 }
 
-function InviteItem({ item }: { item: any }) {
+function InviteItem({ item }: { item: InviteEntry }) {
   const { t } = useLanguage();
 
   const inviteIcon = () => {

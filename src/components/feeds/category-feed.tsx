@@ -14,6 +14,64 @@ import { cn } from '@/lib/utils';
 import { Pagination, PaginationContent, PaginationItem } from "@/components/ui/pagination";
 import { getToken } from '@/lib/token';
 
+export interface FeedComment {
+  id: number;
+  author?: string;
+  authorRu?: string;
+  authorEn?: string;
+  avatar?: string;
+  text?: string;
+  textRu?: string;
+  textEn?: string;
+  time?: string;
+  timeRu?: string;
+  timeEn?: string;
+  imageUrl?: string;
+}
+
+export interface FeedPost {
+  id: number;
+  author?: string;
+  authorRu?: string;
+  authorEn?: string;
+  group?: string;
+  groupRu?: string;
+  groupEn?: string;
+  text?: string;
+  textRu?: string;
+  textEn?: string;
+  time?: string;
+  timeRu?: string;
+  timeEn?: string;
+  avatar?: string;
+  images?: string[];
+  likes: number;
+  commentsCount: number;
+  isLiked: boolean;
+  comments: FeedComment[];
+}
+
+type ApiComment = {
+  id: number;
+  author?: string;
+  avatar?: string;
+  text?: string;
+  imageUrl?: string;
+  createdAt?: string;
+};
+
+type ApiPost = {
+  id: number;
+  author?: string;
+  text?: string;
+  createdAt?: string;
+  avatar?: string;
+  images?: string[];
+  likes: number;
+  likedByMe?: boolean;
+  comments?: ApiComment[];
+};
+
 
 const PostText = ({ text, charLimit = 280 }: { text: string, charLimit?: number }) => {
   const { language } = useLanguage();
@@ -261,7 +319,7 @@ function generatePosts(categoryName: string, categoryEn: string) {
       likes: 100 + ((i * 137) % 4900),
       commentsCount: comments.length,
       isLiked: false,
-      comments: comments as any[],
+      comments,
     };
   });
 }
@@ -274,7 +332,7 @@ interface CategoryFeedProps {
 
 export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: CategoryFeedProps) {
   const isApiMode = !!groupId;
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<FeedPost[]>([]);
   const { toast } = useToast();
   const { t, language } = useLanguage();
 
@@ -286,7 +344,7 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
       fetch(`/api/groups/${groupId}/posts`, { headers })
         .then(r => r.ok ? r.json() : [])
         .then(data => {
-          const mapped = data.map((p: any) => ({
+          const mapped = (data as ApiPost[]).map((p: ApiPost) => ({
             id: p.id,
             author: p.author,
             group: language === 'RU' ? categoryNameRu : categoryNameEn,
@@ -295,9 +353,9 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
             avatar: p.avatar || '',
             images: p.images || [],
             likes: p.likes,
-            isLiked: p.likedByMe,
+            isLiked: Boolean(p.likedByMe),
             commentsCount: (p.comments || []).length,
-            comments: (p.comments || []).map((c: any) => ({
+            comments: (p.comments || []).map((c: ApiComment) => ({
               id: c.id, author: c.author, avatar: c.avatar || '',
               text: c.text || '', imageUrl: c.imageUrl,
               time: c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '',
@@ -368,7 +426,7 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
       text: localize(post.textRu, post.textEn, post.text || ''),
       avatar: normalizeUrl(post.avatar, post.id),
       images: (post.images || []).map((img: string, i: number) => normalizeUrl(img, i + post.id)),
-      comments: (post.comments || []).map((c: any, i: number) => ({
+      comments: (post.comments || []).map((c: FeedComment, i: number) => ({
         ...c,
         author: localize(c.authorRu, c.authorEn, c.author || ''),
         time: localize(c.timeRu, c.timeEn, c.time || ''),
@@ -515,7 +573,7 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
           });
         });
     } else {
-      const newComment: any = {
+      const newComment: FeedComment = {
         id: Date.now(),
         author: tr("Вы", "You"),
         avatar: "/demo/people/me.png",
@@ -600,7 +658,7 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
         likes: 0,
         commentsCount: 0,
         isLiked: false,
-        comments: [] as any[],
+        comments: [],
       };
       setPosts((current) => [newPost, ...current]);
       closeCreatePost();
@@ -700,7 +758,7 @@ export function CategoryFeed({ categoryNameRu, categoryNameEn, groupId }: Catego
                     className="overflow-hidden"
                   >
                     <div className="px-5 pb-4">
-                      {post.comments.map((comment: any) => (
+                      {post.comments.map((comment: FeedComment) => (
                         <div key={comment.id} className="flex items-start gap-3 mb-4">
                           <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden mt-1 flex-shrink-0">
                             <img src={comment.avatar} alt={comment.author} className="w-full h-full object-cover" />

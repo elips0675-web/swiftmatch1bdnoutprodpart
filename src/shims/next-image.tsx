@@ -12,7 +12,7 @@ interface NextImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, "src"
   placeholder?: string;
   blurDataURL?: string;
   unoptimized?: boolean;
-  loader?: any;
+  loader?: (args: { src: string; width?: number; quality?: number }) => string;
   sizes?: string;
   loading?: "eager" | "lazy";
 }
@@ -43,8 +43,8 @@ export default function NextImage({
     <img
       src={resolvedSrc}
       alt={alt}
-      width={fill ? undefined : (width as any)}
-      height={fill ? undefined : (height as any)}
+      width={fill ? undefined : width}
+      height={fill ? undefined : height}
       loading={priority ? "eager" : loading ?? "lazy"}
       decoding="async"
       sizes={sizes}

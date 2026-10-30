@@ -1,11 +1,11 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { apiCall, loginViaApi } from './helpers/api'
 
 const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:8081'
 const ADMIN_EMAIL = 'admin@mail.ru'
 const ADMIN_PASS = 'demo123456'
 
-async function loginViaUI(page: any, email: string, password: string) {
+async function loginViaUI(page: Page, email: string, password: string) {
   await page.goto(`${BASE_URL}/login`)
   await page.waitForLoadState('networkidle')
   await page.fill('[data-testid="email"]', email)
@@ -35,7 +35,7 @@ test.describe('Admin Messaging — campaigns CRUD', () => {
     expect(res.status).toBe(201)
 
     const list = await apiCall(request, 'GET', '/api/admin/campaigns', undefined, token)
-    const found = list.body.some((c: any) => c.title === title)
+    const found = list.body.some((c: { title?: string }) => c.title === title)
     expect(found).toBe(true)
   })
 

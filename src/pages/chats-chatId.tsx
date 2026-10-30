@@ -33,7 +33,33 @@ import { firstNameOf } from "@/lib/opening-lines";
 const MESSAGES_PAGE_SIZE = 50;
 const MESSAGE_EDIT_WINDOW_MS = 15 * 60 * 1000;
 
-type MessagesPage = { messages: any[]; has_more: boolean; next_before: number | null };
+type ChatReaction = { emoji: string; user_id: number };
+
+type ChatMessage = {
+  id: number;
+  sender_id: number | string;
+  text?: string | null;
+  created_at: string;
+  ttl_seconds?: number | null;
+  edited_at?: string | null;
+  seen?: boolean;
+  reactions?: ChatReaction[];
+  reply_to?: number | null;
+  reply_text?: string | null;
+  reply_sender_name?: string | null;
+  reply_image_url?: string | null;
+  card_type?: string | null;
+  card_payload?: unknown;
+};
+
+type ChatPartner = {
+  user_id: number;
+  name?: string | null;
+  avatar?: string | null;
+  common_interest?: string | null;
+};
+
+type MessagesPage = { messages: ChatMessage[]; has_more: boolean; next_before: number | null };
 
 // Страница истории: без курсора — новые сообщения, с курсором — строго старше.
 // Ответ — объект `{ messages, has_more, next_before }`: по массиву нельзя
@@ -137,7 +163,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
   const [inputValue, setInputValue] = useState("");
   const [selectedTtl, setSelectedTtl] = useState<number | null>(null);
-  const [optimisticMessages, setOptimisticMessages] = useState<any[]>([]);
+  const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
   const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
   const [reactionMsgId, setReactionMsgId] = useState<number | null>(null);
   const [replyTo, setReplyTo] = useState<{ id: number; name: string; text: string } | null>(null);
@@ -172,7 +198,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     `/api/chats/${params.chatId}/messages?limit=${MESSAGES_PAGE_SIZE}`
   );
   const messages = useMemo(() => messagePage?.messages ?? [], [messagePage]);
-  const [olderMessages, setOlderMessages] = useState<any[]>([]);
+  const [olderMessages, setOlderMessages] = useState<ChatMessage[]>([]);
   const [historyExhausted, setHistoryExhausted] = useState(false);
   const loadingHistoryRef = useRef(false);
   const restoreScrollRef = useRef<number | null>(null);
@@ -188,7 +214,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   // состояние курсора расходилось бы с картинкой: второй скролл повторил бы
   // первый запрос (`before` первой страницы) и сообщения добавились бы дважды.
   const historyCursor = olderMessages.length > 0 ? olderMessages[0].id : messagePage?.next_before ?? null;
-  const { data: chatPartner, loading: partnerLoading } = useApi<any>(
+  const { data: chatPartner, loading: partnerLoading } = useApi<ChatPartner>(
     `/api/chats/${params.chatId}?lang=${language === 'EN' ? 'en' : 'ru'}`
   );
   const [hangoutCtx, setHangoutCtx] = useState<{ id: number; title: string; event_date: string; category: string; status: string } | null>(null);
@@ -302,7 +328,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     if (!content) return;
 
     const reply = replyTo;
-    const tempId = `temp-${Date.now()}`;
+    const tempId = -Date.now();
     const optimisticMessage = {
       id: tempId, text: content, sender_id: 'me', created_at: new Date().toISOString(), reactions: [], seen: false,
       reply_to: reply?.id ?? null,
@@ -371,7 +397,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     }
   };
 
-  const getReactionsGrouped = (reactions: any[]) => {
+  const getReactionsGrouped = (reactions: ChatReaction[]) => {
     const grouped: Record<string, { emoji: string; count: number; users: number[] }> = {}
     for (const r of reactions) {
       if (!grouped[r.emoji]) grouped[r.emoji] = { emoji: r.emoji, count: 0, users: [] }
@@ -382,13 +408,15 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   }
 
   const handleStartVideoCall = () => {
+    if (!chatPartner) return;
     setIsVideoCall(true);
-    webrtc.startCall(chatPartner?.user_id, 'video');
+    webrtc.startCall(chatPartner.user_id, 'video');
   };
 
   const handleStartVoiceCall = () => {
+    if (!chatPartner) return;
     setIsVoiceCall(true);
-    webrtc.startCall(chatPartner?.user_id, 'audio');
+    webrtc.startCall(chatPartner.user_id, 'audio');
   };
 
   const isInitialLoading = (!chatPartner && partnerLoading) || (!messagePage && messagesLoading);
@@ -501,9 +529,9 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                       : <Eye size={12} className="text-muted-foreground/40" />
                   )}
                 </div>
-                {msg.reactions?.length > 0 && (
+                {(msg.reactions?.length ?? 0) > 0 && (
                   <div className="flex gap-1 mt-1 px-1">
-                    {getReactionsGrouped(msg.reactions).map(rg => (
+                    {getReactionsGrouped(msg.reactions ?? []).map(rg => (
                       <button key={rg.emoji} onClick={() => toggleReaction(msg.id, rg.emoji)}
                         className="text-xs bg-white rounded-full px-1.5 py-0.5 border shadow-sm hover:bg-muted transition-colors">
                         {rg.emoji}<span className="text-[10px] ml-0.5 text-muted-foreground">{rg.count}</span>

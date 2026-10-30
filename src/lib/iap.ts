@@ -8,12 +8,24 @@ import { getToken } from '@/lib/token'
 //   3. Server: REVENUECAT_WEBHOOK_SECRET (subscriptions are created by the server webhook, iap.js)
 // Without the package or the key this module is a graceful no-op (fallback = true).
 
-let Purchases: any = null
+type PurchasesPackage = { identifier: string }
+
+type PurchasesModule = {
+  configure: (options: { apiKey: string; appUserID: string }) => Promise<void>
+  getOfferings: () => Promise<{ current?: { availablePackages?: PurchasesPackage[] } }>
+  purchasePackage: (pkg: PurchasesPackage) => Promise<unknown>
+}
+
+type NativeWindow = Window & { Capacitor?: { isNativePlatform?: () => boolean } }
+
+type PurchaseError = { userInfo?: { code?: string }; code?: string; message?: string }
+
+let Purchases: PurchasesModule | null = null
 let purchasesLoaded = false
 
 function isNative(): boolean {
   try {
-    return typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform?.() === true
+    return typeof window !== 'undefined' && (window as NativeWindow).Capacitor?.isNativePlatform?.() === true
   } catch {
     return false
   }
@@ -23,7 +35,7 @@ async function loadPurchases(): Promise<boolean> {
   if (purchasesLoaded) return !!Purchases
   try {
     const mod = await import('@revenuecat/purchases-capacitor')
-    Purchases = mod?.Purchases || null
+    Purchases = (mod?.Purchases as unknown as PurchasesModule) || null
   } catch {
     Purchases = null
   }
@@ -72,30 +84,34 @@ export async function purchaseWithIAP(
   const userId = decodeUserIdFromToken()
   if (!userId) return { ok: false, fallback: false, message: 'Not authenticated' }
 
+  const purchases = Purchases
+  if (!purchases) return { ok: false, fallback: true, message: 'RevenueCat package not installed' }
+
   try {
-    await Purchases.configure({ apiKey, appUserID: String(userId) })
-    const offerings = await Purchases.getOfferings()
+    await purchases.configure({ apiKey, appUserID: String(userId) })
+    const offerings = await purchases.getOfferings()
     const offering = offerings?.current
     if (!offering?.availablePackages?.length) {
       return { ok: false, fallback: false, message: 'No offerings configured in RevenueCat' }
     }
 
     const pkg = offering.availablePackages.find(
-      (p: any) => p.identifier === productIdFor(tier, durationMonths),
+      (p: PurchasesPackage) => p.identifier === productIdFor(tier, durationMonths),
     )
     if (!pkg) {
       return { ok: false, fallback: false, message: `Product ${productIdFor(tier, durationMonths)} not found` }
     }
 
-    await Purchases.purchasePackage(pkg)
+    await purchases.purchasePackage(pkg)
     // Server receives the RevenueCat webhook (iap.js) and creates the subscription.
     // The webhook must be configured in RevenueCat dashboard → App → Webhooks.
     return { ok: true, fallback: false }
-  } catch (err: any) {
-    const code = err?.userInfo?.code || err?.code || ''
+  } catch (err) {
+    const info = err as PurchaseError
+    const code = info?.userInfo?.code || info?.code || ''
     if (code === '1' || code === 'USER_CANCELLED') {
       return { ok: false, fallback: false, message: 'Purchase cancelled' }
     }
-    return { ok: false, fallback: true, message: err?.message || 'IAP failed' }
+    return { ok: false, fallback: true, message: info?.message || 'IAP failed' }
   }
 }

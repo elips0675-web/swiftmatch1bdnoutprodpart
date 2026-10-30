@@ -47,7 +47,30 @@ import { ATTACHMENT_STYLE_INFO } from "@/lib/attachment-styles";
 import { useFeatureFlags } from "@/context/feature-flags-context";
 import { ActivityList } from "@/components/profile/activity-list";
 
-const interestIconsMap: Record<string, any> = {
+type ProfileData = {
+  displayName?: string;
+  name?: string;
+  age?: number;
+  birthDate?: string;
+  city?: string;
+  height?: number;
+  gender?: string;
+  lookingFor?: string;
+  datingGoal?: string;
+  zodiac?: string;
+  bio?: string;
+  interests?: string[];
+  match?: number;
+  attachmentStyle?: string | null;
+  boost?: { boostedUntil?: string };
+  joinedGroups?: string[];
+  education?: string;
+  photos?: string[];
+};
+
+type StoryEntry = { id: string; url: string };
+
+const interestIconsMap: Record<string, React.ElementType> = {
   "Photography": Camera, "Travel": Globe, "Sports": Dumbbell, "Art": Palette, "Movies": Film, "Yoga": Flower2, "Business": Briefcase, "Gaming": Gamepad2, "Cats": Dog,
   "interest.photography": Camera, "interest.travel": Globe, "interest.coffee": Coffee, "interest.music": Music, "interest.sport": Dumbbell, "interest.art": Palette, "interest.movies": Film, "interest.yoga": Flower2, "interest.games": Gamepad2, "interest.animals": Dog, "interest.books": Heart, "interest.cooking": Coffee, "interest.design": Palette, "interest.nature": Flower2, "interest.fashion": Briefcase, "interest.dance": Music, "interest.tech": Briefcase, "interest.volunteering": Heart, "interest.politics": Briefcase, "interest.psychology": Heart, "interest.philosophy": Heart, "interest.meditation": Flower2, "interest.gardening": Flower2, "interest.cars": Briefcase, "interest.science": Briefcase, "interest.history": Heart, "interest.architecture": Briefcase,
   "interest.diy": Dumbbell, "interest.extreme": Rocket, "interest.films": Film, "interest.food": Coffee, "interest.hiking": Globe, "interest.martial_arts": Dumbbell, "interest.podcasts": Video,
@@ -59,7 +82,7 @@ export default function ProfilePage() {
   const { t, language } = useLanguage();
   const { interests: allowedInterests } = useContentConfig();
   const { profileActivityEnabled, userWatchesEnabled } = useFeatureFlags();
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const [isBoosted, setIsBoosted] = useState(false);
@@ -88,7 +111,7 @@ export default function ProfilePage() {
   });
 
   // Stories states
-  const [stories, setStories] = useState<any[]>([]);
+  const [stories, setStories] = useState<StoryEntry[]>([]);
   const [aliases, setAliases] = useState<{ id: number; alias: string; is_primary: boolean }[]>([]);
   const [photoVerified, setPhotoVerified] = useState(false);
 
@@ -101,21 +124,6 @@ export default function ProfilePage() {
   const [isBoostDialogOpen, setIsBoostDialogOpen] = useState(false);
 
 type InterestInput = string | { name_ru?: string; name_en?: string };
-
-interface ProfileStateFragment {
-  displayName?: string
-  age?: number
-  birthDate?: string
-  city?: string
-  height?: number
-  gender?: string
-  lookingFor?: string
-  datingGoal?: string
-  zodiac?: string
-  bio?: string
-  interests?: unknown[]
-  [key: string]: unknown
-}
 
 function toLocalDate(value?: string): string {
   if (!value) return ''
@@ -222,7 +230,7 @@ function fileToDataUrl(file: File): Promise<string> {
           apiPhotoRows.forEach((p) => { if (typeof p.id === 'number') ids[p.url as string] = p.id })
           setPhotoIds(ids)
           const apiInterests = normalizeInterests(data.interests)
-          setProfile((prev: ProfileStateFragment | null) => {
+          setProfile((prev) => {
             const updated = {
               displayName: data.display_name || prev?.displayName || t('profile.someone'),
               age: data.age || prev?.age || 24,
@@ -629,14 +637,14 @@ function fileToDataUrl(file: File): Promise<string> {
                       <span className="text-[10px] font-black uppercase text-muted-foreground ml-1">{t('profile.label.goal')}</span>
                       <Badge variant="secondary" className="w-full justify-start py-2 px-3 rounded-lg bg-primary/5 border-0 font-bold text-[11px] gap-2 text-primary">
                         <Target size={12} />
-                        {t(profile.datingGoal)}
+                        {profile.datingGoal ? t(profile.datingGoal) : ''}
                       </Badge>
                     </div>
                     <div className="space-y-1">
                       <span className="text-[10px] font-black uppercase text-muted-foreground ml-1">{t('profile.label.zodiac')}</span>
                       <Badge variant="secondary" className="w-full justify-start py-2 px-3 rounded-lg bg-muted/40 border-0 font-bold text-[11px] gap-2">
-                        <ZodiacIcon sign={profile.zodiac} />
-                        {t(profile.zodiac)}
+                        <ZodiacIcon sign={profile.zodiac || ''} />
+                        {profile.zodiac ? t(profile.zodiac) : ''}
                       </Badge>
                     </div>
                     <div className="space-y-1">

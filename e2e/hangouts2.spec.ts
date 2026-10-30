@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type APIRequestContext } from '@playwright/test'
 import { apiCall } from './helpers/api'
 
 // Этап 74 (аудит qwen, пробел #2): Hangouts 2.0 — Date flow (like/skip/mutual),
@@ -12,7 +12,7 @@ function tomorrowISO(days = 7): string {
   return new Date(Date.now() + days * 24 * 3600 * 1000).toISOString()
 }
 
-async function registerUser(ctx: any, name: string) {
+async function registerUser(ctx: APIRequestContext, name: string) {
   const email = `e2e_h2_${name}_${Date.now()}@mail.ru`
   const reg = await apiCall(ctx, 'POST', '/api/auth/register', {
     email,
@@ -24,7 +24,7 @@ async function registerUser(ctx: any, name: string) {
   return { token: reg.body?.token as string, userId: reg.body?.userId as number }
 }
 
-async function createHangout(ctx: any, token: string, type: string, overrides: Record<string, unknown> = {}) {
+async function createHangout(ctx: APIRequestContext, token: string, type: string, overrides: Record<string, unknown> = {}) {
   // createLimiter в hangouts.js: 10 созданий/мин с одного IP (pitfall #24).
   // На повторных E2E-прогонах в коротком окне может вернуть 429. Окно 60с — retry внутри
   // него бесполезен, поэтому короткий bounded-retry; полный reset покрывает test-level

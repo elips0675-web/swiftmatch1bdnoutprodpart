@@ -40,12 +40,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const HeartConfetti = dynamic(() => import("@/components/animations/heart-confetti").then(mod => mod.HeartConfetti), { ssr: false });
 
-const interestIcons: Record<string, any> = {
+const interestIcons: Record<string, React.ElementType> = {
     "Photography": Camera, "Travel": Globe, "Sports": Dumbbell, "Art": Palette, "Movies": Film, "Yoga": Flower2, "Business": Briefcase, "Gaming": Gamepad2,
     "interest.photography": Camera, "interest.travel": Globe, "interest.coffee": Coffee, "interest.music": Music, "interest.sport": Dumbbell, "interest.art": Palette, "interest.movies": Film, "interest.yoga": Flower2, "interest.games": Gamepad2, "interest.animals": Dog, "interest.books": BookOpen, "interest.cooking": ChefHat, "interest.design": Palette, "interest.nature": Sun, "interest.fashion": Sparkles, "interest.dance": Music, "interest.tech": Cpu, "interest.volunteering": Heart, "interest.politics": Briefcase, "interest.psychology": Heart, "interest.philosophy": Heart, "interest.meditation": Flower2, "interest.gardening": Sprout, "interest.cars": Car, "interest.science": FlaskConical, "interest.history": BookOpen, "interest.architecture": Briefcase
 };
 
-const DataBox = React.memo(({ label, value, icon: Icon, color = "default" }: { label: string, value: any, icon?: any, color?: "default" | "primary" }) => (
+const DataBox = React.memo(({ label, value, icon: Icon, color = "default" }: { label: string, value: React.ReactNode, icon?: React.ElementType | string, color?: "default" | "primary" }) => (
   <div className="space-y-1.5">
     <span className="text-[10px] font-black uppercase text-muted-foreground/60 ml-1">{label}</span>
     <Badge 
@@ -96,6 +96,8 @@ type UserView = {
   photos: string[];
 };
 
+type CurrentUserPreview = { photoURL?: string; img?: string };
+
 function mapApiProfile(profile: ApiProfileResponse): UserView {
   const photoUrls = (profile.photos ?? [])
     .map((photo) => photo.url)
@@ -129,8 +131,8 @@ function UserProfileContent() {
 
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [matchUser, setMatchUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUserPreview | null>(null);
+  const [matchUser, setMatchUser] = useState<UserView | null>(null);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [reportDescription, setReportDescription] = useState('');
@@ -510,7 +512,7 @@ function UserProfileContent() {
             </div>
             <div className="flex flex-col gap-2 p-4 bg-white">
               {(['coffee', 'cinema', 'walk', 'dinner', 'picnic', 'exhibition', 'museum'] as const).map((type) => {
-                const iconMap: Record<string, { icon: any, bg: string, color: string }> = {
+                const iconMap: Record<string, { icon: React.ElementType, bg: string, color: string }> = {
                   coffee: { icon: Coffee, bg: 'bg-white border-amber-200', color: 'text-amber-600' },
                   cinema: { icon: Film, bg: 'bg-white border-blue-200', color: 'text-blue-600' },
                   walk: { icon: Mountain, bg: 'bg-white border-green-200', color: 'text-green-600' },

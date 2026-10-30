@@ -10,9 +10,9 @@ const h = vi.hoisted(() => {
   const tokenState = { value: "test-token" as string | null };
   const authState = { user: { id: 7 } as { id: number } | null, isLoading: false };
   const flagsState = { partnerOffersEnabled: false };
-  const wsHandlers: Record<string, (payload?: any) => void> = {};
+  const wsHandlers: Record<string, (payload?: unknown) => void> = {};
   const wsSocket = {
-    on: vi.fn((ev: string, cb: (payload?: any) => void) => {
+    on: vi.fn((ev: string, cb: (payload?: unknown) => void) => {
       wsHandlers[ev] = cb;
     }),
     off: vi.fn(),
@@ -158,7 +158,7 @@ const mockTranslations: Record<string, string> = {
 const languageState = { value: "RU" as "RU" | "EN" };
 
 const mockUseLanguage = {
-  t: (key: string, options?: Record<string, any>) => {
+  t: (key: string, options?: Record<string, unknown>) => {
     let value = mockTranslations[key] ?? key;
     if (options) {
       Object.entries(options).forEach(([k, v]) => {
@@ -179,7 +179,7 @@ vi.mock("@/context/language-context", () => ({
 import ChatPage from "@/pages/chats-chatId";
 
 const CHAT_ID = "7";
-const tr = (key: string, options?: Record<string, any>) => mockUseLanguage.t(key, options);
+const tr = (key: string, options?: Record<string, unknown>) => mockUseLanguage.t(key, options);
 
 const partnerState = { user_id: 8, name: "Аня", avatar: "/a.png", common_interest: "sport" };
 
@@ -974,7 +974,7 @@ describe("Комната чата: шапка и мелочи", () => {
   it("resize с visualViewport подписывается и снимает подписку", async () => {
     const addEventListener = vi.fn();
     const removeEventListener = vi.fn();
-    (window as any).visualViewport = { addEventListener, removeEventListener };
+    (window as unknown as { visualViewport?: { addEventListener: unknown; removeEventListener: unknown } }).visualViewport = { addEventListener, removeEventListener };
 
     const view = await openChat();
     expect(addEventListener).toHaveBeenCalledWith("resize", expect.any(Function));
@@ -985,12 +985,12 @@ describe("Комната чата: шапка и мелочи", () => {
 
     view.unmount();
     expect(removeEventListener).toHaveBeenCalledWith("resize", expect.any(Function));
-    delete (window as any).visualViewport;
+    delete (window as unknown as { visualViewport?: unknown }).visualViewport;
   });
 
   it("без visualViewport страница монтируется и размонтируется без ошибок", async () => {
     const view = await openChat();
-    expect((window as any).visualViewport).toBeUndefined();
+    expect((window as unknown as { visualViewport?: unknown }).visualViewport).toBeUndefined();
     view.unmount();
   });
 

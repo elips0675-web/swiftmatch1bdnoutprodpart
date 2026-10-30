@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "@/shims/next-navigation";
 import { useLanguage } from "@/context/language-context";
 import { useFeatureFlags } from "@/context/feature-flags-context";
-import { ALL_DEMO_USERS, GROUP_CATEGORIES } from "@/lib/demo-data";
+import { ALL_DEMO_USERS, GROUP_CATEGORIES, type DemoGroupCategory } from "@/lib/demo-data";
 import { toast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,16 @@ import { cn } from "@/lib/utils";
 const iconMap: Record<string, React.ElementType> = {
   Music, Dumbbell, Palette, Gamepad2, Film, Globe, ChefHat, Cpu, BookOpen, Sparkles, Shirt, HeartPulse, Dog, FlaskConical, Briefcase, Home: HomeIcon, Car, Laugh, Star, Scroll
 };
+
+type HomeUser = {
+  id?: number;
+  city?: string;
+  gender?: string;
+  datingGoal?: string;
+  interests?: string[];
+};
+
+type PopularGroup = DemoGroupCategory & { onlineCount: number };
 
 const TopOfWeekSection = dynamic(() => import('@/components/sections/top-of-week').then(mod => mod.TopOfWeekSection), { 
   ssr: false,
@@ -32,8 +42,8 @@ export default function Home() {
   const { t, language } = useLanguage();
   const { hangoutsEnabled } = useFeatureFlags();
   const [showAutosearchDialog, setShowAutosearchDialog] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [popularGroups, setPopularGroups] = useState<any[]>([]);
+  const [currentUser, setCurrentUser] = useState<HomeUser | null>(null);
+  const [popularGroups, setPopularGroups] = useState<PopularGroup[]>([]);
   const [view, setView] = useState<'top-users' | 'popular-groups'>('top-users');
 
   useEffect(() => {

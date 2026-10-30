@@ -23,7 +23,7 @@ export function PwaInstallBanner() {
   const { t } = useLanguage();
 
   useEffect(() => {
-    const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+    const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone;
     setIsStandalone(!!isStandaloneMode);
 
     const userAgent = window.navigator.userAgent.toLowerCase();

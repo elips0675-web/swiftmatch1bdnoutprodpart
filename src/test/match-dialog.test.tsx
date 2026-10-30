@@ -56,19 +56,14 @@ const tr = (key: string) => TRANSLATIONS[key] ?? key;
 
 const MATCH = { id: 42, name: "Анна", img: "/demo/people/anna.png" };
 
-function renderDialog(props: {
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  currentUser?: any;
-  matchUser?: any;
-} = {}) {
+function renderDialog(props: Partial<React.ComponentProps<typeof MatchDialog>> = {}) {
   const onOpenChange = props.onOpenChange ?? vi.fn();
   const view = render(
     <MatchDialog
       open={props.open ?? true}
       onOpenChange={onOpenChange}
-      currentUser={"currentUser" in props ? props.currentUser : { photoURL: "/me.png" }}
-      matchUser={"matchUser" in props ? props.matchUser : MATCH}
+      currentUser={props.currentUser === undefined ? { photoURL: "/me.png" } : props.currentUser}
+      matchUser={props.matchUser === undefined ? MATCH : props.matchUser}
     />,
   );
   return { ...view, onOpenChange };

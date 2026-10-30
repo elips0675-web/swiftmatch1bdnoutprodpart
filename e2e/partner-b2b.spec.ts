@@ -1,11 +1,11 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type APIRequestContext } from '@playwright/test'
 import crypto from 'crypto'
 import { apiCall, loginViaApi, API_BASE } from './helpers/api'
 
 // Этап 74 (аудит qwen, пробел #3): B2B partner dashboard —
 // регистрация партнёра → оффер → конверсия (S2S postback с HMAC) → статистика → выплата.
 
-async function registerUser(ctx: any, name: string) {
+async function registerUser(ctx: APIRequestContext, name: string) {
   const email = `e2e_b2b_${name}_${Date.now()}@mail.ru`
   const reg = await apiCall(ctx, 'POST', '/api/auth/register', {
     email,

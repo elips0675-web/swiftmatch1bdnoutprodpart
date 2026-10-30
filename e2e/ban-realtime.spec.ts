@@ -35,7 +35,7 @@ test.describe('Realtime ban chain → user:banned → logout', () => {
     adminToken = adminLogin.body.token
 
     const list = await apiCall(request, 'GET', `/api/admin/users?search=${email}`, undefined, adminToken)
-    const user = list.body?.users?.find((u: any) => u.email === email)
+    const user = list.body?.users?.find((u: { id: number; email?: string }) => u.email === email)
     if (!user) throw new Error('Freshly registered user not found in admin list')
     bannedUserId = user.id
 

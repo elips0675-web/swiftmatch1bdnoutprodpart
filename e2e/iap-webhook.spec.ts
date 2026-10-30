@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type APIRequestContext } from '@playwright/test'
 import mysql from 'mysql2/promise'
 import { apiCall } from './helpers/api'
 
@@ -40,7 +40,7 @@ test.afterAll(async () => {
   if (conn) await conn.end()
 })
 
-async function registerUser(request: any, name: string) {
+async function registerUser(request: APIRequestContext, name: string) {
   const email = `e2e_iap_${name}_${Date.now()}@mail.ru`
   const reg = await apiCall(request, 'POST', '/api/auth/register', {
     email,
@@ -52,7 +52,7 @@ async function registerUser(request: any, name: string) {
   return { userId: reg.body?.userId as number, token: reg.body?.token as string }
 }
 
-async function sendEvent(request: any, event: Record<string, unknown>, secret = SECRET) {
+async function sendEvent(request: APIRequestContext, event: Record<string, unknown>, secret = SECRET) {
   const res = await apiCall(request, 'POST', '/api/iap/webhook', { event }, secret)
   if (res.status === 503) {
     throw new Error(
@@ -63,7 +63,7 @@ async function sendEvent(request: any, event: Record<string, unknown>, secret = 
   return res
 }
 
-async function iapStatus(request: any, token: string) {
+async function iapStatus(request: APIRequestContext, token: string) {
   const res = await apiCall(request, 'GET', '/api/iap/status', undefined, token)
   expect(res.status).toBe(200)
   return res.body as { active: boolean; tier: string | null; expiresAt?: string }

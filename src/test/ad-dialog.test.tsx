@@ -38,8 +38,11 @@ import { AdDialog } from "@/components/dialogs/ad-dialog";
 
 const tr = (key: string) => TRANSLATIONS[key] ?? key;
 
+type NativeBridge = { isNativePlatform: () => boolean; registerPlugin?: (name: string) => unknown };
+type WindowWithBridge = { Capacitor?: NativeBridge };
+
 function setNative(native: boolean | "throws") {
-  (window as any).Capacitor = {
+  (window as unknown as WindowWithBridge).Capacitor = {
     isNativePlatform: () => {
       if (native === "throws") throw new Error("no bridge");
       return native;
@@ -48,7 +51,7 @@ function setNative(native: boolean | "throws") {
 }
 
 function clearNative() {
-  delete (window as any).Capacitor;
+  delete (window as unknown as WindowWithBridge).Capacitor;
 }
 
 function renderDialog(props: { open?: boolean; onOpenChange?: (v: boolean) => void } = {}) {

@@ -8,7 +8,7 @@ function utf8Plugin(): import('vite').Plugin {
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const origSetHeader = res.setHeader.bind(res);
-        res.setHeader = function(name: string, value: any) {
+        res.setHeader = function(name: string, value: number | string | readonly string[]) {
           if (typeof name === 'string' && name.toLowerCase() === 'content-type' && value === 'text/html') {
             return origSetHeader(name, 'text/html; charset=utf-8');
           }

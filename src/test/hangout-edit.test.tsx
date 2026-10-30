@@ -15,7 +15,7 @@ vi.mock("@/hooks/use-premium", () => ({
 }));
 
 const mockUseLanguage = {
-  t: (key: string, options?: Record<string, any>) => {
+  t: (key: string, options?: Record<string, unknown>) => {
     let value = (mockTranslations as Record<string, string>)[key] || key;
     if (options) {
       Object.entries(options).forEach(([k, v]) => {

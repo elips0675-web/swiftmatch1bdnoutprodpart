@@ -7,7 +7,14 @@ const FALLBACK_SUGGESTIONS = [
   'Какой фильм посоветуешь?',
 ];
 
-export async function aiChatIcebreakerSuggestions(input?: any): Promise<{ suggestions: string[] }> {
+type IcebreakerInput = {
+  chatUserId?: number;
+  userId?: number;
+  chat_user_id?: number;
+  language?: string;
+};
+
+export async function aiChatIcebreakerSuggestions(input?: IcebreakerInput): Promise<{ suggestions: string[] }> {
   const chatUserId = input?.chatUserId || input?.userId || input?.chat_user_id;
   const language = input?.language || (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'ru';
   try {
@@ -30,7 +37,7 @@ export async function aiChatIcebreakerSuggestions(input?: any): Promise<{ sugges
   return { suggestions: FALLBACK_SUGGESTIONS };
 }
 
-export async function aiGenerateProfileBio(_input?: any): Promise<{ bio: string }> {
+export async function aiGenerateProfileBio(_input?: unknown): Promise<{ bio: string }> {
   return { bio: "" };
 }
 // Aliases used by some pages

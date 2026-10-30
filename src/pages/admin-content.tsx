@@ -23,7 +23,7 @@ interface EditableListProps {
   saving: boolean;
 }
 
-function itemLabel(item: string, section: string, t: any): string {
+function itemLabel(item: string, section: string, t: (key: string) => string): string {
   if (section === 'cities' || section === 'banned_words') return item
   const prefix =
     section === 'interests' ? 'interest.'
@@ -37,7 +37,7 @@ function itemLabel(item: string, section: string, t: any): string {
   return translated !== key ? translated : raw
 }
 
-function sortKey(item: string, prefix: string, t: any): string {
+function sortKey(item: string, prefix: string, t: (key: string) => string): string {
   const key = `${prefix}${item}`;
   const translated = t(key);
   return translated !== key ? translated : item;

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { apiCall, loginViaApi } from './helpers/api'
 
 const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:8081'
@@ -9,7 +9,7 @@ const USER2_PASS = 'demo123456'
 const USER3_EMAIL = 'user3@mail.ru'
 const USER3_PASS = 'demo123456'
 
-async function loginViaUI(page: any, email: string, password: string) {
+async function loginViaUI(page: Page, email: string, password: string) {
   await page.goto(`${BASE_URL}/login`)
   await page.waitForLoadState('networkidle')
   await page.fill('[data-testid="email"]', email)
@@ -68,7 +68,7 @@ test.describe('Chats — messaging and groups', () => {
         expect(m.id).toBeLessThan(first.body.next_before)
       }
       // Хронологический порядок внутри страницы обязан сохраняться
-      const ids = older.body.messages.map((m: any) => m.id)
+      const ids = older.body.messages.map((m: { id?: number }) => m.id)
       expect(ids).toEqual([...ids].sort((a: number, b: number) => a - b))
     })
 
@@ -94,7 +94,7 @@ test.describe('Chats — messaging and groups', () => {
       expect(res.ok).toBe(true)
 
       const msgs = await apiCall(request, 'GET', `/api/chats/${chatId}/messages?limit=100`, undefined, token)
-      const found = msgs.body.messages.some((m: any) => m.text === text)
+      const found = msgs.body.messages.some((m: { text?: string }) => m.text === text)
       expect(found).toBe(true)
     })
 

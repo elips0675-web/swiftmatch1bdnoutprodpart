@@ -16,6 +16,13 @@ const HeartConfetti = dynamic(() => import("@/components/animations/heart-confet
 
 const DEFAULT_AVATAR = '/default-avatar.svg';
 
+export type MatchUserPreview = {
+  id?: number | string;
+  name?: string;
+  img?: string;
+  photoURL?: string;
+};
+
 export function MatchDialog({
   open,
   onOpenChange,
@@ -24,8 +31,8 @@ export function MatchDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  currentUser: any;
-  matchUser: any;
+  currentUser: MatchUserPreview | null;
+  matchUser: MatchUserPreview | null;
 }) {
   const { t } = useLanguage();
   const router = useRouter();

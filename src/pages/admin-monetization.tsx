@@ -10,13 +10,31 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 import { useLanguage } from '@/context/language-context';
 import { getToken } from '@/lib/token';
 
+type PricingTier = {
+  key?: string;
+  tier: string;
+  color?: string;
+  prices: Record<string, number>;
+};
+
+type RevenuePoint = {
+  month: string;
+  subscriptions: number;
+  ads: number;
+  boosts: number;
+};
+
+type FunnelStep = { stage: string; count: number };
+
+type AdSettings = { google: boolean; yandex: boolean; googleId: string; yandexId: string };
+
 export default function MonetizationPage() {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
-  const [pricing, setPricing] = useState<any[]>([]);
-  const [revenueData, setRevenueData] = useState<any[]>([]);
-  const [funnelData, setFunnelData] = useState<any[]>([]);
-  const [ads, setAds] = useState({ google: true, yandex: false, googleId: 'ca-app-pub-3940256099942544/5224354917', yandexId: 'R-M-DEMO-rewarded' });
+  const [pricing, setPricing] = useState<PricingTier[]>([]);
+  const [revenueData, setRevenueData] = useState<RevenuePoint[]>([]);
+  const [funnelData, setFunnelData] = useState<FunnelStep[]>([]);
+  const [ads, setAds] = useState<AdSettings>({ google: true, yandex: false, googleId: 'ca-app-pub-3940256099942544/5224354917', yandexId: 'R-M-DEMO-rewarded' });
 
   useEffect(() => {
     const token = getToken();
@@ -24,7 +42,7 @@ export default function MonetizationPage() {
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
     const apiGet = (url: string) => fetch(url, { headers }).then(r => { if (!r.ok) throw new Error('fetch failed'); return r.json(); });
-    const ensureArray = (v: unknown): any[] => Array.isArray(v) ? v : [];
+    const ensureArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
     Promise.all([
       apiGet('/api/admin/monetization/pricing'),
       apiGet('/api/admin/monetization/revenue'),
@@ -32,10 +50,10 @@ export default function MonetizationPage() {
       apiGet('/api/admin/monetization/ads').catch(() => null),
     ])
       .then(([pricingData, revenue, funnel, adsData]) => {
-        setPricing(ensureArray(pricingData));
-        setRevenueData(ensureArray(revenue));
-        setFunnelData(ensureArray(funnel));
-        if (adsData) setAds(adsData);
+        setPricing(ensureArray<PricingTier>(pricingData));
+        setRevenueData(ensureArray<RevenuePoint>(revenue));
+        setFunnelData(ensureArray<FunnelStep>(funnel));
+        if (adsData) setAds(adsData as AdSettings);
       })
       .catch(() => {
         toast.error(t('admin.error.load'));

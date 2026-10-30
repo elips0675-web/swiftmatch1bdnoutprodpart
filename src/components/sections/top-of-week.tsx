@@ -6,7 +6,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "@/shims/next-image";
 
-const FeaturedCard = memo(({ user, onLike, priority = false }: { user: any; onLike: () => void; priority?: boolean }) => {
+export type TopUser = {
+  id: number;
+  name: string;
+  age: number;
+  img: string;
+  distance: number;
+  match: number;
+};
+
+const FeaturedCard = memo(({ user, onLike, priority = false }: { user: TopUser; onLike: () => void; priority?: boolean }) => {
     return (
       <div className="bg-white rounded-xl overflow-hidden app-shadow group border border-transparent hover:border-primary/10 flex flex-col h-full transition-all relative">
         <Link href={`/user?id=${user.id}`} prefetch={true} className="relative aspect-[4/3] bg-muted block overflow-hidden cursor-pointer">
@@ -58,7 +67,7 @@ const FeaturedCard = memo(({ user, onLike, priority = false }: { user: any; onLi
 FeaturedCard.displayName = "FeaturedCard";
 
 
-export function TopOfWeekSection({ topUsers, onLike, t }: { topUsers: any[], onLike: (user: any) => void, t: (key: string) => string }) {
+export function TopOfWeekSection({ topUsers, onLike, t }: { topUsers: TopUser[], onLike: (user: TopUser) => void, t: (key: string) => string }) {
     return (
         <section className="px-5">
             <div className="grid grid-cols-2 gap-4">

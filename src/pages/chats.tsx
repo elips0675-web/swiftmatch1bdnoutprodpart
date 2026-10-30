@@ -40,7 +40,70 @@ function deleteConversation(chatId: number) {
 
 const MESSAGES_PAGE_SIZE = 50;
 
-type MessagesPage = { messages: any[]; has_more: boolean; next_before: number | null };
+type ChatReaction = { emoji: string; user_id: number };
+
+type ApiMessage = {
+  id: number;
+  text?: string | null;
+  sender_id: number;
+  created_at: string;
+  reactions?: ChatReaction[];
+  image_url?: string | null;
+  ttl_seconds?: number | null;
+  reply_to?: number | null;
+  reply_text?: string | null;
+  reply_sender_name?: string | null;
+  reply_image_url?: string | null;
+};
+
+type ChatMessageView = {
+  id: number;
+  text?: string | null;
+  sender: 'me' | 'other';
+  time: string;
+  reactions: ChatReaction[];
+  image_url: string | null;
+  ttl_seconds: number | null;
+  reply_to: number | null;
+  reply_text: string | null;
+  reply_sender_name: string | null;
+  reply_image_url: string | null;
+};
+
+type ApiChat = {
+  id: number;
+  other_user_id: number;
+  display_name: string;
+  avatar_url?: string | null;
+  online?: boolean;
+  last_message?: string | null;
+  updated_at?: string | null;
+  last_read_at?: string | null;
+  unread_count?: number | null;
+};
+
+type DirectChat = {
+  id: number;
+  other_user_id: number;
+  name: string;
+  img: string;
+  online?: boolean;
+  lastMessage: string;
+  time: string;
+  last_read_at?: string | null;
+  unread_count: number;
+};
+
+type SelectedChat = {
+  id: number;
+  name?: string;
+  img?: string;
+  online?: boolean;
+  isGroup?: boolean;
+  other_user_id?: number;
+};
+
+type MessagesPage = { messages: ApiMessage[]; has_more: boolean; next_before: number | null };
 
 // Страница истории чата: без курсора — новые сообщения, с курсором — строго
 // старше него. Ответ — объект `{ messages, has_more, next_before }`, а не
@@ -55,7 +118,7 @@ function fetchMessagePage(chatId: number, token: string, before?: number | null)
     .catch(() => null);
 }
 
-function toChatMessage(m: any, myId?: number) {
+function toChatMessage(m: ApiMessage, myId?: number): ChatMessageView {
   return {
     id: m.id,
     text: m.text,
@@ -214,8 +277,8 @@ function ChatsContent() {
     };
   }, []);
 
-  const [selectedChat, setSelectedChat] = useState<any>(null);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [selectedChat, setSelectedChat] = useState<SelectedChat | null>(null);
+  const [messages, setMessages] = useState<ChatMessageView[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [selectedTtl, setSelectedTtl] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -234,7 +297,7 @@ function ChatsContent() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const openingChatRef = useRef<number | null>(null);
-  const [reactions, setReactions] = useState<Record<number, any[]>>({});
+  const [reactions, setReactions] = useState<Record<number, ChatReaction[]>>({});
   const [reactionMsgId, setReactionMsgId] = useState<number | null>(null);
   const [replyTo, setReplyTo] = useState<{ id: number; name: string; text: string } | null>(null);
   const [partnerCommonInterest, setPartnerCommonInterest] = useState<string | null>(null);
@@ -250,7 +313,7 @@ function ChatsContent() {
   const [isVideoCall, setIsVideoCall] = useState(false);
   const [isVoiceCall, setIsVoiceCall] = useState(false);  
   const [currentPage, setCurrentPage] = useState(1);
-  const [apiChats, setApiChats] = useState<any[]>([]);
+  const [apiChats, setApiChats] = useState<ApiChat[]>([]);
   const [isChatsLoading, setIsChatsLoading] = useState(true);
   const [icebreakerSuggestions, setIcebreakerSuggestions] = useState<string[]>([]);
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
@@ -260,10 +323,10 @@ function ChatsContent() {
   const msgContainerRef = useAntiScreenshot<HTMLDivElement>();
 
   // Страница новых сообщений: сброс истории чата и установка курсора.
-  const applyFirstPage = (rows: any[], myId?: number) => {
+  const applyFirstPage = (rows: ApiMessage[], myId?: number) => {
     setMessages(rows.map(m => toChatMessage(m, myId)));
-    const rMap: Record<number, any[]> = {};
-    rows.forEach((m: any) => { if (m.reactions?.length) rMap[m.id] = m.reactions; });
+    const rMap: Record<number, ChatReaction[]> = {};
+    rows.forEach((m) => { if (m.reactions?.length) rMap[m.id] = m.reactions; });
     setReactions(rMap);
   };
 
@@ -421,22 +484,25 @@ function ChatsContent() {
 
   useEffect(() => {
     if (!wsSocket) return;
-    const handler = (event: { chatId: number; message: any }) => {
-      setSelectedChat((prev: { id: number } | null) => {
+    const handler = (event: { chatId: number; message: ApiMessage }) => {
+      setSelectedChat((prev) => {
         if (prev && Number(prev.id) === event.chatId) {
           setMessages(prevMsgs => {
             if (prevMsgs.some(m => m.id === event.message.id)) return prevMsgs;
-            return [...prevMsgs, {
+            const incoming: ChatMessageView = {
               id: event.message.id,
               text: event.message.text,
               sender: 'other',
               time: new Date(event.message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               reactions: [],
+              image_url: event.message.image_url ?? null,
+              ttl_seconds: event.message.ttl_seconds ?? null,
               reply_to: event.message.reply_to ?? null,
               reply_text: event.message.reply_text ?? null,
               reply_sender_name: event.message.reply_sender_name ?? null,
               reply_image_url: event.message.reply_image_url ?? null,
-            }];
+            };
+            return [...prevMsgs, incoming];
           });
         } else {
           fetch('/api/chats', { headers: { Authorization: `Bearer ${authToken}` } })
@@ -479,6 +545,7 @@ function ChatsContent() {
   }
 
   const handleSendMessage = (textOverride?: string) => {
+    if (!selectedChat) return;
     const textToSend = textOverride || inputValue;
     if (!textToSend.trim()) return;
 
@@ -506,10 +573,12 @@ function ChatsContent() {
       .then(res => res.ok ? res.json() : null)
       .then(msg => {
         if (msg) {
-          const newMessage = {
+          const newMessage: ChatMessageView = {
             id: msg.id, text: msg.text, sender: 'me',
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            ttl_seconds: msg.ttl_seconds,
+            reactions: [],
+            image_url: msg.image_url ?? null,
+            ttl_seconds: msg.ttl_seconds ?? null,
             reply_to: msg.reply_to ?? null,
             reply_text: msg.reply_text ?? null,
             reply_sender_name: msg.reply_sender_name ?? null,
@@ -523,7 +592,7 @@ function ChatsContent() {
     if (!textOverride) setInputValue('');
   };
 
-  const openChat = (chat: any) => {
+  const openChat = (chat: DirectChat) => {
     setSelectedChat(chat);
     setReactions({});
     const authH = { Authorization: `Bearer ${authToken}` };
@@ -561,6 +630,7 @@ function ChatsContent() {
   };
 
   const toggleReaction = async (msgId: number, emoji: string) => {
+    if (!selectedChat) return;
     try {
       const res = await fetch(`/api/chats/${selectedChat.id}/messages/${msgId}/reactions`, {
         method: 'POST',
@@ -613,7 +683,7 @@ function ChatsContent() {
       <>
         <AppHeader />
         <div className="flex-1 overflow-y-auto pb-24">
-          <GroupFeed categoryNameRu={selectedChat.name} categoryNameEn={selectedChat.name} groupId={groupId} />
+          <GroupFeed categoryNameRu={selectedChat.name || ''} categoryNameEn={selectedChat.name || ''} groupId={groupId} />
         </div>
         <BottomNav />
       </>
@@ -691,9 +761,9 @@ function ChatsContent() {
                 </div>
               </div>
             )}
-            <div data-testid="message-list"><AnimatePresence>{messages.map((msg: any) => {
+            <div data-testid="message-list"><AnimatePresence>{messages.map((msg) => {
               const msgReactions = reactions[msg.id] || [];
-              const reactionEmojis = [...new Set(msgReactions.map((r: any) => r.emoji))];
+              const reactionEmojis = [...new Set(msgReactions.map((r) => r.emoji))];
               const isReactionPickerOpen = reactionMsgId === msg.id;
               return (
               <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} key={msg.id} className={cn("flex flex-col max-w-[80%]", msg.sender === "me" ? "ml-auto items-end" : "items-start")}>
@@ -711,7 +781,7 @@ function ChatsContent() {
                   <div className={cn("flex gap-1 mt-1", msg.sender === "me" ? "justify-end" : "justify-start")}>
                     {reactionEmojis.map(emoji => (
                       <button key={emoji} aria-label={emoji} onClick={(e) => { e.stopPropagation(); toggleReaction(msg.id, emoji); }} className="text-xs bg-white/70 rounded-full px-1.5 py-0.5 border border-border/30 shadow-sm hover:bg-muted/50 transition-all active:scale-90">
-                        {emoji} <span className="text-[9px] text-muted-foreground font-bold">{msgReactions.filter((r: any) => r.emoji === emoji).length}</span>
+                        {emoji} <span className="text-[9px] text-muted-foreground font-bold">{msgReactions.filter((r) => r.emoji === emoji).length}</span>
                       </button>
                     ))}
                     <button aria-label={t('chats.add_reaction')} onClick={() => setReactionMsgId(isReactionPickerOpen ? null : msg.id)} className="text-muted-foreground/50 hover:text-muted-foreground transition-all"><Smile size={12} /></button>

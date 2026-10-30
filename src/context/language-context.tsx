@@ -5,7 +5,7 @@ type Language = 'RU' | 'EN';
 interface LanguageContextProps {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: string, options?: Record<string, any>) => string;
+  t: (key: string, options?: Record<string, unknown>) => string;
 }
 
 export const translations = {
@@ -4174,7 +4174,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (savedLang) setLanguageState(savedLang);
   }, []);
 
-  const t = useCallback((key: string, options?: Record<string, any>) => {
+  const t = useCallback((key: string, options?: Record<string, unknown>) => {
     let value = translations[language][key as keyof typeof translations['RU']];
     if (value === undefined) value = translations.EN[key as keyof typeof translations['RU']];
     if (value === undefined) value = key;

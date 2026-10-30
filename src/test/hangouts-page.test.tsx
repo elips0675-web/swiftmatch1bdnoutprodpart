@@ -7,14 +7,16 @@ import HangoutsPage, { __resetFeedCache } from "@/pages/hangouts"
 const mockFetch = vi.fn()
 globalThis.fetch = mockFetch
 
+type MockResponse = { ok: boolean; status?: number; json: () => Promise<unknown> }
+
 vi.mock("@/lib/token", () => ({
   getToken: () => "test-token",
 }))
 
 const mockWs = vi.hoisted(() => {
-  const handlers: Record<string, (payload?: any) => void> = {}
+  const handlers: Record<string, (payload?: unknown) => void> = {}
   const socket = {
-    on: vi.fn((ev: string, cb: (payload?: any) => void) => { handlers[ev] = cb }),
+    on: vi.fn((ev: string, cb: (payload?: unknown) => void) => { handlers[ev] = cb }),
     off: vi.fn(),
     emit: vi.fn(),
   }
@@ -88,7 +90,7 @@ const mockTranslations: Record<string, string> = {
 }
 
 const mockUseLanguage = {
-  t: (key: string, options?: Record<string, any>) => {
+  t: (key: string, options?: Record<string, unknown>) => {
     let value = mockTranslations[key] || key
     if (options) {
       Object.entries(options).forEach(([k, v]) => {
@@ -511,8 +513,8 @@ describe("HangoutsPage: pull-to-refresh и AI-подбор", () => {
   })
 
   it("пока рекомендации грузятся, показывает заглушку", async () => {
-    let resolveRecs: (v: any) => void = () => {}
-    const recsPromise = new Promise<any>((res) => { resolveRecs = res })
+    let resolveRecs: (v: MockResponse) => void = () => {}
+    const recsPromise = new Promise<MockResponse>((res) => { resolveRecs = res })
     mockFetch.mockImplementation((url: string) => {
       const u = String(url)
       if (u.includes("/api/affiliate/offers")) return okOffers()

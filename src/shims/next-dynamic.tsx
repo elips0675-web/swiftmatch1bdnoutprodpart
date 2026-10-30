@@ -6,19 +6,20 @@ interface DynamicOptions {
   suspense?: boolean;
 }
 
-export default function dynamic<P = any>(
+export default function dynamic<P extends object = Record<string, never>>(
   importFn: () => Promise<{ default: ComponentType<P> } | ComponentType<P>>,
   options: DynamicOptions = {},
 ) {
-  const Lazy = lazy(async () => {
-    const mod: any = await importFn();
-    if (mod && typeof mod === "object" && "default" in mod) return mod;
-    return { default: mod };
+  const Lazy: React.LazyExoticComponent<ComponentType<P>> = lazy(async () => {
+    const mod = await importFn();
+    if (mod && typeof mod === "object" && "default" in mod) return mod as { default: ComponentType<P> };
+    return { default: mod as ComponentType<P> };
   });
   const Loading = options.loading ?? (() => null);
-  const Wrapped: React.FC<P> = (props: any) => (
+  const Content = Lazy as unknown as ComponentType<P>;
+  const Wrapped: React.FC<P> = (props: P) => (
     <Suspense fallback={<Loading />}>
-      <Lazy {...props} />
+      <Content {...props} />
     </Suspense>
   );
   Wrapped.displayName = "DynamicComponent";

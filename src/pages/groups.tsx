@@ -3,7 +3,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { BottomNav } from "@/components/navigation/bottom-nav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLanguage } from "@/context/language-context";
-import { GROUP_CATEGORIES } from "@/lib/demo-data";
+import { GROUP_CATEGORIES, type DemoGroupCategory } from "@/lib/demo-data";
 import Link from "@/shims/next-link";
 import { Users, Search, Star, Music, Dumbbell, Palette, Gamepad2, Film, Globe, ChefHat, Cpu, BookOpen, Sparkles, Shirt, HeartPulse, Dog, FlaskConical, Briefcase, Chrome as HomeIcon, Car, Laugh, Scroll, CirclePlus as PlusCircle, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,7 +34,9 @@ const iconMap: Record<string, React.ElementType> = {
   Music, Dumbbell, Palette, Gamepad2, Film, Globe, ChefHat, Cpu, BookOpen, Sparkles, Shirt, HeartPulse, Dog, FlaskConical, Briefcase, Home: HomeIcon, Car, Laugh, Star, Scroll
 };
 
-const GroupCard = ({ group }: { group: any }) => {
+type GroupEntry = DemoGroupCategory & { onlineCount?: number };
+
+const GroupCard = ({ group }: { group: GroupEntry }) => {
   const { t, language } = useLanguage();
   const Icon = iconMap[group.icon] || Users;
   return (
@@ -57,7 +59,7 @@ const GroupCard = ({ group }: { group: any }) => {
   );
 };
 
-const GroupList = ({ groups, emptyMessage }: { groups: any[], emptyMessage: string }) => {
+const GroupList = ({ groups, emptyMessage }: { groups: GroupEntry[], emptyMessage: string }) => {
   if (groups.length === 0) {
     return <p className="text-center text-muted-foreground mt-8 text-sm">{emptyMessage}</p>;
   }

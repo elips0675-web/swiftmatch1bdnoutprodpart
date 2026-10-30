@@ -26,12 +26,13 @@ import { usePremium } from "@/hooks/use-premium";
 import { PremiumDialog } from "./premium-dialog";
 import { Lock } from "lucide-react";
 import { useLanguage } from "@/context/language-context";
+import type { AutoSearchFilters } from "@/pages/search";
 
 interface FiltersDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  currentFilters: any;
-  onApplyFilters: (newFilters: any) => void;
+  currentFilters: Partial<AutoSearchFilters>;
+  onApplyFilters: (newFilters: AutoSearchFilters) => void;
 }
 
 export function FiltersDialog({

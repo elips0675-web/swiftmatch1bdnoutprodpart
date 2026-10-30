@@ -1,10 +1,10 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type APIRequestContext } from '@playwright/test'
 import { createAudit } from './helpers/audit'
 import { apiCall } from './helpers/api'
 
 const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:8081'
 
-async function enableHangoutsFlag(request: any) {
+async function enableHangoutsFlag(request: APIRequestContext) {
   const admin = await apiCall(request, 'POST', '/api/auth/login', {
     email: 'admin@mail.ru',
     password: 'demo123456',
@@ -14,7 +14,7 @@ async function enableHangoutsFlag(request: any) {
   return put.ok === true
 }
 
-async function registerUser(request: any, name: string) {
+async function registerUser(request: APIRequestContext, name: string) {
   const email = `e2e_hangout_${name}_${Date.now()}@mail.ru`
   const reg = await apiCall(request, 'POST', '/api/auth/register', {
     email,

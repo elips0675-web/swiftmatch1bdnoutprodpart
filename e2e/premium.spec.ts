@@ -1,10 +1,10 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type APIRequestContext } from '@playwright/test'
 import { apiCall } from './helpers/api'
 
 // Этап 74 (аудит qwen, пробел #1): Premium-флоу с mock Stripe.
 // В локальной среде STRIPE_SECRET_KEY отсутствует → create-checkout активирует mock-подписку (201).
 
-async function registerUser(request: any, name: string) {
+async function registerUser(request: APIRequestContext, name: string) {
   const email = `e2e_premium_${name}_${Date.now()}@mail.ru`
   const reg = await apiCall(request, 'POST', '/api/auth/register', {
     email,
@@ -16,7 +16,7 @@ async function registerUser(request: any, name: string) {
   return { token: reg.body?.token as string, userId: reg.body?.userId as number }
 }
 
-async function getMySubscription(request: any, token: string) {
+async function getMySubscription(request: APIRequestContext, token: string) {
   return apiCall(request, 'GET', '/api/premium/my', undefined, token)
 }
 

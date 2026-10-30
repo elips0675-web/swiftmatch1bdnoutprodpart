@@ -29,6 +29,14 @@ const initialState: AuthState = {
   error: null,
 }
 
+function errorMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === 'object' && 'message' in err) {
+    const message = (err as { message?: unknown }).message
+    if (typeof message === 'string' && message) return message
+  }
+  return fallback
+}
+
 function authReducer(state: AuthState, action: AuthAction): AuthState {
   switch (action.type) {
     case 'AUTH_START':
@@ -163,8 +171,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const sb = getClient()
       const { error } = await sb.auth.signInWithPassword({ email, password })
       if (error) throw error
-    } catch (err: any) {
-      dispatch({ type: 'AUTH_FAILURE', payload: err.message || 'Login failed' })
+    } catch (err) {
+      dispatch({ type: 'AUTH_FAILURE', payload: errorMessage(err, 'Login failed') })
       throw err
     }
   }, [getClient])
@@ -175,8 +183,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const sb = getClient()
       const { error } = await sb.auth.signInWithOAuth({ provider: 'google' })
       if (error) throw error
-    } catch (err: any) {
-      dispatch({ type: 'AUTH_FAILURE', payload: err.message || 'Google login failed' })
+    } catch (err) {
+      dispatch({ type: 'AUTH_FAILURE', payload: errorMessage(err, 'Google login failed') })
       throw err
     }
   }, [getClient])
@@ -190,8 +198,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         options: { data: { name } },
       })
       if (error) throw error
-    } catch (err: any) {
-      dispatch({ type: 'AUTH_FAILURE', payload: err.message || 'Registration failed' })
+    } catch (err) {
+      dispatch({ type: 'AUTH_FAILURE', payload: errorMessage(err, 'Registration failed') })
       throw err
     }
   }, [getClient])

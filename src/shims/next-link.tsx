@@ -18,7 +18,7 @@ const NextLink = forwardRef<HTMLAnchorElement, NextLinkProps>(
     if (typeof href === "string" && (/^https?:\/\//.test(href) || href.startsWith("mailto:") || href.startsWith("tel:"))) {
       return <a ref={ref} href={href} {...rest} />;
     }
-    return <RouterLink ref={ref as any} to={href} replace={replace} {...(rest as any)} />;
+    return <RouterLink ref={ref} to={href} replace={replace} {...rest} />;
   },
 );
 NextLink.displayName = "NextLink";

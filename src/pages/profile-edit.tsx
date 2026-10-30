@@ -32,7 +32,45 @@ import { BottomNav } from "@/components/navigation/bottom-nav";
 
 const PROFILE_API = '/api/profile'
 
-function getDefaultProfile(t: (key: string) => string) {
+type ProfileForm = {
+  displayName: string;
+  name?: string;
+  age?: number;
+  city?: string;
+  height?: number | string;
+  gender?: string;
+  lookingFor?: string;
+  datingGoal?: string;
+  zodiac?: string;
+  bio?: string;
+  interests?: string[];
+  match?: number;
+  attachmentStyle?: string | null;
+  birthDate?: string;
+  location?: string;
+  photos?: string[];
+  education?: string;
+};
+
+type DbProfileRow = {
+  display_name?: string;
+  displayName?: string;
+  age?: number;
+  city?: string;
+  height?: number | string;
+  gender?: string;
+  looking_for?: string;
+  dating_goal?: string;
+  zodiac?: string;
+  bio?: string;
+  interests?: unknown;
+  match?: number;
+  attachment_style?: string | null;
+  birth_date?: string;
+  photos?: unknown;
+};
+
+function getDefaultProfile(t: (key: string) => string): ProfileForm {
   return {
     displayName: t('profile.demo_name'),
     age: 24,
@@ -52,7 +90,7 @@ function getDefaultProfile(t: (key: string) => string) {
   };
 }
 
-function mapDbProfile(rows: any) {
+function mapDbProfile(rows: unknown): ProfileForm | null {
   if (!rows) return null
   const p = Array.isArray(rows) ? rows[0] : rows
   return {
@@ -132,7 +170,7 @@ export default function EditProfilePage() {
     if (!authToken) router.replace('/login');
   }, [isAuthLoading, authToken, router]);
 
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<ProfileForm | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [photoIds, setPhotoIds] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -159,9 +197,9 @@ export default function EditProfilePage() {
           else {
             const saved = localStorage.getItem('userProfileGallery')
             if (saved) {
-              try { setPhotos(JSON.parse(saved)) } catch { setPhotos(getDefaultProfile(t).photos) }
+              try { setPhotos(JSON.parse(saved)) } catch { setPhotos(getDefaultProfile(t).photos ?? []) }
             } else {
-              const defaults = getDefaultProfile(t).photos
+              const defaults = getDefaultProfile(t).photos ?? []
               setPhotos(defaults)
               localStorage.setItem('userProfileGallery', JSON.stringify(defaults))
             }
@@ -173,10 +211,10 @@ export default function EditProfilePage() {
       } catch { /* ignored */ }
 
       const savedProfile = localStorage.getItem('userProfile');
-      let parsed: any;
+      let parsed: ProfileForm;
       if (savedProfile) {
         try {
-          parsed = JSON.parse(savedProfile);
+          parsed = JSON.parse(savedProfile) as ProfileForm;
           if (parsed.interests && Array.isArray(parsed.interests)) {
             parsed.interests = parsed.interests.filter((i: string) => !BANNED_WORDS.includes(i));
           }
@@ -197,10 +235,10 @@ export default function EditProfilePage() {
         try {
           setPhotos(JSON.parse(savedPhotos));
         } catch {
-          setPhotos(parsed.photos || defaultProfile.photos);
+          setPhotos(parsed.photos || defaultProfile.photos || []);
         }
       } else {
-        setPhotos(parsed.photos || defaultProfile.photos);
+        setPhotos(parsed.photos || defaultProfile.photos || []);
       }
 
       setIsLoading(false);
@@ -343,7 +381,7 @@ export default function EditProfilePage() {
     try {
       const result = await generateProfileBio({ keywords: profile.interests, description: profile.bio });
       if (result && result.bio && result.bio.trim()) {
-        setProfile((prev: any) => ({ ...prev, bio: result.bio }));
+        setProfile((prev) => (prev ? { ...prev, bio: result.bio } : prev));
         toast({ title: t('profile.ai_improve'), description: t('toast.bio_improved') });
       } else {
         toast({ variant: "destructive", title: t('toast.ai_error'), description: t('toast.ai_error_desc') });
@@ -356,6 +394,7 @@ export default function EditProfilePage() {
   };
 
   const handleSave = async () => {
+    if (!profile) return;
     const persistedPhotos = photos.filter(p => !p.startsWith('blob:'));
     if (photos.length === 0 || persistedPhotos.length === 0) {
       toast({ title: t('toast.save_error'), description: t('toast.save_error_desc'), variant: "destructive" });
@@ -467,7 +506,8 @@ export default function EditProfilePage() {
 
   const toggleInterest = (interest: string) => {
     if (BANNED_WORDS.includes(interest)) return;
-    setProfile((prev: any) => {
+    setProfile((prev) => {
+      if (!prev) return prev;
       const current = prev.interests || [];
       return {
         ...prev,

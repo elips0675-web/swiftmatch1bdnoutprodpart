@@ -63,7 +63,7 @@ beforeEach(() => {
   fetchMock = vi.fn(async (url: unknown, init?: RequestInit): Promise<{ ok: boolean; json: () => Promise<unknown> }> => {
     const u = String(url)
     if (u.includes('/merge')) {
-      if (init && (init as any).body && String((init as any).body).includes('999')) {
+      if (init && init.body && String(init.body).includes('999')) {
         return { ok: false, json: async () => ({ message: 'err' }) }
       }
       return { ok: true, json: async () => ({ message: 'Hangouts merged' }) }
@@ -78,7 +78,9 @@ beforeEach(() => {
           const it = items.find(x => x.id === id)
           if (it && (body.status === 'blocked' || body.status === 'active')) it.status = body.status
         }
-      } catch {}
+      } catch {
+        return { ok: true, json: async () => ({}) }
+      }
       return { ok: true, json: async () => ({}) }
     }
     if (u.includes('/api/admin/hangouts')) {
