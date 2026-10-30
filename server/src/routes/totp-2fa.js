@@ -9,6 +9,27 @@ import { wrapRouter } from '../async-handler.js'
 
 const router = Router()
 
+/**
+ * @openapi
+ * /api/auth/2fa/status:
+ *   get:
+ *     tags: [Auth]
+ *     summary: Current TOTP 2FA state of the admin
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: enabled flag }
+ */
+router.get('/api/auth/2fa/status', adminAuth, async (req, res) => {
+  try {
+    const [[row]] = await pool.query('SELECT totp_enabled FROM users WHERE id = ?', [req.admin.id])
+    res.json({ enabled: row?.totp_enabled === 1 })
+  } catch (err) {
+    rootLogger.error('2FA status error: ' + err.message)
+    res.status(500).json({ message: 'Internal server error' })
+  }
+})
+
 // Генерация секрета + otpauth URL для приложения-аутентификатора
 /**
  * @openapi
@@ -20,9 +41,12 @@ const router = Router()
  *       - bearerAuth: []
  *     responses:
  *       200: { description: otpauth URL and secret }
+ *       409: { description: 2FA already enabled - disable it first }
  */
 router.post('/api/auth/2fa/setup', adminAuth, async (req, res) => {
   try {
+    const [[row]] = await pool.query('SELECT totp_enabled FROM users WHERE id = ?', [req.admin.id])
+    if (row?.totp_enabled === 1) return res.status(409).json({ message: 'ALREADY_ENABLED' })
     const { secret, otpauthUrl } = generateTotpSecret(req.admin.email || 'admin')
     await pool.query('UPDATE users SET totp_secret = ?, totp_enabled = 0 WHERE id = ?', [secret, req.admin.id])
     res.json({ otpauthUrl, secret })

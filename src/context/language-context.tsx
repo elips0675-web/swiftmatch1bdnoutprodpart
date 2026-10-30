@@ -2081,6 +2081,13 @@ export const translations = {
     'two_fa_enabled': '2FA включена. Теперь при входе нужен код.',
     'two_fa_disabled': '2FA отключена.',
     'two_fa_invalid_code': 'Неверный код',
+    'two_fa_already_enabled': '2FA уже включена. Чтобы перенастроить, сначала отключите её текущим кодом.',
+    'two_fa_setup_required': 'Сначала начните настройку 2FA.',
+    'two_fa_code_required': 'Введите код из приложения-аутентификатора.',
+    'two_fa_not_enabled': '2FA не включена.',
+    'two_fa_error_generic': 'Не удалось выполнить запрос. Попробуйте ещё раз.',
+    'two_fa_status_error': 'Не удалось получить состояние 2FA.',
+    'two_fa_retry': 'Повторить',
   },
   EN: {
     'common.zodiac.aries': 'Aries',
@@ -4156,6 +4163,13 @@ export const translations = {
     'two_fa_enabled': '2FA enabled. You will need a code at login.',
     'two_fa_disabled': '2FA disabled.',
     'two_fa_invalid_code': 'Invalid code',
+    'two_fa_already_enabled': '2FA is already enabled. Disable it with your current code to set it up again.',
+    'two_fa_setup_required': 'Start the 2FA setup first.',
+    'two_fa_code_required': 'Enter the code from your authenticator app.',
+    'two_fa_not_enabled': '2FA is not enabled.',
+    'two_fa_error_generic': 'Request failed. Please try again.',
+    'two_fa_status_error': 'Could not load the 2FA state.',
+    'two_fa_retry': 'Retry',
   }
 };
 

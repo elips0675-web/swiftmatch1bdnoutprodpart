@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,21 @@ import { useLanguage } from '@/context/language-context';
 import { getToken } from '@/lib/token';
 import QRCode from 'qrcode';
 
-// TOTP 2FA enrollment (этап 38): секрет + otpauth URL для приложения-аутентификатора
+const ERROR_KEYS: Record<string, string> = {
+  ALREADY_ENABLED: 'two_fa_already_enabled',
+  SETUP_REQUIRED: 'two_fa_setup_required',
+  CODE_REQUIRED: 'two_fa_code_required',
+  NOT_ENABLED: 'two_fa_not_enabled',
+  TOTP_INVALID: 'two_fa_invalid_code',
+};
+
+const errorKey = (message: unknown) => ERROR_KEYS[String(message ?? '')] ?? 'two_fa_error_generic';
+
+const authHeaders = (): Record<string, string> => {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 export default function TwoFaSettings() {
   const { t } = useLanguage();
   const [busy, setBusy] = useState(false);
@@ -16,8 +30,26 @@ export default function TwoFaSettings() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [statusFailed, setStatusFailed] = useState(false);
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
+
+  const loadStatus = useCallback(async () => {
+    setStatusFailed(false);
+    try {
+      const res = await fetch('/api/auth/2fa/status', { headers: authHeaders() });
+      if (!res.ok) throw new Error('status failed');
+      const data = await res.json().catch(() => ({}));
+      setEnabled(data.enabled === true);
+    } catch {
+      setEnabled(null);
+      setStatusFailed(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadStatus();
+  }, [loadStatus]);
 
   useEffect(() => {
     if (setup?.otpauthUrl) {
@@ -30,10 +62,9 @@ export default function TwoFaSettings() {
   }, [setup]);
 
   const post = async (path: string, body: Record<string, unknown>) => {
-    const token = getToken();
     const res = await fetch(path, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(body),
     });
     return { status: res.status, data: await res.json().catch(() => ({})) };
@@ -43,10 +74,16 @@ export default function TwoFaSettings() {
     setBusy(true); setError(''); setOk('');
     try {
       const { status, data } = await post('/api/auth/2fa/setup', {});
-      if (status !== 200) throw new Error(data.message || 'setup failed');
+      if (status === 409) {
+        setEnabled(true);
+        setError(t(errorKey(data.message)));
+        return;
+      }
+      if (status !== 200) throw new Error(data.message);
       setSetup(data);
+      setEnabled(false);
     } catch (e) {
-      setError((e as Error).message);
+      setError(t(errorKey((e as Error).message)));
     } finally {
       setBusy(false);
     }
@@ -56,13 +93,13 @@ export default function TwoFaSettings() {
     setBusy(true); setError(''); setOk('');
     try {
       const { status, data } = await post('/api/auth/2fa/enable', { code });
-      if (status !== 200) throw new Error(data.message || 'TOTP_INVALID');
+      if (status !== 200) throw new Error(data.message);
       setEnabled(true);
       setSetup(null);
       setCode('');
       setOk(t('two_fa_enabled'));
     } catch (e) {
-      setError((e as Error).message === 'TOTP_INVALID' ? t('two_fa_invalid_code') : (e as Error).message);
+      setError(t(errorKey((e as Error).message)));
     } finally {
       setBusy(false);
     }
@@ -72,12 +109,12 @@ export default function TwoFaSettings() {
     setBusy(true); setError(''); setOk('');
     try {
       const { status, data } = await post('/api/auth/2fa/disable', { code });
-      if (status !== 200) throw new Error(data.message || 'TOTP_INVALID');
+      if (status !== 200) throw new Error(data.message);
       setEnabled(false);
       setCode('');
       setOk(t('two_fa_disabled'));
     } catch (e) {
-      setError((e as Error).message === 'TOTP_INVALID' ? t('two_fa_invalid_code') : (e as Error).message);
+      setError(t(errorKey((e as Error).message)));
     } finally {
       setBusy(false);
     }
@@ -95,7 +132,22 @@ export default function TwoFaSettings() {
         )}
       </CardHeader>
       <CardContent className="space-y-3">
-        {!setup && !enabled && (
+        {statusFailed && (
+          <div className="space-y-2">
+            <p className="text-xs text-destructive">{t('two_fa_status_error')}</p>
+            <Button size="sm" variant="outline" onClick={() => void loadStatus()} data-testid="two-fa-retry">
+              {t('two_fa_retry')}
+            </Button>
+          </div>
+        )}
+
+        {!statusFailed && enabled === null && (
+          <p className="text-xs text-muted-foreground" data-testid="two-fa-loading">
+            <Loader2 size={14} className="animate-spin" />
+          </p>
+        )}
+
+        {!statusFailed && !setup && enabled === false && (
           <>
             <p className="text-xs text-muted-foreground">{t('two_fa_hint')}</p>
             <Button size="sm" onClick={startSetup} disabled={busy}>
@@ -138,7 +190,7 @@ export default function TwoFaSettings() {
           </div>
         )}
 
-        {enabled && (
+        {!setup && enabled === true && (
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">{t('two_fa_disable_hint')}</p>
             <Input
