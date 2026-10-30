@@ -47,6 +47,7 @@ export function GoOutBookingDialog({
   const [guests, setGuests] = useState("2");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fallbackLink, setFallbackLink] = useState<string | null>(null);
 
   if (!offer) return null;
   const Icon = GO_OUT_ICONS[offer.category] || MapPin;
@@ -55,7 +56,17 @@ export function GoOutBookingDialog({
   const today = new Date().toISOString().slice(0, 10);
   const link = fillDeeplink(offer.deeplink, city, offer);
 
+  const openLink = (url: string) => {
+    const opened = window.open(url, "_blank", "noopener");
+    if (!opened) {
+      setFallbackLink(url);
+      return false;
+    }
+    return true;
+  };
+
   const handleBook = async () => {
+    setFallbackLink(null);
     if (isRestaurant) {
       if (!date || !time) {
         setError(t("partner.booking.fill_required"));
@@ -77,22 +88,18 @@ export function GoOutBookingDialog({
             guests: Number(guests),
           }),
         });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.message || t("partner.booking.error"));
-        }
-        const data = await res.json();
-        if (data.deeplink) window.open(data.deeplink, "_blank", "noopener");
+        if (!res.ok) throw new Error("booking_failed");
+        const data = await res.json().catch(() => ({}));
+        if (data.deeplink && !openLink(data.deeplink)) return;
         onOpenChange(false);
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : t("partner.booking.error"));
+      } catch {
+        setError(t("partner.booking.error"));
       } finally {
         setLoading(false);
       }
       return;
     }
-    window.open(link, "_blank", "noopener");
-    onOpenChange(false);
+    if (openLink(link)) onOpenChange(false);
   };
 
   return (
@@ -175,6 +182,26 @@ export function GoOutBookingDialog({
           )}
 
           {error && <p className="text-xs text-destructive">{error}</p>}
+
+          {fallbackLink && (
+            <div className="space-y-2 rounded-xl border border-muted p-3 text-xs">
+              <p className="text-muted-foreground">{t("partner.popup_blocked")}</p>
+              <p className="break-all text-muted-foreground" data-testid="goout-fallback-link">{fallbackLink}</p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  data-testid="goout-fallback-copy"
+                  onClick={() => void navigator.clipboard?.writeText(fallbackLink).catch(() => {})}
+                >
+                  {t("partner.copy_link")}
+                </Button>
+                <Button size="sm" variant="outline" data-testid="goout-fallback-close" onClick={() => onOpenChange(false)}>
+                  {t("partner.close")}
+                </Button>
+              </div>
+            </div>
+          )}
 
           <Button
             data-testid="goout-booking-confirm"
