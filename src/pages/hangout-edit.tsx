@@ -42,6 +42,8 @@ export default function HangoutEditPage() {
   const companionOptions = isPremium ? COMPANION_OPTIONS_PREMIUM : COMPANION_OPTIONS;
   const [loading, setLoading] = useState(true);
   const [notEditable, setNotEditable] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [placeName, setPlaceName] = useState("");
@@ -79,6 +81,8 @@ export default function HangoutEditPage() {
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setLoadFailed(false);
     const load = async () => {
       try {
         const token = getToken();
@@ -107,7 +111,7 @@ export default function HangoutEditPage() {
         setCapacity(data.capacity !== null && data.capacity !== undefined ? String(data.capacity) : "");
         setSeriesId(data.series_id ? String(data.series_id) : "");
       } catch {
-        if (!cancelled) setNotEditable(true);
+        if (!cancelled) setLoadFailed(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -116,7 +120,7 @@ export default function HangoutEditPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, navigate]);
+  }, [id, navigate, reloadKey]);
 
   const submit = async () => {
     if (!title.trim() || !eventDate) {
@@ -149,7 +153,7 @@ export default function HangoutEditPage() {
       toast.success(t("hangout.toast.updated"));
       navigate(`/hangouts/${id}`);
     } catch {
-      toast.error(t("hangout.error.load"));
+      toast.error(t("hangout.error.save"));
     } finally {
       setSubmitting(false);
     }
@@ -190,6 +194,7 @@ export default function HangoutEditPage() {
       });
       if (!res.ok) throw new Error("failed");
       const created = await res.json();
+      if (!created?.id) throw new Error("failed");
       setNewSeriesTitle("");
       setNewSeriesOpen(false);
       await loadSeries();
@@ -214,7 +219,20 @@ export default function HangoutEditPage() {
             </Button>
           </Card>
         )}
-        {!loading && !notEditable && (
+        {!loading && loadFailed && (
+          <Card className="p-6 text-center space-y-4" data-testid="edit-load-error">
+            <p className="text-sm text-muted-foreground">{t("hangout.edit.load_error")}</p>
+            <Button
+              variant="outline"
+              className="rounded-full"
+              data-testid="edit-retry"
+              onClick={() => setReloadKey((k) => k + 1)}
+            >
+              {t("hangout.edit.retry")}
+            </Button>
+          </Card>
+        )}
+        {!loading && !notEditable && !loadFailed && (
           <Card className="p-5 space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="hangout-title">{t("hangout.form.title")}</Label>
