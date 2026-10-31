@@ -7,7 +7,7 @@ export default function ProfileById() {
 
   useEffect(() => {
     if (id) {
-      navigate(`/user?id=${id}`, { replace: true })
+      navigate(`/user?id=${encodeURIComponent(id)}`, { replace: true })
     }
   }, [id, navigate])
 
