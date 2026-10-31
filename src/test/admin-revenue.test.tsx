@@ -88,9 +88,9 @@ describe('AdminDashboardPage', () => {
     expect(screen.queryByText('6.99 ₽')).toBeNull()
     expect(dashboardCalls()).toHaveLength(5)
     dashboardCalls().forEach(r => expect(r.init?.headers).toEqual({ Authorization: 'Bearer admin-token' }))
-    const statusCalls = requests.filter(r => r.url === '/api/auth/2fa/status')
-    expect(statusCalls).toHaveLength(1)
-    expect(statusCalls[0].init?.headers).toEqual({ Authorization: 'Bearer admin-token' })
+    const statusCalls = () => requests.filter(r => r.url === '/api/auth/2fa/status')
+    await waitFor(() => expect(statusCalls()).toHaveLength(1))
+    expect(statusCalls()[0].init?.headers).toEqual({ Authorization: 'Bearer admin-token' })
   })
 
   it('показывает ключ заглушки, если выручка пришла пустой', async () => {
