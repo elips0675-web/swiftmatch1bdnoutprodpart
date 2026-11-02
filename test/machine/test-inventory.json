@@ -1,19 +1,19 @@
 {
-  "generated": "2026-11-02T06:15:30.307Z",
+  "generated": "2026-11-02T06:30:23.417Z",
   "tool": "node scripts/test-counter-audit.mjs (vitest --reporter=json, actual execution)",
   "verified_by": "vitest run (actual execution)",
   "frontend": {
-    "files": 168,
-    "tests": 2952,
-    "passed": 2952,
+    "files": 169,
+    "tests": 2956,
+    "passed": 2956,
     "failed": 0,
     "gate": {
       "files": 33,
       "tests": 845
     },
     "product": {
-      "files": 135,
-      "tests": 2107
+      "files": 136,
+      "tests": 2111
     },
     "perFile": [
       {
@@ -551,6 +551,10 @@
       {
         "file": "src/test/pwa-install-banner.test.tsx",
         "tests": 18
+      },
+      {
+        "file": "src/test/pwa-registry.test.tsx",
+        "tests": 4
       },
       {
         "file": "src/test/register.test.tsx",
@@ -1477,7 +1481,7 @@
     ]
   },
   "total": {
-    "files": 335,
-    "tests": 5781
+    "files": 336,
+    "tests": 5785
   }
 }
