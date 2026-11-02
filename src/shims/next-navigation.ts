@@ -10,11 +10,13 @@ export function useRouter() {
   const forward = useCallback(() => navigate(1), [navigate]);
   const refresh = useCallback(() => window.location.reload(), []);
   const prefetch = useCallback((_: string) => {}, []);
+  const search = location.search;
+  const query = useMemo(() => Object.fromEntries(new URLSearchParams(search)), [search]);
   return useMemo(() => ({
     push, replace, back, forward, refresh, prefetch,
     pathname: location.pathname,
-    query: {} as Record<string, string>,
-  }), [push, replace, back, forward, refresh, prefetch, location.pathname]);
+    query,
+  }), [push, replace, back, forward, refresh, prefetch, location.pathname, query]);
 }
 
 export function usePathname() {

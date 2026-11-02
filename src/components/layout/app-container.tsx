@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 
 export function AppContainer({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const isAdminPage = pathname.startsWith('/admin');
+    const isAdminPage = pathname === '/admin' || pathname.startsWith('/admin/');
 
     return (
         <div className={cn(
