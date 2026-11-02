@@ -65,4 +65,16 @@ describe("useLanguage: реальный LanguageProvider", () => {
   it("useLanguage вне провайдера бросает понятную ошибку", () => {
     expect(() => renderHook(() => useLanguage())).toThrow(/useLanguage must be used within LanguageProvider/)
   })
+
+  it("сообщение о длине пароля при регистрации совпадает с требованием кода (8 символов)", () => {
+    for (const language of ["RU", "EN"] as const) {
+      expect(translations[language]["register.password_length"]).toContain("8")
+      expect(translations[language]["register.password_length"]).not.toContain("6")
+    }
+  })
+
+  it("союз в тексте согласия берётся из каталога на обоих языках", () => {
+    expect(translations.RU["register.consent_and"]).toBe("и")
+    expect(translations.EN["register.consent_and"]).toBe("and")
+  })
 })

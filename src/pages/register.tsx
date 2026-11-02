@@ -43,12 +43,16 @@ export default function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!name.trim()) {
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    const trimmedPhone = phone.trim();
+
+    if (!trimmedName) {
       toast({ title: t('common.error'), description: t('register.name_required'), variant: "destructive" });
       return;
     }
 
-    if (!validateEmail(email)) {
+    if (!validateEmail(trimmedEmail)) {
       toast({ title: t('common.error'), description: t('register.invalid_email'), variant: "destructive" });
       return;
     }
@@ -76,7 +80,7 @@ export default function RegisterPage() {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ email, password, displayName: name, phone: phone || undefined, consent }),
+            body: JSON.stringify({ email: trimmedEmail, password, displayName: trimmedName, phone: trimmedPhone || undefined, consent }),
         });
 
         const data = await response.json();
@@ -206,11 +210,11 @@ export default function RegisterPage() {
                 <Link href="/legal/data-processing" className="text-primary hover:underline font-medium">
                   {t('register.consent_doc')}
                 </Link>{" "}
-                и{" "}
+                {t('register.consent_and')}{" "}
                 <Link href="/legal/privacy" className="text-primary hover:underline font-medium">
                   {t('register.consent_privacy')}
                 </Link>
-                {" "}и{" "}
+                {" "}{t('register.consent_and')}{" "}
                 <Link href="/legal/terms" className="text-primary hover:underline font-medium">
                   {t('register.consent_terms')}
                 </Link>
