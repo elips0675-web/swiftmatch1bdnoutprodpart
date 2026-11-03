@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
@@ -7,10 +7,11 @@ import React from 'react';
 const h = vi.hoisted(() => ({
   t: (key: string) => key,
   toast: vi.fn(),
+  language: 'RU' as 'RU' | 'EN',
 }));
 
 vi.mock('@/context/language-context', () => ({
-  useLanguage: () => ({ t: h.t, language: 'RU', setLanguage: vi.fn() }),
+  useLanguage: () => ({ t: h.t, language: h.language, setLanguage: vi.fn() }),
 }));
 
 vi.mock('@/components/layout/app-header', () => ({
@@ -50,6 +51,7 @@ import GroupsPage from '@/pages/groups';
 describe('Страница groups', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    h.language = 'RU';
   });
 
   it('на вкладке «Найти» показывает первую страницу из 12 категорий и пагинацию', () => {
@@ -71,13 +73,23 @@ describe('Страница groups', () => {
     expect(screen.getByText('2')).toBeInTheDocument();
   });
 
-  it('пагинация листает категории, а смена вкладки сбрасывает страницу', async () => {
+  it('пагинация листает категории стрелками и номером, а смена вкладки сбрасывает страницу', async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
         <GroupsPage />
       </MemoryRouter>,
     );
+
+    await user.click(screen.getByText('›'));
+
+    expect(screen.getByText('Питомцы')).toBeInTheDocument();
+    expect(screen.queryByText('Музыка')).toBeNull();
+
+    await user.click(screen.getByText('‹'));
+
+    expect(screen.getByText('Музыка')).toBeInTheDocument();
+    expect(screen.queryByText('Питомцы')).toBeNull();
 
     await user.click(screen.getByText('2'));
 
@@ -220,5 +232,70 @@ describe('Страница groups', () => {
     await user.click(screen.getByTestId('create-group-button'));
     expect(screen.getByTestId('group-name')).toHaveValue('');
     expect(screen.getByTestId('group-description')).toHaveValue('');
+  });
+
+  it('после прокрутки больше 300 px показывает кнопку «наверх» и возвращает к началу', () => {
+    render(
+      <MemoryRouter>
+        <GroupsPage />
+      </MemoryRouter>,
+    );
+
+    const main = document.querySelector('main') as HTMLElement;
+    const scrollTo = vi.fn();
+    main.scrollTo = scrollTo;
+
+    expect(document.querySelector('button.fixed.bottom-24')).toBeNull();
+
+    main.scrollTop = 500;
+    fireEvent.scroll(main);
+
+    const topButton = document.querySelector('button.fixed.bottom-24') as HTMLButtonElement;
+    expect(topButton).not.toBeNull();
+
+    fireEvent.click(topButton);
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+
+    main.scrollTop = 0;
+    fireEvent.scroll(main);
+
+    expect(document.querySelector('button.fixed.bottom-24')).toBeNull();
+  });
+
+  it('кнопка «Отмена» закрывает диалог создания и ничего не создаёт', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <GroupsPage />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId('create-group-button'));
+    await user.type(screen.getByTestId('group-name'), 'Клуб');
+
+    await user.click(screen.getByText('button.cancel'));
+
+    await waitFor(() => expect(screen.queryByTestId('group-name')).toBeNull());
+    expect(h.toast).not.toHaveBeenCalled();
+    expect(screen.getByText('Музыка')).toBeInTheDocument();
+  });
+
+  it('в языке EN карточки и категории в диалоге берут английские названия', async () => {
+    h.language = 'EN';
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <GroupsPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('Music')).toBeInTheDocument();
+    expect(screen.queryByText('Музыка')).toBeNull();
+
+    await user.click(screen.getByTestId('create-group-button'));
+
+    expect(screen.getAllByText('Music').length).toBeGreaterThan(1);
+    expect(screen.queryByText('Музыка')).toBeNull();
   });
 });

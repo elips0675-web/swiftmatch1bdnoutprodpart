@@ -168,7 +168,7 @@ export default function GroupsPage() {
     onScroll();
 
     return () => el.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [isMounted]);
 
   const handleCreateGroup = () => {
     if (!newGroupName.trim() || !newGroupCategory) {
