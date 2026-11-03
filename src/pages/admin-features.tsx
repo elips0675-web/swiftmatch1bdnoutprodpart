@@ -83,11 +83,12 @@ export default function FeatureFlagsPage() {
       flags.forEach(f => { payload[f.key] = f.enabled; });
       payload.rolloutPercent = rolloutPercent;
       const token = getToken();
-      await fetch('/api/admin/features', {
+      const res = await fetch('/api/admin/features', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify(payload),
       });
+      if (!res.ok) throw new Error('Failed to save');
       setSavedFlags([...flags]);
       setSavedRolloutPercent(rolloutPercent);
       toast.success(t('admin.features.saved'));
