@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
@@ -34,6 +34,7 @@ vi.mock('@/components/watch-button', () => ({
 
 import UserProfilePage from '@/pages/user';
 import { clearToken, setToken } from '@/lib/token';
+import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 const PROFILE = {
   id: 2,
@@ -481,6 +482,268 @@ describe('Страница user', () => {
     resolveInvite({ ok: true, json: async () => ({}) } as Response);
     await waitFor(() =>
       expect(h.toast).toHaveBeenCalledWith({ title: 'invite.sent_title', description: 'invite.sent_desc' }),
+    );
+  });
+
+  it('профиль без фото, аватара, возраста и города показывает заглушку и имя без хвостов', async () => {
+    stubFetch((url) =>
+      url === '/api/profile/2'
+        ? jsonResponse({
+            id: 2,
+            name: 'Иван',
+            gender: 'male',
+            looking_for: 'female',
+            interests: [{ name_en: 'Hiking' }],
+          })
+        : undefined,
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByRole('heading', { level: 3 })).toHaveTextContent(/^Иван$/);
+    expect(screen.getByAltText('Иван')).toHaveAttribute('src', PlaceHolderImages[0].imageUrl);
+    expect(screen.getByText('onboarding.step1.male')).toBeInTheDocument();
+    expect(screen.getByText('filter.gender.female')).toBeInTheDocument();
+    expect(screen.getByText('interest.hiking')).toBeInTheDocument();
+
+    await user.click(screen.getByText('profile.tab.gallery'));
+
+    const photos = screen.getAllByAltText('Gallery photo');
+    expect(photos).toHaveLength(1);
+    expect(photos[0]).toHaveAttribute('src', PlaceHolderImages[0].imageUrl);
+  });
+
+  it('аватар берётся из первого фото, а неизвестная цель показывает «всех»', async () => {
+    stubFetch((url) =>
+      url === '/api/profile/2'
+        ? jsonResponse({ id: 2, name: 'Пётр', photos: [{ url: '/petr.jpg' }], looking_for: 'all', interests: [] })
+        : undefined,
+    );
+    renderPage();
+
+    expect(await screen.findByAltText('Пётр')).toHaveAttribute('src', '/petr.jpg');
+    expect(screen.getByText('filter.gender.all')).toBeInTheDocument();
+  });
+
+  it('сетевой сбой загрузки профиля показывает недоступность, а не пустую страницу', async () => {
+    stubFetch((url) => (url === '/api/profile/2' ? Promise.reject(new Error('offline')) : undefined));
+    renderPage();
+
+    expect(await screen.findByText('user.not_found')).toBeInTheDocument();
+    expect(screen.getByText('user.not_found_desc')).toBeInTheDocument();
+  });
+
+  it('ответ API после размонтирования не трогает состояние', async () => {
+    let resolveProfile: (value: Response) => void = () => {};
+    stubFetch((url) => {
+      if (url !== '/api/profile/2') return undefined;
+      return new Promise<Response>((resolve) => {
+        resolveProfile = resolve;
+      });
+    });
+
+    const view = renderPage();
+    view.unmount();
+
+    resolveProfile({ ok: true, json: async () => PROFILE } as Response);
+    await waitFor(() => expect(screen.queryByText(/Анна/)).toBeNull());
+  });
+
+  it('битый userProfile в localStorage не ломает страницу', async () => {
+    localStorage.setItem('userProfile', '{oops');
+    stubFetch();
+    await renderLoaded();
+
+    expect(screen.getByText(/Анна, 24/)).toBeInTheDocument();
+  });
+
+  it('«назад» в шапке уводит в историю, а без истории — на главную; крестик закрывает профиль', async () => {
+    stubFetch();
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    const backButton = document.querySelector('header button') as HTMLButtonElement;
+    Object.defineProperty(window.history, 'length', { configurable: true, value: 2 });
+
+    await user.click(backButton);
+
+    expect(h.router.back).toHaveBeenCalledTimes(1);
+    expect(h.router.push).not.toHaveBeenCalled();
+
+    delete (window.history as unknown as Record<string, unknown>).length;
+    await user.click(backButton);
+
+    expect(h.router.push).toHaveBeenCalledWith('/');
+
+    await user.click(document.querySelector('div.fixed.bottom-0 button') as HTMLButtonElement);
+
+    expect(h.router.push).toHaveBeenCalledTimes(2);
+  });
+
+  it('на странице недоступного профиля кнопка «назад» возвращает в историю', async () => {
+    stubFetch((url) => (url === '/api/profile/2' ? jsonResponse({}, false, 404) : undefined));
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText('user.not_found');
+    await user.click(screen.getByText('button.back'));
+
+    expect(h.router.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('просмотрщик фото закрывается крестиком', async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    stubFetch();
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    await user.click(screen.getByText('profile.tab.gallery'));
+    await user.click(screen.getAllByAltText('Gallery photo')[0]);
+
+    const dialog = screen.getByRole('dialog');
+    const closeButton = dialog.querySelector('div.absolute.top-6.right-6 button') as HTMLButtonElement;
+
+    await user.click(closeButton);
+
+    await waitFor(() => expect(screen.queryByText('gallery.viewer')).toBeNull());
+    expect(consoleWarn).not.toHaveBeenCalledWith(expect.stringContaining('Missing `Description`'));
+  });
+
+  it('своё приглашение отменяется кнопкой «Отмена» без запроса на сервер', async () => {
+    const fetchMock = stubFetch();
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    await user.click(screen.getByTestId('invite-user'));
+    await user.click(screen.getByText('invite.option.custom'));
+    await user.type(screen.getByPlaceholderText('invite.custom_placeholder'), 'Поход');
+
+    await user.click(screen.getByText('button.cancel'));
+
+    await waitFor(() => expect(screen.queryByPlaceholderText('invite.custom_placeholder')).toBeNull());
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).not.toContain('/api/invites');
+  });
+
+  it('диалог матча закрывается клавишей Escape и кнопкой «Продолжить»', async () => {
+    stubFetch((url) =>
+      url === '/api/likes' ? jsonResponse({ message: "It's a match!", matched: true }, true, 201) : undefined,
+    );
+    localStorage.setItem('userProfile', JSON.stringify({ photoURL: '/me.jpg' }));
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    await user.click(screen.getByText('button.like'));
+    expect(await screen.findByText('match.title')).toBeInTheDocument();
+    expect(screen.getByAltText('You')).toHaveAttribute('src', '/me.jpg');
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByText('match.title')).toBeNull());
+
+    await user.click(screen.getByText('button.like'));
+    expect(await screen.findByText('match.title')).toBeInTheDocument();
+
+    await user.click(screen.getByText('button.continue'));
+
+    await waitFor(() => expect(screen.queryByText('match.title')).toBeNull());
+    expect(h.router.push).not.toHaveBeenCalled();
+  });
+
+  it('описание жалобы уходит на сервер, а «Отмена» закрывает диалог без запроса', async () => {
+    const fetchMock = stubFetch();
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    await user.click(screen.getByTestId('report-user'));
+    const details = screen.getByPlaceholderText('report.details_placeholder');
+    await user.type(details, 'Пишет оскорбления');
+
+    expect(details).toHaveValue('Пишет оскорбления');
+
+    await user.click(screen.getByText('report.button.cancel'));
+
+    await waitFor(() => expect(screen.queryByText('report.title')).toBeNull());
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).not.toContain('/api/reports');
+  });
+
+  it('сетевой сбой при блокировке показывает ошибку и не уводит со страницы', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    stubFetch((url) => (url === '/api/block' ? Promise.reject(new Error('offline')) : undefined));
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    await user.click(screen.getByTestId('block-user'));
+
+    await waitFor(() =>
+      expect(h.toast).toHaveBeenCalledWith({ variant: 'destructive', title: 'user.block_error' }),
+    );
+    expect(h.router.back).not.toHaveBeenCalled();
+  });
+
+  it('профиль без имени, цели и интересов рисует пустые поля вместо падения', async () => {
+    stubFetch((url) => (url === '/api/profile/2' ? jsonResponse({ id: 2 }) : undefined));
+    renderPage();
+
+    expect(await screen.findByText('profile.about')).toBeInTheDocument();
+
+    const heading = screen.getByRole('heading', { level: 3 });
+    expect(heading.textContent?.trim()).toBe('');
+    expect(document.querySelector('main img')).toHaveAttribute('src', PlaceHolderImages[0].imageUrl);
+    expect(screen.getByText('profile.interests')).toBeInTheDocument();
+  });
+
+  it('размонтирование до разбора JSON не применяет профиль', async () => {
+    let resolveJson: (value: unknown) => void = () => {};
+    stubFetch((url) => {
+      if (url !== '/api/profile/2') return undefined;
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          new Promise((resolve) => {
+            resolveJson = resolve;
+          }),
+      } as Response);
+    });
+
+    const view = renderPage();
+    await screen.findByText('common.loading');
+
+    view.unmount();
+    resolveJson(PROFILE);
+
+    await waitFor(() => expect(screen.queryByText(/Анна/)).toBeNull());
+  });
+
+  it('фото текущего пользователя берётся из img, если photoURL нет', async () => {
+    stubFetch((url) =>
+      url === '/api/likes' ? jsonResponse({ message: "It's a match!", matched: true }, true, 201) : undefined,
+    );
+    localStorage.setItem('userProfile', JSON.stringify({ img: '/me-2.jpg' }));
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    await user.click(screen.getByText('button.like'));
+
+    expect(await screen.findByText('match.title')).toBeInTheDocument();
+    expect(screen.getByAltText('You')).toHaveAttribute('src', '/me-2.jpg');
+  });
+
+  it('лайк с токеном отправляет Authorization, а отказ не из-за лимита даёт общую ошибку', async () => {
+    setToken('jwt');
+    const fetchMock = stubFetch((url) =>
+      url === '/api/likes' ? jsonResponse({ message: 'nope' }, false, 500) : undefined,
+    );
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    await user.click(screen.getByText('button.like'));
+
+    await waitFor(() =>
+      expect(h.toast).toHaveBeenCalledWith({ variant: 'destructive', title: 'user.like_error' }),
+    );
+    const init = fetchMock.mock.calls.find(([url]) => String(url) === '/api/likes')?.[1] as RequestInit;
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer jwt');
+    expect(h.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'user.like_limit' }),
     );
   });
 });
