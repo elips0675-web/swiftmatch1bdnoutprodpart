@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "path";
 
 function utf8Plugin(): import('vite').Plugin {
@@ -21,6 +22,42 @@ function utf8Plugin(): import('vite').Plugin {
 }
 
 const API_TARGET = process.env.VITE_PROXY_TARGET || 'http://localhost:3002';
+
+const COPYRIGHT_NOTICE = `/*! SwiftMatch — проприетарное (платное) ПО. © 2026 SwiftMatch. Все права защищены.
+ * Лицензия: LICENSE — использование только по оплаченному договору; удаление этого уведомления запрещено.
+ * Лицензиат: ${process.env.SMARTMATCH_LICENSEE || 'не указан'} */`;
+
+function copyrightPlugin(): import('vite').Plugin {
+  let outDir = path.resolve(__dirname, 'dist');
+  const stamp = `${COPYRIGHT_NOTICE}\n`;
+  const collect = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+      const abs = path.join(dir, entry.name);
+      return entry.isDirectory() ? collect(abs) : [abs];
+    });
+  return {
+    name: 'copyright-notice',
+    apply: 'build',
+    enforce: 'post',
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir);
+    },
+    transformIndexHtml(html: string) {
+      return html.replace(
+        '<!doctype html>',
+        '<!doctype html>\n    <!-- SwiftMatch — проприетарное (платное) ПО. © 2026 SwiftMatch. Условия использования: LICENSE -->'
+      );
+    },
+    closeBundle() {
+      for (const file of collect(outDir)) {
+        if (!file.endsWith('.js') && !file.endsWith('.css')) continue;
+        const code = readFileSync(file, 'utf8');
+        if (code.startsWith('/*! SwiftMatch')) continue;
+        writeFileSync(file, stamp + code, 'utf8');
+      }
+    },
+  };
+}
 
 export default defineConfig(({ mode }) => ({
   server: {
@@ -59,6 +96,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     utf8Plugin(),
+    copyrightPlugin(),
   ],
   resolve: {
     alias: {

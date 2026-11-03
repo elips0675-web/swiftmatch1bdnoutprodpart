@@ -198,9 +198,11 @@ export const README_FILE = 'README.md'
  * проприетарной платной модели, поле в обоих `package.json` и раздел в README.
  */
 export const LICENSE_FILE = 'LICENSE'
+export const NOTICE_FILE = 'NOTICE'
 export const SERVER_PKG_FILE = 'server/package.json'
 export const LICENSE_PROPRIETARY_RE = /проприетарн/i
 export const LICENSE_PAID_RE = /платн[а-яё]*/i
+export const NOTICE_COPYRIGHT_RE = /Copyright \(c\) 2026 SwiftMatch/i
 export const README_LICENSE_HEADING_RE = /^##\s+Лицензия\s*$/m
 
 export const CI_JOBS_CLAIM_RE = /(\d+)\s+джобы\s+`ci\.yml`/
@@ -629,7 +631,7 @@ export function collectChangelogFindings(text) {
  * Лицензия: файл, объявление модели, поле `license` в обоих пакетах и раздел в
  * README. Закрывает LEGAL-02 — до этапа 242 у публичного репозитория прав на код
  * не было ни в одном файле, и «проприетарная, платная» держалась на памяти.
- * @param {{licenseText: string|null, pkgJson: object|null, serverPkg: object|null, readmeText: string|null}} docs
+ * @param {{licenseText: string|null, noticeText: string|null, pkgJson: object|null, serverPkg: object|null, readmeText: string|null}} docs
  */
 export function collectLicenseFindings(docs) {
   const findings = []
@@ -644,6 +646,20 @@ export function collectLicenseFindings(docs) {
     }
     if (!LICENSE_PAID_RE.test(docs.licenseText)) {
       findings.push({ id: 'license-paid', file: LICENSE_FILE, line: 1, text: 'в тексте нет ни одного упоминания платности («платн…») — модель «платная лицензия» не объявлена' })
+    }
+    if (!docs.licenseText.includes(NOTICE_FILE)) {
+      findings.push({ id: 'license-notice-link', file: LICENSE_FILE, line: 1, text: `лицензия не ссылается на ${NOTICE_FILE} — уведомление о правах и его охрана существуют отдельно от условий` })
+    }
+  }
+
+  if (!docs.noticeText || !docs.noticeText.trim()) {
+    findings.push({ id: 'notice-missing', file: NOTICE_FILE, line: 1, text: `файла ${NOTICE_FILE} нет — копия кода ходит без уведомления об авторских правах и без указания, что использование платное` })
+  } else {
+    if (!NOTICE_COPYRIGHT_RE.test(docs.noticeText)) {
+      findings.push({ id: 'notice-copyright', file: NOTICE_FILE, line: 1, text: 'в уведомлении нет строки «Copyright (c) 2026 SwiftMatch» — правообладатель не назван в форме, пригодной для претензии' })
+    }
+    if (!docs.noticeText.includes(LICENSE_FILE)) {
+      findings.push({ id: 'notice-license-link', file: NOTICE_FILE, line: 1, text: `уведомление не ссылается на ${LICENSE_FILE} — читатель не узнает, что использование платное и на каких условиях` })
     }
   }
 
@@ -1007,6 +1023,7 @@ export function audit(root) {
   try { pkgJson = JSON.parse(read('package.json') || 'null') } catch { pkgJson = null }
   findings.push(...collectLicenseFindings({
     licenseText: read(LICENSE_FILE),
+    noticeText: read(NOTICE_FILE),
     pkgJson,
     serverPkg: serverPkgJson,
     readmeText: read(README_FILE),
@@ -1043,7 +1060,7 @@ function main() {
   console.log(`Канон-указатель: ${PROMPTS_INDEX} (ссылок: ${promptsCheck.links.length}); идеи: ${ROADMAP_FILE} (${roadmapCheck.nonEmptyLines} непустых строк); архив: ${ARCHIVE_FILE}; бэклог: ${TODO_JOURNAL} (структура), хроника: ${DONE_JOURNAL}, архив срезов: ${AGENDA_ARCHIVE}`)
   console.log(`Стек: ${STACK_VERSION_ROWS.length} версий сверяется с package.json, ${STACK_ABSENCES.length} запрета на удалённую зависимость`)
   console.log(`Согласованность: джобы CI/CD ↔ runs-on (${countWorkflowJobs(read(CI_WORKFLOW))}/${countWorkflowJobs(read(DEPLOY_WORKFLOW))}), лимит загрузки ↔ ${UPLOAD_ROUTE}, миграции ↔ ${MIGRATIONS_DIR} (${countMigrations(root) ?? 'нет'}), ${WORKFLOW_DOC} без архивных ссылок`)
-  console.log(`Лицензия: ${LICENSE_FILE} (проприетарная, платная) ↔ поле «license» в package.json и ${SERVER_PKG_FILE} ↔ раздел README`)
+  console.log(`Лицензия: ${LICENSE_FILE} (проприетарная, платная) ↔ ${NOTICE_FILE} (уведомление о правах) ↔ поле «license» в package.json и ${SERVER_PKG_FILE} ↔ раздел README`)
   console.log(`\nНаходок: ${findings.length}\n`)
 
   if (!findings.length) {
@@ -1065,7 +1082,7 @@ function main() {
   console.log(`  6) структура бэклога (${TODO_JOURNAL}) — уникальные ID и заголовки, закрытие с хроникой в ${DONE_JOURNAL}, записи этапов — только там.`)
   console.log('  7) версии стека и упоминания `zod` — привести к `package.json`: источник истины — зависимости, а не проза.')
   console.log('  8) числа в доках (джобы, лимиты, миграции) — править по реальному файлу-источнику, а не по другому доку.')
-  console.log(`  9) лицензия — ${LICENSE_FILE} (проприетарная, платная) + поле «license» в package.json и ${SERVER_PKG_FILE} + раздел «## Лицензия» в ${README_FILE}.`)
+  console.log(`  9) лицензия — ${LICENSE_FILE} (проприетарная, платная) + ${NOTICE_FILE} (Copyright (c) 2026 SwiftMatch и ссылка на LICENSE) + поле «license» в package.json и ${SERVER_PKG_FILE} + раздел «## Лицензия» в ${README_FILE}.`)
   process.exit(1)
 }
 

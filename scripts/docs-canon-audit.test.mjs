@@ -55,6 +55,7 @@ import {
   collectChangelogFindings,
   collectLicenseFindings,
   LICENSE_FILE,
+  NOTICE_FILE,
   SERVER_PKG_FILE,
   collectWiringFindings,
   collectConsistencyFindings,
@@ -808,7 +809,8 @@ describe('согласованность чисел документации с 
 
 describe('лицензия репозитория (LEGAL-02)', () => {
   const good = {
-    licenseText: '# ПРОПРИЕТАРНАЯ (ПЛАТНАЯ) ЛИЦЕНЗИЯ\n\nВсе права защищены.\n',
+    licenseText: '# ПРОПРИЕТАРНАЯ (ПЛАТНАЯ) ЛИЦЕНЗИЯ\n\nУведомление о правах — файл NOTICE.\n\nВсе права защищены.\n',
+    noticeText: 'УВЕДОМЛЕНИЕ ОБ АВТОРСКИХ ПРАВАХ\n\nCopyright (c) 2026 SwiftMatch. Все права защищены.\n\nУсловия использования — LICENSE.\n',
     pkgJson: { license: 'SEE LICENSE IN LICENSE' },
     serverPkg: { license: 'SEE LICENSE IN ../LICENSE' },
     readmeText: '## Лицензия\n\nПолный текст: [`LICENSE`](LICENSE).\n',
@@ -818,6 +820,7 @@ describe('лицензия репозитория (LEGAL-02)', () => {
   it('текущий репозиторий проходит: файл, оба package.json и раздел README на месте', () => {
     expect(collectLicenseFindings({
       licenseText: read(LICENSE_FILE),
+      noticeText: read(NOTICE_FILE),
       pkgJson: JSON.parse(read('package.json')),
       serverPkg: JSON.parse(read(SERVER_PKG_FILE)),
       readmeText: read(README_FILE),
@@ -870,6 +873,33 @@ describe('лицензия репозитория (LEGAL-02)', () => {
     const list = ids(run({ readmeText: '## Лицензия\n\nсм. условия у владельца\n' }))
     expect(list).toContain('license-readme-link')
     expect(list).not.toContain('license-readme')
+  })
+
+  it('нет файла NOTICE — копия кода ходит без уведомления о правах', () => {
+    expect(ids(run({ noticeText: null }))).toContain('notice-missing')
+    expect(ids(run({ noticeText: '  \n' }))).toContain('notice-missing')
+  })
+
+  it('в NOTICE нет строки «Copyright (c) 2026 SwiftMatch» — находка', () => {
+    const list = ids(run({ noticeText: 'УВЕДОМЛЕНИЕ ОБ АВТОРСКИХ ПРАВАХ\n\nУсловия — LICENSE.\n' }))
+    expect(list).toContain('notice-copyright')
+    expect(list).not.toContain('notice-license-link')
+  })
+
+  it('NOTICE без ссылки на LICENSE — читатель не узнает условия', () => {
+    const list = ids(run({ noticeText: 'Copyright (c) 2026 SwiftMatch. Все права защищены.\n' }))
+    expect(list).toContain('notice-license-link')
+    expect(list).not.toContain('notice-copyright')
+  })
+
+  it('LICENSE без ссылки на NOTICE — уведомление живёт отдельно от условий', () => {
+    const list = ids(run({ licenseText: '# ПРОПРИЕТАРНАЯ (ПЛАТНАЯ) ЛИЦЕНЗИЯ\n\nВсе права защищены.\n' }))
+    expect(list).toContain('license-notice-link')
+  })
+
+  it('NOTICE и LICENSE ссылаются друг на друга (якорь на реальных файлах)', () => {
+    expect(read(LICENSE_FILE)).toContain(NOTICE_FILE)
+    expect(read(NOTICE_FILE)).toContain(LICENSE_FILE)
   })
 
   it('audit() реального репозитория не выдаёт находок по лицензии', () => {

@@ -16,8 +16,14 @@
  *
  * Локальный инструмент, в CI не заведён: нужен собранный `dist/`
  * (`npx vite build`), гейт не запустить на чистом контуре.
+ *
+ * Тот же прогон держит охрану сборки (Stage 247): в `dist/` не должно быть
+ * `.map` (source map отдаёт исходник один в один), а каждый initial-JS-бандл и
+ * `index.html` обязаны нести уведомление об авторских правах из
+ * `build.rollupOptions.output.banner` — удалить его можно только вместе со
+ * сборкой заново, поэтому утёкшая копия остаётся с указанием на LICENSE.
  */
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -69,3 +75,36 @@ if (overBudget) {
   process.exit(1)
 }
 console.log('✓ Бюджеты бандла в норме')
+
+const walk = dir =>
+  readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    const abs = join(dir, entry.name)
+    return entry.isDirectory() ? walk(abs) : [abs]
+  })
+
+const sourcemaps = walk(dist).filter(file => file.endsWith('.map'))
+if (sourcemaps.length > 0) {
+  console.log(`✗ В dist/ лежат source maps (${sourcemaps.length}): исходный код восстановим один в один`)
+  for (const file of sourcemaps.slice(0, 5)) console.log(`  ${file.slice(dist.length + 1)}`)
+  process.exit(1)
+}
+console.log('✓ Source maps в прод-сборке отсутствуют')
+
+const bannerMissing = assets
+  .filter(file => file.endsWith('.js'))
+  .filter(file => {
+    const head = readFileSync(join(dist, 'assets', file), 'utf8').slice(0, 600)
+    return !(head.includes('SwiftMatch — проприетарное (платное) ПО') && head.includes('Лицензия: LICENSE'))
+  })
+if (bannerMissing.length > 0) {
+  console.log(`✗ Уведомление об авторских правах потеряно в ${bannerMissing.length} бандл(ах): ${bannerMissing.join(', ')}`)
+  console.log('  Проверь build.rollupOptions.output.banner в vite.config.ts (LICENSE, п. 11.1)')
+  process.exit(1)
+}
+
+const htmlHead = readFileSync(join(dist, 'index.html'), 'utf8').slice(0, 600)
+if (!htmlHead.includes('SwiftMatch — проприетарное (платное) ПО')) {
+  console.log('✗ В dist/index.html нет уведомления об авторских правах (плагин copyright-notice в vite.config.ts)')
+  process.exit(1)
+}
+console.log('✓ Уведомление об авторских правах в бандлах и index.html на месте')
