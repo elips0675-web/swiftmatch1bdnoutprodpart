@@ -384,4 +384,164 @@ describe('Страница onboarding', () => {
     });
     expect(user).toBeDefined();
   });
+
+  it('подставляет имя и аватар из метаданных пользователя Supabase', async () => {
+    h.supabase = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'u1', user_metadata: { name: 'Алиса', avatar_url: '/demo/people/me.png' } } },
+        }),
+      },
+      from: vi.fn(),
+    };
+
+    const user = userEvent.setup();
+    const { container } = renderPage();
+
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText('onboarding.step1.placeholder')).toHaveValue('Алиса'),
+    );
+
+    await advanceToStep(user, 5);
+
+    expect(container.querySelector('img')?.getAttribute('src')).toBe('/demo/people/me.png');
+  });
+
+  it('без метаданных пользователя форма остаётся с дефолтами', async () => {
+    const getUser = vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } } });
+    h.supabase = { auth: { getUser }, from: vi.fn() };
+
+    renderPage();
+
+    await waitFor(() => expect(getUser).toHaveBeenCalled());
+    expect(screen.getByPlaceholderText('onboarding.step1.placeholder')).toHaveValue('');
+  });
+
+  it('сбой геокодера гасится: индикатор снимается, поле не заполняется', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    Object.defineProperty(window.navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (success: PositionCallback) =>
+          success({ coords: { latitude: 1, longitude: 2 } } as GeolocationPosition),
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+
+    const user = userEvent.setup();
+    const { container } = renderPage();
+
+    await advanceToStep(user, 2);
+
+    const city = screen.getByPlaceholderText('onboarding.step2.city_placeholder');
+    await user.click(city.parentElement?.querySelector('button') as HTMLButtonElement);
+
+    await waitFor(() => expect(errorSpy).toHaveBeenCalledWith('Geocoding error:', expect.any(Error)));
+    await waitFor(() => expect(container.querySelector('.animate-pulse')).toBeNull());
+    expect(city).toHaveValue('');
+  });
+
+  it.each([
+    ['town', 'Химки'],
+    ['village', 'Истра'],
+  ])('берёт %s, когда в ответе геокодера нет города', async (kind, expected) => {
+    Object.defineProperty(window.navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (success: PositionCallback) =>
+          success({ coords: { latitude: 1, longitude: 2 } } as GeolocationPosition),
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: async () => ({ address: { [kind]: expected } }) }));
+
+    const user = userEvent.setup();
+    renderPage();
+
+    await advanceToStep(user, 2);
+
+    const city = screen.getByPlaceholderText('onboarding.step2.city_placeholder');
+    await user.click(city.parentElement?.querySelector('button') as HTMLButtonElement);
+
+    await waitFor(() => expect(city).toHaveValue(expected));
+  });
+
+  it('«пропустить» без пользователя Supabase уводит на логин и не пишет профиль', async () => {
+    const upsert = vi.fn();
+    h.supabase = {
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) },
+      from: vi.fn(() => ({ upsert })),
+    };
+
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByText('button.skip'));
+
+    await waitFor(() => expect(h.router.push).toHaveBeenCalledWith('/login'));
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('клик по превью и по кнопке загрузки открывает выбор файла', async () => {
+    const user = userEvent.setup();
+    const { container } = renderPage();
+
+    await advanceToStep(user, 5);
+
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const click = vi.spyOn(input, 'click').mockImplementation(() => {});
+
+    await user.click(container.querySelector('img')?.parentElement as HTMLElement);
+    expect(click).toHaveBeenCalledTimes(1);
+
+    const uploadButton = container.querySelector('.absolute.-bottom-1') as HTMLButtonElement;
+    await user.click(uploadButton);
+    expect(click).toHaveBeenCalledTimes(2);
+  });
+
+  it('метаданные без имени и аватара не затирают дефолты формы', async () => {
+    h.supabase = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1', user_metadata: { locale: 'ru' } } } }),
+      },
+      from: vi.fn(),
+    };
+
+    const user = userEvent.setup();
+    const { container } = renderPage();
+
+    await advanceToStep(user, 5);
+
+    expect(container.querySelector('img')?.getAttribute('src')).toBe('/demo/people/me.png');
+
+    const back = () => container.querySelector('header button') as HTMLButtonElement;
+    for (let index = 0; index < 4; index += 1) {
+      await user.click(back());
+    }
+
+    expect(screen.getByPlaceholderText('onboarding.step1.placeholder')).toHaveValue('');
+    expect(screen.queryByDisplayValue('Неизвестно')).toBeNull();
+  });
+
+  it('ответ геокодера без города не подставляет пустое значение и не хвалится тостом', async () => {
+    Object.defineProperty(window.navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (success: PositionCallback) =>
+          success({ coords: { latitude: 1, longitude: 2 } } as GeolocationPosition),
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: async () => ({ address: {} }) }));
+
+    const user = userEvent.setup();
+    const { container } = renderPage();
+
+    await advanceToStep(user, 2);
+
+    const city = screen.getByPlaceholderText('onboarding.step2.city_placeholder');
+    await user.click(city.parentElement?.querySelector('button') as HTMLButtonElement);
+
+    await waitFor(() => expect(container.querySelector('.animate-pulse')).toBeNull());
+    expect(city).toHaveValue('');
+    expect(h.toast).not.toHaveBeenCalledWith(expect.objectContaining({ title: expect.stringContaining('onboarding.loc.success') }));
+  });
 });
