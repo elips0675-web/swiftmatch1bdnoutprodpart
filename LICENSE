@@ -1,0 +1,195 @@
+ЛИЦЕНЗИЯ НА ПРОГРАММНОЕ ОБЕСПЕЧЕНИЕ SWIFTMATCH
+Версия 1.0 от 03.11.2026
+
+ПРОПРИЕТАРНАЯ (ПЛАТНАЯ) ЛИЦЕНЗИЯ
+
+Copyright (c) 2026 SwiftMatch. Все права защищены.
+Правообладатель — владелец репозитория https://github.com/elips0675-web
+(далее — Правообладатель).
+
+Кратко: репозиторий опубликован для ознакомления. Публикация исходного кода не
+даёт права использовать его бесплатно, копировать, распространять или
+передавать третьим лицам. Любое продуктивное использование — только на
+основании оплаченного договора.
+
+1. ОПРЕДЕЛЕНИЯ
+1.1. «ПО» — исходный код, сборочные скрипты, конфигурация, схема базы данных,
+миграции, документация и иные материалы репозитория
+swiftmatch1bdnoutprodpart.
+1.2. «Использование» — запуск, воспроизведение, модификация, сборка,
+развёртывание, публикация, распространение ПО или его производных, а также
+предоставление доступа к функциональности ПО третьим лицам, в том числе по
+модели SaaS.
+1.3. «Лицензиат» — лицо, оплатившее право использования по договору с
+Правообладателем.
+1.4. «Тариф» — объём прав, стоимость и срок, указанные в счёте или договоре.
+
+2. ПРАВА
+2.1. Исключительные права на ПО принадлежат Правообладателю. Настоящая
+лицензия не передаёт исключительное право и не является его отчуждением.
+2.2. Ознакомление. Любой посетитель репозитория вправе прочитать исходный код
+для оценки возможности приобретения лицензии. Это право ознакомления не
+является лицензией и не даёт прав по п. 1.2 — ни полностью, ни частично, ни в
+учебных, ни в некоммерческих целях.
+2.3. Продуктивное использование разрешается только после оплаты по Тарифу.
+Права возникают с момента поступления оплаты и в объёме, указанном в счёте
+или договоре.
+2.4. Объём прав Лицензиата ограничен Тарифом: число продуктивных контуров,
+домены, срок, территория, право на модификацию. Права, прямо не
+предоставленные договором, не предоставлены.
+2.5. Одна оплаченная лицензия — один продуктивный контур, если в счёте не
+указано иное. Тестовые и локальные контуры Лицензиата в этот объём входят.
+
+3. ЗАПРЕТЫ (при отсутствии оплаченного договора)
+3.1. Использовать ПО в продуктивной среде.
+3.2. Копировать, распространять, публиковать, передавать, продавать, сдавать
+в аренду или сублицензировать ПО и его части.
+3.3. Создавать производные произведения на основе ПО, в том числе
+переименованные копии и форки для самостоятельного использования.
+3.4. Удалять или скрывать уведомления об авторских правах и настоящую
+лицензию.
+3.5. Использовать наименование, логотипы и иные обозначения SwiftMatch.
+3.6. Оказывать третьим лицам услуги на базе ПО (разработка, хостинг,
+сопровождение, обучение).
+
+4. СТОРОННИЕ КОМПОНЕНТЫ
+4.1. Зависимости из `package.json` и `server/package.json` поставляются на
+условиях их собственных лицензий. Настоящая лицензия их не заменяет и не
+ограничивает. Перечень — lock-файлы репозитория.
+4.2. Лицензиат самостоятельно соблюдает условия сторонних лицензий.
+
+5. ОПЛАТА И ПОРЯДОК ПРЕДОСТАВЛЕНИЯ ПРАВ
+5.1. Запрос лицензии направляется Правообладателю через профиль
+https://github.com/elips0675-web (или иным указанным им каналом).
+5.2. Правообладатель выставляет счёт с Тарифом. Оплата счёта означает
+акцепт условий настоящей лицензии в редакции, действующей на дату счёта.
+5.3. Возврат оплаты за уже предоставленные права не производится, если
+договором не предусмотрено иное.
+
+6. ОТСУТСТВИЕ ГАРАНТИЙ
+6.1. ПО предоставляется «как есть» (as is). Правообладатель не гарантирует
+пригодность для конкретных целей, отсутствие ошибок и совместимость с
+инфраструктурой Лицензиата.
+6.2. Лицензиат самостоятельно оценивает риски и несёт ответственность за
+данные, резервные копии и соответствие требованиям законодательства в своей
+юрисдикции.
+
+7. ОГРАНИЧЕНИЕ ОТВЕТСТВЕННОСТИ
+7.1. Правообладатель не отвечает за упущенную выгоду и косвенные убытки.
+7.2. Совокупная ответственность ограничена суммой, фактически уплаченной за
+лицензию за последние 12 месяцев.
+
+8. СРОК И ПРЕКРАЩЕНИЕ
+8.1. Лицензия действует в течение срока Тарифа.
+8.2. При нарушении разделов 2–4 лицензия прекращается автоматически, без
+предварительного уведомления.
+8.3. После прекращения Использование останавливается, продуктивные экземпляры
+и копии ПО удаляются в течение 30 дней, кроме копий, хранение которых
+требуется законом.
+
+9. ПРИМЕНИМОЕ ПРАВО И СПОРЫ
+9.1. Применяется право по месту нахождения Правообладателя.
+9.2. Споры разрешаются путём переговоров, а при недостижении согласия — в
+компетентном суде по месту нахождения Правообладателя.
+
+10. ЗАКЛЮЧИТЕЛЬНЫЕ ПОЛОЖЕНИЯ
+10.1. Если какое-либо положение признано недействительным, остальные
+положения сохраняют силу.
+10.2. Настоящая лицензия заменяет все предыдущие устные и письменные
+договорённости о правах на ПО.
+10.3. Актуальная редакция лицензии — файл LICENSE в репозитории.
+
+---
+
+SWIFTMATCH SOFTWARE LICENSE
+Version 1.0 dated 2026-11-03
+
+PROPRIETARY (PAID) LICENSE
+The Russian text above prevails; this English text is a reference translation.
+
+Copyright (c) 2026 SwiftMatch. All rights reserved.
+Licensor — the owner of https://github.com/elips0675-web.
+
+Summary: the repository is published for evaluation only. Publication of the
+source code grants no right to use it free of charge, to copy it, to
+redistribute it or to pass it to third parties. Any productive use requires a
+paid agreement.
+
+1. DEFINITIONS
+1.1. "Software" — the source code, build scripts, configuration, database
+schema, migrations, documentation and other materials of the
+swiftmatch1bdnoutprodpart repository.
+1.2. "Use" — running, reproducing, modifying, building, deploying,
+publishing, distributing the Software or its derivatives, and providing access
+to its functionality to third parties, including as a service (SaaS).
+1.3. "Licensee" — a party that paid for the right of use under an agreement
+with the Licensor.
+1.4. "Plan" — the scope of rights, price and term stated in the invoice or
+agreement.
+
+2. RIGHTS
+2.1. All exclusive rights remain with the Licensor. This license transfers no
+exclusive right.
+2.2. Evaluation. Any visitor may read the source code to evaluate a possible
+purchase. This is not a license and grants no rights under clause 1.2, in whole
+or in part, for commercial, educational or non-commercial purposes.
+2.3. Productive use is allowed only after payment under the Plan. Rights arise
+upon receipt of payment and to the extent stated in the invoice or agreement.
+2.4. The Licensee's rights are limited to the Plan: number of production
+environments, domains, term, territory and the right to modify. Rights not
+expressly granted are withheld.
+2.5. One paid license covers one production environment unless the invoice
+states otherwise. Staging and local environments of the Licensee are included.
+
+3. PROHIBITED WITHOUT A PAID AGREEMENT
+3.1. Productive use of the Software.
+3.2. Copying, redistribution, publication, transfer, sale, rental or
+sublicensing of the Software or its parts.
+3.3. Creating derivative works, including renamed copies and forks for
+independent use.
+3.4. Removing or hiding copyright notices and this license.
+3.5. Using the SwiftMatch name, logos or other marks.
+3.6. Providing services to third parties based on the Software (development,
+hosting, maintenance, training).
+
+4. THIRD-PARTY COMPONENTS
+4.1. Dependencies listed in `package.json` and `server/package.json` are
+distributed under their own licenses, which this license neither replaces nor
+restricts. The lock files list them.
+4.2. The Licensee complies with third-party licenses independently.
+
+5. PAYMENT AND GRANT
+5.1. License requests go to the Licensor via https://github.com/elips0675-web or
+another channel designated by the Licensor.
+5.2. The Licensor issues an invoice with the Plan. Paying the invoice accepts
+this license as of the invoice date.
+5.3. Payments for rights already granted are non-refundable unless the
+agreement provides otherwise.
+
+6. NO WARRANTY
+6.1. The Software is provided "as is", without warranty of fitness for a
+particular purpose, freedom from errors or compatibility with the Licensee's
+infrastructure.
+6.2. The Licensee bears responsibility for data, backups and compliance with
+the law of its jurisdiction.
+
+7. LIMITATION OF LIABILITY
+7.1. The Licensor is not liable for lost profits or indirect damages.
+7.2. Aggregate liability is limited to the amounts actually paid for the
+license in the preceding 12 months.
+
+8. TERM AND TERMINATION
+8.1. The license runs for the term of the Plan.
+8.2. A breach of sections 2–4 terminates the license automatically.
+8.3. After termination the Licensee stops Use, removes production instances and
+copies within 30 days, except copies required by law.
+
+9. GOVERNING LAW
+9.1. The law at the Licensor's place of business applies.
+9.2. Disputes are settled by negotiation and otherwise by the competent court
+at the Licensor's place of business.
+
+10. FINAL PROVISIONS
+10.1. If a provision is held invalid, the remaining provisions stay in force.
+10.2. This license supersedes prior arrangements about rights in the Software.
+10.3. The current version is the LICENSE file in the repository.
