@@ -53,6 +53,9 @@ import {
   collectBacklogFindings,
   collectAgendaFindings,
   collectChangelogFindings,
+  collectLicenseFindings,
+  LICENSE_FILE,
+  SERVER_PKG_FILE,
   collectWiringFindings,
   collectConsistencyFindings,
   countWorkflowJobs,
@@ -800,5 +803,90 @@ describe('согласованность чисел документации с 
 
   it('README без числа миграций — тишина, а не выдуманная находка', () => {
     expect(ids(run({ readmeText: '- **Миграции:** каталог `database/migrations/` + `migrate.js`\n' }))).not.toContain('consistency-readme-migrations')
+  })
+})
+
+describe('лицензия репозитория (LEGAL-02)', () => {
+  const good = {
+    licenseText: '# ПРОПРИЕТАРНАЯ (ПЛАТНАЯ) ЛИЦЕНЗИЯ\n\nВсе права защищены.\n',
+    pkgJson: { license: 'SEE LICENSE IN LICENSE' },
+    serverPkg: { license: 'SEE LICENSE IN ../LICENSE' },
+    readmeText: '## Лицензия\n\nПолный текст: [`LICENSE`](LICENSE).\n',
+  }
+  const run = over => collectLicenseFindings({ ...good, ...over })
+
+  it('текущий репозиторий проходит: файл, оба package.json и раздел README на месте', () => {
+    expect(collectLicenseFindings({
+      licenseText: read(LICENSE_FILE),
+      pkgJson: JSON.parse(read('package.json')),
+      serverPkg: JSON.parse(read(SERVER_PKG_FILE)),
+      readmeText: read(README_FILE),
+    })).toEqual([])
+  })
+
+  it('поле license в root package.json действительно есть (якорь сверки на месте)', () => {
+    expect(typeof JSON.parse(read('package.json')).license).toBe('string')
+    expect(typeof JSON.parse(read(SERVER_PKG_FILE)).license).toBe('string')
+  })
+
+  it('пропавший LICENSE — находка, а не тихий зелёный', () => {
+    expect(ids(run({ licenseText: null }))).toContain('license-missing')
+    expect(ids(run({ licenseText: '   \n' }))).toContain('license-missing')
+  })
+
+  it('текст без «проприетарн…» — модель прав не объявлена', () => {
+    expect(ids(run({ licenseText: '# ПЛАТНАЯ ЛИЦЕНЗИЯ\n\nВсе права защищены.\n' }))).toContain('license-model')
+  })
+
+  it('текст без упоминания платности — платная модель не объявлена', () => {
+    expect(ids(run({ licenseText: '# ПРОПРИЕТАРНАЯ ЛИЦЕНЗИЯ\n\nВсе права защищены.\n' }))).toContain('license-paid')
+  })
+
+  it('поле license пропало из корневого package.json — находка', () => {
+    expect(ids(run({ pkgJson: { name: 'x' } }))).toContain('license-field-missing')
+    expect(ids(run({ pkgJson: null }))).toContain('license-field-missing')
+  })
+
+  it('поле license указывает не на LICENSE — находка', () => {
+    expect(ids(run({ pkgJson: { license: 'MIT' } }))).toContain('license-field-target')
+  })
+
+  it('серверный package.json без поля license — отдельная находка', () => {
+    const list = ids(run({ serverPkg: {} }))
+    expect(list).toContain('license-field-server')
+    expect(list).not.toContain('license-field-missing')
+  })
+
+  it('поле license сервера указывает не на LICENSE — находка', () => {
+    expect(ids(run({ serverPkg: { license: 'UNLICENSED' } }))).toContain('license-field-server-target')
+  })
+
+  it('README без раздела «## Лицензия» — находка', () => {
+    expect(ids(run({ readmeText: '# Проект\n\nтекст\n' }))).toContain('license-readme')
+    expect(ids(run({ readmeText: null }))).toContain('license-readme')
+  })
+
+  it('раздел без ссылки на LICENSE — отдельная находка', () => {
+    const list = ids(run({ readmeText: '## Лицензия\n\nсм. условия у владельца\n' }))
+    expect(list).toContain('license-readme-link')
+    expect(list).not.toContain('license-readme')
+  })
+
+  it('audit() реального репозитория не выдаёт находок по лицензии', () => {
+    expect(ids(audit(ROOT).findings).filter(id => id.startsWith('license-'))).toEqual([])
+  })
+
+  it('гейт подключён к audit(): репозиторий без LICENSE даёт находку полного прогона', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'docs-canon-license-'))
+    try {
+      fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ license: 'SEE LICENSE IN LICENSE' }), 'utf8')
+      fs.mkdirSync(path.join(tmp, 'server'))
+      fs.writeFileSync(path.join(tmp, 'server', 'package.json'), JSON.stringify({ license: 'SEE LICENSE IN ../LICENSE' }), 'utf8')
+      fs.writeFileSync(path.join(tmp, 'README.md'), '## Лицензия\n\n[`LICENSE`](LICENSE)\n', 'utf8')
+
+      expect(ids(audit(tmp).findings).filter(id => id.startsWith('license-'))).toContain('license-missing')
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true })
+    }
   })
 })

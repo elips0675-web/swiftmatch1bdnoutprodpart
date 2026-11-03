@@ -190,6 +190,19 @@ export const MIGRATIONS_DIR = 'database/migrations'
 export const E2E_DIR = 'e2e'
 export const README_FILE = 'README.md'
 
+/**
+ * Лицензия (LEGAL-02, закрыто 03.11.2026). До гейта у публичного репозитория не
+ * было ни `LICENSE`, ни поля `license` в `package.json`: права на код не были
+ * определены ни для кого, кто его читает, и «лицензия есть» держалось на памяти
+ * владельца. Проверка держит минимальный контракт: файл в корне, объявление
+ * проприетарной платной модели, поле в обоих `package.json` и раздел в README.
+ */
+export const LICENSE_FILE = 'LICENSE'
+export const SERVER_PKG_FILE = 'server/package.json'
+export const LICENSE_PROPRIETARY_RE = /проприетарн/i
+export const LICENSE_PAID_RE = /платн[а-яё]*/i
+export const README_LICENSE_HEADING_RE = /^##\s+Лицензия\s*$/m
+
 export const CI_JOBS_CLAIM_RE = /(\d+)\s+джобы\s+`ci\.yml`/
 export const DEPLOY_JOBS_CLAIM_RE = /(\d+)\s+`deploy\.yml`/
 export const MIGRATIONS_CLAIM_RE = /`database\/migrations\/`\s*\|\s*(\d+)\s+нумерованн/i
@@ -612,6 +625,53 @@ export function collectChangelogFindings(text) {
   return findings
 }
 
+/**
+ * Лицензия: файл, объявление модели, поле `license` в обоих пакетах и раздел в
+ * README. Закрывает LEGAL-02 — до этапа 242 у публичного репозитория прав на код
+ * не было ни в одном файле, и «проприетарная, платная» держалась на памяти.
+ * @param {{licenseText: string|null, pkgJson: object|null, serverPkg: object|null, readmeText: string|null}} docs
+ */
+export function collectLicenseFindings(docs) {
+  const findings = []
+  const licenseField = pkg => (pkg && typeof pkg.license === 'string' ? pkg.license.trim() : '')
+  const pointsToLicense = value => /^SEE LICENSE IN (?:[^\s]*\/)?LICENSE$/i.test(value)
+
+  if (!docs.licenseText || !docs.licenseText.trim()) {
+    findings.push({ id: 'license-missing', file: LICENSE_FILE, line: 1, text: 'файла нет — права на код не определены для того, кто его читает или получает' })
+  } else {
+    if (!LICENSE_PROPRIETARY_RE.test(docs.licenseText)) {
+      findings.push({ id: 'license-model', file: LICENSE_FILE, line: 1, text: 'в тексте нет слова «проприетарн…» — модель прав не объявлена' })
+    }
+    if (!LICENSE_PAID_RE.test(docs.licenseText)) {
+      findings.push({ id: 'license-paid', file: LICENSE_FILE, line: 1, text: 'в тексте нет ни одного упоминания платности («платн…») — модель «платная лицензия» не объявлена' })
+    }
+  }
+
+  const rootField = licenseField(docs.pkgJson)
+  if (!rootField) {
+    findings.push({ id: 'license-field-missing', file: 'package.json', line: 1, text: 'нет поля «license» — менеджеры пакетов и читатель видят пакет без лицензии' })
+  } else if (!pointsToLicense(rootField)) {
+    findings.push({ id: 'license-field-target', file: 'package.json', line: 1, text: `поле «license» = <${rootField}>, а обязано указывать на ${LICENSE_FILE} (SEE LICENSE IN ${LICENSE_FILE})` })
+  }
+
+  const serverField = licenseField(docs.serverPkg)
+  if (!serverField) {
+    findings.push({ id: 'license-field-server', file: SERVER_PKG_FILE, line: 1, text: 'нет поля «license» в серверном пакете — он собирается в отдельный образ и живёт без объявленных прав' })
+  } else if (!pointsToLicense(serverField)) {
+    findings.push({ id: 'license-field-server-target', file: SERVER_PKG_FILE, line: 1, text: `поле «license» = <${serverField}>, а обязано указывать на ${LICENSE_FILE}` })
+  }
+
+  if (!docs.readmeText) {
+    findings.push({ id: 'license-readme', file: README_FILE, line: 1, text: `раздел «## Лицензия» не найден: файл ${LICENSE_FILE} есть, но читатель README о нём не узнает` })
+  } else if (!README_LICENSE_HEADING_RE.test(docs.readmeText)) {
+    findings.push({ id: 'license-readme', file: README_FILE, line: 1, text: 'нет раздела «## Лицензия» — условия обязан объявлять README, а не только файл LICENSE' })
+  } else if (!docs.readmeText.includes(LICENSE_FILE)) {
+    findings.push({ id: 'license-readme-link', file: README_FILE, line: 1, text: `в README нет ссылки на ${LICENSE_FILE} — раздел без ссылки не даёт найти текст` })
+  }
+
+  return findings
+}
+
 /** Блок джобы по отступу: от `  <имя>:` до следующей строки с тем же или меньшим отступом. */
 export function getJobBlock(yaml, jobName) {
   if (!yaml) return null
@@ -937,11 +997,20 @@ export function audit(root) {
 
   findings.push(...collectChangelogFindings(read(CHANGELOG_FILE)))
 
+  let serverPkgJson = null
+  try { serverPkgJson = JSON.parse(read(SERVER_PKG_FILE) || 'null') } catch { serverPkgJson = null }
+
   const { docs, missing, source } = collectTrackedDocs(root)
   findings.push(...collectForbiddenFindings(docs))
 
   let pkgJson = null
   try { pkgJson = JSON.parse(read('package.json') || 'null') } catch { pkgJson = null }
+  findings.push(...collectLicenseFindings({
+    licenseText: read(LICENSE_FILE),
+    pkgJson,
+    serverPkg: serverPkgJson,
+    readmeText: read(README_FILE),
+  }))
   const pkgVersions = { ...(pkgJson && pkgJson.dependencies), ...(pkgJson && pkgJson.devDependencies) }
   findings.push(...collectStackFindings(docs, pkgVersions))
   findings.push(...collectWiringFindings({ pkgJson, ciYaml: read(CI_WORKFLOW), deployYaml: read(DEPLOY_WORKFLOW) }))
@@ -974,6 +1043,7 @@ function main() {
   console.log(`Канон-указатель: ${PROMPTS_INDEX} (ссылок: ${promptsCheck.links.length}); идеи: ${ROADMAP_FILE} (${roadmapCheck.nonEmptyLines} непустых строк); архив: ${ARCHIVE_FILE}; бэклог: ${TODO_JOURNAL} (структура), хроника: ${DONE_JOURNAL}, архив срезов: ${AGENDA_ARCHIVE}`)
   console.log(`Стек: ${STACK_VERSION_ROWS.length} версий сверяется с package.json, ${STACK_ABSENCES.length} запрета на удалённую зависимость`)
   console.log(`Согласованность: джобы CI/CD ↔ runs-on (${countWorkflowJobs(read(CI_WORKFLOW))}/${countWorkflowJobs(read(DEPLOY_WORKFLOW))}), лимит загрузки ↔ ${UPLOAD_ROUTE}, миграции ↔ ${MIGRATIONS_DIR} (${countMigrations(root) ?? 'нет'}), ${WORKFLOW_DOC} без архивных ссылок`)
+  console.log(`Лицензия: ${LICENSE_FILE} (проприетарная, платная) ↔ поле «license» в package.json и ${SERVER_PKG_FILE} ↔ раздел README`)
   console.log(`\nНаходок: ${findings.length}\n`)
 
   if (!findings.length) {
@@ -995,6 +1065,7 @@ function main() {
   console.log(`  6) структура бэклога (${TODO_JOURNAL}) — уникальные ID и заголовки, закрытие с хроникой в ${DONE_JOURNAL}, записи этапов — только там.`)
   console.log('  7) версии стека и упоминания `zod` — привести к `package.json`: источник истины — зависимости, а не проза.')
   console.log('  8) числа в доках (джобы, лимиты, миграции) — править по реальному файлу-источнику, а не по другому доку.')
+  console.log(`  9) лицензия — ${LICENSE_FILE} (проприетарная, платная) + поле «license» в package.json и ${SERVER_PKG_FILE} + раздел «## Лицензия» в ${README_FILE}.`)
   process.exit(1)
 }
 
