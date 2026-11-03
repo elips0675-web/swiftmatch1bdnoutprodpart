@@ -1,5 +1,5 @@
 ЛИЦЕНЗИЯ НА ПРОГРАММНОЕ ОБЕСПЕЧЕНИЕ SWIFTMATCH
-Версия 1.0 от 03.11.2026
+Версия 1.1 от 03.11.2026
 
 ПРОПРИЕТАРНАЯ (ПЛАТНАЯ) ЛИЦЕНЗИЯ
 
@@ -99,10 +99,40 @@ https://github.com/elips0675-web (или иным указанным им кан
 договорённости о правах на ПО.
 10.3. Актуальная редакция лицензии — файл LICENSE в репозитории.
 
+11. ОХРАНА УВЕДОМЛЕНИЙ О ПРАВАХ
+11.1. Уведомления об авторских правах — часть ПО: файл NOTICE, строка баннера в
+начале каждого JS-бандла сборки и комментарий в dist/index.html. Удалять,
+скрывать или переписывать их, а также собирать ПО с отключённым баннером
+запрещено.
+11.2. Лицензиат не вправе выдавать ПО за собственное произведение, регистрировать
+на него исключительные права, товарные знаки и домены, сходные до степени
+смешения с обозначениями Правообладателя.
+11.3. Сборка для Лицензиата помечается его идентификатором (переменная окружения
+SMARTMATCH_LICENSEE). Идентификатор в утёкшей копии означает, что копию передал
+этот Лицензиат.
+
+12. ОТВЕТСТВЕННОСТЬ ЗА НАРУШЕНИЕ
+12.1. Использование без оплаченного договора нарушает исключительное право.
+Правообладатель вправе требовать прекращения нарушения, удаления копий и
+возмещения убытков, а также задействовать процедуры уведомления о нарушении
+авторских прав, включая блокировку репозитория, домена и приложения по правилам
+хостинга (DMCA и аналогичные).
+12.2. Расходы на установление нарушения, включая услуги юриста и нотариальное
+заверение доказательств, возмещаются нарушителем в пределах, допускаемых
+применимым правом.
+
+13. СООБЩЕНИЯ О НАРУШЕНИИ
+13.1. Сообщения о копиях, используемых без лицензии, направляются через профиль
+https://github.com/elips0675-web.
+13.2. Правообладатель вправе запросить у владельца продуктивного контура
+подтверждение оплаты (счёт, договор, идентификатор лицензии). Отсутствие ответа
+в течение 30 дней с даты запроса может рассматриваться как использование без
+договора при последующих требованиях.
+
 ---
 
 SWIFTMATCH SOFTWARE LICENSE
-Version 1.0 dated 2026-11-03
+Version 1.1 dated 2026-11-03
 
 PROPRIETARY (PAID) LICENSE
 The Russian text above prevails; this English text is a reference translation.
@@ -193,3 +223,32 @@ at the Licensor's place of business.
 10.1. If a provision is held invalid, the remaining provisions stay in force.
 10.2. This license supersedes prior arrangements about rights in the Software.
 10.3. The current version is the LICENSE file in the repository.
+
+11. PROTECTION OF RIGHTS NOTICES
+11.1. Copyright notices are part of the Software: the NOTICE file, the banner at
+the start of every built JS bundle and the comment in dist/index.html. Removing,
+hiding or rewriting them, or building the Software with the banner disabled, is
+prohibited.
+11.2. The Licensee may not present the Software as its own work or register
+exclusive rights, trademarks or domains confusingly similar to the Licensor's
+marks.
+11.3. A build prepared for a Licensee is tagged with that Licensee's identifier
+(the SMARTMATCH_LICENSEE environment variable). An identifier found in a leaked
+copy identifies the party that passed it on.
+
+12. LIABILITY FOR INFRINGEMENT
+12.1. Use without a paid agreement infringes the exclusive right. The Licensor may
+demand cessation, removal of copies and compensation for damages, and may use
+copyright-notice procedures, including takedown of the repository, domain and
+application under hosting rules (DMCA and equivalents).
+12.2. Costs of establishing the infringement, including legal fees and notarised
+evidence, are recoverable from the infringer to the extent permitted by the
+applicable law.
+
+13. INFRINGEMENT REPORTS
+13.1. Reports of copies used without a license go through
+https://github.com/elips0675-web.
+13.2. The Licensor may request proof of payment (invoice, agreement, license
+identifier) from the owner of a production environment. No reply within 30 days
+of the request may be treated as unlicensed use in further claims.
+

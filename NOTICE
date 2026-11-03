@@ -1,0 +1,28 @@
+УВЕДОМЛЕНИЕ ОБ АВТОРСКИХ ПРАВАХ / COPYRIGHT NOTICE
+
+SwiftMatch — проприетарное (платное) программное обеспечение.
+Copyright (c) 2026 SwiftMatch. Все права защищены. / All rights reserved.
+
+Правообладатель — владелец профиля https://github.com/elips0675-web.
+
+Этот репозиторий опубликован только для ознакомления и оценки перед покупкой.
+Любое продуктивное использование (запуск в продакшене, SaaS, предоставление
+доступа третьим лицам), копирование, распространение, публикация форков и
+производных работ разрешены только на основании оплаченного договора.
+Полные условия — файл LICENSE.
+
+Каждая сборка несёт уведомление об авторских правах: строка баннера в начале
+каждого JS-бандла и комментарий в dist/index.html. Удаление, сокрытие или
+переписывание этих уведомлений, а также сборка с отключённым баннером запрещены
+(LICENSE, п. 3.4 и п. 11). Сборка для Лицензиата помечается его идентификатором
+(переменная окружения SMARTMATCH_LICENSEE) — идентификатор в утёкшей копии
+указывает на того, кто её передал.
+
+Если вы нашли копию этого ПО в продуктивном использовании без оплаченной
+лицензии, сообщите правообладателю через https://github.com/elips0675-web.
+
+This repository is published for evaluation only. Any productive use, copying,
+redistribution, forks and derivative works require a paid agreement with the
+licensor; full terms are in LICENSE. Removing or hiding the copyright notices
+embedded in the build output is prohibited. Report unauthorised use via
+https://github.com/elips0675-web.
