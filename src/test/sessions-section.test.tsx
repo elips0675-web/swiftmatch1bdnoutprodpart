@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SessionsSection } from '@/components/settings/sessions-section';
+import { toast } from '@/hooks/use-toast';
+
+const h = vi.hoisted(() => ({ language: 'RU' }));
 
 vi.mock('@/context/language-context', () => ({
   useLanguage: () => ({
@@ -22,7 +25,7 @@ vi.mock('@/context/language-context', () => ({
         'sessions.retry': 'Повторить',
         'sessions.last_used': 'Активность',
       })[key] ?? key,
-    language: 'RU',
+    language: h.language,
     setLanguage: vi.fn(),
   }),
 }));
@@ -68,6 +71,7 @@ const PHONE = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  h.language = 'RU';
   vi.stubGlobal('confirm', vi.fn(() => true));
   apiGet.mockResolvedValue({ sessions: [] });
 });
@@ -103,6 +107,8 @@ describe('SessionsSection', () => {
     const devices = screen.getAllByTestId('session-device').map((el) => el.textContent);
     expect(devices).toContain('Chrome · Windows');
     expect(devices).toContain('Safari · iOS');
+    expect(document.querySelectorAll('.lucide-monitor')).toHaveLength(1);
+    expect(document.querySelectorAll('.lucide-smartphone')).toHaveLength(1);
   });
 
   it('показывает IP и дату активности', async () => {
@@ -186,6 +192,36 @@ describe('SessionsSection', () => {
     await waitFor(() => expect(logout).toHaveBeenCalled());
   });
 
+  it('ошибка «выйти со всех» оставляет пользователя в системе', async () => {
+    apiGet.mockResolvedValue({ sessions: [DESKTOP, PHONE] });
+    apiPost.mockRejectedValue(new Error('boom'));
+    render(<SessionsSection />);
+
+    await waitFor(() => expect(screen.getByTestId('sessions-revoke-all')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('sessions-revoke-all'));
+
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith({
+        variant: 'destructive',
+        title: 'Не удалось отозвать сессию',
+      }),
+    );
+    expect(logout).not.toHaveBeenCalled();
+    expect(screen.getByTestId('sessions-revoke-all')).not.toBeDisabled();
+  });
+
+  it('отказ от подтверждения не запускает выход со всех устройств', async () => {
+    vi.stubGlobal('confirm', vi.fn(() => false));
+    apiGet.mockResolvedValue({ sessions: [DESKTOP, PHONE] });
+    render(<SessionsSection />);
+
+    await waitFor(() => expect(screen.getByTestId('sessions-revoke-all')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('sessions-revoke-all'));
+
+    expect(apiPost).not.toHaveBeenCalled();
+    expect(logout).not.toHaveBeenCalled();
+  });
+
   it('ошибка загрузки показывает сообщение и кнопку повтора', async () => {
     apiGet.mockRejectedValue(new Error('boom'));
     render(<SessionsSection />);
@@ -238,6 +274,100 @@ describe('SessionsSection', () => {
 
     await waitFor(() => expect(screen.getByTestId('session-device')).toBeInTheDocument());
     expect(screen.getByTestId('session-device').textContent).toBe('Неизвестное устройство');
+  });
+
+  it('неопознанная строка user_agent не притворяется устройством', async () => {
+    apiGet.mockResolvedValue({
+      sessions: [{ ...DESKTOP, current: false, userAgent: 'curl/8.4.0' }],
+    });
+    render(<SessionsSection />);
+
+    await waitFor(() => expect(screen.getByTestId('session-device')).toBeInTheDocument());
+    expect(screen.getByTestId('session-device').textContent).toBe('Неизвестное устройство');
+    expect(document.querySelectorAll('.lucide-globe')).toHaveLength(1);
+  });
+
+  it('система без известного браузера подписывается по одной ОС', async () => {
+    apiGet.mockResolvedValue({
+      sessions: [{ ...DESKTOP, current: false, userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }],
+    });
+    render(<SessionsSection />);
+
+    await waitFor(() => expect(screen.getByTestId('session-device')).toBeInTheDocument());
+    expect(screen.getByTestId('session-device').textContent).toBe('Windows');
+  });
+
+  it('браузер без известной ОС подписывается по одному браузеру', async () => {
+    apiGet.mockResolvedValue({
+      sessions: [{ ...DESKTOP, current: false, userAgent: 'Mozilla/5.0 Chrome/131.0' }],
+    });
+    render(<SessionsSection />);
+
+    await waitFor(() => expect(screen.getByTestId('session-device')).toBeInTheDocument());
+    expect(screen.getByTestId('session-device').textContent).toBe('Chrome');
+  });
+
+  it('понимает ISO-дату с T и не показывает мусор вместо невалидной даты', async () => {
+    apiGet.mockResolvedValue({
+      sessions: [
+        { ...DESKTOP, lastUsedAt: '2026-10-02T11:30:00Z' },
+        { ...PHONE, familyId: '33333333-3333-4333-8333-333333333333', lastUsedAt: 'не дата' },
+      ],
+    });
+    render(<SessionsSection />);
+
+    await waitFor(() => expect(screen.getAllByTestId('session-item')).toHaveLength(2));
+    expect(screen.getByText(/02\.10\.2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Активность: —/)).toBeInTheDocument();
+  });
+
+  it('в языке EN дата печатается в формате en-US', async () => {
+    h.language = 'EN';
+    apiGet.mockResolvedValue({ sessions: [DESKTOP] });
+    render(<SessionsSection />);
+
+    await waitFor(() => expect(screen.getByTestId('session-item')).toBeInTheDocument());
+    expect(screen.getByText(/10\/01\/2026/)).toBeInTheDocument();
+    expect(screen.getByText(/\d{1,2}:\d{2}\s?(AM|PM)/)).toBeInTheDocument();
+  });
+
+  it('ответ без поля sessions считается пустым списком', async () => {
+    apiGet.mockResolvedValue({});
+    render(<SessionsSection />);
+
+    await waitFor(() => expect(screen.getByTestId('sessions-empty')).toBeInTheDocument());
+  });
+
+  it('Opera, Android и macOS распознаются', async () => {
+    apiGet.mockResolvedValue({
+      sessions: [
+        {
+          ...DESKTOP,
+          current: true,
+          userAgent:
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36 OPR/106.0',
+        },
+        {
+          ...PHONE,
+          familyId: '44444444-4444-4444-8444-444444444444',
+          userAgent:
+            'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/131.0 Mobile Safari/537.36',
+        },
+        {
+          ...PHONE,
+          familyId: '55555555-5555-4555-8555-555555555555',
+          userAgent:
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1',
+        },
+      ],
+    });
+    render(<SessionsSection />);
+
+    await waitFor(() => expect(screen.getAllByTestId('session-device')).toHaveLength(3));
+    const devices = screen.getAllByTestId('session-device').map((el) => el.textContent);
+    expect(devices).toContain('Opera · Windows');
+    expect(devices).toContain('Chrome · Android');
+    expect(devices).toContain('Safari · macOS');
   });
 
   it('Edge и Firefox распознаются', async () => {

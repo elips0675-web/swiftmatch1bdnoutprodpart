@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 
@@ -39,7 +39,7 @@ function renderVideo(overrides: Partial<React.ComponentProps<typeof VideoCallDia
     ...overrides,
   };
   const view = render(<VideoCallDialog {...props} />);
-  return { ...props, ...view };
+  return { ...props, ...view, callProps: props };
 }
 
 function renderVoice(overrides: Partial<React.ComponentProps<typeof VoiceCallDialog>> = {}) {
@@ -96,6 +96,28 @@ describe('VideoCallDialog', () => {
     expect(videos[0]).toHaveAttribute('playsinline');
   });
 
+  it('подключает уже готовые потоки к видео сразу при открытии', () => {
+    const local = stream('local');
+    const remote = stream('remote');
+    renderVideo({ callState: 'connected', localStream: local, remoteStream: remote });
+
+    const videos = Array.from(document.querySelectorAll('video')) as HTMLVideoElement[];
+    expect(videos).toHaveLength(2);
+    expect(videos[0].srcObject).toBe(remote);
+    expect(videos[1].srcObject).toBe(local);
+  });
+
+  it('переподключает поток, когда он меняется', () => {
+    const first = stream('first');
+    const second = stream('second');
+    const view = renderVideo({ localStream: first });
+    const video = () => document.querySelector('video') as HTMLVideoElement;
+
+    expect(video().srcObject).toBe(first);
+    view.rerender(<VideoCallDialog {...view.callProps} localStream={second} />);
+    expect(video().srcObject).toBe(second);
+  });
+
   it('локальный поток показывает PiP, а при выключенной камере прячет', () => {
     const local = stream('local');
     const first = renderVideo({ remoteStream: stream('remote'), localStream: local });
@@ -127,6 +149,38 @@ describe('VideoCallDialog', () => {
     renderVideo({ isMuted: true, isVideoOff: true, localStream: stream('local') });
     expect(screen.getByRole('button', { name: 'call.unmute' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'call.video_on' })).toBeInTheDocument();
+  });
+
+  it('поверх PiP показывает значок выключенного микрофона', () => {
+    renderVideo({ localStream: stream('local'), isMuted: true });
+    expect(document.querySelectorAll('.lucide-mic-off')).toHaveLength(2);
+  });
+
+  it('без выключенного микрофона значка перечёркнутого микрофона на PiP нет', () => {
+    renderVideo({ localStream: stream('local'), isMuted: false });
+    expect(document.querySelectorAll('.lucide-mic-off')).toHaveLength(0);
+    expect(document.querySelectorAll('.lucide-mic')).toHaveLength(1);
+  });
+
+  it('без пользователя подставляет пустое имя вместо падения', () => {
+    const view = renderVideo({ user: null });
+    expect(screen.getByText('call.calling_name[name=]')).toBeInTheDocument();
+    expect(screen.getByText('call.video_title[name=]')).toBeInTheDocument();
+
+    view.rerender(<VideoCallDialog {...view.callProps} callState="ringing" />);
+    expect(screen.getByText('call.incoming_name[name=]')).toBeInTheDocument();
+  });
+
+  it('клик вне диалога не закрывает его и не завершает звонок', async () => {
+    const props = renderVideo({ callState: 'connected' });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    fireEvent.pointerDown(document.body, { pointerType: 'mouse' });
+
+    expect(props.endCall).not.toHaveBeenCalled();
+    expect(props.onOpenChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
   it('переключает полноэкранный режим подписью и иконкой', async () => {

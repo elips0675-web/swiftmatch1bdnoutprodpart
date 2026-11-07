@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -53,18 +53,16 @@ export function VideoCallDialog({
   const { t } = useLanguage();
   const [callDuration, setCallDuration] = useState(0);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
-  useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
+  const attachLocalStream = useCallback((el: HTMLVideoElement | null) => {
+    if (el) {
+      el.srcObject = localStream;
     }
   }, [localStream]);
 
-  useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
+  const attachRemoteStream = useCallback((el: HTMLVideoElement | null) => {
+    if (el) {
+      el.srcObject = remoteStream;
     }
   }, [remoteStream]);
 
@@ -107,7 +105,7 @@ export function VideoCallDialog({
           <div className="absolute inset-0">
             {remoteStream ? (
               <video
-                ref={remoteVideoRef}
+                ref={attachRemoteStream}
                 autoPlay
                 playsInline
                 className="w-full h-full object-cover"
@@ -154,7 +152,7 @@ export function VideoCallDialog({
                 className="absolute bottom-28 sm:bottom-32 right-4 w-28 h-40 bg-gray-800 rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl cursor-grab active:cursor-grabbing"
               >
                 <video
-                  ref={localVideoRef}
+                  ref={attachLocalStream}
                   autoPlay
                   muted
                   playsInline
