@@ -29,7 +29,7 @@ USER node
 # Миграции идемпотентны (_migrations) и обязательны для производственной БД.
 CMD ["sh", "-c", "node database/migrations/migrate.js && node server/src/index.js"]
 
-FROM nginx:1.30-alpine AS web
+FROM nginx:1.31-alpine AS web
 # Статика из frontend-этапа + конфиг nginx. Образ самодостаточен (не зависит от хост-папки ./dist).
 COPY --from=frontend /app/dist /usr/share/nginx/html
 COPY nginx/swiftmatch.http.conf /etc/nginx/conf.d/default.conf
